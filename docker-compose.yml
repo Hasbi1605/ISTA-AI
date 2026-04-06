@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: ista_mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: '${DB_PASSWORD:-secret}'
+      MYSQL_DATABASE: 'istanaai'
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  # Redis for Queue & Cache
+  redis:
+    image: redis:alpine
+    container_name: ista_redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+  # Python AI Microservice
+  python-ai:
+    build:
+      context: ./python-ai
+      dockerfile: Dockerfile
+    container_name: ista_python_ai
+    restart: always
+    ports:
+      - "8001:8001"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+    volumes:
+      - ./python-ai:/app
+      - chroma_data:/app/chroma_data
+    depends_on:
+      - mysql
+      - redis
+
+  # Laravel Web App
+  laravel:
+    build:
+      context: ./laravel
+      dockerfile: Dockerfile
+    container_name: ista_laravel
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_CONNECTION=mysql
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_DATABASE=istanaai
+      - DB_USERNAME=root
+      - DB_PASSWORD=${DB_PASSWORD:-secret}
+    volumes:
+      - ./laravel:/var/www/html
+    depends_on:
+      - mysql
+      - redis
+      - python-ai
+
+volumes:
+  mysql_data:
+  chroma_data:
