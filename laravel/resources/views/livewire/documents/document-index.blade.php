@@ -27,9 +27,9 @@
             </div>
         @endif
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 xl:grid-cols-4 gap-6">
             <!-- Upload Area -->
-            <div class="lg:col-span-1 space-y-6">
+                <div class="xl:col-span-1 space-y-6">
                 <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
                     <h2 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Unggah Dokumen Baru</h2>
                     
@@ -102,16 +102,16 @@
             </div>
 
             <!-- Documents List -->
-            <div class="lg:col-span-2">
+            <div class="xl:col-span-3">
                 <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
                     <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <table class="min-w-full sm:min-w-[700px] divide-y divide-gray-200 dark:divide-gray-700">
                             <thead class="bg-gray-50 dark:bg-gray-700/50">
                                 <tr>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Nama File</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Dibuat</th>
-                                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Aksi</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 tracking-wide">Nama File</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 tracking-wide">Status</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 tracking-wide">Dibuat</th>
+                                    <th scope="col" class="px-6 py-3 text-right text-xs font-semibold text-gray-700 dark:text-gray-300 tracking-wide">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -129,7 +129,7 @@
                                                     @endif
                                                 </div>
                                                 <div class="ml-4">
-                                                    <div class="text-sm font-medium text-gray-900 dark:text-white truncate max-w-xs">{{ $document->original_name }}</div>
+                                                    <div class="text-sm font-medium text-gray-900 dark:text-white truncate max-w-xs" title="{{ $document->original_name }}">{{ $document->original_name }}</div>
                                                     <div class="text-xs text-gray-500 dark:text-gray-400">{{ Number::fileSize(Storage::size($document->file_path)) }}</div>
                                                 </div>
                                             </div>
@@ -160,7 +160,7 @@
                                             <button 
                                                 wire:confirm="Hapus dokumen ini dan bersihkan memori AI terkait?"
                                                 wire:click="delete({{ $document->id }})" 
-                                                class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 bg-red-50 dark:bg-red-900/20 p-2 rounded-lg transition-colors group"
+                                                class="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 border border-red-200 dark:border-red-800 p-2 rounded-lg transition-all duration-150 group"
                                             >
                                                 <svg class="h-5 w-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

@@ -1,6 +1,6 @@
 <div class="flex h-[calc(100vh-64px)] overflow-hidden bg-gray-50 dark:bg-gray-900">
     <!-- Sidebar for History -->
-    <aside class="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
+    <aside class="w-52 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex-col overflow-y-auto">
         <div class="p-4 border-b border-gray-200 dark:border-gray-700">
             <button wire:click="startNewChat" class="w-full flex items-center justify-center p-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition duration-150">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -20,7 +20,7 @@
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                             </svg>
-                            <span class="truncate text-sm">{{ $conversation->title }}</span>
+                            <span class="truncate text-sm" title="{{ $conversation->title }}">{{ $conversation->title }}</span>
                         </button>
                     </li>
                 @endforeach
@@ -33,18 +33,25 @@
         <!-- Messages List -->
         <div class="flex-1 overflow-y-auto p-4 space-y-6" x-ref="chatBox" x-on:message-streamed.window="$refs.chatBox.scrollTop = $refs.chatBox.scrollHeight">
             @if(empty($messages))
-                <div class="h-full flex items-center justify-center text-center">
-                    <div class="max-w-md">
-                        <x-application-logo class="h-16 w-16 mx-auto mb-4 opacity-50 fill-current text-gray-400" />
-                        <h2 class="text-xl font-medium text-gray-900 dark:text-gray-100">Selamat Datang di ISTA AI</h2>
-                        <p class="mt-2 text-gray-500">Mulai percakapan cerdas dengan asisten virtual istana. Tanyakan tentang prosedur, bantuan penulisan, atau ringkasan dokumen.</p>
+                <div class="h-full flex items-center justify-center text-center px-4">
+                    <div class="max-w-md space-y-4">
+                        <x-application-logo class="h-20 w-20 mx-auto opacity-60 fill-current text-indigo-500 dark:text-indigo-400" />
+                        <h2 class="text-2xl font-semibold text-gray-900 dark:text-gray-100">Selamat Datang di ISTA AI</h2>
+                        <p class="text-gray-600 dark:text-gray-400 text-base leading-relaxed">
+                            Mulai percakapan cerdas dengan asisten virtual istana. Tanyakan tentang prosedur, bantuan penulisan, atau ringkasan dokumen.
+                        </p>
+                        <div class="flex flex-wrap gap-2 justify-center pt-4">
+                            <span class="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full text-xs sm:text-sm">💡 Tanya prosedur</span>
+                            <span class="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full text-xs sm:text-sm">📝 Bantuan penulisan</span>
+                            <span class="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full text-xs sm:text-sm">📄 Ringkasan dokumen</span>
+                        </div>
                     </div>
                 </div>
             @endif
 
             @foreach($messages as $message)
                 <div class="flex {{ $message['role'] == 'user' ? 'justify-end' : 'justify-start' }}">
-                    <div class="max-w-[80%] flex {{ $message['role'] == 'user' ? 'flex-row-reverse' : 'flex-row' }} items-start">
+                    <div class="max-w-[90%] sm:max-w-xl flex {{ $message['role'] == 'user' ? 'flex-row-reverse' : 'flex-row' }} items-start">
                         <!-- Avatar placeholder -->
                         <div class="shrink-0 h-8 w-8 rounded-full flex items-center justify-center {{ $message['role'] == 'user' ? 'bg-blue-600 ml-3' : 'bg-gray-400 dark:bg-gray-600 mr-3' }}">
                             <span class="text-xs text-white uppercase font-bold">{{ substr($message['role'], 0, 1) }}</span>
@@ -71,7 +78,7 @@
                  "
                  class="flex justify-start"
                  x-show="streaming">
-                 <div class="max-w-[80%] flex flex-row items-start">
+                 <div class="max-w-[90%] sm:max-w-xl flex flex-row items-start">
                     <div class="shrink-0 h-8 w-8 rounded-full bg-blue-500 mr-3 flex items-center justify-center">
                         <span class="text-xs text-white font-bold">AI</span>
                     </div>
@@ -84,7 +91,7 @@
 
             <!-- Loading Indicator -->
             <div wire:loading wire:target="sendMessage" class="flex justify-start">
-                <div class="max-w-[80%] flex flex-row items-center">
+                <div class="max-w-[90%] sm:max-w-xl flex flex-row items-center">
                     <div class="shrink-0 h-8 w-8 rounded-full bg-gray-400 dark:bg-gray-600 mr-3 flex items-center justify-center">
                         <span class="text-xs text-white font-bold">A</span>
                     </div>
@@ -99,7 +106,7 @@
 
         <!-- Input Area -->
         <div class="p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
-            <form wire:submit.prevent="sendMessage" class="max-w-4xl mx-auto flex items-end space-x-3">
+            <form wire:submit.prevent="sendMessage" class="max-w-[90%] sm:max-w-xl mx-auto flex items-end space-x-3">
                 <div class="flex-1 relative">
                     <textarea 
                         wire:model="prompt"
@@ -117,7 +124,7 @@
                     </svg>
                 </button>
             </form>
-            <p class="mt-2 text-center text-xs text-gray-500">ISTA AI dapat memberikan informasi yang kurang akurat. Periksa kembali informasi penting.</p>
+            <p class="mt-3 text-center text-sm text-gray-600 dark:text-gray-400">ISTA AI dapat memberikan informasi yang kurang akurat. Periksa kembali informasi penting.</p>
         </div>
     </main>
 </div>
