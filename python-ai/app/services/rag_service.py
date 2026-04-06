@@ -1,4 +1,5 @@
 import os
+import json
 import logging
 import time
 import requests
@@ -171,7 +172,10 @@ class LightweightEmbeddings(Embeddings):
     
     def __init__(self, model: str = "bge-m3"):
         self.model = model
-        self.api_url = "https://lamhieu-lightweight-embeddings.hf.space/v1/embeddings"
+        self.api_url = os.getenv(
+            "LIGHTWEIGHT_EMBEDDINGS_URL",
+            "https://lamhieu-lightweight-embeddings.hf.space/v1/embeddings"
+        )
         
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
         """Embed daftar dokumen menggunakan Lightweight Embeddings API."""
@@ -184,17 +188,28 @@ class LightweightEmbeddings(Embeddings):
             "input": texts
         }
         
-        response = requests.post(
-            self.api_url, 
-            json=payload, 
-            headers=headers, 
-            timeout=EMBEDDING_TIMEOUT
-        )
-        response.raise_for_status()
-        
-        data = response.json()
-        embeddings = [item["embedding"] for item in data["data"]]
-        return embeddings
+        try:
+            response = requests.post(
+                self.api_url, 
+                json=payload, 
+                headers=headers, 
+                timeout=EMBEDDING_TIMEOUT
+            )
+            response.raise_for_status()
+            
+            try:
+                data = response.json()
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Invalid JSON response from Lightweight API: {e}")
+            
+            if "data" not in data or not data["data"]:
+                raise ValueError("Invalid response structure from Lightweight API")
+            
+            embeddings = [item["embedding"] for item in data["data"]]
+            return embeddings
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Lightweight Embeddings API error: {e}")
+            raise
     
     def embed_query(self, text: str) -> List[float]:
         """Embed single query menggunakan Lightweight Embeddings API."""
@@ -207,16 +222,27 @@ class LightweightEmbeddings(Embeddings):
             "input": [text]
         }
         
-        response = requests.post(
-            self.api_url, 
-            json=payload, 
-            headers=headers, 
-            timeout=EMBEDDING_TIMEOUT
-        )
-        response.raise_for_status()
-        
-        data = response.json()
-        return data["data"][0]["embedding"]
+        try:
+            response = requests.post(
+                self.api_url, 
+                json=payload, 
+                headers=headers, 
+                timeout=EMBEDDING_TIMEOUT
+            )
+            response.raise_for_status()
+            
+            try:
+                data = response.json()
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Invalid JSON response from Lightweight API: {e}")
+            
+            if "data" not in data or not data["data"]:
+                raise ValueError("Invalid response structure from Lightweight API")
+            
+            return data["data"][0]["embedding"]
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Lightweight Embeddings API error: {e}")
+            raise
 
 
 def get_embeddings():
@@ -345,8 +371,8 @@ def process_document(file_path: str, filename: str):
         
         for i, chunk in enumerate(chunks):
             try:
-                # Add delay kecuali untuk chunk pertama
-                if i > 0:
+                # Add delay только untuk non-Lightweight providers (yang butuh rate limiting)
+                if i > 0 and provider_name != "Lightweight Embeddings":
                     time.sleep(0.6)  # 600ms delay
                 
                 vectorstore.add_documents([chunk])
