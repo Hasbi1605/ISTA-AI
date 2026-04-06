@@ -9,9 +9,13 @@ from typing import List, Dict
 from fastapi import FastAPI, Depends, HTTPException, Header
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from llm_manager import get_llm_stream
+from app.llm_manager import get_llm_stream
+from app.routers import documents
 
-app = FastAPI(title="ISTA AI Microservice", version="1.1.0")
+app = FastAPI(title="ISTA AI Microservice", version="1.1.5")
+
+# Include Routers
+app.include_router(documents.router)
 
 # Security
 AI_SERVICE_TOKEN = os.getenv("AI_SERVICE_TOKEN", "your_internal_api_secret")

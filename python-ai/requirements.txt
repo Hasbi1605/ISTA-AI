@@ -176,7 +176,8 @@ transformers==5.5.0
 typer==0.23.1
 typing-inspection==0.4.2
 typing_extensions==4.15.0
-unstructured==0.22.12
+langchain-chroma>=0.1.2
+unstructured[all-docs]==0.22.12
 unstructured-client==0.43.2
 unstructured.pytesseract==0.3.15
 unstructured_inference==1.2.0
