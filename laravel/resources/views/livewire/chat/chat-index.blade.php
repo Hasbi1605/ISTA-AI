@@ -1,6 +1,6 @@
 <div class="flex h-[calc(100vh-64px)] overflow-hidden bg-gray-50 dark:bg-gray-900">
     <!-- Sidebar for History -->
-    <aside class="w-52 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex-col overflow-y-auto">
+    <aside class="w-52 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col overflow-y-auto">
         <div class="p-4 border-b border-gray-200 dark:border-gray-700">
             <button wire:click="startNewChat" class="w-full flex items-center justify-center p-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition duration-150">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
