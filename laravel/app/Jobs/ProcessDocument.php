@@ -16,6 +16,9 @@ class ProcessDocument implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public $tries = 3;
+    public $backoff = [30, 60, 120];
+
     /**
      * Create a new job instance.
      */
@@ -65,5 +68,11 @@ class ProcessDocument implements ShouldQueue
             // Log the error
             logger()->error("Document processing failed for ID {$this->document->id}: " . $e->getMessage());
         }
+    }
+
+    public function failed(\Throwable $exception): void
+    {
+        $this->document->update(['status' => 'error']);
+        logger()->error("Document processing permanently failed for ID {$this->document->id}: " . $exception->getMessage());
     }
 }

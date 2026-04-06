@@ -16,6 +16,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 CHROMA_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "chroma_data")
+EMBEDDING_TIMEOUT = int(os.getenv("EMBEDDING_TIMEOUT", "30"))
 
 # Embedding model list untuk fallback
 EMBEDDING_MODELS = [
@@ -61,7 +62,7 @@ class JinaAIEmbeddings(Embeddings):
             "input": texts
         }
         
-        response = requests.post(self.api_url, json=payload, headers=headers, timeout=30)
+        response = requests.post(self.api_url, json=payload, headers=headers, timeout=EMBEDDING_TIMEOUT)
         response.raise_for_status()
         
         data = response.json()
@@ -82,7 +83,7 @@ class JinaAIEmbeddings(Embeddings):
             "input": [text]
         }
         
-        response = requests.post(self.api_url, json=payload, headers=headers, timeout=30)
+        response = requests.post(self.api_url, json=payload, headers=headers, timeout=EMBEDDING_TIMEOUT)
         response.raise_for_status()
         
         data = response.json()
@@ -118,7 +119,7 @@ class QwenEmbeddings(Embeddings):
             "encoding_format": "float"
         }
         
-        response = requests.post(self.api_url, json=payload, headers=headers, timeout=30)
+        response = requests.post(self.api_url, json=payload, headers=headers, timeout=EMBEDDING_TIMEOUT)
         response.raise_for_status()
         
         data = response.json()
@@ -138,7 +139,7 @@ class QwenEmbeddings(Embeddings):
             "encoding_format": "float"
         }
         
-        response = requests.post(self.api_url, json=payload, headers=headers, timeout=30)
+        response = requests.post(self.api_url, json=payload, headers=headers, timeout=EMBEDDING_TIMEOUT)
         response.raise_for_status()
         
         data = response.json()

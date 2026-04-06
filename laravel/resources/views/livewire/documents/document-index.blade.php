@@ -114,7 +114,7 @@
                                     <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Aksi</th>
                                 </tr>
                             </thead>
-                            <body class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                            <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                                 @forelse($documents as $document)
                                     <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors duration-150">
                                         <td class="px-6 py-4 whitespace-nowrap">
@@ -178,7 +178,7 @@
                                         </td>
                                     </tr>
                                 @endforelse
-                            </body>
+                            </tbody>
                         </table>
                     </div>
                 </div>

@@ -69,12 +69,16 @@ class DocumentIndex extends Component
 
         try {
             // 1. Notify Python Microservice to delete vectors
-            $pythonUrl = config('services.ai_service.url', 'http://127.0.0.1:8001') . '/api/documents/' . $document->original_name;
+            $pythonUrl = config('services.ai_service.url', 'http://127.0.0.1:8001') . '/api/documents/' . urlencode($document->original_name);
             $token = config('services.ai_service.token');
 
-            Http::withHeaders([
+            $response = Http::withHeaders([
                 'Authorization' => "Bearer {$token}",
             ])->delete($pythonUrl);
+
+            if (!$response->successful()) {
+                logger()->warning("Vector deletion failed for {$document->original_name}, proceeding anyway: " . $response->body());
+            }
 
             // 2. Delete file from storage
             Storage::delete($document->file_path);
