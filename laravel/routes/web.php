@@ -1,3 +1,5 @@
+<?php
+
 use App\Livewire\Chat\ChatIndex;
 use App\Livewire\Documents\DocumentIndex;
 use Illuminate\Support\Facades\Route;

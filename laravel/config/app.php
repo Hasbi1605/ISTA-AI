@@ -123,4 +123,13 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | AI Service Configuration
+    |--------------------------------------------------------------------------
+    */
+
+    'ai_service_url' => env('AI_SERVICE_URL', 'http://localhost:8001'),
+    'ai_service_token' => env('AI_SERVICE_TOKEN', 'your_internal_api_secret'),
+
 ];
