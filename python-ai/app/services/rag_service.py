@@ -3,14 +3,15 @@ import json
 import logging
 import time
 import requests
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict
 from langchain_community.document_loaders import UnstructuredFileLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_chroma import Chroma
 from langchain_core.embeddings import Embeddings
+from langchain_core.documents import Document
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
-import shutil
+from app.services.langsearch_service import LangSearchService
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -455,3 +456,100 @@ def delete_document_vectors(filename: str):
     except Exception as e:
         logger.error(f"❌ Error deleting vectors for {filename}: {str(e)}")
         return False, str(e)
+
+
+# LangSearch service instance
+_langsearch_service = None
+
+def get_langsearch_service() -> LangSearchService:
+    """Get or create LangSearch service instance."""
+    global _langsearch_service
+    if _langsearch_service is None:
+        _langsearch_service = LangSearchService()
+    return _langsearch_service
+
+
+def get_context_for_query(query: str) -> Dict:
+    """
+    Get context for LLM dari LangSearch + RAG documents.
+    
+    Priority: LangSearch first -> RAG fallback -> LLM knowledge
+    
+    Returns:
+        Dict dengan keys:
+            - search_results: List[Dict] dari LangSearch
+            - rag_documents: List[Document] dari ChromaDB
+            - has_search: bool
+            - has_rag: bool
+            - search_context: str (formatted untuk system prompt)
+    """
+    # Step 1: Always call LangSearch (search-first strategy)
+    langsearch = get_langsearch_service()
+    search_results = langsearch.search(query)
+    has_search = len(search_results) > 0
+    
+    # Build search context for system prompt
+    search_context = langsearch.build_search_context(search_results) if has_search else ""
+    
+    # Step 2: Get RAG documents (existing logic)
+    rag_documents = []
+    has_rag = False
+    
+    try:
+        embeddings, provider_name = get_embeddings_with_fallback()
+        if embeddings:
+            vectorstore = Chroma(
+                collection_name="documents_collection",
+                embedding_function=embeddings,
+                persist_directory=CHROMA_PATH
+            )
+            
+            # Search for relevant documents
+            docs = vectorstore.similarity_search(query, k=3)
+            if docs:
+                rag_documents = docs
+                has_rag = True
+                logger.info(f"📚 RAG: Found {len(docs)} relevant documents for query: '{query}'")
+    except Exception as e:
+        logger.warning(f"⚠️ RAG search failed: {str(e)}")
+    
+    return {
+        "search_results": search_results,
+        "rag_documents": rag_documents,
+        "has_search": has_search,
+        "has_rag": has_rag,
+        "search_context": search_context
+    }
+
+
+def get_rag_context_for_prompt(query: str, base_rag_prompt: str = "") -> str:
+    """
+    Build context string untuk inject ke system prompt.
+    
+    Args:
+        query: User query
+        base_rag_prompt: Existing RAG prompt from embeddings (optional)
+    
+    Returns:
+        Formatted context string untuk system prompt
+    """
+    context_data = get_context_for_query(query)
+    
+    result_parts = []
+    
+    # Add search context (already formatted with date + results)
+    if context_data["search_context"]:
+        result_parts.append(context_data["search_context"])
+    
+    # Add RAG documents only if no search results
+    if context_data["has_rag"] and not context_data["has_search"]:
+        if base_rag_prompt:
+            result_parts.append(base_rag_prompt)
+        else:
+            result_parts.append("Relevant documents from knowledge base:")
+            result_parts.append("")
+            for doc in context_data["rag_documents"]:
+                result_parts.append(f"- {doc.page_content[:200]}...")
+            result_parts.append("")
+    
+    return "\n".join(result_parts)

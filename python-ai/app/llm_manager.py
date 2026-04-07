@@ -3,6 +3,7 @@ import json
 import requests
 import litellm
 from typing import List, Dict, Generator
+from app.services.rag_service import get_rag_context_for_prompt
 
 # Suppress verbose litellm output
 litellm.set_verbose = False
@@ -69,7 +70,49 @@ def get_llm_stream(messages: List[Dict[str, str]]) -> Generator[str, None, None]
     """
     Generator that yields chunks of text from the best available LLM.
     Fallback sequence: Gemini -> Groq -> GitHub Models.
+    
+    Includes LangSearch integration for real-time information.
     """
+    # Extract query and system prompt from messages
+    # Get LAST user message (most recent query)
+    query = None
+    system_prompt_base = None
+    
+    for msg in reversed(messages):
+        if msg["role"] == "user":
+            query = msg["content"]
+            break
+        elif msg["role"] == "system" and system_prompt_base is None:
+            system_prompt_base = msg["content"]
+    
+    # Get default system prompt from env config
+    default_system_prompt = os.getenv("DEFAULT_SYSTEM_PROMPT", "Anda adalah ISTA AI, asisten virtual istana pintar. Jawablah dengan sopan dan membantu.")
+    
+    # Get search + RAG context if we have a query
+    search_context = ""
+    if query:
+        try:
+            search_context = get_rag_context_for_prompt(query)
+        except Exception as e:
+            print(f"[Warning] Search/RAG context failed: {e}")
+    
+    # Build enhanced system prompt with search results
+    if search_context:
+        if system_prompt_base:
+            enhanced_system = search_context + system_prompt_base + "\n\nGunakan informasi dari web search results jika relevan dengan pertanyaan user."
+        else:
+            enhanced_system = search_context + default_system_prompt + "\n\nGunakan informasi dari web search results jika relevan dengan pertanyaan user."
+    else:
+        enhanced_system = system_prompt_base if system_prompt_base else default_system_prompt
+    
+    # Rebuild messages with enhanced system prompt
+    enhanced_messages = []
+    for msg in messages:
+        if msg["role"] == "system":
+            enhanced_messages.append({"role": "system", "content": enhanced_system})
+        else:
+            enhanced_messages.append(msg)
+    
     for model in MODEL_LIST:
         api_key = os.getenv(model["api_key_env"])
         if not api_key:
@@ -78,12 +121,12 @@ def get_llm_stream(messages: List[Dict[str, str]]) -> Generator[str, None, None]
         try:
             if model["provider"] == "gemini_native":
                 # Use direct REST API for Gemini
-                gen = _stream_gemini_native(model["model_name"], api_key, messages)
+                gen = _stream_gemini_native(model["model_name"], api_key, enhanced_messages)
             else:
                 # Use litellm for other providers
                 kwargs = {
                     "model": model["model_name"],
-                    "messages": messages,
+                    "messages": enhanced_messages,
                     "api_key": api_key,
                     "stream": True,
                     "timeout": 30,
