@@ -108,7 +108,7 @@ class DocumentIndex extends Component
         $this->summarizingDocumentId = $id;
         
         try {
-            $result = $aiService->summarizeDocument($document->original_name);
+            $result = $aiService->summarizeDocument($document->original_name, (string) auth()->id());
             
             if ($result['status'] === 'success') {
                 $this->summaryResult = $result['summary'];

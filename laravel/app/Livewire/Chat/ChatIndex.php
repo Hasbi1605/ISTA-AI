@@ -79,9 +79,9 @@ class ChatIndex extends Component
     public function toggleDocument($documentId)
     {
         if (in_array($documentId, $this->selectedDocuments)) {
-            $this->selectedDocuments = array_filter($this->selectedDocuments, function($id) use ($documentId) {
+            $this->selectedDocuments = array_values(array_filter($this->selectedDocuments, function($id) use ($documentId) {
                 return $id != $documentId;
-            });
+            }));
         } else {
             $this->selectedDocuments[] = $documentId;
         }
@@ -176,7 +176,7 @@ class ChatIndex extends Component
         }
         
         // Fetch stream from AIService
-        foreach ($aiService->sendChat($history, $documentFilenames) as $chunk) {
+        foreach ($aiService->sendChat($history, $documentFilenames, (string) Auth::id()) as $chunk) {
             // Parse model indicator from the first chunk
             if (preg_match('/\[MODEL:(.+?)\]\n?/', $chunk, $matches)) {
                 $modelName = $matches[1];

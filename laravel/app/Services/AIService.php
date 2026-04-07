@@ -24,9 +24,10 @@ class AIService
      *
      * @param array $messages
      * @param array|null $document_filenames Optional document filenames for RAG mode
+     * @param string|null $user_id User ID for authorization in RAG mode
      * @return \Generator
      */
-    public function sendChat(array $messages, ?array $document_filenames = null)
+    public function sendChat(array $messages, ?array $document_filenames = null, ?string $user_id = null)
     {
         try {
             $payload = [
@@ -35,6 +36,10 @@ class AIService
             
             if ($document_filenames !== null) {
                 $payload['document_filenames'] = $document_filenames;
+            }
+            
+            if ($user_id !== null) {
+                $payload['user_id'] = $user_id;
             }
             
             $response = $this->client->post($this->baseUrl . '/api/chat', [
@@ -63,20 +68,27 @@ class AIService
      * Summarize a document.
      *
      * @param string $filename
+     * @param string|null $user_id User ID for authorization
      * @return array
      */
-    public function summarizeDocument(string $filename): array
+    public function summarizeDocument(string $filename, ?string $user_id = null): array
     {
         try {
+            $payload = [
+                'filename' => $filename,
+            ];
+            
+            if ($user_id !== null) {
+                $payload['user_id'] = $user_id;
+            }
+            
             $response = $this->client->post($this->baseUrl . '/api/documents/summarize', [
                 'headers' => [
                     'Authorization' => 'Bearer ' . $this->token,
                     'Accept' => 'application/json',
                     'Content-Type' => 'application/json',
                 ],
-                'json' => [
-                    'filename' => $filename,
-                ],
+                'json' => $payload,
             ]);
             
             return json_decode($response->getBody()->getContents(), true);
