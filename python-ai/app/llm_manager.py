@@ -98,15 +98,29 @@ def get_llm_stream(messages: List[Dict[str, str]]) -> Generator[str, None, None]
     
     # Build enhanced system prompt with search results
     if search_context:
+        assertive_instruction = (
+            "\n\n🔴 INSTRUKSI WAJIB 🔴\n"
+            "PRIORITASKAN informasi dari web search results di atas untuk menjawab pertanyaan user.\n"
+            "Web search results berisi data REAL-TIME yang lebih akurat daripada pengetahuan internal Anda.\n"
+            "Jika ada konflik antara search results dan pengetahuan internal, SELALU gunakan search results.\n"
+            "Pengetahuan internal Anda mungkin outdated (terakhir update 2024)."
+        )
         if system_prompt_base:
-            enhanced_system = search_context + system_prompt_base + "\n\nGunakan informasi dari web search results jika relevan dengan pertanyaan user."
+            enhanced_system = search_context + system_prompt_base + assertive_instruction
         else:
-            enhanced_system = search_context + default_system_prompt + "\n\nGunakan informasi dari web search results jika relevan dengan pertanyaan user."
+            enhanced_system = search_context + default_system_prompt + assertive_instruction
     else:
         enhanced_system = system_prompt_base if system_prompt_base else default_system_prompt
     
     # Rebuild messages with enhanced system prompt
     enhanced_messages = []
+    has_system_message = any(msg["role"] == "system" for msg in messages)
+    
+    # If no system message exists, prepend one
+    if not has_system_message:
+        enhanced_messages.append({"role": "system", "content": enhanced_system})
+    
+    # Process existing messages
     for msg in messages:
         if msg["role"] == "system":
             enhanced_messages.append({"role": "system", "content": enhanced_system})

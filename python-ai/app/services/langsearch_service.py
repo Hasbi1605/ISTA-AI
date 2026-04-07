@@ -16,9 +16,16 @@ class LangSearchService:
     """Service untuk melakukan web search menggunakan LangSearch API."""
     
     def __init__(self):
-        self.api_key = os.getenv("LANGSEARCH_API_KEY")
         self.base_url = "https://api.langsearch.com/v1/web-search"
         self._search_cache: Dict[Tuple[str, int], Tuple[List[Dict], float]] = {}
+        self._api_key: Optional[str] = None
+    
+    @property
+    def api_key(self) -> Optional[str]:
+        """Lazy load API key from environment."""
+        if self._api_key is None:
+            self._api_key = os.getenv("LANGSEARCH_API_KEY")
+        return self._api_key
     
     def _get_cached_result(self, query: str, time_bucket: int) -> Optional[List[Dict]]:
         """Get cached search result if not expired."""
@@ -125,17 +132,33 @@ class LangSearchService:
             results: List of search result dicts
             
         Returns:
-            Formatted string untuk system prompt
+            Formatted string untuk system prompt with strong emphasis
         """
         if not results:
             return ""
         
         current_date = datetime.now().strftime("%A, %d %B %Y")
+        current_year = datetime.now().year
         
         prompt_parts = [
-            f"Today is {current_date}.",
+            "=" * 80,
+            "🔴 INFORMASI TERBARU DARI WEB - PRIORITAS TERTINGGI 🔴",
+            "=" * 80,
             "",
-            "Recent web search results:",
+            f"📅 Tanggal Hari Ini: {current_date}",
+            "",
+            f"⚠️ PERHATIAN PENTING:",
+            f"- Pengetahuan internal Anda terakhir diperbarui tahun 2024",
+            f"- Sekarang adalah tahun {current_year}",
+            f"- Data di bawah ini adalah informasi TERBARU dari web (real-time)",
+            f"- WAJIB gunakan informasi ini untuk menjawab pertanyaan tentang:",
+            f"  * Pejabat pemerintahan (presiden, menteri, gubernur, dll)",
+            f"  * Berita terkini dan kejadian terbaru",
+            f"  * Data yang berubah dari waktu ke waktu",
+            f"- JANGAN mengandalkan pengetahuan internal untuk fakta yang bisa outdated",
+            "",
+            "📰 HASIL PENCARIAN WEB:",
+            "=" * 80,
             ""
         ]
         
@@ -145,16 +168,21 @@ class LangSearchService:
             url = result.get("url", "")
             date = result.get("datePublished", "")
             
-            prompt_parts.append(f"{idx}. {title}")
-            prompt_parts.append(f"   {snippet}")
+            prompt_parts.append(f"🔍 Hasil #{idx}:")
+            prompt_parts.append(f"   📌 Judul: {title}")
+            prompt_parts.append(f"   📝 Isi: {snippet}")
             if url:
-                prompt_parts.append(f"   Source: {url}")
+                prompt_parts.append(f"   🔗 Sumber: {url}")
             if date:
-                prompt_parts.append(f"   Published: {date}")
+                prompt_parts.append(f"   📅 Tanggal Publikasi: {date}")
             prompt_parts.append("")
         
-        prompt_parts.append("---")
-        prompt_parts.append("")
+        prompt_parts.extend([
+            "=" * 80,
+            "🔴 AKHIR INFORMASI TERBARU DARI WEB 🔴",
+            "=" * 80,
+            ""
+        ])
         
         return "\n".join(prompt_parts)
 
