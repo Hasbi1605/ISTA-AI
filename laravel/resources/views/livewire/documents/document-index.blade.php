@@ -102,16 +102,16 @@
             </div>
 
             <!-- Documents List -->
-            <div class="lg:col-span-2 xl:col-span-3">
+            <div class="lg:col-span-2 xl:col-span-4">
                 <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
                     <div class="overflow-x-auto">
-                        <table class="min-w-full sm:min-w-[700px] divide-y divide-gray-200 dark:divide-gray-700">
+                        <table class="min-w-full md:min-w-[900px] divide-y divide-gray-200 dark:divide-gray-700">
                             <thead class="bg-gray-50 dark:bg-gray-700/50">
                                 <tr>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 tracking-wide">Nama File</th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 tracking-wide">Status</th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 tracking-wide">Dibuat</th>
-                                    <th scope="col" class="px-6 py-3 text-right text-xs font-semibold text-gray-700 dark:text-gray-300 tracking-wide">Aksi</th>
+                                    <th scope="col" class="px-6 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 tracking-wide">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -156,11 +156,11 @@
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                                             {{ $document->created_at->diffForHumans() }}
                                         </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <td class="px-6 py-4 whitespace-nowrap text-center">
                                             <button 
                                                 wire:confirm="Hapus dokumen ini dan bersihkan memori AI terkait?"
                                                 wire:click="delete({{ $document->id }})" 
-                                                class="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 border border-red-200 dark:border-red-800 p-2 rounded-lg transition-all duration-150 group"
+                                                class="inline-flex text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 border border-red-200 dark:border-red-800 px-3 py-2 rounded-lg transition-all duration-150 group"
                                             >
                                                 <svg class="h-5 w-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
