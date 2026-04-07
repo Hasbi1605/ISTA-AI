@@ -4,6 +4,7 @@ namespace App\Livewire\Documents;
 
 use App\Jobs\ProcessDocument;
 use App\Models\Document;
+use App\Services\AIService;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Attributes\Layout;
@@ -17,6 +18,9 @@ class DocumentIndex extends Component
 
     public $file;
     public $isUploading = false;
+    public $summarizingDocumentId = null;
+    public $summaryResult = null;
+    public $showSummaryModal = false;
 
     protected $rules = [
         'file' => 'required|mimes:pdf,docx,xlsx|max:51200', // 50MB
@@ -90,6 +94,39 @@ class DocumentIndex extends Component
         } catch (\Exception $e) {
             session()->flash('error', 'Gagal menghapus dokumen: ' . $e->getMessage());
         }
+    }
+
+    public function summarize($id, AIService $aiService)
+    {
+        $document = Document::where('user_id', auth()->id())->findOrFail($id);
+        
+        if ($document->status !== 'ready') {
+            session()->flash('error', 'Dokumen belum selesai diproses. Tunggu hingga status menjadi "ready".');
+            return;
+        }
+
+        $this->summarizingDocumentId = $id;
+        
+        try {
+            $result = $aiService->summarizeDocument($document->original_name, (string) auth()->id());
+            
+            if ($result['status'] === 'success') {
+                $this->summaryResult = $result['summary'];
+                $this->showSummaryModal = true;
+            } else {
+                session()->flash('error', 'Gagal merangkum dokumen: ' . ($result['message'] ?? 'Unknown error'));
+            }
+        } catch (\Exception $e) {
+            session()->flash('error', 'Gagal merangkum dokumen: ' . $e->getMessage());
+        } finally {
+            $this->summarizingDocumentId = null;
+        }
+    }
+
+    public function closeSummaryModal()
+    {
+        $this->showSummaryModal = false;
+        $this->summaryResult = null;
     }
 
     public function render()

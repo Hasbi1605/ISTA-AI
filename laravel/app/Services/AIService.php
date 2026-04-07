@@ -23,20 +23,32 @@ class AIService
      * Send a list of messages to the Python AI service and stream the response.
      *
      * @param array $messages
+     * @param array|null $document_filenames Optional document filenames for RAG mode
+     * @param string|null $user_id User ID for authorization in RAG mode
      * @return \Generator
      */
-    public function sendChat(array $messages)
+    public function sendChat(array $messages, ?array $document_filenames = null, ?string $user_id = null)
     {
         try {
+            $payload = [
+                'messages' => $messages,
+            ];
+            
+            if ($document_filenames !== null) {
+                $payload['document_filenames'] = $document_filenames;
+            }
+            
+            if ($user_id !== null) {
+                $payload['user_id'] = $user_id;
+            }
+            
             $response = $this->client->post($this->baseUrl . '/api/chat', [
                 'headers' => [
                     'Authorization' => 'Bearer ' . $this->token,
                     'Accept' => 'text/event-stream',
                     'Content-Type' => 'application/json',
                 ],
-                'json' => [
-                    'messages' => $messages,
-                ],
+                'json' => $payload,
                 'stream' => True,
             ]);
 
@@ -49,6 +61,44 @@ class AIService
         } catch (RequestException $e) {
             Log::error('AI Service Error: ' . $e->getMessage());
             yield "❌ Kesalahan sistem saat menghubungi otak AI. Silakan coba lagi nanti.";
+        }
+    }
+    
+    /**
+     * Summarize a document.
+     *
+     * @param string $filename
+     * @param string|null $user_id User ID for authorization
+     * @return array
+     */
+    public function summarizeDocument(string $filename, ?string $user_id = null): array
+    {
+        try {
+            $payload = [
+                'filename' => $filename,
+            ];
+            
+            if ($user_id !== null) {
+                $payload['user_id'] = $user_id;
+            }
+            
+            $response = $this->client->post($this->baseUrl . '/api/documents/summarize', [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $this->token,
+                    'Accept' => 'application/json',
+                    'Content-Type' => 'application/json',
+                ],
+                'json' => $payload,
+            ]);
+            
+            return json_decode($response->getBody()->getContents(), true);
+            
+        } catch (RequestException $e) {
+            Log::error('AI Service Summarize Error: ' . $e->getMessage());
+            return [
+                'status' => 'error',
+                'message' => 'Gagal merangkum dokumen: ' . $e->getMessage()
+            ];
         }
     }
 }

@@ -4,6 +4,7 @@ namespace App\Livewire\Chat;
 
 use App\Models\Conversation;
 use App\Models\Message;
+use App\Models\Document;
 use App\Services\AIService;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
@@ -16,10 +17,19 @@ class ChatIndex extends Component
     public $currentConversationId;
     public $messages = [];
     public $conversations = [];
+    public $selectedDocuments = [];
+    public $availableDocuments = [];
+    public $showDocumentSelector = false;
+    public $sources = [];
+    public $showOlderChats = false;
+    
+    // Maximum chats to show before "Show More"
+    const MAX_VISIBLE_CHATS = 10;
 
     public function mount($id = null)
     {
         $this->loadConversations();
+        $this->loadAvailableDocuments();
         
         if ($id) {
             $this->loadConversation($id);
@@ -29,6 +39,14 @@ class ChatIndex extends Component
     public function loadConversations()
     {
         $this->conversations = Auth::user()->conversations()->orderBy('updated_at', 'desc')->get();
+    }
+
+    public function loadAvailableDocuments()
+    {
+        $this->availableDocuments = Document::where('user_id', Auth::id())
+            ->where('status', 'ready')
+            ->orderBy('created_at', 'desc')
+            ->get();
     }
 
     public function loadConversation($id)
@@ -49,6 +67,61 @@ class ChatIndex extends Component
         $this->currentConversationId = null;
         $this->messages = [];
         $this->prompt = '';
+        $this->selectedDocuments = [];
+        $this->sources = [];
+    }
+
+    public function toggleDocumentSelector()
+    {
+        $this->showDocumentSelector = !$this->showDocumentSelector;
+    }
+
+    public function toggleDocument($documentId)
+    {
+        if (in_array($documentId, $this->selectedDocuments)) {
+            $this->selectedDocuments = array_values(array_filter($this->selectedDocuments, function($id) use ($documentId) {
+                return $id != $documentId;
+            }));
+        } else {
+            $this->selectedDocuments[] = $documentId;
+        }
+    }
+
+    public function selectAllDocuments()
+    {
+        $this->selectedDocuments = $this->availableDocuments->pluck('id')->toArray();
+    }
+
+    public function clearDocumentSelection()
+    {
+        $this->selectedDocuments = [];
+    }
+
+    public function toggleOlderChats()
+    {
+        $this->showOlderChats = !$this->showOlderChats;
+    }
+
+    public function deleteConversation($id)
+    {
+        $conversation = Conversation::where('id', $id)
+            ->where('user_id', Auth::id())
+            ->first();
+        
+        if ($conversation) {
+            // Delete all messages first
+            $conversation->messages()->delete();
+            // Delete the conversation
+            $conversation->delete();
+            
+            // If we deleted the current conversation, reset
+            if ($this->currentConversationId == $id) {
+                $this->startNewChat();
+            }
+            
+            // Reload conversations
+            $this->loadConversations();
+        }
     }
 
     public function sendMessage(AIService $aiService)
@@ -76,6 +149,7 @@ class ChatIndex extends Component
         $this->messages[] = $userMessage->toArray();
         $userPrompt = $this->prompt;
         $this->prompt = '';
+        $this->sources = [];
 
         // 3. Prepare full history for AI
         $history = [
@@ -93,13 +167,34 @@ class ChatIndex extends Component
         // Push a placeholder assistant message for streaming
         $this->stream('assistant-output', "", true);
 
+        // Get document filenames for RAG mode
+        $documentFilenames = null;
+        if (!empty($this->selectedDocuments)) {
+            $documentFilenames = Document::whereIn('id', $this->selectedDocuments)
+                ->pluck('original_name')
+                ->toArray();
+        }
+        
         // Fetch stream from AIService
-        foreach ($aiService->sendChat($history) as $chunk) {
+        foreach ($aiService->sendChat($history, $documentFilenames, (string) Auth::id()) as $chunk) {
             // Parse model indicator from the first chunk
             if (preg_match('/\[MODEL:(.+?)\]\n?/', $chunk, $matches)) {
                 $modelName = $matches[1];
                 $chunk = preg_replace('/\[MODEL:.+?\]\n?/', '', $chunk);
                 $this->stream('model-name', $modelName);
+            }
+            
+            // Parse sources if present (match multiline JSON, use /s modifier for multiline)
+            if (preg_match('/\[SOURCES:(\[.+?\])\]/s', $chunk, $matches)) {
+                $sourcesJson = $matches[1];
+                $parsedSources = json_decode($sourcesJson, true);
+                if ($parsedSources) {
+                    $this->sources = $parsedSources;
+                    // Emit to Alpine.js for real-time display
+                    $this->dispatch('assistant-sources', $this->sources);
+                }
+                // Remove sources from chunk
+                $chunk = preg_replace('/\[SOURCES:\[.+?\]\]/s', '', $chunk);
             }
             
             if ($chunk !== '') {
@@ -108,11 +203,15 @@ class ChatIndex extends Component
             }
         }
 
-        // 5. Finalize: Save AI Message to DB
+        // 5. Finalize: Save AI Message to DB (remove sources metadata completely)
+        // Clean up any remaining source markers
+        $cleanContent = preg_replace('/\[SOURCES:\[.+?\]\]/s', '', $fullResponse);
+        $cleanContent = trim($cleanContent);
+        
         Message::create([
             'conversation_id' => $this->currentConversationId,
             'role' => 'assistant',
-            'content' => $fullResponse
+            'content' => $cleanContent
         ]);
 
         // Refresh state

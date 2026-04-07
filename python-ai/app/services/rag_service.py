@@ -4,6 +4,11 @@ import logging
 import time
 import requests
 from typing import List, Tuple, Optional, Dict
+from dotenv import load_dotenv
+
+# Ensure .env is loaded (for standalone imports)
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), '.env'))
+
 from langchain_community.document_loaders import UnstructuredFileLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
@@ -312,12 +317,17 @@ def get_embeddings_with_fallback() -> Tuple[Optional[Embeddings], str]:
     logger.error("❌ Semua embedding provider gagal!")
     return None, "none"
 
-def process_document(file_path: str, filename: str):
+def process_document(file_path: str, filename: str, user_id: str = "unknown"):
     """
     Parses a document, splits it into chunks, generates embeddings,
     and stores them in ChromaDB.
     
     Dengan fallback mechanism dan rate limiting untuk mencegah quota exhausted.
+    
+    Args:
+        file_path: Path to the document file
+        filename: Original filename
+        user_id: User ID for authorization filtering
     """
     try:
         logger.info(f"=== Processing document: {filename} ===")
@@ -349,9 +359,10 @@ def process_document(file_path: str, filename: str):
         if embeddings is None:
             raise Exception("Semua embedding provider gagal. Tidak dapat memproses dokumen.")
         
-        # Add metadata untuk tracking
+        # Add metadata untuk tracking (including user_id for authorization)
         for chunk in chunks:
             chunk.metadata["filename"] = filename
+            chunk.metadata["user_id"] = str(user_id)
             chunk.metadata["embedding_model"] = provider_name
             
         # 4. Store in ChromaDB dengan rate limiting
@@ -456,6 +467,249 @@ def delete_document_vectors(filename: str):
     except Exception as e:
         logger.error(f"❌ Error deleting vectors for {filename}: {str(e)}")
         return False, str(e)
+
+
+
+def search_relevant_chunks(query: str, filenames: List[str] = None, top_k: int = 5, user_id: str = None) -> Tuple[List[Dict], bool]:
+    """
+    Search for relevant document chunks based on query.
+    
+    Args:
+        query: User query string
+        filenames: Optional list of filenames to filter by
+        top_k: Number of top chunks to return
+        user_id: User ID for authorization filtering (required for security)
+    
+    Returns:
+        Tuple of (list of chunks with metadata, bool indicating success)
+    """
+    try:
+        embeddings, provider_name = get_embeddings_with_fallback()
+        
+        if embeddings is None:
+            return [], False
+        
+        vectorstore = Chroma(
+            collection_name="documents_collection",
+            embedding_function=embeddings,
+            persist_directory=CHROMA_PATH
+        )
+        
+        # Build filter - ALWAYS require user_id for security
+        if user_id is None:
+            logger.error("❌ Security: user_id is required for RAG search")
+            return [], False
+        
+        # Start with user_id filter
+        filter_dict = {"user_id": str(user_id)}
+        
+        # Add filename filter if provided
+        if filenames and len(filenames) > 0:
+            # Combine with user_id using $and
+            filename_filter = {"$or": [{"filename": fname} for fname in filenames]} if len(filenames) > 1 else {"filename": filenames[0]}
+            filter_dict = {"$and": [filter_dict, filename_filter]}
+            logger.info(f"🔍 RAG: Filtering by filenames: {filenames} for user_id: {user_id}")
+        else:
+            logger.info(f"🔍 RAG: Filtering by user_id: {user_id} (all user documents)")
+        
+        # Search for similar documents with filter
+        docs = vectorstore.similarity_search_with_score(query, k=top_k, filter=filter_dict)
+        
+        results = []
+        for doc, score in docs:
+            chunk_info = {
+                "content": doc.page_content,
+                "score": float(score),
+                "filename": doc.metadata.get("filename", "unknown"),
+                "chunk_index": doc.metadata.get("chunk_index", 0),
+                "embedding_model": doc.metadata.get("embedding_model", provider_name)
+            }
+            results.append(chunk_info)
+        
+        logger.info(f"📚 RAG: Found {len(results)} relevant chunks for query: '{query}'")
+        return results, True
+        
+    except Exception as e:
+        logger.error(f"❌ Error searching chunks: {str(e)}")
+        return [], False
+
+
+def build_rag_prompt(question: str, chunks: List[Dict], include_sources: bool = True) -> Tuple[str, List[Dict]]:
+    """
+    Build RAG prompt from question and relevant chunks.
+    
+    Args:
+        question: User question
+        chunks: List of chunk dictionaries from search_relevant_chunks
+        include_sources: Whether to include source references
+    
+    Returns:
+        Tuple of (formatted prompt, list of source metadata)
+    """
+    if not chunks:
+        return question, []
+    
+    # Format chunks as context
+    context_parts = []
+    sources = []
+    
+    for i, chunk in enumerate(chunks):
+        context_parts.append(f"--- Chunk {i+1} ---")
+        context_parts.append(chunk.get("content", ""))
+        context_parts.append("")
+        
+        if include_sources:
+            sources.append({
+                "filename": chunk.get("filename", "unknown"),
+                "chunk_index": chunk.get("chunk_index", 0),
+                "relevance_score": chunk.get("score", 0)
+            })
+    
+    context_str = "\n".join(context_parts)
+    
+    rag_prompt = f"""Berdasarkan dokumen-dokumen berikut, jawab pertanyaan user.
+
+Dokumen yang menjadi referensi:
+{context_str}
+
+---
+
+Pertanyaan: {question}
+
+Instruksi: 
+- Jawab berdasarkan informasi dari dokumen-dokumen di atas
+- Jika jawaban tidak ditemukan di dokumen, katakan bahwa tidak ada informasi terkait
+- Cantumkan nama dokumen yang menjadi sumber referensi
+
+Jawaban:"""
+    
+    return rag_prompt, sources
+
+
+def summarize_document(filename: str, user_id: str = None) -> Tuple[bool, str]:
+    """
+    Summarize a document by retrieving all chunks and sending to LLM.
+    
+    Args:
+        filename: The filename of the document to summarize
+        user_id: User ID for authorization filtering (required for security)
+    
+    Returns:
+        Tuple of (success: bool, result: str)
+    """
+    try:
+        logger.info(f"=== Summarizing document: {filename} ===")
+        
+        # Security: require user_id
+        if user_id is None:
+            return False, "User ID diperlukan untuk mengakses dokumen."
+        
+        # Get all chunks from ChromaDB for this filename
+        embeddings, provider_name = get_embeddings_with_fallback()
+        
+        if embeddings is None:
+            return False, "Tidak dapat menginisialisasi embedding model."
+        
+        vectorstore = Chroma(
+            collection_name="documents_collection",
+            embedding_function=embeddings,
+            persist_directory=CHROMA_PATH
+        )
+        
+        # Get all chunks for this filename with user_id filter for security
+        docs = vectorstore.get(where={"$and": [{"filename": filename}, {"user_id": str(user_id)}]})
+        
+        if not docs or not docs.get("documents"):
+            return False, f"Dokumen '{filename}' tidak ditemukan atau Anda tidak memiliki akses."
+        
+        chunks_content = docs["documents"]
+        logger.info(f"Found {len(chunks_content)} chunks for summarization")
+        
+        # Build context from chunks
+        context_parts = []
+        for i, chunk in enumerate(chunks_content):
+            context_parts.append(f"--- Bagian {i+1} ---\n{chunk}")
+        
+        context_str = "\n\n".join(context_parts)
+        
+        # Return the context for LLM processing (actual summarization happens in the API endpoint)
+        return True, context_str
+        
+    except Exception as e:
+        logger.error(f"❌ Error summarizing document: {str(e)}")
+        return False, str(e)
+
+
+def get_document_chunks_for_summarization(filename: str, user_id: str = None, max_tokens: int = 8000) -> Tuple[bool, List[str], int]:
+    """
+    Get document chunks for summarization, with chunking for large documents.
+    
+    For large documents that exceed max_tokens, this function performs
+    hierarchical summarization by summarizing chunks in batches.
+    
+    Args:
+        filename: The filename of the document to summarize
+        user_id: User ID for authorization filtering
+        max_tokens: Maximum tokens per batch (approximate)
+    
+    Returns:
+        Tuple of (success: bool, list of chunk_contexts, total_chunks)
+    """
+    try:
+        logger.info(f"=== Getting chunks for summarization: {filename} ===")
+        
+        # Security: require user_id
+        if user_id is None:
+            return False, [], 0
+        
+        embeddings, provider_name = get_embeddings_with_fallback()
+        
+        if embeddings is None:
+            return False, [], 0
+        
+        vectorstore = Chroma(
+            collection_name="documents_collection",
+            embedding_function=embeddings,
+            persist_directory=CHROMA_PATH
+        )
+        
+        # Get all chunks with user_id filter
+        docs = vectorstore.get(where={"$and": [{"filename": filename}, {"user_id": str(user_id)}]})
+        
+        if not docs or not docs.get("documents"):
+            return False, [], 0
+        
+        chunks = docs["documents"]
+        total_chunks = len(chunks)
+        logger.info(f"Found {total_chunks} chunks for summarization")
+        
+        # Estimate tokens (rough: ~4 chars per token for Indonesian/English mix)
+        est_tokens = sum(len(c) for c in chunks) // 4
+        logger.info(f"Estimated tokens: {est_tokens}")
+        
+        # If within limit, return all chunks as single batch
+        if est_tokens <= max_tokens:
+            all_content = "\n\n".join([f"--- Bagian {i+1} ---\n{c}" for i, c in enumerate(chunks)])
+            return True, [all_content], total_chunks
+        
+        # Hierarchical summarization: group chunks and create batches
+        logger.info(f"Document too large ({est_tokens} tokens), implementing chunked summarization...")
+        
+        # Group chunks into batches (approximately max_tokens each)
+        batch_size = max(1, len(chunks) // (est_tokens // max_tokens + 1))
+        batches = []
+        
+        for i in range(0, len(chunks), batch_size):
+            batch_chunks = chunks[i:i + batch_size]
+            batch_content = "\n\n".join([f"--- Bagian {j+1} ---\n{c}" for j, c in enumerate(batch_chunks)])
+            batches.append(batch_content)
+        
+        logger.info(f"Created {len(batches)} batches for hierarchical summarization")
+        return True, batches, total_chunks
+        
+    except Exception as e:
+        logger.error(f"❌ Error getting chunks for summarization: {str(e)}")
+        return False, [], 0
 
 
 # LangSearch service instance

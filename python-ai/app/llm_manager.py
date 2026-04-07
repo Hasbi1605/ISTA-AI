@@ -170,3 +170,57 @@ def get_llm_stream(messages: List[Dict[str, str]]) -> Generator[str, None, None]
 
     # All models failed
     yield "❌ Maaf, semua layanan AI sedang tidak tersedia. Silakan coba lagi nanti."
+
+
+def get_llm_stream_with_sources(messages: List[Dict[str, str]], sources: List[Dict]) -> Generator[str, None, None]:
+    """
+    Generator that yields chunks of text from the best available LLM.
+    Includes source metadata at the end of the stream.
+    Used for RAG mode where system message already contains the RAG prompt.
+    """
+    # Pass messages directly - RAG mode already has the system message with context
+    enhanced_messages = messages
+    
+    for model in MODEL_LIST:
+        api_key = os.getenv(model["api_key_env"])
+        if not api_key:
+            continue
+
+        try:
+            if model["provider"] == "gemini_native":
+                gen = _stream_gemini_native(model["model_name"], api_key, enhanced_messages)
+            else:
+                kwargs = {
+                    "model": model["model_name"],
+                    "messages": enhanced_messages,
+                    "api_key": api_key,
+                    "stream": True,
+                    "timeout": 30,
+                }
+                if "base_url" in model:
+                    kwargs["api_base"] = model["base_url"]
+                gen = litellm.completion(**kwargs)
+
+            yield f"[MODEL:{model['label']}]\n"
+
+            if model["provider"] == "gemini_native":
+                for chunk in gen:
+                    yield chunk
+            else:
+                for chunk in gen:
+                    content = chunk.choices[0].delta.content
+                    if content:
+                        yield content
+
+            # Success — add sources at the end (single line, compact JSON)
+            if sources:
+                sources_json = json.dumps(sources, ensure_ascii=False, separators=(',', ':'))
+                yield f"\n\n[SOURCES:{sources_json}]"
+            
+            return
+
+        except Exception as e:
+            print(f"[Fallback] {model['label']} gagal: {e}")
+            continue
+
+    yield "❌ Maaf, semua layanan AI sedang tidak tersedia. Silakan coba lagi nanti."
