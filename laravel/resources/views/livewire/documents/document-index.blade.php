@@ -27,9 +27,9 @@
             </div>
         @endif
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
             <!-- Upload Area -->
-                <div class="lg:col-span-1 xl:col-span-1 space-y-6">
+            <div class="hidden lg:block lg:col-span-1 space-y-6">
                 <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
                     <h2 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Unggah Dokumen Baru</h2>
                     
@@ -102,10 +102,10 @@
             </div>
 
             <!-- Documents List -->
-            <div class="lg:col-span-2 xl:col-span-4">
+            <div class="lg:col-span-3">
                 <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
                     <div class="overflow-x-auto">
-                        <table class="min-w-full md:min-w-[900px] divide-y divide-gray-200 dark:divide-gray-700">
+                        <table class="min-w-full md:min-w-[1100px] divide-y divide-gray-200 dark:divide-gray-700">
                             <thead class="bg-gray-50 dark:bg-gray-700/50">
                                 <tr>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 tracking-wide">Nama File</th>
