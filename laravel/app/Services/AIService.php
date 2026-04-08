@@ -27,7 +27,7 @@ class AIService
      * @param string|null $user_id User ID for authorization in RAG mode
      * @return \Generator
      */
-    public function sendChat(array $messages, ?array $document_filenames = null, ?string $user_id = null)
+    public function sendChat(array $messages, ?array $document_filenames = null, ?string $user_id = null, bool $force_web_search = false)
     {
         try {
             $payload = [
@@ -41,6 +41,8 @@ class AIService
             if ($user_id !== null) {
                 $payload['user_id'] = $user_id;
             }
+            
+            $payload['force_web_search'] = $force_web_search;
             
             $response = $this->client->post($this->baseUrl . '/api/chat', [
                 'headers' => [

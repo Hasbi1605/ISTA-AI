@@ -73,7 +73,7 @@ def _stream_gemini_native(model_name: str, api_key: str, messages: List[Dict[str
                     continue
 
 
-def get_llm_stream(messages: List[Dict[str, str]]) -> Generator[str, None, None]:
+def get_llm_stream(messages: List[Dict[str, str]], force_web_search: bool = False) -> Generator[str, None, None]:
     """
     Generator that yields chunks of text from the best available LLM.
     Fallback sequence: Gemini -> Groq -> GitHub Models.
@@ -99,7 +99,7 @@ def get_llm_stream(messages: List[Dict[str, str]]) -> Generator[str, None, None]
     search_context = ""
     if query:
         try:
-            search_context = get_rag_context_for_prompt(query)
+            search_context = get_rag_context_for_prompt(query, force_web_search=force_web_search)
         except Exception as e:
             print(f"[Warning] Search/RAG context failed: {e}")
     

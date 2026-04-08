@@ -479,7 +479,7 @@ def get_langsearch_service() -> LangSearchService:
     return _langsearch_service
 
 
-def get_context_for_query(query: str) -> Dict:
+def get_context_for_query(query: str, force_web_search: bool = False) -> Dict:
     """
     Get context for LLM dari LangSearch + RAG documents.
     
@@ -502,7 +502,10 @@ def get_context_for_query(query: str) -> Dict:
     
     is_greeting = query_clean in greetings or (len(query_clean.split()) <= 3 and ("siapa" in query_clean or "hai" in query_clean or "halo" in query_clean))
     
-    if not is_greeting and len(query_clean) > 2:
+    # Memaksa pencarian web jika tombol dihidupkan, dan bukan sekedar sapaan pendek
+    if force_web_search:
+        search_results = langsearch.search(query)
+    elif not is_greeting and len(query_clean) > 2:
         search_results = langsearch.search(query)
         
     has_search = len(search_results) > 0
@@ -541,7 +544,7 @@ def get_context_for_query(query: str) -> Dict:
     }
 
 
-def get_rag_context_for_prompt(query: str, base_rag_prompt: str = "") -> str:
+def get_rag_context_for_prompt(query: str, base_rag_prompt: str = "", force_web_search: bool = False) -> str:
     """
     Build context string untuk inject ke system prompt.
     
@@ -552,7 +555,7 @@ def get_rag_context_for_prompt(query: str, base_rag_prompt: str = "") -> str:
     Returns:
         Formatted context string untuk system prompt
     """
-    context_data = get_context_for_query(query)
+    context_data = get_context_for_query(query, force_web_search=force_web_search)
     
     result_parts = []
     
