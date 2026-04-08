@@ -11,6 +11,20 @@ litellm.set_verbose = False
 # Model definitions (updated April 2026)
 MODEL_LIST = [
     {
+        "label": "GPT-5 Chat (Primary)",
+        "provider": "litellm",
+        "model_name": "openai/gpt-5-chat",
+        "api_key_env": "GITHUB_TOKEN",
+        "base_url": "https://models.inference.ai.azure.com",
+    },
+    {
+        "label": "GPT-5 Chat (Backup Node)",
+        "provider": "litellm",
+        "model_name": "openai/gpt-5-chat",
+        "api_key_env": "GITHUB_TOKEN_2",
+        "base_url": "https://models.inference.ai.azure.com",
+    },
+    {
         "label": "Gemini 3 Flash",
         "provider": "gemini_native",
         "model_name": "gemini-3-flash-preview",
@@ -21,13 +35,6 @@ MODEL_LIST = [
         "provider": "litellm",
         "model_name": "groq/llama-3.3-70b-versatile",
         "api_key_env": "GROQ_API_KEY",
-    },
-    {
-        "label": "GPT-4.1 Mini (GitHub)",
-        "provider": "litellm",
-        "model_name": "openai/gpt-4.1-mini",
-        "api_key_env": "GITHUB_TOKEN",
-        "base_url": "https://models.inference.ai.azure.com",
     },
 ]
 
@@ -144,6 +151,7 @@ def get_llm_stream(messages: List[Dict[str, str]]) -> Generator[str, None, None]
                     "api_key": api_key,
                     "stream": True,
                     "timeout": 30,
+                    "num_retries": 0,
                 }
                 if "base_url" in model:
                     kwargs["api_base"] = model["base_url"]
@@ -196,6 +204,7 @@ def get_llm_stream_with_sources(messages: List[Dict[str, str]], sources: List[Di
                     "api_key": api_key,
                     "stream": True,
                     "timeout": 30,
+                    "num_retries": 0,
                 }
                 if "base_url" in model:
                     kwargs["api_base"] = model["base_url"]

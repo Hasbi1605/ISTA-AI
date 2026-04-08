@@ -4,6 +4,7 @@ import logging
 import time
 import requests
 from typing import List, Tuple, Optional, Dict
+import re
 from dotenv import load_dotenv
 
 # Ensure .env is loaded (for standalone imports)
@@ -11,11 +12,10 @@ load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file_
 
 from langchain_community.document_loaders import UnstructuredFileLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_chroma import Chroma
 from langchain_core.embeddings import Embeddings
+from langchain_openai import OpenAIEmbeddings
 from langchain_core.documents import Document
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from app.services.langsearch_service import LangSearchService
 
 # Setup logging
@@ -27,292 +27,46 @@ EMBEDDING_TIMEOUT = int(os.getenv("EMBEDDING_TIMEOUT", "30"))
 
 # Embedding model list untuk fallback
 EMBEDDING_MODELS = [
-    # Lightweight Embeddings - PRIMARY (FREE UNLIMITED)
     {
-        "name": "Lightweight Embeddings",
-        "provider": "lightweight",
-        "model": os.getenv("LIGHTWEIGHT_EMBEDDINGS_MODEL", "bge-m3"),
-        "api_key_env": None,  # No API key required!
-    },
-    # Fallback providers
-    {
-        "name": "Gemini",
-        "provider": "google",
-        "model": "models/gemini-embedding-001",
-        "api_key_env": "GEMINI_API_KEY",
-    },
-    {
-        "name": "Jina AI",
-        "provider": "jina",
-        "model": "jina-embeddings-v5-text-small",
-        "api_key_env": "JINA_API_KEY",
-    },
-    {
-        "name": "Qwen",
-        "provider": "qwen",
-        "model": "text-embedding-v3",
-        "api_key_env": "QWEN_API_KEY",
+        "name": "GitHub Models (OpenAI Large)",
+        "provider": "github",
+        "model": "text-embedding-3-large",
+        "api_key_env": "GITHUB_TOKEN",
     }
 ]
 
-class JinaAIEmbeddings(Embeddings):
-    """Custom Jina AI Embeddings implementation menggunakan REST API."""
-    
-    def __init__(self, api_key: str, model: str = "jina-embeddings-v5-text-small"):
-        self.api_key = api_key
-        self.model = model
-        self.api_url = "https://api.jina.ai/v1/embeddings"
-        
-    def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        """Embed daftar dokumen menggunakan Jina AI API."""
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.api_key}"
-        }
-        
-        payload = {
-            "model": self.model,
-            "task": "retrieval.passage",  # Optimize untuk dokumen yang akan di-retrieve
-            "normalized": True,  # L2 normalization untuk cosine similarity
-            "input": texts
-        }
-        
-        response = requests.post(self.api_url, json=payload, headers=headers, timeout=EMBEDDING_TIMEOUT)
-        response.raise_for_status()
-        
-        data = response.json()
-        embeddings = [item["embedding"] for item in data["data"]]
-        return embeddings
-    
-    def embed_query(self, text: str) -> List[float]:
-        """Embed single query menggunakan Jina AI API."""
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.api_key}"
-        }
-        
-        payload = {
-            "model": self.model,
-            "task": "retrieval.query",  # Optimize untuk search query
-            "normalized": True,
-            "input": [text]
-        }
-        
-        response = requests.post(self.api_url, json=payload, headers=headers, timeout=EMBEDDING_TIMEOUT)
-        response.raise_for_status()
-        
-        data = response.json()
-        return data["data"][0]["embedding"]
 
-
-class QwenEmbeddings(Embeddings):
-    """
-    Custom Qwen/DashScope Embeddings implementation menggunakan OpenAI-compatible API.
-    
-    Model: text-embedding-v3
-    Dimensi: 1024 (default)
-    Free Quota: 500,000 token (90 hari)
-    Rate Limit: Lebih tinggi dari Gemini free tier
-    """
-    
-    def __init__(self, api_key: str, model: str = "text-embedding-v3"):
-        self.api_key = api_key
-        self.model = model
-        # DashScope OpenAI-compatible endpoint
-        self.api_url = "https://dashscope.aliyuncs.com/compatible-mode/v1/embeddings"
-        
-    def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        """Embed daftar dokumen menggunakan Qwen/DashScope API."""
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.api_key}"
-        }
-        
-        payload = {
-            "model": self.model,
-            "input": texts,
-            "encoding_format": "float"
-        }
-        
-        response = requests.post(self.api_url, json=payload, headers=headers, timeout=EMBEDDING_TIMEOUT)
-        response.raise_for_status()
-        
-        data = response.json()
-        embeddings = [item["embedding"] for item in data["data"]]
-        return embeddings
-    
-    def embed_query(self, text: str) -> List[float]:
-        """Embed single query menggunakan Qwen/DashScope API."""
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.api_key}"
-        }
-        
-        payload = {
-            "model": self.model,
-            "input": [text],
-            "encoding_format": "float"
-        }
-        
-        response = requests.post(self.api_url, json=payload, headers=headers, timeout=EMBEDDING_TIMEOUT)
-        response.raise_for_status()
-        
-        data = response.json()
-        return data["data"][0]["embedding"]
-
-
-class LightweightEmbeddings(Embeddings):
-    """
-    Lightweight Embeddings - FREE UNLIMITED API service.
-    
-    Host: HuggingFace Spaces
-    URL: https://lamhieu-lightweight-embeddings.hf.space
-    Models: bge-m3, multilingual-e5-large, snowflake-arctic-embed-l-v2.0, etc.
-    
-    Features:
-    - No API key required
-    - No rate limits
-    - 100+ languages
-    - Max 8192 tokens (bge-m3)
-    """
-    
-    def __init__(self, model: str = "bge-m3"):
-        self.model = model
-        self.api_url = os.getenv(
-            "LIGHTWEIGHT_EMBEDDINGS_URL",
-            "https://lamhieu-lightweight-embeddings.hf.space/v1/embeddings"
-        )
-        
-    def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        """Embed daftar dokumen menggunakan Lightweight Embeddings API."""
-        headers = {
-            "Content-Type": "application/json"
-        }
-        
-        payload = {
-            "model": self.model,
-            "input": texts
-        }
-        
-        try:
-            response = requests.post(
-                self.api_url, 
-                json=payload, 
-                headers=headers, 
-                timeout=EMBEDDING_TIMEOUT
-            )
-            response.raise_for_status()
-            
-            try:
-                data = response.json()
-            except json.JSONDecodeError as e:
-                raise ValueError(f"Invalid JSON response from Lightweight API: {e}")
-            
-            if "data" not in data or not data["data"]:
-                raise ValueError("Invalid response structure from Lightweight API")
-            
-            embeddings = [item["embedding"] for item in data["data"]]
-            return embeddings
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Lightweight Embeddings API error: {e}")
-            raise
-    
-    def embed_query(self, text: str) -> List[float]:
-        """Embed single query menggunakan Lightweight Embeddings API."""
-        headers = {
-            "Content-Type": "application/json"
-        }
-        
-        payload = {
-            "model": self.model,
-            "input": [text]
-        }
-        
-        try:
-            response = requests.post(
-                self.api_url, 
-                json=payload, 
-                headers=headers, 
-                timeout=EMBEDDING_TIMEOUT
-            )
-            response.raise_for_status()
-            
-            try:
-                data = response.json()
-            except json.JSONDecodeError as e:
-                raise ValueError(f"Invalid JSON response from Lightweight API: {e}")
-            
-            if "data" not in data or not data["data"]:
-                raise ValueError("Invalid response structure from Lightweight API")
-            
-            return data["data"][0]["embedding"]
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Lightweight Embeddings API error: {e}")
-            raise
-
-
-def get_embeddings():
-    """Initializes and returns the Google Generative AI embeddings model."""
-    # Model yang tersedia: gemini-embedding-001 (stable), gemini-embedding-2-preview (preview)
-    return GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001")
 
 def get_embeddings_with_fallback() -> Tuple[Optional[Embeddings], str]:
     """
     Mendapatkan embedding model dengan fallback mechanism.
-    Urutan: Lightweight Embeddings → Gemini → Jina AI → Qwen
+    Urutan: GitHub Models (OpenAI text-embedding-3-large)
     
     Returns:
         Tuple[Optional[Embeddings], str]: (embedding_object, provider_name)
     """
     for model_config in EMBEDDING_MODELS:
-        # Lightweight Embeddings tidak memerlukan API key
-        if model_config["api_key_env"] is not None:
-            api_key = os.getenv(model_config["api_key_env"])
-            if not api_key:
-                logger.warning(f"⚠️ {model_config['name']}: API key tidak ditemukan, skip...")
-                continue
-        else:
-            api_key = None  # No API key needed (e.g., Lightweight Embeddings)
+        api_key = os.getenv(model_config["api_key_env"])
+        if not api_key:
+            logger.warning(f"⚠️ {model_config['name']}: API key tidak ditemukan, pastikan GITHUB_TOKEN ada di .env")
+            continue
         
         try:
-            # Lightweight Embeddings handler - PRIMARY (FREE UNLIMITED)
-            if model_config["provider"] == "lightweight":
-                embeddings = LightweightEmbeddings(model=model_config["model"])
+            if model_config["provider"] == "github":
+                embeddings = OpenAIEmbeddings(
+                    model=model_config["model"],
+                    openai_api_base="https://models.inference.ai.azure.com",
+                    openai_api_key=api_key
+                )
                 # Test dengan embedding sederhana
                 _ = embeddings.embed_query("test")
-                logger.info(f"✅ Menggunakan {model_config['name']} untuk embeddings (FREE UNLIMITED)")
-                return embeddings, model_config["name"]
-                
-            elif model_config["provider"] == "google":
-                embeddings = GoogleGenerativeAIEmbeddings(model=model_config["model"])
-                # Test dengan embedding sederhana
-                _ = embeddings.embed_query("test")
-                logger.info(f"✅ Menggunakan {model_config['name']} untuk embeddings")
-                return embeddings, model_config["name"]
-                
-            elif model_config["provider"] == "jina":
-                embeddings = JinaAIEmbeddings(api_key=api_key, model=model_config["model"])
-                # Test dengan embedding sederhana
-                _ = embeddings.embed_query("test")
-                logger.info(f"✅ Menggunakan {model_config['name']} untuk embeddings")
-                return embeddings, model_config["name"]
-            
-            elif model_config["provider"] == "qwen":
-                embeddings = QwenEmbeddings(api_key=api_key, model=model_config["model"])
-                # Test dengan embedding sederhana
-                _ = embeddings.embed_query("test")
-                logger.info(f"✅ Menggunakan {model_config['name']} untuk embeddings")
+                logger.info(f"✅ Menggunakan {model_config['name']} untuk embeddings (Copilot Pro - 10M Tokens/min)")
                 return embeddings, model_config["name"]
                 
         except Exception as e:
             error_msg = str(e)
             logger.warning(f"⚠️ {model_config['name']} gagal: {error_msg}")
             
-            # Check jika rate limit error
-            if "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg or "rate limit" in error_msg.lower():
-                logger.warning(f"🚫 {model_config['name']} rate limit tercapai, mencoba provider berikutnya...")
-            continue
-    
     # Semua provider gagal
     logger.error("❌ Semua embedding provider gagal!")
     return None, "none"
@@ -368,7 +122,7 @@ def process_document(file_path: str, filename: str, user_id: str = "unknown"):
         # 4. Store in ChromaDB dengan rate limiting
         logger.info(f"Step 4: Generating embeddings dan storing ke ChromaDB...")
         logger.info(f"Using provider: {provider_name}")
-        logger.info(f"Rate limiting: 600ms delay per chunk untuk mencegah rate limit...")
+        logger.info(f"Batching: 10 chunks per request, 1.5s delay antar batch")
         
         vectorstore = Chroma(
             collection_name="documents_collection",
@@ -376,36 +130,35 @@ def process_document(file_path: str, filename: str, user_id: str = "unknown"):
             persist_directory=CHROMA_PATH
         )
         
-        # Process chunks dengan rate limiting (600ms delay antar chunk)
-        # Ini membatasi ke ~100 requests/minute (safe untuk free tier)
+        # Memproses chunk dalam batching (batch size 10) untuk efisiensi HTTP API 
+        # dan mencegah HF Spaces Nginx Drop / Rate Limits
+        batch_size = 10
         successful_chunks = 0
         failed_chunks = 0
         
-        for i, chunk in enumerate(chunks):
+        for i in range(0, len(chunks), batch_size):
+            batch = chunks[i:i+batch_size]
             try:
-                # Add delay только untuk non-Lightweight providers (yang butuh rate limiting)
-                if i > 0 and provider_name != "Lightweight Embeddings":
-                    time.sleep(0.6)  # 600ms delay
+                # Add delay untuk setiap batch untuk mencegah rate limit HF Spaces / provider lain
+                if i > 0 and provider_name != "GitHub Models (OpenAI Large)":
+                    time.sleep(1.5)
                 
-                vectorstore.add_documents([chunk])
-                successful_chunks += 1
-                
-                # Log progress setiap 5 chunks
-                if (i + 1) % 5 == 0:
-                    logger.info(f"Progress: {i + 1}/{len(chunks)} chunks processed...")
+                vectorstore.add_documents(batch)
+                successful_chunks += len(batch)
+                logger.info(f"Progress: {successful_chunks}/{len(chunks)} chunks processed...")
                     
-            except Exception as chunk_error:
-                failed_chunks += 1
-                error_msg = str(chunk_error)
-                logger.error(f"❌ Error processing chunk {i + 1}: {error_msg}")
+            except Exception as batch_error:
+                error_msg = str(batch_error)
+                logger.error(f"❌ Error processing batch {i//batch_size + 1}: {error_msg}")
                 
-                # Jika rate limit, coba fallback ke provider berikutnya
-                if "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg:
-                    logger.warning(f"🚫 Rate limit detected pada chunk {i + 1}, mencoba fallback...")
+                # Jika error atau rate limit, coba fallback ke provider berikutnya
+                if "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg or "rate limit" in error_msg.lower() or "503" in error_msg:
+                    logger.warning(f"🚫 Rate limit detected pada batch {i//batch_size + 1}, mencoba fallback...")
                     
                     # Coba dapatkan provider berikutnya
                     embeddings, provider_name = get_embeddings_with_fallback()
                     if embeddings is None:
+                        failed_chunks += len(batch)
                         raise Exception(f"Semua embedding provider gagal setelah {successful_chunks} chunks berhasil.")
                     
                     # Update vectorstore dengan embedding model baru
@@ -415,19 +168,22 @@ def process_document(file_path: str, filename: str, user_id: str = "unknown"):
                         persist_directory=CHROMA_PATH
                     )
                     
-                    # Update metadata
+                    # Update metadata untuk sisa chunk
                     for remaining_chunk in chunks[i:]:
                         remaining_chunk.metadata["embedding_model"] = provider_name
                     
-                    # Retry chunk yang gagal
+                    # Retry batch yang gagal
                     try:
-                        time.sleep(1)  # Extra delay setelah rate limit
-                        vectorstore.add_documents([chunk])
-                        successful_chunks += 1
-                        logger.info(f"✅ Chunk {i + 1} berhasil dengan {provider_name}")
+                        time.sleep(2)  # Extra delay setelah rate limit
+                        vectorstore.add_documents(batch)
+                        successful_chunks += len(batch)
+                        logger.info(f"✅ Batch {i//batch_size + 1} berhasil dengan {provider_name}")
                     except Exception as retry_error:
-                        logger.error(f"❌ Chunk {i + 1} tetap gagal setelah fallback: {retry_error}")
+                        logger.error(f"❌ Batch {i//batch_size + 1} tetap gagal setelah fallback: {retry_error}")
+                        failed_chunks += len(batch)
                         continue
+                else:
+                    failed_chunks += len(batch)
         
         # Summary
         logger.info(f"✅ Document '{filename}' processed successfully")
@@ -737,9 +493,18 @@ def get_context_for_query(query: str) -> Dict:
             - has_rag: bool
             - search_context: str (formatted untuk system prompt)
     """
-    # Step 1: Always call LangSearch (search-first strategy)
+    # Step 1: Filter sapaan (Greetings) agar tidak membuang kuota web search
     langsearch = get_langsearch_service()
-    search_results = langsearch.search(query)
+    search_results = []
+    
+    query_clean = re.sub(r'[^\w\s]', '', query.lower().strip())
+    greetings = ["hai", "halo", "hello", "hi", "siapa kamu", "siapa anda", "kamu siapa", "test", "tes", "terima kasih", "makasih", "ok", "oke", "pagi", "siang", "sore", "malam", "terimakasih"]
+    
+    is_greeting = query_clean in greetings or (len(query_clean.split()) <= 3 and ("siapa" in query_clean or "hai" in query_clean or "halo" in query_clean))
+    
+    if not is_greeting and len(query_clean) > 2:
+        search_results = langsearch.search(query)
+        
     has_search = len(search_results) > 0
     
     # Build search context for system prompt

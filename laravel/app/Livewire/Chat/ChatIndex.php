@@ -126,6 +126,9 @@ class ChatIndex extends Component
 
     public function sendMessage(AIService $aiService)
     {
+        // Mencegah PHP kill process (Time Limit Exceeded) akibat lamanya process LLM
+        set_time_limit(120);
+
         $this->validate([
             'prompt' => 'required|string|min:1',
         ]);

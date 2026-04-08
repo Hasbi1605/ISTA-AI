@@ -49,7 +49,8 @@ class AIService
                     'Content-Type' => 'application/json',
                 ],
                 'json' => $payload,
-                'stream' => True,
+                'stream' => true,
+                'timeout' => 120, // Tambahkan timeout yang aman (120 detik)
             ]);
 
             $body = $response->getBody();
