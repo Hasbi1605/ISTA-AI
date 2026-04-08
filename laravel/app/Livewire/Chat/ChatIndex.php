@@ -22,6 +22,7 @@ class ChatIndex extends Component
     public $showDocumentSelector = false;
     public $sources = [];
     public $showOlderChats = false;
+    public $webSearchMode = false; // false = auto, true = force/on
     
     // Maximum chats to show before "Show More"
     const MAX_VISIBLE_CHATS = 10;
@@ -102,6 +103,11 @@ class ChatIndex extends Component
         $this->showOlderChats = !$this->showOlderChats;
     }
 
+    public function toggleWebSearch()
+    {
+        $this->webSearchMode = !$this->webSearchMode;
+    }
+
     public function deleteConversation($id)
     {
         $conversation = Conversation::where('id', $id)
@@ -179,7 +185,7 @@ class ChatIndex extends Component
         }
         
         // Fetch stream from AIService
-        foreach ($aiService->sendChat($history, $documentFilenames, (string) Auth::id()) as $chunk) {
+        foreach ($aiService->sendChat($history, $documentFilenames, (string) Auth::id(), $this->webSearchMode) as $chunk) {
             // Parse model indicator from the first chunk
             if (preg_match('/\[MODEL:(.+?)\]\n?/', $chunk, $matches)) {
                 $modelName = $matches[1];

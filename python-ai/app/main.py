@@ -34,6 +34,7 @@ class ChatRequest(BaseModel):
     messages: List[Dict[str, str]]
     document_filenames: Optional[List[str]] = None
     user_id: Optional[str] = None  # For authorization in RAG mode
+    force_web_search: bool = False
 
 @app.get("/api/health", response_model=HealthResponse)
 async def health_check():
@@ -86,19 +87,19 @@ async def chat_stream(request: ChatRequest):
                 # RAG search succeeded but no relevant chunks found
                 def rag_warning_stream():
                     yield "[⚠️ RAG: Tidak ada konteks relevan ditemukan dari dokumen yang dipilih. Menjawab berdasarkan pengetahuan umum...]\n\n"
-                    for chunk in get_llm_stream(request.messages):
+                    for chunk in get_llm_stream(request.messages, force_web_search=request.force_web_search):
                         yield chunk
                 return StreamingResponse(rag_warning_stream(), media_type="text/event-stream")
             else:
                 # RAG search failed - user_id might be missing or other error
                 def rag_error_stream():
                     yield "[⚠️ RAG: Tidak dapat mencari konteks dari dokumen. Pastikan Anda memiliki akses ke dokumen yang dipilih.]\n\n"
-                    for chunk in get_llm_stream(request.messages):
+                    for chunk in get_llm_stream(request.messages, force_web_search=request.force_web_search):
                         yield chunk
                 return StreamingResponse(rag_error_stream(), media_type="text/event-stream")
     
     # Regular chat mode (no RAG)
-    return StreamingResponse(get_llm_stream(request.messages), media_type="text/event-stream")
+    return StreamingResponse(get_llm_stream(request.messages, force_web_search=request.force_web_search), media_type="text/event-stream")
 
 if __name__ == "__main__":
     import uvicorn
