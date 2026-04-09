@@ -54,7 +54,7 @@ class AuthenticationTest extends TestCase
         $this->assertGuest();
     }
 
-    public function test_navigation_menu_can_be_rendered(): void
+    public function test_chat_page_can_be_rendered_for_authenticated_user(): void
     {
         $user = User::factory()->create();
 
@@ -64,7 +64,7 @@ class AuthenticationTest extends TestCase
 
         $response
             ->assertOk()
-            ->assertSeeVolt('layout.navigation');
+            ->assertSee('ISTA AI');
     }
 
     public function test_users_can_logout(): void

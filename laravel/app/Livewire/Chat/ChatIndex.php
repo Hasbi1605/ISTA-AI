@@ -9,6 +9,7 @@ use App\Models\Document;
 use App\Services\AIService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -34,9 +35,16 @@ class ChatIndex extends Component
     public $attachmentUploadStatus = null;
     public $attachmentUploadMessage = '';
     public $uploadingAttachmentName = null;
+    public $hasDocumentsInProgress = false;
 
     // Maximum chats to show before "Show More"
     const MAX_VISIBLE_CHATS = 10;
+
+    private const ALLOWED_ATTACHMENT_MIME_TYPES = [
+        'application/pdf',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ];
 
     public function mount($id = null)
     {
@@ -50,14 +58,37 @@ class ChatIndex extends Component
 
     public function loadConversations()
     {
-        $this->conversations = Auth::user()->conversations()->orderBy('updated_at', 'desc')->get();
+        /** @var \App\Models\User|null $user */
+        $user = Auth::user();
+
+        if (!$user) {
+            $this->conversations = collect();
+            return;
+        }
+
+        $this->conversations = $user->conversations()->orderBy('updated_at', 'desc')->get();
     }
 
     public function loadAvailableDocuments()
     {
-        $this->availableDocuments = Document::where('user_id', Auth::id())
+        $documents = Document::where('user_id', Auth::id())
             ->orderBy('created_at', 'desc')
             ->get();
+
+        $this->hasDocumentsInProgress = $documents->contains(function (Document $document) {
+            return in_array($document->status, ['pending', 'processing'], true);
+        });
+
+        $this->availableDocuments = $documents;
+    }
+
+    protected function getReadyDocumentIds(): array
+    {
+        return Document::where('user_id', Auth::id())
+            ->where('status', 'ready')
+            ->pluck('id')
+            ->map(fn($id) => (int) $id)
+            ->toArray();
     }
 
     public function loadConversation($id)
@@ -104,20 +135,12 @@ class ChatIndex extends Component
 
     public function selectAllDocuments()
     {
-        $this->selectedDocuments = Document::where('user_id', Auth::id())
-            ->where('status', 'ready')
-            ->pluck('id')
-            ->map(fn($id) => (int) $id)
-            ->toArray();
+        $this->selectedDocuments = $this->getReadyDocumentIds();
     }
 
     public function toggleSelectAllDocuments()
     {
-        $allDocumentIds = Document::where('user_id', Auth::id())
-            ->where('status', 'ready')
-            ->pluck('id')
-            ->map(fn($id) => (int) $id)
-            ->toArray();
+        $allDocumentIds = $this->getReadyDocumentIds();
 
         $selectedIds = array_map('intval', $this->selectedDocuments);
         sort($allDocumentIds);
@@ -138,11 +161,7 @@ class ChatIndex extends Component
 
     public function updatedSelectedDocuments()
     {
-        $availableIds = Document::where('user_id', Auth::id())
-            ->where('status', 'ready')
-            ->pluck('id')
-            ->map(fn($id) => (int) $id)
-            ->toArray();
+        $availableIds = $this->getReadyDocumentIds();
 
         $availableMap = array_flip($availableIds);
         $this->selectedDocuments = array_values(array_filter(array_map('intval', $this->selectedDocuments), function ($id) use ($availableMap) {
@@ -152,7 +171,11 @@ class ChatIndex extends Component
 
     public function addSelectedDocumentsToChat()
     {
-        $this->conversationDocuments = array_values(array_unique($this->selectedDocuments));
+        $readyMap = array_flip($this->getReadyDocumentIds());
+
+        $this->conversationDocuments = array_values(array_filter(array_unique(array_map('intval', $this->selectedDocuments)), function ($id) use ($readyMap) {
+            return isset($readyMap[$id]);
+        }));
     }
 
     public function clearConversationDocuments()
@@ -250,8 +273,35 @@ class ChatIndex extends Component
     {
         try {
             $this->validate([
-                'chatAttachment' => 'required|file|mimes:pdf,docx,xlsx|max:51200',
+                'chatAttachment' => [
+                    'required',
+                    'file',
+                    'mimes:pdf,docx,xlsx',
+                    'mimetypes:' . implode(',', self::ALLOWED_ATTACHMENT_MIME_TYPES),
+                    'max:51200',
+                ],
             ]);
+
+            $originalName = $this->chatAttachment->getClientOriginalName();
+            $detectedMimeType = (string) $this->chatAttachment->getMimeType();
+
+            if (!in_array($detectedMimeType, self::ALLOWED_ATTACHMENT_MIME_TYPES, true)) {
+                throw ValidationException::withMessages([
+                    'chatAttachment' => 'Tipe MIME file tidak valid. Gunakan PDF, DOCX, atau XLSX.',
+                ]);
+            }
+
+            $duplicateExists = Document::where('user_id', Auth::id())
+                ->where('original_name', $originalName)
+                ->exists();
+
+            if ($duplicateExists) {
+                $this->attachmentUploadStatus = 'error';
+                $this->attachmentUploadMessage = 'File dengan nama yang sama sudah pernah diunggah.';
+                session()->flash('error', $this->attachmentUploadMessage);
+                $this->reset('chatAttachment');
+                return;
+            }
 
             $documentCount = Document::where('user_id', Auth::id())->count();
             if ($documentCount >= 10) {
@@ -264,7 +314,6 @@ class ChatIndex extends Component
 
             $this->isUploadingAttachment = true;
 
-            $originalName = $this->chatAttachment->getClientOriginalName();
             $this->uploadingAttachmentName = $originalName;
             $filename = time() . '_' . $this->chatAttachment->hashName();
             $filePath = $this->chatAttachment->storeAs('documents/' . Auth::id(), $filename);
@@ -274,6 +323,8 @@ class ChatIndex extends Component
                 'filename' => $filename,
                 'original_name' => $originalName,
                 'file_path' => $filePath,
+                'mime_type' => $detectedMimeType,
+                'file_size_bytes' => $this->chatAttachment->getSize(),
                 'status' => 'pending',
             ]);
 
@@ -283,6 +334,11 @@ class ChatIndex extends Component
             $this->attachmentUploadStatus = 'success';
             $this->attachmentUploadMessage = 'Upload berhasil. Dokumen sedang diproses.';
             $this->loadAvailableDocuments();
+        } catch (ValidationException $e) {
+            $message = $e->validator->errors()->first('chatAttachment') ?: 'Upload gagal. Periksa format file dan coba lagi.';
+            session()->flash('error', $message);
+            $this->attachmentUploadStatus = 'error';
+            $this->attachmentUploadMessage = $message;
         } catch (\Throwable $e) {
             session()->flash('error', 'Gagal mengunggah dokumen: ' . $e->getMessage());
             $this->attachmentUploadStatus = 'error';
