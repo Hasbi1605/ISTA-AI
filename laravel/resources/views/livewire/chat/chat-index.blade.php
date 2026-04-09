@@ -3,6 +3,15 @@
         showRightSidebar: true,
         isDraggingFile: false,
         dragDepth: 0,
+        dropError: '',
+        setDropError(message) {
+            this.dropError = message;
+            setTimeout(() => {
+                if (this.dropError === message) {
+                    this.dropError = '';
+                }
+            }, 3500);
+        },
         onDragEnter(event) {
             if (!event.dataTransfer || !Array.from(event.dataTransfer.types || []).includes('Files')) return;
             this.dragDepth += 1;
@@ -18,16 +27,49 @@
             if (this.dragDepth === 0) this.isDraggingFile = false;
         },
         onDropFile(event) {
-            const files = event.dataTransfer ? event.dataTransfer.files : null;
-            this.dragDepth = 0;
-            this.isDraggingFile = false;
-            if (!files || files.length === 0 || !$refs.chatAttachmentInput) return;
-            $refs.chatAttachmentInput.files = files;
-            $refs.chatAttachmentInput.dispatchEvent(new Event('change', { bubbles: true }));
-            this.showRightSidebar = true;
+            try {
+                const files = event.dataTransfer ? event.dataTransfer.files : null;
+                this.dragDepth = 0;
+                this.isDraggingFile = false;
+
+                if (!files || files.length === 0 || !$refs.chatAttachmentInput) return;
+                if (files.length > 1) {
+                    this.setDropError('Hanya bisa upload 1 file sekaligus.');
+                    return;
+                }
+
+                const file = files[0];
+                const maxSize = 50 * 1024 * 1024;
+                if (file.size > maxSize) {
+                    this.setDropError('File terlalu besar. Maksimal 50MB.');
+                    return;
+                }
+
+                const allowedMimeTypes = [
+                    'application/pdf',
+                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                ];
+                const extension = (file.name.split('.').pop() || '').toLowerCase();
+                const allowedExtensions = ['pdf', 'docx', 'xlsx'];
+
+                if (!allowedMimeTypes.includes(file.type) || !allowedExtensions.includes(extension)) {
+                    this.setDropError('Format file tidak didukung. Gunakan PDF, DOCX, atau XLSX.');
+                    return;
+                }
+
+                this.dropError = '';
+                $refs.chatAttachmentInput.files = files;
+                $refs.chatAttachmentInput.dispatchEvent(new Event('change', { bubbles: true }));
+                this.showRightSidebar = true;
+            } catch (error) {
+                console.error('Upload error:', error);
+                this.setDropError('Gagal upload file. Silakan coba lagi.');
+            }
         },
         openAttachmentPicker() {
             this.showRightSidebar = true;
+            this.dropError = '';
             if (!$refs.chatAttachmentInput) return;
             $refs.chatAttachmentInput.value = '';
             $refs.chatAttachmentInput.click();
@@ -39,28 +81,22 @@
      x-on:drop.window.prevent="onDropFile($event)"
      class="flex h-screen w-full overflow-hidden bg-white dark:bg-[#020618] text-gray-800 dark:text-gray-100 font-sans transition-colors duration-300">
     @php
-        $figmaIcons = [
-            'newChatLight' => 'https://www.figma.com/api/mcp/asset/54b32ad9-c412-4b02-b9f3-e3007e448c09',
-            'newChatDark' => 'https://www.figma.com/api/mcp/asset/c15b657e-874e-43ff-9699-4b38471e8a19',
-            'historyLight' => 'https://www.figma.com/api/mcp/asset/737d71f1-44b9-4f7a-89b1-4dca6a4b52bf',
-            'historyDark' => 'https://www.figma.com/api/mcp/asset/0d73e015-d413-4add-b0bb-5654cc026019',
-            'deleteLight' => 'https://www.figma.com/api/mcp/asset/375910c1-98cb-461c-91aa-59272c9b4518',
-            'deleteDark' => 'https://www.figma.com/api/mcp/asset/87c324d3-8145-4a35-905f-5c56f68c7501',
-            'collapseLeftLight' => 'https://www.figma.com/api/mcp/asset/1451c6ec-d21b-443c-b1b4-a7d5abe111d0',
-            'collapseLeftDark' => 'https://www.figma.com/api/mcp/asset/b6f0ca91-be1e-4093-9706-40fe5c9ee1ef',
-            'themeLight' => 'https://www.figma.com/api/mcp/asset/c69ac7fc-4ac2-4455-82c1-27cf2a8fa815',
-            'themeDark' => 'https://www.figma.com/api/mcp/asset/4fb1770b-9aab-4801-928b-7eb6eb0510d7',
-            'collapseRightLight' => 'https://www.figma.com/api/mcp/asset/3fa47715-a04a-40b1-9580-c08707b3e96e',
-            'collapseRightDark' => 'https://www.figma.com/api/mcp/asset/66a5a12f-e6a3-40ad-a0c4-04236cfe4c66',
-            'searchLight' => 'https://www.figma.com/api/mcp/asset/700547b4-8978-454f-ae29-dd39a972be17',
-            'searchDark' => 'https://www.figma.com/api/mcp/asset/4476156b-07bd-49e2-84e5-6a2ff4e46f30',
-            'uploadLight' => 'https://www.figma.com/api/mcp/asset/5616ec8b-09e7-4e38-bd5f-1b7a20bdb5a4',
-            'uploadDark' => 'https://www.figma.com/api/mcp/asset/9d77789a-1e70-4bf4-b08d-ae55c16351bf',
-            'sendLight' => 'https://www.figma.com/api/mcp/asset/bf2e7ecb-d0c4-467c-952b-8b0b2793152d',
-            'sendDark' => 'https://www.figma.com/api/mcp/asset/7da97f1b-dacc-4875-baf2-a63b2f0d537c',
+        $uiIcons = [
+            'historyLight' => asset('images/icons/history-light.svg'),
+            'historyDark' => asset('images/icons/history-dark.svg'),
+            'collapseLeftLight' => asset('images/icons/collapse-left-light.svg'),
+            'collapseLeftDark' => asset('images/icons/collapse-left-dark.svg'),
+            'collapseRightLight' => asset('images/icons/collapse-right-light.svg'),
+            'collapseRightDark' => asset('images/icons/collapse-right-dark.svg'),
+            'searchLight' => asset('images/icons/search-light.svg'),
+            'searchDark' => asset('images/icons/search-dark.svg'),
+            'uploadLight' => asset('images/icons/upload-light.svg'),
+            'uploadDark' => asset('images/icons/upload-dark.svg'),
+            'sendLight' => asset('images/icons/send-light.svg'),
+            'sendDark' => asset('images/icons/send-dark.svg'),
         ];
     @endphp
-    
+
     <!-- LEFT SIDEBAR: Chat History -->
     <aside 
         :class="showLeftSidebar ? 'w-[288px] opacity-100 translate-x-0 border-r border-[#E2E8F0] dark:border-[#1E293B]' : 'w-0 opacity-0 -translate-x-3 border-r border-transparent pointer-events-none'"
@@ -69,8 +105,9 @@
         <!-- New Chat Button -->
         <div class="p-4 pt-5 pb-5">
             <button wire:click="startNewChat" class="w-full flex items-center justify-start px-4 py-2.5 rounded-lg border border-[#E2E8F0] dark:border-[#334155] dark:bg-transparent bg-white hover:bg-gray-50 dark:hover:bg-white/5 font-medium text-[13px] text-gray-700 dark:text-gray-200 transition-all duration-200 shadow-sm">
-                <img src="{{ $figmaIcons['newChatLight'] }}" alt="" class="h-4 w-4 mr-2 dark:hidden" />
-                <img src="{{ $figmaIcons['newChatDark'] }}" alt="" class="h-4 w-4 mr-2 hidden dark:block" />
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-[#64748B] dark:text-[#CBD5E1]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 5v14m-7-7h14" />
+                </svg>
                 New Chat
             </button>
         </div>
@@ -90,8 +127,8 @@
                             <button wire:click="loadConversation({{ $conversation->id }})" 
                                class="w-full text-left px-3 py-2 rounded-md flex items-center transition-colors duration-200 {{ $currentConversationId == $conversation->id ? 'bg-[#E2E8F0] dark:bg-[#1E293B] text-[#0F172A] dark:text-[#F8FAFC] font-medium' : 'hover:bg-black/5 dark:hover:bg-white/5 text-[#334155] dark:text-[#CBD5E1]' }}">
                                <!-- Chat icon -->
-                               <img src="{{ $figmaIcons['historyLight'] }}" alt="" class="h-4 w-4 mr-2.5 flex-shrink-0 dark:hidden" />
-                               <img src="{{ $figmaIcons['historyDark'] }}" alt="" class="h-4 w-4 mr-2.5 flex-shrink-0 hidden dark:block" />
+                                         <img src="{{ $uiIcons['historyLight'] }}" alt="" class="h-4 w-4 mr-2.5 flex-shrink-0 dark:hidden" />
+                                         <img src="{{ $uiIcons['historyDark'] }}" alt="" class="h-4 w-4 mr-2.5 flex-shrink-0 hidden dark:block" />
                                <span class="truncate text-[13.2px]" title="{{ $conversation->title }}">{{ $conversation->title }}</span>
                             </button>
                             <button wire:click="deleteConversation({{ $conversation->id }})"
@@ -122,8 +159,8 @@
                                 <button wire:click="loadConversation({{ $conversation->id }})" 
                                    class="w-full text-left px-3 py-2 rounded-md flex items-center transition-colors duration-200 {{ $currentConversationId == $conversation->id ? 'bg-[#E2E8F0] dark:bg-[#1E293B] text-[#0F172A] dark:text-[#F8FAFC] font-medium' : 'hover:bg-black/5 dark:hover:bg-white/5 text-[#334155] dark:text-[#CBD5E1]' }}">
                                     <!-- Chat icon -->
-                                    <img src="{{ $figmaIcons['historyLight'] }}" alt="" class="h-4 w-4 mr-2.5 flex-shrink-0 dark:hidden" />
-                                    <img src="{{ $figmaIcons['historyDark'] }}" alt="" class="h-4 w-4 mr-2.5 flex-shrink-0 hidden dark:block" />
+                                    <img src="{{ $uiIcons['historyLight'] }}" alt="" class="h-4 w-4 mr-2.5 flex-shrink-0 dark:hidden" />
+                                    <img src="{{ $uiIcons['historyDark'] }}" alt="" class="h-4 w-4 mr-2.5 flex-shrink-0 hidden dark:block" />
                                     <span class="truncate text-[13.2px]" title="{{ $conversation->title }}">{{ $conversation->title }}</span>
                                 </button>
                                 <button wire:click="deleteConversation({{ $conversation->id }})"
@@ -151,7 +188,7 @@
                     </svg>
                 </div>
                 <div>
-                    <h4 class="text-[13.1px] font-medium leading-tight">Upgrade to Pro</h4>
+                    <h4 class="text-[13.1px] font-medium leading-tight">Settings</h4>
                     <p class="text-[11.3px] text-gray-500 dark:text-gray-400">More models & features</p>
                 </div>
              </a>
@@ -166,8 +203,8 @@
             <!-- Left toggler and title -->
             <div class="flex items-center gap-4">
                 <button @click="showLeftSidebar = !showLeftSidebar" class="p-2 rounded-[10px] hover:bg-[#F1F5F9] dark:hover:bg-[#1D293D] transition-colors">
-                    <img src="{{ $figmaIcons['collapseLeftLight'] }}" alt="" class="h-5 w-5 dark:hidden transition-transform duration-300 ease-in-out" :class="showLeftSidebar ? 'rotate-0' : 'rotate-180'" />
-                    <img src="{{ $figmaIcons['collapseLeftDark'] }}" alt="" class="h-5 w-5 hidden dark:block transition-transform duration-300 ease-in-out" :class="showLeftSidebar ? 'rotate-0' : 'rotate-180'" />
+                    <img src="{{ $uiIcons['collapseLeftLight'] }}" alt="" class="h-5 w-5 dark:hidden transition-transform duration-300 ease-in-out" :class="showLeftSidebar ? 'rotate-0' : 'rotate-180'" />
+                    <img src="{{ $uiIcons['collapseLeftDark'] }}" alt="" class="h-5 w-5 hidden dark:block transition-transform duration-300 ease-in-out" :class="showLeftSidebar ? 'rotate-0' : 'rotate-180'" />
                 </button>
                 <h2 class="text-[17px] font-bold tracking-tight text-[#0F172A] dark:text-[#F8FAFC]">ISTA AI</h2>
             </div>
@@ -176,13 +213,17 @@
             <div class="flex items-center gap-3">
                 <!-- Theme Toggle Button -->
                 <button @click="darkMode = !darkMode" class="p-2 rounded-[10px] hover:bg-[#F1F5F9] dark:hover:bg-[#1D293D] transition-colors">
-                    <img src="{{ $figmaIcons['themeLight'] }}" alt="" class="h-5 w-5 dark:hidden" />
-                    <img src="{{ $figmaIcons['themeDark'] }}" alt="" class="h-5 w-5 hidden dark:block" />
+                    <svg x-show="!darkMode" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#64748B]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 3v2.5M12 18.5V21M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M3 12h2.5M18.5 12H21M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8M12 16a4 4 0 100-8 4 4 0 000 8z" />
+                    </svg>
+                    <svg x-show="darkMode" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#CBD5E1]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z" />
+                    </svg>
                 </button>
 
                 <button @click="showRightSidebar = !showRightSidebar" class="p-2 rounded-[10px] hover:bg-[#F1F5F9] dark:hover:bg-[#1D293D] transition-colors">
-                    <img src="{{ $figmaIcons['collapseRightLight'] }}" alt="" class="h-5 w-5 dark:hidden transition-transform duration-300 ease-in-out" :class="showRightSidebar ? 'rotate-0' : 'rotate-180'" />
-                    <img src="{{ $figmaIcons['collapseRightDark'] }}" alt="" class="h-5 w-5 hidden dark:block transition-transform duration-300 ease-in-out" :class="showRightSidebar ? 'rotate-0' : 'rotate-180'" />
+                    <img src="{{ $uiIcons['collapseRightLight'] }}" alt="" class="h-5 w-5 dark:hidden transition-transform duration-300 ease-in-out" :class="showRightSidebar ? 'rotate-0' : 'rotate-180'" />
+                    <img src="{{ $uiIcons['collapseRightDark'] }}" alt="" class="h-5 w-5 hidden dark:block transition-transform duration-300 ease-in-out" :class="showRightSidebar ? 'rotate-0' : 'rotate-180'" />
                 </button>
             </div>
         </div>
@@ -217,9 +258,16 @@
                         </div>
 
                         <div class="flex flex-col gap-1 w-full">
+                            @php
+                                $messageTime = !empty($message['created_at'])
+                                    ? \Illuminate\Support\Carbon::parse($message['created_at'])->format('h:i A')
+                                    : null;
+                            @endphp
                             <div class="flex items-center gap-2 mb-1">
                                 <span class="text-[13px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">{{ $message['role'] == 'user' ? 'You' : 'ISTA AI' }}</span>
-                                <span class="text-[10px] text-gray-400 dark:text-[#64748B]">10:00 AM</span>
+                                @if($messageTime)
+                                    <span class="text-[10px] text-gray-400 dark:text-[#64748B]">{{ $messageTime }}</span>
+                                @endif
                             </div>
 
                             @if($message['role'] == 'assistant')
@@ -341,22 +389,22 @@
                         <div class="flex items-center gap-2 pl-2">
                             <!-- Toggle Search -->
                             <button type="button" wire:click="toggleWebSearch" class="h-[30px] px-[13px] border border-transparent rounded-full text-[11.4px] font-normal flex items-center gap-[6px] transition-colors {{ $webSearchMode ? 'bg-[#E2E8F0] text-[#334155] dark:bg-[#314158] dark:text-[#E2E8F0]' : 'bg-[#F1F5F9] text-[#62748E] dark:bg-[#1D293D] dark:text-[#62748E]' }}">
-                                <img src="{{ $figmaIcons['searchLight'] }}" alt="" class="w-[14px] h-[14px] dark:hidden" />
-                                <img src="{{ $figmaIcons['searchDark'] }}" alt="" class="w-[14px] h-[14px] hidden dark:block" />
+                                <img src="{{ $uiIcons['searchLight'] }}" alt="" class="w-[14px] h-[14px] dark:hidden" />
+                                <img src="{{ $uiIcons['searchDark'] }}" alt="" class="w-[14px] h-[14px] hidden dark:block" />
                                 <span>Search</span>
                             </button>
 
                             <button type="button" @click="openAttachmentPicker()" wire:loading.attr="disabled" wire:target="chatAttachment" class="h-[34px] w-[34px] rounded-full transition-colors flex items-center justify-center hover:bg-[#F1F5F9] dark:hover:bg-[#1D293D] disabled:opacity-60" title="Attach file">
-                                <img src="{{ $figmaIcons['uploadLight'] }}" alt="" class="h-[18px] w-[18px] dark:hidden" />
-                                <img src="{{ $figmaIcons['uploadDark'] }}" alt="" class="h-[18px] w-[18px] hidden dark:block" />
+                                <img src="{{ $uiIcons['uploadLight'] }}" alt="" class="h-[18px] w-[18px] dark:hidden" />
+                                <img src="{{ $uiIcons['uploadDark'] }}" alt="" class="h-[18px] w-[18px] hidden dark:block" />
                             </button>
 
                             <!-- Send -->
                             <button type="submit" 
                                     wire:loading.attr="disabled"
                                     class="bg-[#F1F5F9] dark:bg-[#1D293D] hover:bg-[#E2E8F0] dark:hover:bg-[#314158] disabled:opacity-50 rounded-full transition-colors h-[32px] w-[32px] flex items-center justify-center">
-                                <img src="{{ $figmaIcons['sendLight'] }}" alt="" class="h-[17px] w-[17px] dark:hidden" />
-                                <img src="{{ $figmaIcons['sendDark'] }}" alt="" class="h-[17px] w-[17px] hidden dark:block" />
+                                <img src="{{ $uiIcons['sendLight'] }}" alt="" class="h-[17px] w-[17px] dark:hidden" />
+                                <img src="{{ $uiIcons['sendDark'] }}" alt="" class="h-[17px] w-[17px] hidden dark:block" />
                             </button>
                         </div>
                     </div>
@@ -371,6 +419,7 @@
                     </div>
                 </div>
             </form>
+            <p x-show="dropError" x-transition.opacity class="max-w-3xl mx-auto mt-2 text-xs text-red-500 dark:text-red-400" x-text="dropError"></p>
             <div class="text-center mt-3 text-[11px] text-[#94A3B8] dark:text-[#64748B]">
                 ISTA AI can make mistakes. Consider verifying critical information.
             </div>
@@ -389,7 +438,7 @@
             </h3>
         </div>
         
-        <div class="flex-1 overflow-y-auto px-4 pt-4" wire:poll.2s="loadAvailableDocuments">
+        <div class="flex-1 overflow-y-auto px-4 pt-4" @if($hasDocumentsInProgress) wire:poll.3s="loadAvailableDocuments" @else wire:poll.20s="loadAvailableDocuments" @endif>
              <div class="mb-4">
                  <h4 class="text-[12px] font-bold text-[#64748B] dark:text-[#94A3B8] uppercase tracking-wider mb-3">Active Files</h4>
                  @php
@@ -436,13 +485,8 @@
                                  $isSelected = in_array($doc->id, $selectedDocuments);
                                  $isReady = $doc->status === 'ready';
                                  $isLoading = in_array($doc->status, ['pending', 'processing']);
-                                 $ext = strtolower(pathinfo($doc->original_name, PATHINFO_EXTENSION));
-                                 $bytes = \Illuminate\Support\Facades\Storage::exists($doc->file_path)
-                                     ? \Illuminate\Support\Facades\Storage::size($doc->file_path)
-                                     : 0;
-                                 $size = $bytes >= 1048576
-                                     ? number_format($bytes / 1048576, 1) . ' MB'
-                                     : number_format(max($bytes / 1024, 0.1), 1) . ' KB';
+                                 $ext = $doc->extension ?? strtolower(pathinfo($doc->original_name, PATHINFO_EXTENSION));
+                                 $size = $doc->formatted_size ?? 'Ukuran tidak tersedia';
                              @endphp
                              <label class="flex items-center gap-3 h-[62px] px-3 rounded-lg border cursor-pointer transition-all duration-200
                                  {{ $isSelected ? 'bg-white/95 dark:bg-[#1D293D] border-[#818CFF] dark:border-[#818CFF] shadow-[0_1px_4px_rgba(97,95,255,0.25)]' : 'bg-white dark:bg-transparent border-[#E2E8F0] dark:border-[#1E293B] hover:border-[#CBD5E1] dark:hover:border-[#334155]' }} {{ $isLoading ? 'animate-pulse' : '' }}">
