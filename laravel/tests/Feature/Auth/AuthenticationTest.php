@@ -32,7 +32,7 @@ class AuthenticationTest extends TestCase
 
         $component
             ->assertHasNoErrors()
-            ->assertRedirect(route('dashboard', absolute: false));
+            ->assertRedirect(route('chat', absolute: false));
 
         $this->assertAuthenticated();
     }
@@ -54,17 +54,17 @@ class AuthenticationTest extends TestCase
         $this->assertGuest();
     }
 
-    public function test_navigation_menu_can_be_rendered(): void
+    public function test_chat_page_can_be_rendered_for_authenticated_user(): void
     {
         $user = User::factory()->create();
 
         $this->actingAs($user);
 
-        $response = $this->get('/dashboard');
+        $response = $this->get('/chat');
 
         $response
             ->assertOk()
-            ->assertSeeVolt('layout.navigation');
+            ->assertSee('ISTA AI');
     }
 
     public function test_users_can_logout(): void

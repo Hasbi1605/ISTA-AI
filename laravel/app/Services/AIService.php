@@ -11,12 +11,21 @@ class AIService
     protected $client;
     protected $baseUrl;
     protected $token;
+    protected $maxRetries;
+    protected $retryDelayMs;
 
     public function __construct()
     {
-        $this->client = new Client();
-        $this->baseUrl = config('app.ai_service_url', 'http://localhost:8001');
-        $this->token = config('app.ai_service_token');
+        $this->baseUrl = rtrim((string) config('services.ai_service.url', 'http://127.0.0.1:8001'), '/');
+        $this->token = (string) config('services.ai_service.token');
+        $this->maxRetries = max(1, (int) config('services.ai_service.retries', 2));
+        $this->retryDelayMs = max(0, (int) config('services.ai_service.retry_delay_ms', 400));
+
+        $this->client = new Client([
+            'connect_timeout' => (float) config('services.ai_service.connect_timeout', 10),
+            'timeout' => (float) config('services.ai_service.timeout', 120),
+            'read_timeout' => (float) config('services.ai_service.read_timeout', 120),
+        ]);
     }
 
     /**
@@ -29,44 +38,66 @@ class AIService
      */
     public function sendChat(array $messages, ?array $document_filenames = null, ?string $user_id = null, bool $force_web_search = false)
     {
-        try {
-            $payload = [
-                'messages' => $messages,
-            ];
-            
-            if ($document_filenames !== null) {
-                $payload['document_filenames'] = $document_filenames;
-            }
-            
-            if ($user_id !== null) {
-                $payload['user_id'] = $user_id;
-            }
-            
-            $payload['force_web_search'] = $force_web_search;
-            
-            $response = $this->client->post($this->baseUrl . '/api/chat', [
-                'headers' => [
-                    'Authorization' => 'Bearer ' . $this->token,
-                    'Accept' => 'text/event-stream',
-                    'Content-Type' => 'application/json',
-                ],
-                'json' => $payload,
-                'stream' => true,
-                'timeout' => 120, // Tambahkan timeout yang aman (120 detik)
-            ]);
+        $payload = [
+            'messages' => $messages,
+            'force_web_search' => $force_web_search,
+        ];
 
-            $body = $response->getBody();
+        if ($document_filenames !== null) {
+            $payload['document_filenames'] = $document_filenames;
+        }
 
-            while (!$body->eof()) {
-                yield $body->read(1024);
+        if ($user_id !== null) {
+            $payload['user_id'] = $user_id;
+        }
+
+        for ($attempt = 1; $attempt <= $this->maxRetries; $attempt++) {
+            try {
+                $response = $this->client->post($this->baseUrl . '/api/chat', [
+                    'headers' => [
+                        'Authorization' => 'Bearer ' . $this->token,
+                        'Accept' => 'text/event-stream',
+                        'Content-Type' => 'application/json',
+                    ],
+                    'json' => $payload,
+                    'stream' => true,
+                ]);
+
+                $body = $response->getBody();
+
+                while (!$body->eof()) {
+                    yield $body->read(1024);
+                }
+
+                return;
+            } catch (RequestException $e) {
+                Log::warning('AI Service Error', [
+                    'attempt' => $attempt,
+                    'max_retries' => $this->maxRetries,
+                    'message' => $e->getMessage(),
+                ]);
+
+                if ($attempt >= $this->maxRetries) {
+                    Log::error('AI Service Error: max retries reached', [
+                        'message' => $e->getMessage(),
+                    ]);
+                    yield "❌ Kesalahan sistem saat menghubungi otak AI. Silakan coba lagi nanti.";
+                    return;
+                }
+
+                if ($this->retryDelayMs > 0) {
+                    usleep($this->retryDelayMs * 1000);
+                }
+            } catch (\Throwable $e) {
+                Log::error('Unexpected AI Service Error', [
+                    'message' => $e->getMessage(),
+                ]);
+                yield "❌ Kesalahan sistem saat menghubungi otak AI. Silakan coba lagi nanti.";
+                return;
             }
-
-        } catch (RequestException $e) {
-            Log::error('AI Service Error: ' . $e->getMessage());
-            yield "❌ Kesalahan sistem saat menghubungi otak AI. Silakan coba lagi nanti.";
         }
     }
-    
+
     /**
      * Summarize a document.
      *
@@ -80,11 +111,11 @@ class AIService
             $payload = [
                 'filename' => $filename,
             ];
-            
+
             if ($user_id !== null) {
                 $payload['user_id'] = $user_id;
             }
-            
+
             $response = $this->client->post($this->baseUrl . '/api/documents/summarize', [
                 'headers' => [
                     'Authorization' => 'Bearer ' . $this->token,
@@ -93,9 +124,8 @@ class AIService
                 ],
                 'json' => $payload,
             ]);
-            
+
             return json_decode($response->getBody()->getContents(), true);
-            
         } catch (RequestException $e) {
             Log::error('AI Service Summarize Error: ' . $e->getMessage());
             return [

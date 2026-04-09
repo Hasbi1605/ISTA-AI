@@ -130,7 +130,7 @@
                                                 </div>
                                                 <div class="ml-4">
                                                     <div class="text-sm font-medium text-gray-900 dark:text-white truncate max-w-xs" title="{{ $document->original_name }}">{{ $document->original_name }}</div>
-                                                    <div class="text-xs text-gray-500 dark:text-gray-400">{{ Number::fileSize(Storage::size($document->file_path)) }}</div>
+                                                    <div class="text-xs text-gray-500 dark:text-gray-400">{{ $document->file_size_bytes ? Number::fileSize($document->file_size_bytes) : 'Ukuran tidak tersedia' }}</div>
                                                 </div>
                                             </div>
                                         </td>

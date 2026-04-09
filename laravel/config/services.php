@@ -38,6 +38,11 @@ return [
     'ai_service' => [
         'url' => env('AI_SERVICE_URL', 'http://127.0.0.1:8001'),
         'token' => env('AI_SERVICE_TOKEN'),
+        'connect_timeout' => env('AI_SERVICE_CONNECT_TIMEOUT', 10),
+        'timeout' => env('AI_SERVICE_TIMEOUT', 120),
+        'read_timeout' => env('AI_SERVICE_READ_TIMEOUT', 120),
+        'retries' => env('AI_SERVICE_RETRIES', 2),
+        'retry_delay_ms' => env('AI_SERVICE_RETRY_DELAY_MS', 400),
     ],
 
 ];
