@@ -1,0 +1,158 @@
+INFO:     Will watch for changes in these directories: ['/Users/macbookair/Magang-Istana/python-ai']
+INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
+INFO:     Started reloader process [69561] using WatchFiles
+INFO:     Started server process [69583]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:57902 - "GET /api/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57920 - "POST /api/check-metadata HTTP/1.1" 404 Not Found
+WARNING:  WatchFiles detected changes in 'check_metadata.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [69583]
+INFO:     Started server process [70234]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'check_metadata.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [70234]
+INFO:     Started server process [70392]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'migrate_user_id.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [70392]
+INFO:     Started server process [71762]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'venv/lib/python3.13/site-packages/mysql/connector/custom_types.py', 'venv/lib/python3.13/site-packages/mysql/connector/_scripting.py', 'venv/lib/python3.13/site-packages/mysql/connector/aio/network.py', 'venv/lib/python3.13/site-packages/mysql/connector/plugins/__init__.py', 'venv/lib/python3.13/site-packages/mysql/connector/aio/pooling.py', 'venv/lib/python3.13/site-packages/mysql/connector/aio/plugins/authentication_webauthn_client.py', 'venv/lib/python3.13/site-packages/mysql/connector/django/creation.py', 'venv/lib/python3.13/site-packages/mysql/connector/cursor.py', 'venv/lib/python3.13/site-packages/mysql/connector/aio/logger.py', 'venv/lib/python3.13/site-packages/mysql/connector/django/features.py', 'venv/lib/python3.13/site-packages/mysql/connector/plugins/mysql_clear_password.py', 'venv/lib/python3.13/site-packages/mysql/ai/genai/__init__.py', 'venv/lib/python3.13/site-packages/mysql/connector/pooling.py', 'venv/lib/python3.13/site-packages/mysql/connector/aio/protocol.py', 'venv/lib/python3.13/site-packages/mysql/connector/locales/__init__.py', 'venv/lib/python3.13/site-packages/mysql/connector/django/schema.py', 'venv/lib/python3.13/site-packages/mysql/ai/utils/__init__.py', 'venv/lib/python3.13/site-packages/mysql/ai/ml/__init__.py', 'venv/lib/python3.13/site-packages/mysql/connector/plugins/mysql_native_password.py', 'venv/lib/python3.13/site-packages/mysql/connector/plugins/authentication_oci_client.py', 'venv/lib/python3.13/site-packages/mysql/connector/constants.py', 'venv/lib/python3.13/site-packages/mysql/connector/aio/connection.py', 'venv/lib/python3.13/site-packages/mysql/connector/opentelemetry/instrumentation.py', 'venv/lib/python3.13/site-packages/mysql/ai/utils/atomic_cursor.py', 'venv/lib/python3.13/site-packages/mysql/connector/_decorating.py', 'venv/lib/python3.13/site-packages/mysql/connector/utils.py', 'venv/lib/python3.13/site-packages/mysql/connector/aio/plugins/caching_sha2_password.py', 'venv/lib/python3.13/site-packages/mysql/connector/django/introspection.py', 'venv/lib/python3.13/site-packages/mysql/connector/tls_ciphers.py', 'venv/lib/python3.13/site-packages/mysql/ai/ml/base.py', 'venv/lib/python3.13/site-packages/mysql/ai/ml/classifier.py', 'venv/lib/python3.13/site-packages/mysql/connector/aio/plugins/authentication_ldap_sasl_client.py', 'venv/lib/python3.13/site-packages/mysql/connector/logger.py', 'venv/lib/python3.13/site-packages/mysql/connector/optionfiles.py', 'venv/lib/python3.13/site-packages/mysql/connector/abstracts.py', 'venv/lib/python3.13/site-packages/mysql/connector/errorcode.py', 'venv/lib/python3.13/site-packages/mysql/connector/aio/plugins/authentication_oci_client.py', 'venv/lib/python3.13/site-packages/mysql/connector/authentication.py', 'venv/lib/python3.13/site-packages/mysql/connector/plugins/authentication_ldap_sasl_client.py', 'venv/lib/python3.13/site-packages/mysql/ai/ml/outlier.py', 'venv/lib/python3.13/site-packages/mysql/connector/django/compiler.py', 'venv/lib/python3.13/site-packages/mysql/connector/cursor_cext.py', 'venv/lib/python3.13/site-packages/mysql/ai/ml/regressor.py', 'venv/lib/python3.13/site-packages/mysql/connector/aio/_decorating.py', 'venv/lib/python3.13/site-packages/mysql/connector/connection_cext.py', 'venv/lib/python3.13/site-packages/mysql/connector/django/operations.py', 'venv/lib/python3.13/site-packages/mysql/connector/charsets.py', 'venv/lib/python3.13/site-packages/mysql/connector/aio/authentication.py', 'venv/lib/python3.13/site-packages/mysql/__init__.py', 'venv/lib/python3.13/site-packages/mysql/connector/version.py', 'venv/lib/python3.13/site-packages/mysql/connector/conversion.py', 'venv/lib/python3.13/site-packages/mysql/connector/__init__.py', 'venv/lib/python3.13/site-packages/mysql/connector/aio/abstracts.py', 'venv/lib/python3.13/site-packages/mysql/connector/protocol.py', 'venv/lib/python3.13/site-packages/mysql/connector/aio/utils.py', 'venv/lib/python3.13/site-packages/mysql/connector/django/client.py', 'venv/lib/python3.13/site-packages/mysql/ai/utils/dependencies.py', 'venv/lib/python3.13/site-packages/mysql/connector/plugins/sha256_password.py', 'venv/lib/python3.13/site-packages/mysql/connector/plugins/authentication_openid_connect_client.py', 'venv/lib/python3.13/site-packages/mysql/connector/aio/plugins/sha256_password.py', 'venv/lib/python3.13/site-packages/mysql/connector/aio/plugins/mysql_native_password.py', 'venv/lib/python3.13/site-packages/mysql/connector/plugins/caching_sha2_password.py', 'venv/lib/python3.13/site-packages/mysql/connector/aio/__init__.py', 'venv/lib/python3.13/site-packages/mysql/ai/__init__.py', 'venv/lib/python3.13/site-packages/mysql/connector/locales/eng/client_error.py', 'venv/lib/python3.13/site-packages/mysql/connector/plugins/authentication_webauthn_client.py', 'venv/lib/python3.13/site-packages/mysql/connector/connection.py', 'venv/lib/python3.13/site-packages/mysql/connector/opentelemetry/context_propagation.py', 'venv/lib/python3.13/site-packages/mysql/ai/genai/generation.py', 'venv/lib/python3.13/site-packages/mysql/connector/network.py', 'venv/lib/python3.13/site-packages/mysql/connector/aio/plugins/mysql_clear_password.py', 'venv/lib/python3.13/site-packages/mysql/connector/django/__init__.py', 'venv/lib/python3.13/site-packages/mysql/connector/plugins/authentication_kerberos_client.py', 'venv/lib/python3.13/site-packages/mysql/ai/utils/utils.py', 'venv/lib/python3.13/site-packages/mysql/ai/genai/vector_store.py', 'venv/lib/python3.13/site-packages/mysql/connector/types.py', 'venv/lib/python3.13/site-packages/mysql/connector/dbapi.py', 'venv/lib/python3.13/site-packages/mysql/connector/django/validation.py', 'venv/lib/python3.13/site-packages/mysql/connector/aio/plugins/authentication_openid_connect_client.py', 'venv/lib/python3.13/site-packages/mysql/ai/ml/transformer.py', 'venv/lib/python3.13/site-packages/mysql/connector/opentelemetry/__init__.py', 'venv/lib/python3.13/site-packages/mysql/connector/locales/eng/__init__.py', 'venv/lib/python3.13/site-packages/mysql/connector/aio/plugins/__init__.py', 'venv/lib/python3.13/site-packages/mysql/ai/ml/model.py', 'venv/lib/python3.13/site-packages/mysql/connector/django/base.py', 'venv/lib/python3.13/site-packages/mysql/connector/aio/cursor.py', 'venv/lib/python3.13/site-packages/mysql/connector/opentelemetry/constants.py', 'venv/lib/python3.13/site-packages/mysql/connector/aio/plugins/authentication_kerberos_client.py', 'venv/lib/python3.13/site-packages/mysql/connector/aio/charsets.py', 'venv/lib/python3.13/site-packages/mysql/ai/genai/embedding.py', 'venv/lib/python3.13/site-packages/mysql/connector/errors.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [71762]
+INFO:     Started server process [71907]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'migrate_user_id.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [71907]
+WARNING:  WatchFiles detected changes in 'migrate_user_id.py'. Reloading...
+INFO:     Started server process [95486]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [95486]
+WARNING:  WatchFiles detected changes in 'migrate_user_id.py'. Reloading...
+INFO:     Started server process [95598]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [95598]
+WARNING:  WatchFiles detected changes in 'migrate_user_id.py'. Reloading...
+INFO:     Started server process [95614]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [95614]
+WARNING:  WatchFiles detected changes in 'migrate_user_id.py'. Reloading...
+INFO:     Started server process [95770]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [95770]
+WARNING:  WatchFiles detected changes in 'migrate_user_id.py'. Reloading...
+INFO:     Started server process [95796]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [95796]
+INFO:     Started server process [95947]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:58626 - "POST /api/search HTTP/1.1" 404 Not Found
+WARNING:  WatchFiles detected changes in 'test_rag_authorization.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [95947]
+INFO:     Started server process [96784]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:app.services.rag_service:✅ Menggunakan Lightweight Embeddings untuk embeddings (FREE UNLIMITED)
+INFO:app.services.rag_service:🔍 RAG: Filtering by filenames: ['test_after_fix.pdf'] for user_id: 1
+INFO:app.services.rag_service:📚 RAG: Found 0 relevant chunks for query: 'What is this document about?'
+INFO:     127.0.0.1:58653 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:app.services.langsearch_service:✅ LangSearch: query='What is this document about?', results=5
+INFO:app.services.rag_service:✅ Menggunakan Lightweight Embeddings untuk embeddings (FREE UNLIMITED)
+INFO:app.services.rag_service:📚 RAG: Found 3 relevant documents for query: 'What is this document about?'
+INFO:app.services.rag_service:✅ Menggunakan Lightweight Embeddings untuk embeddings (FREE UNLIMITED)
+INFO:app.services.rag_service:🔍 RAG: Filtering by filenames: ['231210013_Metopen ASN 7 (1).pdf'] for user_id: 1
+INFO:app.services.rag_service:📚 RAG: Found 1 relevant chunks for query: 'apa isi dari file tersebut'
+INFO:     127.0.0.1:58685 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:app.services.rag_service:✅ Menggunakan Lightweight Embeddings untuk embeddings (FREE UNLIMITED)
+INFO:app.services.rag_service:🔍 RAG: Filtering by filenames: ['test_after_fix.pdf'] for user_id: 2
+INFO:app.services.rag_service:📚 RAG: Found 0 relevant chunks for query: 'What is this document about?'
+INFO:     127.0.0.1:58694 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:app.services.langsearch_service:📦 LangSearch: cache hit for 'What is this document about?'
+INFO:app.services.rag_service:✅ Menggunakan Lightweight Embeddings untuk embeddings (FREE UNLIMITED)
+[92m15:22:57 - LiteLLM:INFO[0m: utils.py:4004 - 
+LiteLLM completion() model= llama-3.3-70b-versatile; provider = groq
+INFO:LiteLLM:
+LiteLLM completion() model= llama-3.3-70b-versatile; provider = groq
+INFO:app.services.rag_service:📚 RAG: Found 3 relevant documents for query: 'What is this document about?'
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+WARNING:huggingface_hub.utils._http:Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+WARNING:  WatchFiles detected changes in 'app/services/rag_service.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [96784]
+WARNING:  WatchFiles detected changes in 'app/services/rag_service.py'. Reloading...
+INFO:     Started server process [99553]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [99553]
+WARNING:  WatchFiles detected changes in 'app/services/rag_service.py'. Reloading...
+INFO:     Started server process [99695]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [99695]
+INFO:     Started server process [99793]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app/services/rag_service.py', 'check_metadata.py', 'test_rag_authorization.py', 'migrate_user_id.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [99793]
+INFO:     Started server process [2770]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [2770]
+INFO:     Stopping reloader process [69561]

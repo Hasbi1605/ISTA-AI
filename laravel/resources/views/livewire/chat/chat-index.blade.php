@@ -1,151 +1,236 @@
-<div class="flex h-[calc(100vh-64px)] overflow-hidden bg-gray-50 dark:bg-gray-900">
-    <!-- Sidebar for History -->
-    <aside class="w-52 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col overflow-y-auto">
-        <div class="p-4 border-b border-gray-200 dark:border-gray-700">
-            <button wire:click="startNewChat" class="w-full flex items-center justify-center p-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition duration-150">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                </svg>
-                Chat Baru
+<div x-data="{ 
+        showLeftSidebar: true,
+        showRightSidebar: true,
+        isDraggingFile: false,
+        dragDepth: 0,
+        onDragEnter(event) {
+            if (!event.dataTransfer || !Array.from(event.dataTransfer.types || []).includes('Files')) return;
+            this.dragDepth += 1;
+            this.isDraggingFile = true;
+        },
+        onDragOver(event) {
+            if (!event.dataTransfer || !Array.from(event.dataTransfer.types || []).includes('Files')) return;
+            this.isDraggingFile = true;
+        },
+        onDragLeave(event) {
+            if (!event.dataTransfer || !Array.from(event.dataTransfer.types || []).includes('Files')) return;
+            this.dragDepth = Math.max(this.dragDepth - 1, 0);
+            if (this.dragDepth === 0) this.isDraggingFile = false;
+        },
+        onDropFile(event) {
+            const files = event.dataTransfer ? event.dataTransfer.files : null;
+            this.dragDepth = 0;
+            this.isDraggingFile = false;
+            if (!files || files.length === 0 || !$refs.chatAttachmentInput) return;
+            $refs.chatAttachmentInput.files = files;
+            $refs.chatAttachmentInput.dispatchEvent(new Event('change', { bubbles: true }));
+            this.showRightSidebar = true;
+        },
+        openAttachmentPicker() {
+            this.showRightSidebar = true;
+            if (!$refs.chatAttachmentInput) return;
+            $refs.chatAttachmentInput.value = '';
+            $refs.chatAttachmentInput.click();
+        }
+     }"
+     x-on:dragenter.window.prevent="onDragEnter($event)"
+     x-on:dragover.window.prevent="onDragOver($event)"
+     x-on:dragleave.window.prevent="onDragLeave($event)"
+     x-on:drop.window.prevent="onDropFile($event)"
+     class="flex h-screen w-full overflow-hidden bg-white dark:bg-[#020618] text-gray-800 dark:text-gray-100 font-sans transition-colors duration-300">
+    @php
+        $figmaIcons = [
+            'newChatLight' => 'https://www.figma.com/api/mcp/asset/54b32ad9-c412-4b02-b9f3-e3007e448c09',
+            'newChatDark' => 'https://www.figma.com/api/mcp/asset/c15b657e-874e-43ff-9699-4b38471e8a19',
+            'historyLight' => 'https://www.figma.com/api/mcp/asset/737d71f1-44b9-4f7a-89b1-4dca6a4b52bf',
+            'historyDark' => 'https://www.figma.com/api/mcp/asset/0d73e015-d413-4add-b0bb-5654cc026019',
+            'deleteLight' => 'https://www.figma.com/api/mcp/asset/375910c1-98cb-461c-91aa-59272c9b4518',
+            'deleteDark' => 'https://www.figma.com/api/mcp/asset/87c324d3-8145-4a35-905f-5c56f68c7501',
+            'collapseLeftLight' => 'https://www.figma.com/api/mcp/asset/1451c6ec-d21b-443c-b1b4-a7d5abe111d0',
+            'collapseLeftDark' => 'https://www.figma.com/api/mcp/asset/b6f0ca91-be1e-4093-9706-40fe5c9ee1ef',
+            'themeLight' => 'https://www.figma.com/api/mcp/asset/c69ac7fc-4ac2-4455-82c1-27cf2a8fa815',
+            'themeDark' => 'https://www.figma.com/api/mcp/asset/4fb1770b-9aab-4801-928b-7eb6eb0510d7',
+            'collapseRightLight' => 'https://www.figma.com/api/mcp/asset/3fa47715-a04a-40b1-9580-c08707b3e96e',
+            'collapseRightDark' => 'https://www.figma.com/api/mcp/asset/66a5a12f-e6a3-40ad-a0c4-04236cfe4c66',
+            'searchLight' => 'https://www.figma.com/api/mcp/asset/700547b4-8978-454f-ae29-dd39a972be17',
+            'searchDark' => 'https://www.figma.com/api/mcp/asset/4476156b-07bd-49e2-84e5-6a2ff4e46f30',
+            'uploadLight' => 'https://www.figma.com/api/mcp/asset/5616ec8b-09e7-4e38-bd5f-1b7a20bdb5a4',
+            'uploadDark' => 'https://www.figma.com/api/mcp/asset/9d77789a-1e70-4bf4-b08d-ae55c16351bf',
+            'sendLight' => 'https://www.figma.com/api/mcp/asset/bf2e7ecb-d0c4-467c-952b-8b0b2793152d',
+            'sendDark' => 'https://www.figma.com/api/mcp/asset/7da97f1b-dacc-4875-baf2-a63b2f0d537c',
+        ];
+    @endphp
+    
+    <!-- LEFT SIDEBAR: Chat History -->
+    <aside 
+        :class="showLeftSidebar ? 'w-[288px] opacity-100 translate-x-0 border-r border-[#E2E8F0] dark:border-[#1E293B]' : 'w-0 opacity-0 -translate-x-3 border-r border-transparent pointer-events-none'"
+        class="h-full flex-shrink-0 overflow-hidden bg-[#F8FAFC]/50 dark:bg-[#0F172B]/50 backdrop-blur-[10px] flex flex-col z-10 transform-gpu will-change-[width,transform,opacity] transition-[width,transform,opacity,border-color] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]">
+        
+        <!-- New Chat Button -->
+        <div class="p-4 pt-5 pb-5">
+            <button wire:click="startNewChat" class="w-full flex items-center justify-start px-4 py-2.5 rounded-lg border border-[#E2E8F0] dark:border-[#334155] dark:bg-transparent bg-white hover:bg-gray-50 dark:hover:bg-white/5 font-medium text-[13px] text-gray-700 dark:text-gray-200 transition-all duration-200 shadow-sm">
+                <img src="{{ $figmaIcons['newChatLight'] }}" alt="" class="h-4 w-4 mr-2 dark:hidden" />
+                <img src="{{ $figmaIcons['newChatDark'] }}" alt="" class="h-4 w-4 mr-2 hidden dark:block" />
+                New Chat
             </button>
         </div>
-        
-        <div class="flex-1 overflow-y-auto">
-            <h3 class="p-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Riwayat Chat</h3>
-            <ul class="space-y-1 px-2">
-                @php
-                    $visibleChats = $conversations->take(10);
-                    $olderChats = $conversations->skip(10);
-                @endphp
-                
-                @foreach($visibleChats as $conversation)
-                    <li class="group relative">
-                        <button wire:click="loadConversation({{ $conversation->id }})" 
-                           class="w-full text-left p-3 pr-8 rounded-lg flex items-center transition duration-150 {{ $currentConversationId == $conversation->id ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600' : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300' }}">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                            </svg>
-                            <span class="truncate text-sm" title="{{ $conversation->title }}">{{ $conversation->title }}</span>
-                        </button>
-                        <!-- Delete button (visible on hover) -->
-                        <button wire:click="deleteConversation({{ $conversation->id }})"
-                                wire:confirm="Yakin ingin menghapus riwayat chat ini?"
-                                class="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-500 transition-all duration-150"
-                                title="Hapus chat">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                        </button>
-                    </li>
-                @endforeach
-                
-                <!-- Older chats dropdown -->
-                @if($olderChats->count() > 0)
-                    <li class="pt-2">
-                        <button wire:click="toggleOlderChats" 
-                                class="w-full text-left p-2 rounded-lg flex items-center justify-between text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition duration-150">
-                            <span class="text-xs font-medium">{{ $olderChats->count() }} chat lainnya</span>
-                            <svg xmlns="http://www.w3.org/2000/svg" 
-                                 class="h-4 w-4 transition-transform duration-200 {{ $showOlderChats ? 'rotate-180' : '' }}" 
-                                 fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                            </svg>
-                        </button>
-                        
-                        @if($showOlderChats)
-                            <ul class="mt-1 space-y-1 border-l-2 border-gray-200 dark:border-gray-600 ml-2 pl-2">
-                                @foreach($olderChats as $conversation)
-                                    <li class="group relative">
-                                        <button wire:click="loadConversation({{ $conversation->id }})" 
-                                           class="w-full text-left p-2 pr-8 rounded-lg flex items-center transition duration-150 {{ $currentConversationId == $conversation->id ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600' : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300' }}">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                                            </svg>
-                                            <span class="truncate text-xs" title="{{ $conversation->title }}">{{ $conversation->title }}</span>
-                                        </button>
-                                        <!-- Delete button -->
-                                        <button wire:click="deleteConversation({{ $conversation->id }})"
-                                                wire:confirm="Yakin ingin menghapus riwayat chat ini?"
-                                                class="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-500 transition-all duration-150"
-                                                title="Hapus chat">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                            </svg>
-                                        </button>
-                                    </li>
-                                @endforeach
-                            </ul>
-                        @endif
-                    </li>
+
+        <div class="flex-1 overflow-y-auto overflow-x-hidden px-4">
+            <!-- TODAY -->
+            <div class="mb-6">
+                <h3 class="text-[11.6px] font-bold text-[#64748B] dark:text-[#94A3B8] uppercase tracking-wider mb-2">Today</h3>
+                <ul class="space-y-1">
+                    @php
+                        $visibleChats = $conversations->take(10);
+                        $olderChats = $conversations->skip(10);
+                    @endphp
+                    
+                    @foreach($visibleChats as $conversation)
+                        <li class="group relative">
+                            <button wire:click="loadConversation({{ $conversation->id }})" 
+                               class="w-full text-left px-3 py-2 rounded-md flex items-center transition-colors duration-200 {{ $currentConversationId == $conversation->id ? 'bg-[#E2E8F0] dark:bg-[#1E293B] text-[#0F172A] dark:text-[#F8FAFC] font-medium' : 'hover:bg-black/5 dark:hover:bg-white/5 text-[#334155] dark:text-[#CBD5E1]' }}">
+                               <!-- Chat icon -->
+                               <img src="{{ $figmaIcons['historyLight'] }}" alt="" class="h-4 w-4 mr-2.5 flex-shrink-0 dark:hidden" />
+                               <img src="{{ $figmaIcons['historyDark'] }}" alt="" class="h-4 w-4 mr-2.5 flex-shrink-0 hidden dark:block" />
+                               <span class="truncate text-[13.2px]" title="{{ $conversation->title }}">{{ $conversation->title }}</span>
+                            </button>
+                            <button wire:click="deleteConversation({{ $conversation->id }})"
+                                    wire:confirm="Delete this chat?"
+                                    class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-500/20 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-all duration-200"
+                                    title="Delete chat">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </button>
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+            
+            @if($olderChats->count() > 0)
+            <div class="mb-6">
+                <button wire:click="toggleOlderChats" class="flex items-center justify-between w-full text-left">
+                    <h3 class="text-[11.3px] font-bold text-[#64748B] dark:text-[#94A3B8] uppercase tracking-wider mb-2">Previous 7 Days</h3>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-[#64748B] dark:text-[#94A3B8] transition-transform duration-200 {{ $showOlderChats ? 'rotate-180' : '' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </button>
+                @if($showOlderChats)
+                    <ul class="mt-1 space-y-1">
+                        @foreach($olderChats as $conversation)
+                            <li class="group relative">
+                                <button wire:click="loadConversation({{ $conversation->id }})" 
+                                   class="w-full text-left px-3 py-2 rounded-md flex items-center transition-colors duration-200 {{ $currentConversationId == $conversation->id ? 'bg-[#E2E8F0] dark:bg-[#1E293B] text-[#0F172A] dark:text-[#F8FAFC] font-medium' : 'hover:bg-black/5 dark:hover:bg-white/5 text-[#334155] dark:text-[#CBD5E1]' }}">
+                                    <!-- Chat icon -->
+                                    <img src="{{ $figmaIcons['historyLight'] }}" alt="" class="h-4 w-4 mr-2.5 flex-shrink-0 dark:hidden" />
+                                    <img src="{{ $figmaIcons['historyDark'] }}" alt="" class="h-4 w-4 mr-2.5 flex-shrink-0 hidden dark:block" />
+                                    <span class="truncate text-[13.2px]" title="{{ $conversation->title }}">{{ $conversation->title }}</span>
+                                </button>
+                                <button wire:click="deleteConversation({{ $conversation->id }})"
+                                        wire:confirm="Delete this chat?"
+                                        class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-500/20 text-gray-400 hover:text-red-600 transition-all duration-200">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                </button>
+                            </li>
+                        @endforeach
+                    </ul>
                 @endif
-            </ul>
+            </div>
+            @endif
+        </div>
+
+        <!-- Upgrade / Profile area at bottom -->
+        <div class="px-4 py-6 text-sm flex flex-col gap-2">
+             <a href="/profile" class="flex items-center gap-3 text-gray-700 dark:text-[#F8FAFC] hover:opacity-80 transition-opacity">
+                <!-- Upgrade Icon -->
+                <div class="h-8 w-8 rounded bg-indigo-600 flex items-center justify-center text-white shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 2a8 8 0 100 16 8 8 0 000-16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div>
+                    <h4 class="text-[13.1px] font-medium leading-tight">Upgrade to Pro</h4>
+                    <p class="text-[11.3px] text-gray-500 dark:text-gray-400">More models & features</p>
+                </div>
+             </a>
         </div>
     </aside>
 
-    <!-- Main Chat Area -->
-    <main class="flex-1 flex flex-col relative">
-        <!-- Document Selector (collapsible) -->
-        @if($showDocumentSelector)
-            <div class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4">
-                <div class="flex items-center justify-between mb-3">
-                    <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Pilih Dokumen untuk Chat</h3>
-                    <div class="flex gap-2">
-                        <button wire:click="selectAllDocuments" class="text-xs text-blue-600 hover:text-blue-800">Pilih Semua</button>
-                        <span class="text-gray-300">|</span>
-                        <button wire:click="clearDocumentSelection" class="text-xs text-gray-500 hover:text-gray-700">Hapus</button>
-                        <span class="text-gray-300">|</span>
-                        <button wire:click="toggleDocumentSelector" class="text-xs text-gray-500 hover:text-gray-700">Tutup</button>
-                    </div>
-                </div>
-                
-                @if(count($availableDocuments) > 0)
-                    <div class="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
-                        @foreach($availableDocuments as $doc)
-                            <label class="flex items-center gap-2 px-3 py-1.5 rounded-lg border cursor-pointer transition
-                                {{ in_array($doc->id, $selectedDocuments) ? 'bg-blue-100 dark:bg-blue-900/30 border-blue-500' : 'bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600' }}">
-                                <input type="checkbox" wire:change="toggleDocument({{ $doc->id }})" 
-                                    {{ in_array($doc->id, $selectedDocuments) ? 'checked' : '' }}
-                                    class="rounded text-blue-600">
-                                <span class="text-sm text-gray-700 dark:text-gray-300 truncate max-w-[200px]">{{ $doc->original_name }}</span>
-                                <span class="text-xs text-gray-400">{{ $doc->status }}</span>
-                            </label>
-                        @endforeach
-                    </div>
-                @else
-                    <p class="text-sm text-gray-500">Tidak ada dokumen yang siap. Upload dokumen terlebih dahulu.</p>
-                @endif
+    <!-- CENTER MAIN: Chat Area -->
+    <main class="flex-1 flex flex-col relative w-full h-full bg-transparent z-0 overflow-hidden">
+        
+        <!-- Header for Chat Space -->
+        <div class="h-[61px] flex-shrink-0 flex items-center justify-between px-6 z-20 border-b border-[#E2E8F0]/70 dark:border-[#1E293B]/70 backdrop-blur-sm">
+            <!-- Left toggler and title -->
+            <div class="flex items-center gap-4">
+                <button @click="showLeftSidebar = !showLeftSidebar" class="p-2 rounded-[10px] hover:bg-[#F1F5F9] dark:hover:bg-[#1D293D] transition-colors">
+                    <img src="{{ $figmaIcons['collapseLeftLight'] }}" alt="" class="h-5 w-5 dark:hidden transition-transform duration-300 ease-in-out" :class="showLeftSidebar ? 'rotate-0' : 'rotate-180'" />
+                    <img src="{{ $figmaIcons['collapseLeftDark'] }}" alt="" class="h-5 w-5 hidden dark:block transition-transform duration-300 ease-in-out" :class="showLeftSidebar ? 'rotate-0' : 'rotate-180'" />
+                </button>
+                <h2 class="text-[17px] font-bold tracking-tight text-[#0F172A] dark:text-[#F8FAFC]">ISTA AI</h2>
             </div>
-        @endif
 
+            <!-- Right toggles -->
+            <div class="flex items-center gap-3">
+                <!-- Theme Toggle Button -->
+                <button @click="darkMode = !darkMode" class="p-2 rounded-[10px] hover:bg-[#F1F5F9] dark:hover:bg-[#1D293D] transition-colors">
+                    <img src="{{ $figmaIcons['themeLight'] }}" alt="" class="h-5 w-5 dark:hidden" />
+                    <img src="{{ $figmaIcons['themeDark'] }}" alt="" class="h-5 w-5 hidden dark:block" />
+                </button>
+
+                <button @click="showRightSidebar = !showRightSidebar" class="p-2 rounded-[10px] hover:bg-[#F1F5F9] dark:hover:bg-[#1D293D] transition-colors">
+                    <img src="{{ $figmaIcons['collapseRightLight'] }}" alt="" class="h-5 w-5 dark:hidden transition-transform duration-300 ease-in-out" :class="showRightSidebar ? 'rotate-0' : 'rotate-180'" />
+                    <img src="{{ $figmaIcons['collapseRightDark'] }}" alt="" class="h-5 w-5 hidden dark:block transition-transform duration-300 ease-in-out" :class="showRightSidebar ? 'rotate-0' : 'rotate-180'" />
+                </button>
+            </div>
+        </div>
+        
         <!-- Messages List -->
-        <div class="flex-1 overflow-y-auto p-4 space-y-6" x-ref="chatBox" x-on:message-streamed.window="$refs.chatBox.scrollTop = $refs.chatBox.scrollHeight">
+        <div class="flex-1 overflow-y-auto px-6 py-8 space-y-8" x-ref="chatBox" x-on:message-streamed.window="$refs.chatBox.scrollTop = $refs.chatBox.scrollHeight">
             @if(empty($messages))
-                <div class="h-full flex items-center justify-center text-center px-4">
-                    <div class="max-w-md space-y-4">
-                        <x-application-logo class="h-20 w-20 mx-auto opacity-60 fill-current text-indigo-500 dark:text-indigo-400" />
-                        <h2 class="text-2xl font-semibold text-gray-900 dark:text-gray-100">Selamat Datang di ISTA AI</h2>
-                        <p class="text-gray-600 dark:text-gray-400 text-base leading-relaxed">
-                            Mulai percakapan cerdas dengan asisten virtual istana. Tanyakan tentang prosedur, bantuan penulisan, atau ringkasan dokumen.
-                        </p>
-                        <div class="flex flex-wrap gap-2 justify-center pt-4">
-                            <span class="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full text-xs sm:text-sm">💡 Tanya prosedur</span>
-                            <span class="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full text-xs sm:text-sm">📝 Bantuan penulisan</span>
-                            <span class="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full text-xs sm:text-sm">📄 Ringkasan dokumen</span>
-                        </div>
+                <div class="h-full flex flex-col items-center justify-center text-center">
+                    <div class="h-12 w-12 rounded-full border border-gray-200 dark:border-[#334155] flex items-center justify-center mb-6">
+                        <svg class="w-6 h-6 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
                     </div>
+                    <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-2">ISTA AI Assistant</h2>
+                    <p class="text-gray-500 dark:text-[#94A3B8] text-[14px]">
+                        Start a new conversation to get started. 
+                    </p>
                 </div>
             @endif
 
             @foreach($messages as $message)
-                <div class="flex {{ $message['role'] == 'user' ? 'justify-end' : 'justify-start' }}">
-                    <div class="max-w-[90%] sm:max-w-xl flex {{ $message['role'] == 'user' ? 'flex-row-reverse' : 'flex-row' }} items-start">
-                        <!-- Avatar placeholder -->
-                        <div class="shrink-0 h-8 w-8 rounded-full flex items-center justify-center {{ $message['role'] == 'user' ? 'bg-blue-600 ml-3' : 'bg-gray-400 dark:bg-gray-600 mr-3' }}">
-                            <span class="text-xs text-white uppercase font-bold">{{ substr($message['role'], 0, 1) }}</span>
+                <div class="flex justify-start">
+                    <div class="w-full sm:max-w-3xl flex items-start gap-4 px-2 sm:px-8">
+                        <div class="shrink-0 h-8 w-8 rounded-full flex items-center justify-center {{ $message['role'] == 'user' ? 'bg-[#E2E8F0] dark:bg-[#1D293D] text-[#62748E] dark:text-[#90A1B9]' : 'bg-[#615FFF] text-white' }}">
+                            @if($message['role'] == 'user')
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2m12-10a4 4 0 11-8 0 4 4 0 018 0z" />
+                                </svg>
+                            @else
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 3l1.2 2.9L16 7.1l-2.8 1.2L12 11l-1.2-2.7L8 7.1l2.8-1.2L12 3zm6 9l.8 1.9L21 15l-2.2.9L18 18l-.8-2.1L15 15l2.2-1.1L18 12zM6 13l.7 1.6L8.4 15l-1.7.7L6 17.4l-.7-1.7L3.6 15l1.7-.4L6 13z" />
+                                </svg>
+                            @endif
                         </div>
-                        
-                        <div class="relative px-4 py-3 rounded-2xl {{ $message['role'] == 'user' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 shadow-sm border border-gray-100 dark:border-gray-700 rounded-tl-none' }}">
-                            <p class="text-sm leading-relaxed whitespace-pre-wrap">{{ $message['content'] }}</p>
+
+                        <div class="flex flex-col gap-1 w-full">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="text-[13px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">{{ $message['role'] == 'user' ? 'You' : 'ISTA AI' }}</span>
+                                <span class="text-[10px] text-gray-400 dark:text-[#64748B]">10:00 AM</span>
+                            </div>
+
+                            @if($message['role'] == 'assistant')
+                                <div class="rounded-xl bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#1D293D] px-4 py-3 text-[14.5px] leading-relaxed text-[#334155] dark:text-[#CAD5E2] max-w-[656px]">
+                                    <p class="whitespace-pre-wrap">{{ $message['content'] }}</p>
+                                </div>
+                            @else
+                                <div class="text-[14.5px] leading-relaxed text-[#334155] dark:text-[#CAD5E2] max-w-[656px]">
+                                    <p class="whitespace-pre-wrap">{{ $message['content'] }}</p>
+                                </div>
+                            @endif
                         </div>
                     </div>
                 </div>
@@ -155,41 +240,25 @@
             <div x-data="{ streaming: false, text: '', modelName: '', sources: [] }" 
                  x-on:message-send.window="streaming = true; text = ''; modelName = ''; sources = []"
                  x-init="
-                    $wire.on('assistant-output', (data) => {
-                        text += data[0];
-                        streaming = true;
-                    });
-                    $wire.on('model-name', (data) => {
-                        modelName = data[0];
-                    });
-                    $wire.on('assistant-sources', (data) => {
-                        sources = data[0];
-                    });
+                    $wire.on('assistant-output', (data) => { text += data[0]; streaming = true; });
+                    $wire.on('model-name', (data) => { modelName = data[0]; });
+                    $wire.on('assistant-sources', (data) => { sources = data[0]; });
                   "
                  class="flex justify-start"
                  x-show="streaming">
-                  <div class="max-w-[90%] sm:max-w-xl flex flex-row items-start">
-                     <div class="shrink-0 h-8 w-8 rounded-full bg-blue-500 mr-3 flex items-center justify-center">
-                         <span class="text-xs text-white font-bold">AI</span>
+                  <div class="w-full sm:max-w-3xl flex flex-row items-start gap-4 px-2 sm:px-8">
+                     <div class="shrink-0 h-8 w-8 rounded-full bg-[#615FFF] text-white flex items-center justify-center">
+                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 3l1.2 2.9L16 7.1l-2.8 1.2L12 11l-1.2-2.7L8 7.1l2.8-1.2L12 3zm6 9l.8 1.9L21 15l-2.2.9L18 18l-.8-2.1L15 15l2.2-1.1L18 12zM6 13l.7 1.6L8.4 15l-1.7.7L6 17.4l-.7-1.7L3.6 15l1.7-.4L6 13z" />
+                         </svg>
                      </div>
-                     <div class="relative px-4 py-3 rounded-2xl bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 shadow-sm border border-gray-100 dark:border-gray-700 rounded-tl-none">
-                         <span x-show="modelName" class="inline-block px-2 py-0.5 mb-2 text-[10px] font-semibold rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" x-text="modelName"></span>
-                         <p class="text-sm leading-relaxed whitespace-pre-wrap" id="ai-streaming-buffer" wire:stream="assistant-output"></p>
-                         
-                         <!-- Sources Display (Alpine.js reactive) -->
-                         <div x-show="sources.length > 0" class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
-                             <p class="text-xs font-semibold text-gray-500 mb-2">📚 Sumber Referensi:</p>
-                             <ul class="space-y-1">
-                                 <template x-for="(source, index) in sources" :key="index">
-                                     <li class="text-xs text-gray-600 dark:text-gray-400">
-                                         <span>📄 </span>
-                                         <span x-text="source.filename"></span>
-                                         <span x-show="source.relevance_score" class="text-gray-400">
-                                             (relevansi: <span x-text="Math.round((1 - source.relevance_score) * 100) + '%'"></span>)
-                                         </span>
-                                     </li>
-                                 </template>
-                             </ul>
+                     <div class="flex flex-col gap-1 items-start w-full">
+                         <div class="flex items-center gap-2 mb-1">
+                             <span class="text-[13px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">ISTA AI</span>
+                             <span x-show="modelName" class="text-[10px] bg-[#E2E8F0] dark:bg-[#1E293B] px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-300" x-text="modelName"></span>
+                         </div>
+                         <div class="rounded-xl bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#1D293D] px-4 py-3 text-[14.5px] leading-relaxed text-[#334155] dark:text-[#CAD5E2] w-full max-w-[656px]">
+                             <p class="whitespace-pre-wrap" id="ai-streaming-buffer" wire:stream="assistant-output"></p>
                          </div>
                      </div>
                   </div>
@@ -197,66 +266,230 @@
 
             <!-- Loading Indicator -->
             <div wire:loading wire:target="sendMessage" class="flex justify-start">
-                <div class="max-w-[90%] sm:max-w-xl flex flex-row items-center">
-                    <div class="shrink-0 h-8 w-8 rounded-full bg-gray-400 dark:bg-gray-600 mr-3 flex items-center justify-center">
-                        <span class="text-xs text-white font-bold">A</span>
+                <div class="w-full sm:max-w-3xl flex flex-row items-start gap-4 px-2 sm:px-8">
+                    <div class="shrink-0 h-8 w-8 rounded-full bg-[#615FFF] text-white flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 3l1.2 2.9L16 7.1l-2.8 1.2L12 11l-1.2-2.7L8 7.1l2.8-1.2L12 3zm6 9l.8 1.9L21 15l-2.2.9L18 18l-.8-2.1L15 15l2.2-1.1L18 12zM6 13l.7 1.6L8.4 15l-1.7.7L6 17.4l-.7-1.7L3.6 15l1.7-.4L6 13z" />
+                        </svg>
                     </div>
-                    <div class="flex space-x-1 p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
-                        <div class="h-2 w-2 bg-gray-400 rounded-full animate-bounce"></div>
-                        <div class="h-2 w-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                        <div class="h-2 w-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                    <div class="flex space-x-1.5 pt-3 rounded-xl bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#1D293D] px-4 py-3">
+                        <div class="h-2 w-2 bg-gray-400 dark:bg-[#64748B] rounded-full animate-bounce"></div>
+                        <div class="h-2 w-2 bg-gray-400 dark:bg-[#64748B] rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                        <div class="h-2 w-2 bg-gray-400 dark:bg-[#64748B] rounded-full animate-bounce [animation-delay:-0.3s]"></div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Input Area -->
-        <div class="p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
-            <!-- Document Selection Button -->
-            <div class="max-w-[90%] sm:max-w-xl mx-auto mb-3 flex items-center justify-between">
-                <div class="flex items-center gap-4">
-                    <button wire:click="toggleDocumentSelector" 
-                            class="flex items-center gap-2 text-sm {{ count($selectedDocuments) > 0 ? 'text-blue-600 font-semibold' : 'text-gray-500 hover:text-gray-700' }}">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        <span>{{ count($selectedDocuments) > 0 ? count($selectedDocuments) . ' dokumen' : 'Pilih Dokumen' }}</span>
-                    </button>
+        <!-- Input Area container -->
+        <div class="px-6 pb-6 pt-2 bg-white dark:bg-[#020618] w-full">
+            @php
+                $chatDocuments = $availableDocuments->whereIn('id', $conversationDocuments)->values();
+            @endphp
+            <input
+                x-ref="chatAttachmentInput"
+                type="file"
+                wire:model.live="chatAttachment"
+                accept=".pdf,.docx,.xlsx"
+                class="hidden"
+            >
+            <form wire:submit.prevent="sendMessage" class="max-w-3xl mx-auto relative rounded-xl shadow-sm bg-white dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#1E293B] focus-within:border-indigo-500 dark:focus-within:border-indigo-500 transition-colors">
+                <div class="flex flex-col w-full">
+                    <div wire:loading.flex wire:target="chatAttachment" class="px-5 pt-4 items-center gap-2 text-[12px] text-[#4A4AF4] dark:text-[#8E81FF]">
+                        <span class="h-2 w-2 rounded-full bg-current animate-ping"></span>
+                    </div>
 
-                    <button wire:click="toggleWebSearch" 
-                            class="flex items-center gap-2 text-sm transition-all duration-200 {{ $webSearchMode ? 'text-blue-600 font-bold' : 'text-gray-400 hover:text-gray-600' }}"
-                            title="{{ $webSearchMode ? 'Web Search: Paksa Aktif' : 'Web Search: Otomatis' }}">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                        </svg>
-                        <span>Web Search</span>
-                    </button>
+                    @if($isUploadingAttachment)
+                        <div class="px-5 pt-4 flex items-center gap-2 text-[12px] text-[#4A4AF4] dark:text-[#8E81FF]">
+                            <span class="h-2 w-2 rounded-full bg-current animate-pulse"></span>
+                        </div>
+                    @endif
+                    @if($chatDocuments->count() > 0)
+                        <div class="px-5 pt-5 pb-1 flex flex-wrap gap-3">
+                            @foreach($chatDocuments as $doc)
+                                <span class="inline-flex items-center gap-2 bg-[#E2E8F0] dark:bg-[#1D293D] text-[#314158] dark:text-[#CAD5E2] rounded-2xl px-4 py-2 text-[14px]">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 3h7l5 5v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1zm7 1v4h4" />
+                                    </svg>
+                                    <span class="max-w-[180px] truncate">{{ $doc->original_name }}</span>
+                                    <button type="button" wire:click="removeConversationDocument({{ $doc->id }})" class="text-[#7C8DA8] hover:text-[#314158] dark:hover:text-white" title="Remove">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                </span>
+                            @endforeach
+                        </div>
+                    @endif
+                    @if($isUploadingAttachment && $uploadingAttachmentName)
+                        <div class="px-5 pt-3 pb-1 flex flex-wrap gap-3">
+                            <span class="inline-flex items-center gap-2 bg-[#EEF2FF] dark:bg-[#312E81]/30 text-[#4A4AF4] dark:text-[#C7D2FE] rounded-2xl px-4 py-2 text-[13px]">
+                                <span class="w-4 h-4 rounded-full border-2 border-[#C7D2FE] border-t-[#4A4AF4] animate-spin"></span>
+                                <span class="max-w-[190px] truncate">{{ $uploadingAttachmentName }}</span>
+                            </span>
+                        </div>
+                    @endif
+                    <div x-show="!isDraggingFile" class="flex items-end px-3 pb-3 pt-3 w-full">
+                        <textarea 
+                            wire:model="prompt"
+                            x-on:keydown.enter.prevent="if($event.shiftKey) return; $wire.sendMessage(); $dispatch('message-send')"
+                            placeholder="Message ISTA AI..." 
+                            class="flex-1 max-h-[200px] min-h-[44px] bg-transparent border-none focus:ring-0 resize-none text-[14.5px] text-[#0F172A] dark:text-[#F8FAFC] placeholder-[#94A3B8] dark:placeholder-[#64748B] outline-none px-2"
+                            rows="1"
+                        ></textarea>
+                        
+                        <div class="flex items-center gap-2 pl-2">
+                            <!-- Toggle Search -->
+                            <button type="button" wire:click="toggleWebSearch" class="h-[30px] px-[13px] border border-transparent rounded-full text-[11.4px] font-normal flex items-center gap-[6px] transition-colors {{ $webSearchMode ? 'bg-[#E2E8F0] text-[#334155] dark:bg-[#314158] dark:text-[#E2E8F0]' : 'bg-[#F1F5F9] text-[#62748E] dark:bg-[#1D293D] dark:text-[#62748E]' }}">
+                                <img src="{{ $figmaIcons['searchLight'] }}" alt="" class="w-[14px] h-[14px] dark:hidden" />
+                                <img src="{{ $figmaIcons['searchDark'] }}" alt="" class="w-[14px] h-[14px] hidden dark:block" />
+                                <span>Search</span>
+                            </button>
+
+                            <button type="button" @click="openAttachmentPicker()" wire:loading.attr="disabled" wire:target="chatAttachment" class="h-[34px] w-[34px] rounded-full transition-colors flex items-center justify-center hover:bg-[#F1F5F9] dark:hover:bg-[#1D293D] disabled:opacity-60" title="Attach file">
+                                <img src="{{ $figmaIcons['uploadLight'] }}" alt="" class="h-[18px] w-[18px] dark:hidden" />
+                                <img src="{{ $figmaIcons['uploadDark'] }}" alt="" class="h-[18px] w-[18px] hidden dark:block" />
+                            </button>
+
+                            <!-- Send -->
+                            <button type="submit" 
+                                    wire:loading.attr="disabled"
+                                    class="bg-[#F1F5F9] dark:bg-[#1D293D] hover:bg-[#E2E8F0] dark:hover:bg-[#314158] disabled:opacity-50 rounded-full transition-colors h-[32px] w-[32px] flex items-center justify-center">
+                                <img src="{{ $figmaIcons['sendLight'] }}" alt="" class="h-[17px] w-[17px] dark:hidden" />
+                                <img src="{{ $figmaIcons['sendDark'] }}" alt="" class="h-[17px] w-[17px] hidden dark:block" />
+                            </button>
+                        </div>
+                    </div>
+
+                    <div x-show="isDraggingFile" x-transition.opacity class="px-3 pb-3 pt-3 w-full">
+                        <div class="h-[84px] w-full rounded-xl border-2 border-dashed border-[#818CFF] dark:border-[#8E81FF] bg-[#EEF2FF] dark:bg-[#312E81]/20 flex items-center justify-center gap-2 text-[13px] font-semibold text-[#4A4AF4] dark:text-[#A5B4FC]">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                            </svg>
+                            Drop file di sini untuk upload
+                        </div>
+                    </div>
                 </div>
-                
-                @if(count($selectedDocuments) > 0)
-                    <span class="text-[10px] uppercase tracking-wider font-bold text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full border border-blue-100 dark:border-blue-800">Mode RAG</span>
-                @endif
-            </div>
-            
-            <form wire:submit.prevent="sendMessage" class="max-w-[90%] sm:max-w-xl mx-auto flex items-end space-x-3">
-                <div class="flex-1 relative">
-                    <textarea 
-                        wire:model="prompt"
-                        x-on:keydown.enter.prevent="if($event.shiftKey) return; $wire.sendMessage(); $dispatch('message-send')"
-                        placeholder="Ketik pesan untuk ISTA AI..." 
-                        class="w-full pl-4 pr-12 py-3 bg-gray-100 dark:bg-gray-900 border-transparent focus:border-blue-500 focus:ring-blue-500 rounded-2xl resize-none max-h-32 text-gray-800 dark:text-gray-200 transition duration-150"
-                        rows="1"
-                    ></textarea>
-                </div>
-                <button type="submit" 
-                        wire:loading.attr="disabled"
-                        class="p-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-2xl transition duration-150">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                    </svg>
-                </button>
             </form>
-            <p class="mt-3 text-center text-sm text-gray-600 dark:text-gray-400">ISTA AI dapat memberikan informasi yang kurang akurat. Periksa kembali informasi penting.</p>
+            <div class="text-center mt-3 text-[11px] text-[#94A3B8] dark:text-[#64748B]">
+                ISTA AI can make mistakes. Consider verifying critical information.
+            </div>
         </div>
     </main>
+
+    <!-- RIGHT SIDEBAR: Documents -->
+    <aside 
+        :class="showRightSidebar ? 'w-[288px] opacity-100 translate-x-0 border-l border-[#E2E8F0] dark:border-[#1E293B]' : 'w-0 opacity-0 translate-x-3 border-l border-transparent pointer-events-none'"
+        class="h-full flex-shrink-0 overflow-hidden bg-[#F8FAFC]/50 dark:bg-[#0F172B]/50 backdrop-blur-[10px] flex flex-col z-10 transform-gpu will-change-[width,transform,opacity] transition-[width,transform,opacity,border-color] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]">
+        
+        <div class="h-[53px] px-4 flex items-center">
+            <h3 class="text-[13.8px] font-bold text-[#0F172A] dark:text-[#F8FAFC] flex items-center gap-2">
+                <svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z"/></svg>
+                Semua Dokumen Saya
+            </h3>
+        </div>
+        
+        <div class="flex-1 overflow-y-auto px-4 pt-4" wire:poll.2s="loadAvailableDocuments">
+             <div class="mb-4">
+                 <h4 class="text-[12px] font-bold text-[#64748B] dark:text-[#94A3B8] uppercase tracking-wider mb-3">Active Files</h4>
+                 @php
+                     $readyDocumentIds = $availableDocuments->where('status', 'ready')->pluck('id')->map(fn ($id) => (int) $id)->toArray();
+                     $selectedIds = array_map('intval', $selectedDocuments);
+                     $selectedInAvailableCount = count(array_intersect($selectedIds, $readyDocumentIds));
+                     $allDocumentsSelected = count($readyDocumentIds) > 0 && $selectedInAvailableCount === count($readyDocumentIds);
+                 @endphp
+                 <div class="flex items-center flex-nowrap gap-0.5 mb-4 px-1 pb-3 border-b border-[#E2E8F0]/70 dark:border-[#1D293D]/70">
+                     <button type="button" wire:click="toggleSelectAllDocuments" aria-pressed="{{ $allDocumentsSelected ? 'true' : 'false' }}" class="inline-flex items-center gap-1.5 text-[#62748E] dark:text-[#90A1B9] hover:text-[#314158] dark:hover:text-white text-[11px] leading-[1.1] font-semibold px-1.5 py-1 rounded-md hover:bg-[#F1F5F9] dark:hover:bg-[#1D293D] transition-colors whitespace-nowrap">
+                         @if($allDocumentsSelected)
+                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#615FFF]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                 <rect x="3" y="3" width="18" height="18" rx="4" stroke-width="2"></rect>
+                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12.5l2.8 2.8L16.8 9.3" />
+                             </svg>
+                             Deselect All
+                         @else
+                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#64748B] dark:text-[#94A3B8]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                 <rect x="3" y="3" width="18" height="18" rx="4" stroke-width="2"></rect>
+                             </svg>
+                             Select All
+                         @endif
+                     </button>
+                     @if($selectedInAvailableCount > 0)
+                         <button type="button" wire:click="deleteSelectedDocuments" wire:confirm="Delete selected files from your documents?" class="inline-flex shrink-0 items-center gap-1 text-[#FF2056] text-[10.5px] font-semibold px-1.5 py-1 rounded-md bg-[#FF2056]/10 hover:bg-[#FF2056]/20 transition-colors whitespace-nowrap">
+                             <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                             </svg>
+                             Delete
+                         </button>
+                         <button type="button" wire:click="addSelectedDocumentsToChat" class="inline-flex shrink-0 items-center gap-1 text-[#4A4AF4] dark:text-[#8E81FF] text-[10.5px] font-semibold px-1.5 py-1 rounded-md bg-[#4A4AF4]/10 dark:bg-[#4A4AF4]/20 hover:bg-[#4A4AF4]/15 dark:hover:bg-[#4A4AF4]/30 transition-colors whitespace-nowrap">
+                             <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                             </svg>
+                             Add to Chat
+                         </button>
+                     @endif
+                 </div>
+                 
+                 @if(count($availableDocuments) > 0)
+                     <div class="space-y-3">
+                         @foreach($availableDocuments as $doc)
+                             @php
+                                 $isSelected = in_array($doc->id, $selectedDocuments);
+                                 $isReady = $doc->status === 'ready';
+                                 $isLoading = in_array($doc->status, ['pending', 'processing']);
+                                 $ext = strtolower(pathinfo($doc->original_name, PATHINFO_EXTENSION));
+                                 $bytes = \Illuminate\Support\Facades\Storage::exists($doc->file_path)
+                                     ? \Illuminate\Support\Facades\Storage::size($doc->file_path)
+                                     : 0;
+                                 $size = $bytes >= 1048576
+                                     ? number_format($bytes / 1048576, 1) . ' MB'
+                                     : number_format(max($bytes / 1024, 0.1), 1) . ' KB';
+                             @endphp
+                             <label class="flex items-center gap-3 h-[62px] px-3 rounded-lg border cursor-pointer transition-all duration-200
+                                 {{ $isSelected ? 'bg-white/95 dark:bg-[#1D293D] border-[#818CFF] dark:border-[#818CFF] shadow-[0_1px_4px_rgba(97,95,255,0.25)]' : 'bg-white dark:bg-transparent border-[#E2E8F0] dark:border-[#1E293B] hover:border-[#CBD5E1] dark:hover:border-[#334155]' }} {{ $isLoading ? 'animate-pulse' : '' }}">
+                                 @if($isLoading)
+                                     <div class="w-3.5 h-3.5 rounded-full border-2 border-[#CBD5E1] dark:border-[#334155] border-t-[#615FFF] dark:border-t-[#8E81FF] animate-spin"></div>
+                                 @else
+                                     <input type="checkbox" wire:model.live="selectedDocuments" value="{{ $doc->id }}"
+                                         class="rounded text-indigo-600 focus:ring-indigo-500 bg-white dark:bg-transparent border-[#CBD5E1] dark:border-[#64748B] w-3.5 h-3.5 cursor-pointer aspect-square"
+                                         {{ $isReady ? '' : 'disabled' }}>
+                                 @endif
+                                 <div class="h-[34px] w-[34px] rounded-lg bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] flex items-center justify-center">
+                                     @if($ext === 'pdf')
+                                         <svg class="w-[18px] h-[18px] text-[#FF2056] shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"></path></svg>
+                                     @elseif($ext === 'txt')
+                                         <svg class="w-[18px] h-[18px] text-[#62748E] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 3h7l5 5v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1zm7 1v4h4M8 13h8M8 17h6" /></svg>
+                                     @elseif(in_array($ext, ['png', 'jpg', 'jpeg', 'gif', 'webp', 'img']))
+                                         <svg class="w-[18px] h-[18px] text-[#FD9A00] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 5h16a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V6a1 1 0 011-1zm4 4h.01M21 15l-5-5-7 7-3-3-3 3" /></svg>
+                                     @else
+                                         <svg class="w-[18px] h-[18px] text-[#2B7FFF] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 3h7l5 5v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1zm7 1v4h4M8 13h8M8 17h8" /></svg>
+                                     @endif
+                                 </div>
+                                 <div class="min-w-0 flex-1 flex flex-col gap-0.5">
+                                     <div class="flex items-center gap-2">
+                                        <p class="text-[13.3px] text-[#0F172A] dark:text-[#F8FAFC] truncate">{{ $doc->original_name }}</p>
+                                        @if($isLoading)
+                                            <span class="inline-flex items-center gap-1 text-[10px] text-[#615FFF] dark:text-[#A5B4FC]">
+                                                <span class="h-1.5 w-1.5 rounded-full bg-current animate-ping"></span>
+                                                Uploading
+                                            </span>
+                                        @endif
+                                     </div>
+                                     <p class="text-[11.4px] text-[#64748B] dark:text-[#94A3B8]">{{ $size }} @if($isLoading) • Processing... @endif</p>
+                                 </div>
+
+                                 <button type="button" wire:click.prevent="deleteDocument({{ $doc->id }})" wire:confirm="Delete this file from your documents?" class="h-7 w-7 rounded-md text-[#94A3B8] hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors flex items-center justify-center" title="Remove">
+                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                     </svg>
+                                 </button>
+                             </label>
+                          @endforeach
+                     </div>
+                 @else
+                     <p class="text-[12px] text-gray-400 mt-6 px-1">No documents available</p>
+                 @endif
+             </div>
+        </div>
+    </aside>
+
 </div>
