@@ -28,10 +28,28 @@ EMBEDDING_TIMEOUT = int(os.getenv("EMBEDDING_TIMEOUT", "30"))
 # Embedding model list untuk fallback
 EMBEDDING_MODELS = [
     {
-        "name": "GitHub Models (OpenAI Large)",
+        "name": "GitHub Models (OpenAI Large) - Primary",
         "provider": "github",
         "model": "text-embedding-3-large",
         "api_key_env": "GITHUB_TOKEN",
+    },
+    {
+        "name": "GitHub Models (OpenAI Large) - Backup",
+        "provider": "github",
+        "model": "text-embedding-3-large",
+        "api_key_env": "GITHUB_TOKEN_2",
+    },
+    {
+        "name": "GitHub Models (OpenAI Small) - Backup 2",
+        "provider": "github",
+        "model": "text-embedding-3-small",
+        "api_key_env": "GITHUB_TOKEN",
+    },
+    {
+        "name": "GitHub Models (OpenAI Small) - Backup 3",
+        "provider": "github",
+        "model": "text-embedding-3-small",
+        "api_key_env": "GITHUB_TOKEN_2",
     }
 ]
 

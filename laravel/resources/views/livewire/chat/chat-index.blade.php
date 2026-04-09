@@ -4,6 +4,64 @@
         isDraggingFile: false,
         dragDepth: 0,
         dropError: '',
+        promptDraft: '',
+        isSendingMessage: false,
+        optimisticUserMessage: '',
+        scrollToBottom(smooth = false) {
+            const chatBox = this.$refs.chatBox;
+            if (!chatBox) return;
+
+            chatBox.scrollTo({
+                top: chatBox.scrollHeight,
+                behavior: smooth ? 'smooth' : 'auto',
+            });
+        },
+        submitPrompt(event) {
+            if (event) event.preventDefault();
+            if (this.isSendingMessage) return;
+
+            const text = this.promptDraft.trim();
+            if (!text) return;
+
+            this.isSendingMessage = true;
+            this.optimisticUserMessage = text;
+            this.promptDraft = '';
+            this.$dispatch('message-send');
+            this.$nextTick(() => this.scrollToBottom());
+
+            this.$wire.sendMessage(text)
+                .then(() => {
+                    this.$nextTick(() => this.scrollToBottom());
+                })
+                .catch(() => {
+                    this.promptDraft = text;
+                    this.optimisticUserMessage = '';
+                })
+                .finally(() => {
+                    this.isSendingMessage = false;
+                    this.$dispatch('message-complete');
+                    this.$nextTick(() => this.scrollToBottom());
+                });
+        },
+        initChatBehavior() {
+            this.$nextTick(() => this.scrollToBottom());
+
+            const chatBox = this.$refs.chatBox;
+            if (chatBox) {
+                const observer = new MutationObserver(() => this.scrollToBottom());
+                observer.observe(chatBox, { childList: true, subtree: true, characterData: true });
+                window.addEventListener('beforeunload', () => observer.disconnect(), { once: true });
+            }
+
+            this.$wire.on('assistant-output', () => {
+                this.$nextTick(() => this.scrollToBottom());
+            });
+
+            this.$wire.on('user-message-acked', () => {
+                this.optimisticUserMessage = '';
+                this.$nextTick(() => this.scrollToBottom());
+            });
+        },
         setDropError(message) {
             this.dropError = message;
             setTimeout(() => {
@@ -79,6 +137,7 @@
      x-on:dragover.window.prevent="onDragOver($event)"
      x-on:dragleave.window.prevent="onDragLeave($event)"
      x-on:drop.window.prevent="onDropFile($event)"
+    x-init="initChatBehavior()"
      class="flex h-screen w-full overflow-hidden bg-white dark:bg-[#020618] text-gray-800 dark:text-gray-100 font-sans transition-colors duration-300">
     @php
         $uiIcons = [
@@ -243,8 +302,11 @@
             @endif
 
             @foreach($messages as $message)
-                <div class="flex justify-start">
-                    <div class="w-full sm:max-w-3xl flex items-start gap-4 px-2 sm:px-8">
+                @php
+                    $isUserMessage = $message['role'] == 'user';
+                @endphp
+                <div class="flex {{ $isUserMessage ? 'justify-end' : 'justify-start' }}">
+                    <div class="w-full sm:max-w-3xl flex items-start gap-4 px-2 sm:px-8 {{ $isUserMessage ? 'flex-row-reverse' : '' }}">
                         <div class="shrink-0 h-8 w-8 rounded-full flex items-center justify-center {{ $message['role'] == 'user' ? 'bg-[#E2E8F0] dark:bg-[#1D293D] text-[#62748E] dark:text-[#90A1B9]' : 'bg-[#615FFF] text-white' }}">
                             @if($message['role'] == 'user')
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -257,13 +319,13 @@
                             @endif
                         </div>
 
-                        <div class="flex flex-col gap-1 w-full">
+                        <div class="flex flex-col gap-1 w-full {{ $isUserMessage ? 'items-end text-right' : 'items-start text-left' }}">
                             @php
                                 $messageTime = !empty($message['created_at'])
-                                    ? \Illuminate\Support\Carbon::parse($message['created_at'])->format('h:i A')
+                                    ? \Illuminate\Support\Carbon::parse($message['created_at'])->timezone('Asia/Jakarta')->format('H:i') . ' WIB'
                                     : null;
                             @endphp
-                            <div class="flex items-center gap-2 mb-1">
+                            <div class="flex items-center gap-2 mb-1 {{ $isUserMessage ? 'justify-end' : 'justify-start' }}">
                                 <span class="text-[13px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">{{ $message['role'] == 'user' ? 'You' : 'ISTA AI' }}</span>
                                 @if($messageTime)
                                     <span class="text-[10px] text-gray-400 dark:text-[#64748B]">{{ $messageTime }}</span>
@@ -271,9 +333,48 @@
                             </div>
 
                             @if($message['role'] == 'assistant')
-                                <div class="rounded-xl bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#1D293D] px-4 py-3 text-[14.5px] leading-relaxed text-[#334155] dark:text-[#CAD5E2] max-w-[656px]">
-                                    <p class="whitespace-pre-wrap">{{ $message['content'] }}</p>
-                                </div>
+                                @if($message['id'] == $newMessageId)
+                                    <div 
+                                        wire:ignore
+                                        wire:key="msg-typing-{{ $message['id'] }}"
+                                        class="rounded-xl bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#1D293D] px-4 py-3 text-[14.5px] leading-relaxed text-[#334155] dark:text-[#CAD5E2] max-w-[656px] prose dark:prose-invert prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-li:my-0 prose-li:marker:text-[#0F172A] dark:prose-li:marker:text-[#F8FAFC] pb-1"
+                                        x-data="{ 
+                                            content: `{{ addslashes(str($message['content'])->markdown()) }}`, 
+                                            displayedContent: '', 
+                                            typewriterEffect() {
+                                                let i = 0;
+                                                const speed = 10;
+                                                const type = () => {
+                                                    if (i < this.content.length) {
+                                                        let nextChunk = this.content.substring(i, i + 3);
+                                                        if (nextChunk.startsWith('<')) {
+                                                            const tagEnd = this.content.indexOf('>', i);
+                                                            if (tagEnd !== -1) {
+                                                                nextChunk = this.content.substring(i, tagEnd + 1);
+                                                            }
+                                                        }
+                                                        
+                                                        this.displayedContent += nextChunk;
+                                                        i += nextChunk.length;
+                                                        
+                                                        setTimeout(type, speed);
+                                                    }
+                                                };
+                                                setTimeout(type, 100);
+                                            }
+                                        }" 
+                                        x-init="typewriterEffect()"
+                                        x-html="displayedContent"
+                                    >
+                                    </div>
+                                @else
+                                    <div 
+                                        wire:key="msg-static-{{ $message['id'] }}"
+                                        class="rounded-xl bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#1D293D] px-4 py-3 text-[14.5px] leading-relaxed text-[#334155] dark:text-[#CAD5E2] max-w-[656px] prose dark:prose-invert prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-li:my-0 prose-li:marker:text-[#0F172A] dark:prose-li:marker:text-[#F8FAFC] pb-1"
+                                        x-html="`{{ addslashes(str($message['content'])->markdown()) }}`"
+                                    >
+                                    </div>
+                                @endif
                             @else
                                 <div class="text-[14.5px] leading-relaxed text-[#334155] dark:text-[#CAD5E2] max-w-[656px]">
                                     <p class="whitespace-pre-wrap">{{ $message['content'] }}</p>
@@ -284,9 +385,30 @@
                 </div>
             @endforeach
 
+            <template x-if="optimisticUserMessage">
+                <div class="flex justify-end">
+                    <div class="w-full sm:max-w-3xl flex items-start gap-4 px-2 sm:px-8 flex-row-reverse">
+                        <div class="shrink-0 h-8 w-8 rounded-full flex items-center justify-center bg-[#E2E8F0] dark:bg-[#1D293D] text-[#62748E] dark:text-[#90A1B9]">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2m12-10a4 4 0 11-8 0 4 4 0 018 0z" />
+                            </svg>
+                        </div>
+                        <div class="flex flex-col gap-1 w-full items-end text-right">
+                            <div class="flex items-center gap-2 mb-1 justify-end">
+                                <span class="text-[13px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">You</span>
+                            </div>
+                            <div class="text-[14.5px] leading-relaxed text-[#334155] dark:text-[#CAD5E2] max-w-[656px]">
+                                <p class="whitespace-pre-wrap" x-text="optimisticUserMessage"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
+
             <!-- AI Streaming Output -->
             <div x-data="{ streaming: false, text: '', modelName: '', sources: [] }" 
                  x-on:message-send.window="streaming = true; text = ''; modelName = ''; sources = []"
+                  x-on:message-complete.window="streaming = false; text = ''; modelName = ''; sources = []"
                  x-init="
                     $wire.on('assistant-output', (data) => { text += data[0]; streaming = true; });
                     $wire.on('model-name', (data) => { modelName = data[0]; });
@@ -305,27 +427,17 @@
                              <span class="text-[13px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">ISTA AI</span>
                              <span x-show="modelName" class="text-[10px] bg-[#E2E8F0] dark:bg-[#1E293B] px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-300" x-text="modelName"></span>
                          </div>
-                         <div class="rounded-xl bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#1D293D] px-4 py-3 text-[14.5px] leading-relaxed text-[#334155] dark:text-[#CAD5E2] w-full max-w-[656px]">
-                             <p class="whitespace-pre-wrap" id="ai-streaming-buffer" wire:stream="assistant-output"></p>
+                         <div class="rounded-xl bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#1D293D] text-[14.5px] leading-relaxed text-[#334155] dark:text-[#CAD5E2]"
+                              :class="text === '' ? 'inline-flex items-center px-4 py-3 w-auto' : 'px-4 py-3 w-full max-w-[656px]'">
+                             <div x-show="text === ''" class="flex space-x-1.5 py-1">
+                                <div class="h-2 w-2 bg-gray-400 dark:bg-[#64748B] rounded-full animate-bounce"></div>
+                                <div class="h-2 w-2 bg-gray-400 dark:bg-[#64748B] rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                                <div class="h-2 w-2 bg-gray-400 dark:bg-[#64748B] rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                             </div>
+                             <p x-show="text !== ''" class="whitespace-pre-wrap" x-text="text"></p>
                          </div>
                      </div>
                   </div>
-            </div>
-
-            <!-- Loading Indicator -->
-            <div wire:loading wire:target="sendMessage" class="flex justify-start">
-                <div class="w-full sm:max-w-3xl flex flex-row items-start gap-4 px-2 sm:px-8">
-                    <div class="shrink-0 h-8 w-8 rounded-full bg-[#615FFF] text-white flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 3l1.2 2.9L16 7.1l-2.8 1.2L12 11l-1.2-2.7L8 7.1l2.8-1.2L12 3zm6 9l.8 1.9L21 15l-2.2.9L18 18l-.8-2.1L15 15l2.2-1.1L18 12zM6 13l.7 1.6L8.4 15l-1.7.7L6 17.4l-.7-1.7L3.6 15l1.7-.4L6 13z" />
-                        </svg>
-                    </div>
-                    <div class="flex space-x-1.5 pt-3 rounded-xl bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#1D293D] px-4 py-3">
-                        <div class="h-2 w-2 bg-gray-400 dark:bg-[#64748B] rounded-full animate-bounce"></div>
-                        <div class="h-2 w-2 bg-gray-400 dark:bg-[#64748B] rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                        <div class="h-2 w-2 bg-gray-400 dark:bg-[#64748B] rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                    </div>
-                </div>
             </div>
         </div>
 
@@ -341,7 +453,7 @@
                 accept=".pdf,.docx,.xlsx"
                 class="hidden"
             >
-            <form wire:submit.prevent="sendMessage" class="max-w-3xl mx-auto relative rounded-xl shadow-sm bg-white dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#1E293B] focus-within:border-indigo-500 dark:focus-within:border-indigo-500 transition-colors">
+            <form x-on:submit.prevent="submitPrompt($event)" class="max-w-3xl mx-auto relative rounded-xl shadow-sm bg-white dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#1E293B] focus-within:border-indigo-500 dark:focus-within:border-indigo-500 transition-colors">
                 <div class="flex flex-col w-full">
                     <div wire:loading.flex wire:target="chatAttachment" class="px-5 pt-4 items-center gap-2 text-[12px] text-[#4A4AF4] dark:text-[#8E81FF]">
                         <span class="h-2 w-2 rounded-full bg-current animate-ping"></span>
@@ -379,8 +491,8 @@
                     @endif
                     <div x-show="!isDraggingFile" class="flex items-end px-3 pb-3 pt-3 w-full">
                         <textarea 
-                            wire:model="prompt"
-                            x-on:keydown.enter.prevent="if($event.shiftKey) return; $wire.sendMessage(); $dispatch('message-send')"
+                            x-model="promptDraft"
+                            x-on:keydown.enter.prevent="if($event.shiftKey) return; submitPrompt($event)"
                             placeholder="Message ISTA AI..." 
                             class="flex-1 max-h-[200px] min-h-[44px] bg-transparent border-none focus:ring-0 resize-none text-[14.5px] text-[#0F172A] dark:text-[#F8FAFC] placeholder-[#94A3B8] dark:placeholder-[#64748B] outline-none px-2"
                             rows="1"
@@ -401,7 +513,7 @@
 
                             <!-- Send -->
                             <button type="submit" 
-                                    wire:loading.attr="disabled"
+                                    :disabled="isSendingMessage"
                                     class="bg-[#F1F5F9] dark:bg-[#1D293D] hover:bg-[#E2E8F0] dark:hover:bg-[#314158] disabled:opacity-50 rounded-full transition-colors h-[32px] w-[32px] flex items-center justify-center">
                                 <img src="{{ $uiIcons['sendLight'] }}" alt="" class="h-[17px] w-[17px] dark:hidden" />
                                 <img src="{{ $uiIcons['sendDark'] }}" alt="" class="h-[17px] w-[17px] hidden dark:block" />
