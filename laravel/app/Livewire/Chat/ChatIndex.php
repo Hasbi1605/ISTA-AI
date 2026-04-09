@@ -36,6 +36,7 @@ class ChatIndex extends Component
     public $attachmentUploadMessage = '';
     public $uploadingAttachmentName = null;
     public $hasDocumentsInProgress = false;
+    public $newMessageId = null;
 
     // Maximum chats to show before "Show More"
     const MAX_VISIBLE_CHATS = 10;
@@ -372,8 +373,12 @@ class ChatIndex extends Component
         }
     }
 
-    public function sendMessage(AIService $aiService)
+    public function sendMessage(?string $prompt = null, AIService $aiService)
     {
+        if ($prompt !== null) {
+            $this->prompt = $prompt;
+        }
+
         // Mencegah PHP kill process (Time Limit Exceeded) akibat lamanya process LLM
         set_time_limit(120);
 
@@ -398,6 +403,7 @@ class ChatIndex extends Component
         ]);
 
         $this->messages[] = $userMessage->toArray();
+        $this->dispatch('user-message-acked');
         $userPrompt = $this->prompt;
         $this->prompt = '';
         $this->sources = [];
@@ -459,11 +465,13 @@ class ChatIndex extends Component
         $cleanContent = preg_replace('/\[SOURCES:\[.+?\]\]/s', '', $fullResponse);
         $cleanContent = trim($cleanContent);
 
-        Message::create([
+        $assistantMsg = Message::create([
             'conversation_id' => $this->currentConversationId,
             'role' => 'assistant',
             'content' => $cleanContent
         ]);
+
+        $this->newMessageId = $assistantMsg->id;
 
         // Refresh state
         $this->loadConversation($this->currentConversationId);

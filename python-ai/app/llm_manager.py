@@ -25,6 +25,20 @@ MODEL_LIST = [
         "base_url": "https://models.inference.ai.azure.com",
     },
     {
+        "label": "GPT-4o (Primary)",
+        "provider": "litellm",
+        "model_name": "openai/gpt-4o",
+        "api_key_env": "GITHUB_TOKEN",
+        "base_url": "https://models.inference.ai.azure.com",
+    },
+    {
+        "label": "GPT-4o (Backup Node)",
+        "provider": "litellm",
+        "model_name": "openai/gpt-4o",
+        "api_key_env": "GITHUB_TOKEN_2",
+        "base_url": "https://models.inference.ai.azure.com",
+    },
+    {
         "label": "Gemini 3 Flash",
         "provider": "gemini_native",
         "model_name": "gemini-3-flash-preview",
