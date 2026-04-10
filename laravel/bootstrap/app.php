@@ -14,5 +14,13 @@ return Application::configure(basePath: dirname(__DIR__))
         //
     })
     ->withExceptions(function (Exceptions $exceptions) {
+        $exceptions->reportable(function (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Global Exception Caught: ' . $e->getMessage(), [
+                'exception_class' => get_class($e),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ]);
+        });
+
         //
     })->create();
