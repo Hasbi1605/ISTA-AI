@@ -384,6 +384,9 @@ class ChatIndex extends Component
         // Mencegah PHP kill process (Time Limit Exceeded) akibat lamanya process LLM
         set_time_limit(120);
 
+        // Reset pointer typewriter agar hanya pesan assistant terbaru yang dianimasikan.
+        $this->newMessageId = null;
+
         $this->validate([
             'prompt' => 'required|string|min:1',
         ]);
@@ -406,7 +409,6 @@ class ChatIndex extends Component
 
         $this->messages[] = $userMessage->toArray();
         $this->dispatch('user-message-acked');
-        $userPrompt = $this->prompt;
         $this->prompt = '';
         $this->sources = [];
 
@@ -435,7 +437,6 @@ class ChatIndex extends Component
         }
 
         $hasDocumentContext = !empty($documentFilenames);
-        $explicitWebRequest = $this->isExplicitWebRequest($userPrompt);
         $sourcePolicy = $hasDocumentContext ? 'document_context' : 'hybrid_realtime_auto';
         $allowAutoRealtimeWeb = !$hasDocumentContext;
 
@@ -447,8 +448,7 @@ class ChatIndex extends Component
                 (string) Auth::id(),
                 $this->webSearchMode,
                 $sourcePolicy,
-                $allowAutoRealtimeWeb,
-                $explicitWebRequest
+                $allowAutoRealtimeWeb
             ) as $chunk
         ) {
             // Parse model indicator from the first chunk
@@ -496,37 +496,7 @@ class ChatIndex extends Component
         // Refresh state
         $this->loadConversation($this->currentConversationId);
         $this->loadConversations();
-    }
-
-    private function isExplicitWebRequest(string $prompt): bool
-    {
-        if (trim($prompt) === '') {
-            return false;
-        }
-
-        $patterns = [
-            '/\bweb\s*search\b/i',
-            '/\bsearch\s*web\b/i',
-            '/\bcari\s+di\s+web\b/i',
-            '/\bcari\s+di\s+internet\b/i',
-            '/\bpakai\s+web\b/i',
-            '/\bpakai\s+internet\b/i',
-            '/\bgunakan\s+web\b/i',
-            '/\bwajib\s+web\s*search\b/i',
-            '/\bharus\s+web\s*search\b/i',
-            '/\bbrowse\s+web\b/i',
-            '/\btelusuri\s+web\b/i',
-            '/\bsearch\s+online\b/i',
-            '/\bcek\s+internet\b/i',
-        ];
-
-        foreach ($patterns as $pattern) {
-            if (preg_match($pattern, $prompt)) {
-                return true;
-            }
-        }
-
-        return false;
+        $this->dispatch('assistant-message-persisted');
     }
 
     private function sanitizeAssistantOutput(string $text): string
@@ -535,8 +505,20 @@ class ChatIndex extends Component
             return $text;
         }
 
-        $sanitized = preg_replace('/\bchunk(?:ing|ed)?\b/i', 'bagian dokumen', $text);
-        $sanitized = preg_replace('/\bchunks\b/i', 'bagian dokumen', (string) $sanitized);
+        $replacements = [
+            '/\bchunks?\b/i' => 'bagian dokumen',
+            '/\bchunk(?:ing|ed)?\b/i' => 'bagian dokumen',
+            '/\bembeddings?\b/i' => 'representasi dokumen',
+            '/\bvectors?\b/i' => 'indeks dokumen',
+            '/\brag\b/i' => 'konteks dokumen',
+            '/\bretrieval\b/i' => 'pencarian dokumen',
+            '/\btop\s*[- ]?k\b/i' => 'hasil teratas',
+        ];
+
+        $sanitized = $text;
+        foreach ($replacements as $pattern => $replacement) {
+            $sanitized = preg_replace($pattern, $replacement, (string) $sanitized);
+        }
 
         return (string) $sanitized;
     }

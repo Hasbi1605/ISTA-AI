@@ -42,14 +42,12 @@ class AIService
         ?string $user_id = null,
         bool $force_web_search = false,
         ?string $source_policy = null,
-        bool $allow_auto_realtime_web = true,
-        bool $explicit_web_request = false
+        bool $allow_auto_realtime_web = true
     ) {
         $payload = [
             'messages' => $messages,
             'force_web_search' => $force_web_search,
             'allow_auto_realtime_web' => $allow_auto_realtime_web,
-            'explicit_web_request' => $explicit_web_request,
         ];
 
         if ($source_policy !== null) {

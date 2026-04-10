@@ -9,6 +9,8 @@
         promptDraft: '',
         isSendingMessage: false,
         optimisticUserMessage: '',
+        scrollObserver: null,
+        scrollFrame: null,
         scrollToBottom(smooth = false) {
             const chatBox = this.$refs.chatBox;
             if (!chatBox) return;
@@ -17,6 +19,36 @@
                 top: chatBox.scrollHeight,
                 behavior: smooth ? 'smooth' : 'auto',
             });
+        },
+        scheduleScroll() {
+            if (this.scrollFrame !== null) return;
+            this.scrollFrame = requestAnimationFrame(() => {
+                this.scrollFrame = null;
+                this.scrollToBottom();
+            });
+        },
+        startScrollObserver() {
+            const chatBox = this.$refs.chatBox;
+            if (!chatBox || this.scrollObserver) return;
+
+            this.scrollObserver = new MutationObserver((mutations) => {
+                if (mutations.some((mutation) => mutation.type === 'childList')) {
+                    this.scheduleScroll();
+                }
+            });
+
+            this.scrollObserver.observe(chatBox, { childList: true });
+        },
+        stopScrollObserver() {
+            if (this.scrollObserver) {
+                this.scrollObserver.disconnect();
+                this.scrollObserver = null;
+            }
+
+            if (this.scrollFrame !== null) {
+                cancelAnimationFrame(this.scrollFrame);
+                this.scrollFrame = null;
+            }
         },
         submitPrompt(event) {
             if (event) event.preventDefault();
@@ -61,13 +93,8 @@
         },
         initChatBehavior() {
             this.$nextTick(() => this.scrollToBottom());
-
-            const chatBox = this.$refs.chatBox;
-            if (chatBox) {
-                const observer = new MutationObserver(() => this.scrollToBottom());
-                observer.observe(chatBox, { childList: true, subtree: true, characterData: true });
-                window.addEventListener('beforeunload', () => observer.disconnect(), { once: true });
-            }
+            this.startScrollObserver();
+            window.addEventListener('beforeunload', () => this.stopScrollObserver(), { once: true });
 
             this.$wire.on('assistant-output', () => {
                 this.$nextTick(() => this.scrollToBottom());
@@ -76,6 +103,11 @@
             this.$wire.on('user-message-acked', () => {
                 this.messageAcked = true;
                 this.optimisticUserMessage = '';
+                this.$nextTick(() => this.scrollToBottom());
+            });
+
+            this.$wire.on('assistant-message-persisted', () => {
+                this.stopScrollObserver();
                 this.$nextTick(() => this.scrollToBottom());
             });
         },
@@ -154,6 +186,8 @@
      x-on:dragover.window.prevent="onDragOver($event)"
      x-on:dragleave.window.prevent="onDragLeave($event)"
      x-on:drop.window.prevent="onDropFile($event)"
+    x-on:message-send.window="startScrollObserver()"
+    x-on:message-complete.window="stopScrollObserver(); $nextTick(() => scrollToBottom())"
     x-init="initChatBehavior()"
      class="flex h-screen w-full overflow-hidden bg-white dark:bg-[#020618] text-gray-800 dark:text-gray-100 font-sans transition-colors duration-300">
     @php
@@ -457,6 +491,7 @@
                     $wire.on('assistant-output', (data) => { text += data[0]; streaming = true; });
                     $wire.on('model-name', (data) => { modelName = data[0]; });
                     $wire.on('assistant-sources', (data) => { sources = data[0]; });
+                          $wire.on('assistant-message-persisted', () => { streaming = false; text = ''; modelName = ''; sources = []; });
                   "
                  class="flex justify-start"
                  x-show="streaming">

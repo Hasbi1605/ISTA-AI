@@ -96,7 +96,7 @@ def get_llm_stream(
 ) -> Generator[str, None, None]:
     """
     Generator that yields chunks of text from the best available LLM.
-    Fallback sequence: Gemini -> Groq -> GitHub Models.
+    Fallback sequence: GPT-5 Chat -> GPT-4o -> Gemini -> Groq.
     
     Includes policy-aware LangSearch integration.
     """

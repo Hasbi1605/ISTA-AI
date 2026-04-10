@@ -1,5 +1,6 @@
 import os
 import json
+import hashlib
 import logging
 import time
 import requests
@@ -361,7 +362,7 @@ def search_relevant_chunks(query: str, filenames: List[str] = None, top_k: int =
             }
             results.append(chunk_info)
         
-        logger.info(f"📚 RAG: Found {len(results)} relevant chunks for query: '{query}'")
+        logger.info("📚 RAG: Found %s relevant chunks (%s)", len(results), _query_log_meta(query))
         return results, True
         
     except Exception as e:
@@ -566,6 +567,15 @@ _langsearch_service = None
 
 def _normalize_query(query: str) -> str:
     return re.sub(r"\s+", " ", (query or "").strip().lower())
+
+
+def _query_log_meta(query: str) -> str:
+    cleaned = (query or "").strip()
+    if not cleaned:
+        return "query_len=0 query_hash=none"
+
+    query_hash = hashlib.sha256(cleaned.encode("utf-8")).hexdigest()[:10]
+    return f"query_len={len(cleaned)} query_hash={query_hash}"
 
 
 def _normalize_for_match(text: str) -> str:
@@ -804,7 +814,7 @@ def get_context_for_query(
     )
 
     if should_search:
-        logger.info(f"🌐 Web search enabled ({reason_code}) for query: '{query}'")
+        logger.info("🌐 Web search enabled (%s, %s)", reason_code, _query_log_meta(query))
         search_results = langsearch.search(query)
 
         # For score-related questions, retry once with a focused query when no score is found.
@@ -814,7 +824,7 @@ def get_context_for_query(
             focused_results = langsearch.search(focused_query)
             search_results = _merge_search_results(search_results, focused_results)
     else:
-        logger.info(f"🚫 Web search skipped ({reason_code}) for query: '{query}'")
+        logger.info("🚫 Web search skipped (%s, %s)", reason_code, _query_log_meta(query))
         
     has_search = len(search_results) > 0
     
@@ -855,7 +865,7 @@ def get_context_for_query(
             if docs:
                 rag_documents = docs
                 has_rag = True
-                logger.info(f"📚 RAG: Found {len(docs)} relevant documents for query: '{query}'")
+                logger.info("📚 RAG: Found %s relevant documents (%s)", len(docs), _query_log_meta(query))
     except Exception as e:
         logger.warning(f"⚠️ RAG search failed: {str(e)}")
     

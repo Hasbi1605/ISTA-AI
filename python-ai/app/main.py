@@ -1,11 +1,12 @@
 import os
+import logging
 from dotenv import load_dotenv
 
 # Load .env from the project root (python-ai/.env)
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
 
 import socket
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 from fastapi import FastAPI, Depends, HTTPException, Header
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -20,6 +21,7 @@ from app.services.rag_service import (
 )
 
 app = FastAPI(title="ISTA AI Microservice", version="1.1.5")
+logger = logging.getLogger(__name__)
 
 # Include Routers
 app.include_router(documents.router)
@@ -44,6 +46,27 @@ class ChatRequest(BaseModel):
     source_policy: Optional[str] = None
     allow_auto_realtime_web: bool = True
     explicit_web_request: bool = False
+
+
+def _resolve_policy_flags(request: ChatRequest, documents_active: bool) -> Tuple[bool, str]:
+    """
+    Resolve routing policy flags so Laravel source_policy is applied consistently.
+    """
+    source_policy = (request.source_policy or "").strip().lower()
+    allow_auto_realtime_web = request.allow_auto_realtime_web
+
+    if source_policy == "document_context":
+        # Document-first mode should not auto-escalate to web unless explicitly requested.
+        allow_auto_realtime_web = False
+    elif source_policy == "hybrid_realtime_auto":
+        allow_auto_realtime_web = True
+    elif source_policy:
+        logger.warning("Unknown source_policy received: %s", source_policy)
+
+    if source_policy == "document_context" and not documents_active:
+        logger.warning("source_policy=document_context received without active document_filenames")
+
+    return allow_auto_realtime_web, source_policy
 
 
 def _get_latest_user_query(messages: List[Dict[str, str]]) -> str:
@@ -86,16 +109,25 @@ async def chat_stream(request: ChatRequest):
     """
     query = _get_latest_user_query(request.messages)
     documents_active = bool(request.document_filenames)
+    allow_auto_realtime_web, source_policy = _resolve_policy_flags(request, documents_active)
     explicit_web_request = request.explicit_web_request or detect_explicit_web_request(query)
 
     should_web_search, reason_code, realtime_intent = should_use_web_search(
         query=query,
         force_web_search=request.force_web_search,
         explicit_web_request=explicit_web_request,
-        allow_auto_realtime_web=request.allow_auto_realtime_web,
+        allow_auto_realtime_web=allow_auto_realtime_web,
         documents_active=documents_active,
     )
-    print(f"[Policy] reason={reason_code} realtime_intent={realtime_intent} docs_active={documents_active}")
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug(
+            "Policy reason=%s realtime_intent=%s docs_active=%s explicit_web=%s source_policy=%s",
+            reason_code,
+            realtime_intent,
+            documents_active,
+            explicit_web_request,
+            source_policy or "unset",
+        )
 
     # RAG mode with document-first guardrails
     if documents_active and query:
@@ -112,7 +144,7 @@ async def chat_stream(request: ChatRequest):
                 context_data = get_context_for_query(
                     query,
                     force_web_search=request.force_web_search,
-                    allow_auto_realtime_web=request.allow_auto_realtime_web,
+                    allow_auto_realtime_web=allow_auto_realtime_web,
                     documents_active=True,
                     explicit_web_request=explicit_web_request,
                 )
@@ -132,7 +164,7 @@ async def chat_stream(request: ChatRequest):
                     get_llm_stream(
                         request.messages,
                         force_web_search=request.force_web_search,
-                        allow_auto_realtime_web=request.allow_auto_realtime_web,
+                        allow_auto_realtime_web=allow_auto_realtime_web,
                         documents_active=True,
                         explicit_web_request=explicit_web_request,
                     ),
@@ -150,7 +182,7 @@ async def chat_stream(request: ChatRequest):
                 get_llm_stream(
                     request.messages,
                     force_web_search=request.force_web_search,
-                    allow_auto_realtime_web=request.allow_auto_realtime_web,
+                    allow_auto_realtime_web=allow_auto_realtime_web,
                     documents_active=True,
                     explicit_web_request=explicit_web_request,
                 ),
@@ -167,7 +199,7 @@ async def chat_stream(request: ChatRequest):
         get_llm_stream(
             request.messages,
             force_web_search=request.force_web_search,
-            allow_auto_realtime_web=request.allow_auto_realtime_web,
+            allow_auto_realtime_web=allow_auto_realtime_web,
             documents_active=False,
             explicit_web_request=explicit_web_request,
         ),
