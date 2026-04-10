@@ -8,6 +8,9 @@ from typing import List, Tuple, Optional, Dict
 import re
 import unicodedata
 from dotenv import load_dotenv
+import tiktoken
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 # Ensure .env is loaded (for standalone imports)
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), '.env'))
@@ -87,48 +90,97 @@ logger = logging.getLogger(__name__)
 CHROMA_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "chroma_data")
 EMBEDDING_TIMEOUT = int(os.getenv("EMBEDDING_TIMEOUT", "30"))
 
-# Embedding model list untuk fallback
+# Token-aware chunking configuration
+TOKEN_CHUNK_SIZE = int(os.getenv("TOKEN_CHUNK_SIZE", "1500"))  # Max tokens per chunk
+TOKEN_CHUNK_OVERLAP = int(os.getenv("TOKEN_CHUNK_OVERLAP", "150"))  # Token overlap
+AGGRESSIVE_BATCH_SIZE = int(os.getenv("AGGRESSIVE_BATCH_SIZE", "200"))  # Chunks per batch (aggressive)
+BATCH_DELAY_SECONDS = float(os.getenv("BATCH_DELAY_SECONDS", "0.5"))  # Delay between batches
+
+# Embedding model list untuk cascading fallback (4-tier system)
 EMBEDDING_MODELS = [
     {
         "name": "GitHub Models (OpenAI Large) - Primary",
         "provider": "github",
         "model": "text-embedding-3-large",
         "api_key_env": "GITHUB_TOKEN",
+        "tpm_limit": 500000,  # 500K TPM
+        "dimensions": 3072,
     },
     {
         "name": "GitHub Models (OpenAI Large) - Backup",
         "provider": "github",
         "model": "text-embedding-3-large",
         "api_key_env": "GITHUB_TOKEN_2",
+        "tpm_limit": 500000,  # 500K TPM
+        "dimensions": 3072,
     },
     {
-        "name": "GitHub Models (OpenAI Small) - Backup 2",
+        "name": "GitHub Models (OpenAI Small) - Fallback 1",
         "provider": "github",
         "model": "text-embedding-3-small",
         "api_key_env": "GITHUB_TOKEN",
+        "tpm_limit": 500000,  # 500K TPM
+        "dimensions": 1536,
     },
     {
-        "name": "GitHub Models (OpenAI Small) - Backup 3",
+        "name": "GitHub Models (OpenAI Small) - Fallback 2",
         "provider": "github",
         "model": "text-embedding-3-small",
         "api_key_env": "GITHUB_TOKEN_2",
+        "tpm_limit": 500000,  # 500K TPM
+        "dimensions": 1536,
     }
 ]
 
+# Initialize tiktoken encoder for token-aware chunking
+try:
+    TIKTOKEN_ENCODER = tiktoken.get_encoding("cl100k_base")  # OpenAI's encoding
+    logger.info("✅ Tiktoken encoder initialized (cl100k_base)")
+except Exception as e:
+    logger.error(f"❌ Failed to initialize tiktoken: {e}")
+    TIKTOKEN_ENCODER = None
 
 
-def get_embeddings_with_fallback() -> Tuple[Optional[Embeddings], str]:
+
+def count_tokens(text: str) -> int:
     """
-    Mendapatkan embedding model dengan fallback mechanism.
-    Urutan: GitHub Models (OpenAI text-embedding-3-large)
+    Count tokens in text using tiktoken encoder.
+    
+    Args:
+        text: Text to count tokens for
+        
+    Returns:
+        Number of tokens
+    """
+    if TIKTOKEN_ENCODER is None:
+        # Fallback: rough estimate (4 chars per token)
+        return len(text) // 4
+    
+    try:
+        return len(TIKTOKEN_ENCODER.encode(text))
+    except Exception as e:
+        logger.warning(f"⚠️ Token counting failed: {e}, using fallback estimate")
+        return len(text) // 4
+
+
+def get_embeddings_with_fallback(model_index: int = 0) -> Tuple[Optional[Embeddings], str, int]:
+    """
+    Mendapatkan embedding model dengan cascading fallback mechanism.
+    Urutan: 2x Large (3072 dim) → 2x Small (1536 dim)
+    Total kapasitas: 2 Juta TPM (4 x 500K TPM)
+    
+    Args:
+        model_index: Starting index in EMBEDDING_MODELS list (for cascading)
     
     Returns:
-        Tuple[Optional[Embeddings], str]: (embedding_object, provider_name)
+        Tuple[Optional[Embeddings], str, int]: (embedding_object, provider_name, model_index)
     """
-    for model_config in EMBEDDING_MODELS:
+    for idx in range(model_index, len(EMBEDDING_MODELS)):
+        model_config = EMBEDDING_MODELS[idx]
         api_key = os.getenv(model_config["api_key_env"])
+        
         if not api_key:
-            logger.warning(f"⚠️ {model_config['name']}: API key tidak ditemukan, pastikan GITHUB_TOKEN ada di .env")
+            logger.warning(f"⚠️ {model_config['name']}: API key tidak ditemukan")
             continue
         
         try:
@@ -140,23 +192,27 @@ def get_embeddings_with_fallback() -> Tuple[Optional[Embeddings], str]:
                 )
                 # Test dengan embedding sederhana
                 _ = embeddings.embed_query("test")
-                logger.info(f"✅ Menggunakan {model_config['name']} untuk embeddings (Copilot Pro - 10M Tokens/min)")
-                return embeddings, model_config["name"]
+                logger.info(f"✅ Menggunakan {model_config['name']} (TPM: {model_config['tpm_limit']:,}, Dim: {model_config['dimensions']})")
+                return embeddings, model_config["name"], idx
                 
         except Exception as e:
             error_msg = str(e)
             logger.warning(f"⚠️ {model_config['name']} gagal: {error_msg}")
             
     # Semua provider gagal
-    logger.error("❌ Semua embedding provider gagal!")
-    return None, "none"
+    logger.error("❌ Semua embedding provider gagal! Total kapasitas: 2M TPM habis atau tidak tersedia")
+    return None, "none", -1
 
 def process_document(file_path: str, filename: str, user_id: str = "unknown"):
     """
-    Parses a document, splits it into chunks, generates embeddings,
-    and stores them in ChromaDB.
+    Parses a document, splits it into chunks using Token-Aware Recursive Chunking,
+    generates embeddings with Aggressive Batching, and stores them in ChromaDB.
     
-    Dengan fallback mechanism dan rate limiting untuk mencegah quota exhausted.
+    Implementasi Update Tahap 5:
+    - Token-Aware Recursive Chunking (tiktoken cl100k_base)
+    - Aggressive Batching (200+ chunks per batch)
+    - Cascading Fallback 4-tier (2M TPM total capacity)
+    - Circuit Breaker untuk rate limit handling
     
     Args:
         file_path: Path to the document file
@@ -168,7 +224,8 @@ def process_document(file_path: str, filename: str, user_id: str = "unknown"):
         logger.info(f"File path: {file_path}")
         logger.info(f"File exists: {os.path.exists(file_path)}")
         if os.path.exists(file_path):
-            logger.info(f"File size: {os.path.getsize(file_path)} bytes")
+            file_size = os.path.getsize(file_path)
+            logger.info(f"File size: {file_size:,} bytes ({file_size / 1024 / 1024:.2f} MB)")
         
         # 1. Load document
         logger.info("Step 1: Loading document...")
@@ -176,19 +233,38 @@ def process_document(file_path: str, filename: str, user_id: str = "unknown"):
         docs = loader.load()
         logger.info(f"Loaded {len(docs)} document(s)")
         
-        # 2. Split text into chunks
-        logger.info("Step 2: Splitting text into chunks...")
+        # Calculate total content size
+        total_content = "".join([doc.page_content for doc in docs])
+        total_chars = len(total_content)
+        estimated_tokens = count_tokens(total_content)
+        logger.info(f"Total content: {total_chars:,} chars, ~{estimated_tokens:,} tokens")
+        
+        # 2. Token-Aware Recursive Chunking
+        logger.info(f"Step 2: Token-Aware Recursive Chunking (chunk_size={TOKEN_CHUNK_SIZE}, overlap={TOKEN_CHUNK_OVERLAP})...")
+        
+        # Use RecursiveCharacterTextSplitter with token counting
         text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000,
-            chunk_overlap=200,
-            add_start_index=True
+            chunk_size=TOKEN_CHUNK_SIZE,
+            chunk_overlap=TOKEN_CHUNK_OVERLAP,
+            length_function=count_tokens,  # Use token-based counting
+            add_start_index=True,
+            separators=["\n\n", "\n", ". ", " ", ""]  # Prioritize semantic boundaries
         )
         chunks = text_splitter.split_documents(docs)
-        logger.info(f"Created {len(chunks)} chunks")
+        logger.info(f"Created {len(chunks)} token-aware chunks")
         
-        # 3. Get embedding model dengan fallback
-        logger.info("Step 3: Initializing embedding model dengan fallback...")
-        embeddings, provider_name = get_embeddings_with_fallback()
+        # Log chunk statistics
+        if chunks:
+            chunk_tokens = [count_tokens(chunk.page_content) for chunk in chunks]
+            avg_tokens = sum(chunk_tokens) / len(chunk_tokens)
+            max_tokens = max(chunk_tokens)
+            min_tokens = min(chunk_tokens)
+            logger.info(f"Chunk stats: avg={avg_tokens:.0f} tokens, min={min_tokens}, max={max_tokens}")
+        
+        # 3. Get embedding model dengan cascading fallback
+        logger.info("Step 3: Initializing embedding model dengan cascading fallback...")
+        current_model_index = 0
+        embeddings, provider_name, current_model_index = get_embeddings_with_fallback(current_model_index)
         
         if embeddings is None:
             raise Exception("Semua embedding provider gagal. Tidak dapat memproses dokumen.")
@@ -199,10 +275,10 @@ def process_document(file_path: str, filename: str, user_id: str = "unknown"):
             chunk.metadata["user_id"] = str(user_id)
             chunk.metadata["embedding_model"] = provider_name
             
-        # 4. Store in ChromaDB dengan rate limiting
-        logger.info(f"Step 4: Generating embeddings dan storing ke ChromaDB...")
-        logger.info(f"Using provider: {provider_name}")
-        logger.info(f"Batching: 10 chunks per request, 1.5s delay antar batch")
+        # 4. Aggressive Batching dengan Circuit Breaker
+        logger.info(f"Step 4: Aggressive Batching & Embedding Generation...")
+        logger.info(f"Batch size: {AGGRESSIVE_BATCH_SIZE} chunks/batch (delay: {BATCH_DELAY_SECONDS}s)")
+        logger.info(f"Total capacity: 2M TPM across 4 models (4 x 500K TPM)")
         
         vectorstore = Chroma(
             collection_name="documents_collection",
@@ -210,36 +286,47 @@ def process_document(file_path: str, filename: str, user_id: str = "unknown"):
             persist_directory=CHROMA_PATH
         )
         
-        # Memproses chunk dalam batching (batch size 10) untuk efisiensi HTTP API 
-        # dan mencegah HF Spaces Nginx Drop / Rate Limits
-        batch_size = 10
         successful_chunks = 0
         failed_chunks = 0
+        total_batches = (len(chunks) + AGGRESSIVE_BATCH_SIZE - 1) // AGGRESSIVE_BATCH_SIZE
         
-        for i in range(0, len(chunks), batch_size):
-            batch = chunks[i:i+batch_size]
+        for batch_num in range(0, len(chunks), AGGRESSIVE_BATCH_SIZE):
+            batch = chunks[batch_num:batch_num + AGGRESSIVE_BATCH_SIZE]
+            batch_index = batch_num // AGGRESSIVE_BATCH_SIZE + 1
+            
+            # Calculate batch token count
+            batch_tokens = sum(count_tokens(chunk.page_content) for chunk in batch)
+            
             try:
-                # Add delay untuk setiap batch untuk mencegah rate limit HF Spaces / provider lain
-                if i > 0 and provider_name != "GitHub Models (OpenAI Large)":
-                    time.sleep(1.5)
+                # Add minimal delay between batches (aggressive mode)
+                if batch_num > 0:
+                    time.sleep(BATCH_DELAY_SECONDS)
                 
+                logger.info(f"Processing batch {batch_index}/{total_batches}: {len(batch)} chunks, ~{batch_tokens:,} tokens...")
                 vectorstore.add_documents(batch)
                 successful_chunks += len(batch)
-                logger.info(f"Progress: {successful_chunks}/{len(chunks)} chunks processed...")
+                logger.info(f"✅ Batch {batch_index}/{total_batches} success | Progress: {successful_chunks}/{len(chunks)} chunks")
                     
             except Exception as batch_error:
                 error_msg = str(batch_error)
-                logger.error(f"❌ Error processing batch {i//batch_size + 1}: {error_msg}")
+                logger.error(f"❌ Batch {batch_index} error: {error_msg}")
                 
-                # Jika error atau rate limit, coba fallback ke provider berikutnya
-                if "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg or "rate limit" in error_msg.lower() or "503" in error_msg:
-                    logger.warning(f"🚫 Rate limit detected pada batch {i//batch_size + 1}, mencoba fallback...")
+                # Circuit Breaker: Detect rate limit and cascade to next model
+                is_rate_limit = any(indicator in error_msg.lower() for indicator in [
+                    "429", "rate limit", "resource_exhausted", "quota", "503", "too many requests"
+                ])
+                
+                if is_rate_limit and current_model_index < len(EMBEDDING_MODELS) - 1:
+                    logger.warning(f"🚫 Rate limit detected! Cascading to next model tier...")
                     
-                    # Coba dapatkan provider berikutnya
-                    embeddings, provider_name = get_embeddings_with_fallback()
+                    # Cascade to next model in the fallback chain
+                    current_model_index += 1
+                    embeddings, provider_name, current_model_index = get_embeddings_with_fallback(current_model_index)
+                    
                     if embeddings is None:
                         failed_chunks += len(batch)
-                        raise Exception(f"Semua embedding provider gagal setelah {successful_chunks} chunks berhasil.")
+                        logger.error(f"❌ All 4 models exhausted! Failed after {successful_chunks} chunks")
+                        raise Exception(f"Semua 4 embedding models gagal (2M TPM exhausted) setelah {successful_chunks} chunks berhasil.")
                     
                     # Update vectorstore dengan embedding model baru
                     vectorstore = Chroma(
@@ -249,31 +336,69 @@ def process_document(file_path: str, filename: str, user_id: str = "unknown"):
                     )
                     
                     # Update metadata untuk sisa chunk
-                    for remaining_chunk in chunks[i:]:
+                    for remaining_chunk in chunks[batch_num:]:
                         remaining_chunk.metadata["embedding_model"] = provider_name
                     
-                    # Retry batch yang gagal
-                    try:
-                        time.sleep(2)  # Extra delay setelah rate limit
-                        vectorstore.add_documents(batch)
-                        successful_chunks += len(batch)
-                        logger.info(f"✅ Batch {i//batch_size + 1} berhasil dengan {provider_name}")
-                    except Exception as retry_error:
-                        logger.error(f"❌ Batch {i//batch_size + 1} tetap gagal setelah fallback: {retry_error}")
-                        failed_chunks += len(batch)
-                        continue
+                    # Retry batch dengan model baru (dengan exponential backoff)
+                    retry_delay = 2.0
+                    max_retries = 3
+                    
+                    for retry in range(max_retries):
+                        try:
+                            logger.info(f"🔄 Retry {retry + 1}/{max_retries} dengan {provider_name}...")
+                            time.sleep(retry_delay)
+                            vectorstore.add_documents(batch)
+                            successful_chunks += len(batch)
+                            logger.info(f"✅ Batch {batch_index} berhasil dengan {provider_name} (retry {retry + 1})")
+                            break
+                        except Exception as retry_error:
+                            retry_error_msg = str(retry_error)
+                            logger.warning(f"⚠️ Retry {retry + 1} failed: {retry_error_msg}")
+                            
+                            # Check if still rate limit
+                            if any(indicator in retry_error_msg.lower() for indicator in ["429", "rate limit", "quota"]):
+                                if retry < max_retries - 1:
+                                    retry_delay *= 2  # Exponential backoff
+                                    continue
+                                else:
+                                    # Try next model if available
+                                    if current_model_index < len(EMBEDDING_MODELS) - 1:
+                                        current_model_index += 1
+                                        embeddings, provider_name, current_model_index = get_embeddings_with_fallback(current_model_index)
+                                        if embeddings:
+                                            vectorstore = Chroma(
+                                                collection_name="documents_collection",
+                                                embedding_function=embeddings,
+                                                persist_directory=CHROMA_PATH
+                                            )
+                                            for remaining_chunk in chunks[batch_num:]:
+                                                remaining_chunk.metadata["embedding_model"] = provider_name
+                                            continue
+                            
+                            # Final failure
+                            if retry == max_retries - 1:
+                                logger.error(f"❌ Batch {batch_index} gagal setelah {max_retries} retries")
+                                failed_chunks += len(batch)
+                            break
                 else:
+                    # Non-rate-limit error or no more fallback models
+                    logger.error(f"❌ Batch {batch_index} gagal (non-rate-limit atau no fallback)")
                     failed_chunks += len(batch)
         
         # Summary
-        logger.info(f"✅ Document '{filename}' processed successfully")
-        logger.info(f"Summary: {successful_chunks}/{len(chunks)} chunks berhasil, {failed_chunks} gagal")
-        logger.info(f"Embedding provider used: {provider_name}")
+        success_rate = (successful_chunks / len(chunks) * 100) if len(chunks) > 0 else 0
+        logger.info(f"{'='*60}")
+        logger.info(f"✅ Document '{filename}' processing completed")
+        logger.info(f"Success: {successful_chunks}/{len(chunks)} chunks ({success_rate:.1f}%)")
+        logger.info(f"Failed: {failed_chunks} chunks")
+        logger.info(f"Final embedding model: {provider_name}")
+        logger.info(f"Total tokens processed: ~{estimated_tokens:,}")
+        logger.info(f"{'='*60}")
         
         if failed_chunks > 0:
-            return True, f"Document processed dengan {failed_chunks} chunks gagal (total: {len(chunks)})"
+            return True, f"Document processed dengan {failed_chunks}/{len(chunks)} chunks gagal"
         
-        return True, "Document processed successfully."
+        return True, "Document processed successfully dengan Token-Aware Chunking & Aggressive Batching."
         
     except Exception as e:
         logger.error(f"❌ Error processing document '{filename}': {type(e).__name__}: {str(e)}")
@@ -285,7 +410,7 @@ def delete_document_vectors(filename: str):
     """
     try:
         # Gunakan embedding model dengan fallback
-        embeddings, provider_name = get_embeddings_with_fallback()
+        embeddings, provider_name, _ = get_embeddings_with_fallback()
         
         if embeddings is None:
             return False, "Tidak dapat menginisialisasi embedding model untuk delete operation."
@@ -320,7 +445,7 @@ def search_relevant_chunks(query: str, filenames: List[str] = None, top_k: int =
         Tuple of (list of chunks with metadata, bool indicating success)
     """
     try:
-        embeddings, provider_name = get_embeddings_with_fallback()
+        embeddings, provider_name, _ = get_embeddings_with_fallback()
         
         if embeddings is None:
             return [], False
@@ -500,7 +625,7 @@ def summarize_document(filename: str, user_id: str = None) -> Tuple[bool, str]:
             return False, "User ID diperlukan untuk mengakses dokumen."
         
         # Get all chunks from ChromaDB for this filename
-        embeddings, provider_name = get_embeddings_with_fallback()
+        embeddings, provider_name, _ = get_embeddings_with_fallback()
         
         if embeddings is None:
             return False, "Tidak dapat menginisialisasi embedding model."
@@ -557,7 +682,7 @@ def get_document_chunks_for_summarization(filename: str, user_id: str = None, ma
         if user_id is None:
             return False, [], 0
         
-        embeddings, provider_name = get_embeddings_with_fallback()
+        embeddings, provider_name, _ = get_embeddings_with_fallback()
         
         if embeddings is None:
             return False, [], 0
@@ -578,9 +703,9 @@ def get_document_chunks_for_summarization(filename: str, user_id: str = None, ma
         total_chunks = len(chunks)
         logger.info(f"Found {total_chunks} chunks for summarization")
         
-        # Estimate tokens (rough: ~4 chars per token for Indonesian/English mix)
-        est_tokens = sum(len(c) for c in chunks) // 4
-        logger.info(f"Estimated tokens: {est_tokens}")
+        # Estimate tokens using token counter
+        est_tokens = sum(count_tokens(c) for c in chunks)
+        logger.info(f"Estimated tokens: {est_tokens:,}")
         
         # If within limit, return all chunks as single batch
         if est_tokens <= max_tokens:
@@ -588,15 +713,29 @@ def get_document_chunks_for_summarization(filename: str, user_id: str = None, ma
             return True, [all_content], total_chunks
         
         # Hierarchical summarization: group chunks and create batches
-        logger.info(f"Document too large ({est_tokens} tokens), implementing chunked summarization...")
+        logger.info(f"Document too large ({est_tokens:,} tokens), implementing chunked summarization...")
         
         # Group chunks into batches (approximately max_tokens each)
-        batch_size = max(1, len(chunks) // (est_tokens // max_tokens + 1))
         batches = []
+        current_batch = []
+        current_tokens = 0
         
-        for i in range(0, len(chunks), batch_size):
-            batch_chunks = chunks[i:i + batch_size]
-            batch_content = "\n\n".join([f"--- Bagian {j+1} ---\n{c}" for j, c in enumerate(batch_chunks)])
+        for chunk in chunks:
+            chunk_tokens = count_tokens(chunk)
+            
+            if current_tokens + chunk_tokens > max_tokens and current_batch:
+                # Save current batch and start new one
+                batch_content = "\n\n".join([f"--- Bagian {j+1} ---\n{c}" for j, c in enumerate(current_batch)])
+                batches.append(batch_content)
+                current_batch = [chunk]
+                current_tokens = chunk_tokens
+            else:
+                current_batch.append(chunk)
+                current_tokens += chunk_tokens
+        
+        # Add remaining batch
+        if current_batch:
+            batch_content = "\n\n".join([f"--- Bagian {j+1} ---\n{c}" for j, c in enumerate(current_batch)])
             batches.append(batch_content)
         
         logger.info(f"Created {len(batches)} batches for hierarchical summarization")
