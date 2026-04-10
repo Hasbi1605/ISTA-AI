@@ -610,7 +610,8 @@ def build_rag_prompt(
     sources = []
     
     for i, chunk in enumerate(chunks):
-        context_parts.append(f"--- Kutipan Dokumen {i+1} ---")
+        filename = chunk.get("filename", "Dokumen Tidak Diketahui")
+        context_parts.append(f"--- Referensi dari Dokumen: {filename} ---")
         context_parts.append(chunk.get("content", ""))
         context_parts.append("")
         
@@ -629,21 +630,23 @@ Informasi web terbaru (digunakan jika relevan):
 {web_context}
 """
 
-    rag_prompt = f"""Jawab pertanyaan user berdasarkan referensi berikut.
+    rag_prompt = f"""Anda adalah asisten AI cerdas. Jawab pertanyaan user secara detail dan natural berdasarkan referensi dokumen berikut.
 
-Kutipan dokumen yang menjadi referensi utama:
+SUMBER DOKUMEN REFERENSI:
 {context_str}
 {web_section}
 ---
 
 Pertanyaan: {question}
 
-Instruksi:
-- Utamakan informasi dari kutipan dokumen.
-- Jika ada konteks web, gunakan hanya sebagai pelengkap yang relevan.
-- Jika jawaban tidak ditemukan di dokumen, katakan bahwa tidak ada informasi terkait di dokumen.
-- Cantumkan nama dokumen yang menjadi sumber referensi.
-- Jangan menyebut istilah teknis internal sistem retrieval.
+INSTRUKSI PENTING UNTUK FORMAT JAWABAN:
+1. JANGAN PERNAH menyebut istilah internal seperti "Kutipan 1", "Kutipan Dokumen 2", dsb. Gantikan secara natural dengan menyebut nama file atau merujuk ke isi dokumen tersebut.
+2. Jika di dalam teks/isi dokumen rujukan terdapat Judul Dokumen yang spesifik, sebutkan dan cetak TEBAL (BOLD). Namun jika tidak ada judul di dalamnya, JANGAN mengarang atau memaksakan adanya judul.
+3. WAJIB cetak TEBAL (BOLD) setiap kali Anda menyebutkan nama file rujukan (contoh: "Berdasarkan dokumen **nama_dokumen.pdf**, ...").
+4. Sintesiskan jawaban Anda menjadi paragraf yang kohesif, mengalir, dan mudah dibaca. Jangan sekadar menyalin mentah atau membuat daftar urutan yang kaku.
+5. Utamakan informasi dari sumber dokumen di atas. Jika konteks web tersedia, gunakan hanya sebagai tambahan pelengkap yang memperkaya jawaban.
+6. Jika jawaban tidak ditemukan sama sekali di dalam dokumen rujukan, katakan secara langsung bahwa informasi tersebut tidak tersedia pada dokumen yang Anda baca.
+7. Hindari mencantumkan daftar pustaka di bagian akhir jawaban yang berbentuk "Sumber referensi: Kutipan X". Langsung saja integrasikan penyebutan nama rujukan secara natural ke dalam teks kalimat Anda.
 
 Jawaban:"""
     

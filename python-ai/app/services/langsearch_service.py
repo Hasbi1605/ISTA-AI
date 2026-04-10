@@ -72,11 +72,11 @@ class LangSearchService:
         if cached is not None:
             return cached
         
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
-        
+        api_keys = [self.api_key]
+        backup_key = os.getenv("LANGSEARCH_API_KEY_BACKUP")
+        if backup_key:
+            api_keys.append(backup_key)
+            
         payload = {
             "query": query,
             "freshness": freshness,
@@ -84,46 +84,61 @@ class LangSearchService:
             "count": count
         }
         
-        try:
-            response = requests.post(
-                self.base_url,
-                json=payload,
-                headers=headers,
-                timeout=LANGSEARCH_TIMEOUT
-            )
-            response.raise_for_status()
-            
-            data = response.json()
-            
-            # LangSearch response format: data.webPages.value[]
-            web_pages = data.get("data", {}).get("webPages", {})
-            results = web_pages.get("value", [])
-            
-            formatted_results = []
-            for item in results:
-                formatted_results.append({
-                    "title": item.get("name", ""),
-                    "snippet": item.get("snippet", item.get("summary", "")),
-                    "url": item.get("url", ""),
-                    "datePublished": item.get("datePublished", "")
-                })
-            
-            logger.info(f"✅ LangSearch: query='{query}', results={len(formatted_results)}")
-            
-            # Cache the result
-            self._cache_result(query, time_bucket, formatted_results)
-            
-            return formatted_results
-            
-        except requests.exceptions.Timeout:
-            logger.error(f"⏱️ LangSearch: query='{query}', timeout after {LANGSEARCH_TIMEOUT}s")
+        data = None
+        for i, key in enumerate(api_keys):
+            headers = {
+                "Authorization": f"Bearer {key}",
+                "Content-Type": "application/json"
+            }
+            try:
+                response = requests.post(
+                    self.base_url,
+                    json=payload,
+                    headers=headers,
+                    timeout=LANGSEARCH_TIMEOUT
+                )
+                response.raise_for_status()
+                data = response.json()
+                break
+            except requests.exceptions.Timeout:
+                if i < len(api_keys) - 1:
+                    logger.warning(f"⏱️ LangSearch: attempt {i+1} timeout. Retrying with backup key...")
+                    continue
+                logger.error(f"⏱️ LangSearch: query='{query}', timeout after {LANGSEARCH_TIMEOUT}s")
+                return []
+            except requests.exceptions.RequestException as e:
+                status_code = getattr(getattr(e, 'response', None), 'status_code', None)
+                if i < len(api_keys) - 1 and (status_code in (401, 403, 429) or (status_code and status_code >= 500)):
+                    logger.warning(f"⚠️ LangSearch: attempt {i+1} failed ({status_code}). Retrying with backup key...")
+                    continue
+                logger.error(f"❌ LangSearch: query='{query}', error={str(e)}")
+                return []
+            except Exception as e:
+                logger.error(f"❌ LangSearch: query='{query}', unexpected error={str(e)}")
+                return []
+                
+        if not data:
             return []
-        except requests.exceptions.RequestException as e:
-            logger.error(f"❌ LangSearch: query='{query}', error={str(e)}")
-            return []
-        except Exception as e:
-            logger.error(f"❌ LangSearch: query='{query}', unexpected error={str(e)}")
-            return []
+            
+        # LangSearch response format: data.webPages.value[]
+        web_pages = data.get("data", {}).get("webPages", {})
+        results = web_pages.get("value", [])
+        
+        formatted_results = []
+        for item in results:
+            formatted_results.append({
+                "title": item.get("name", ""),
+                "snippet": item.get("snippet", item.get("summary", "")),
+                "url": item.get("url", ""),
+                "datePublished": item.get("datePublished", "")
+            })
+        
+        logger.info(f"✅ LangSearch: query='{query}', results={len(formatted_results)}")
+        
+        # Cache the result
+        self._cache_result(query, time_bucket, formatted_results)
+        
+        return formatted_results
     
     def build_search_context(self, results: List[Dict]) -> str:
         """
@@ -223,10 +238,10 @@ class LangSearchService:
         model = os.getenv("LANGSEARCH_RERANK_MODEL", "langsearch-reranker-v1")
         timeout = int(os.getenv("LANGSEARCH_RERANK_TIMEOUT", "8"))
         
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
+        api_keys = [self.api_key]
+        backup_key = os.getenv("LANGSEARCH_API_KEY_BACKUP")
+        if backup_key:
+            api_keys.append(backup_key)
         
         payload = {
             "model": model,
@@ -239,37 +254,57 @@ class LangSearchService:
         if return_documents:
             payload["return_documents"] = return_documents
             
-        try:
-            logger.info(f"🔄 LangSearch Rerank: query='{query}', docs={len(documents)}, top_n={top_n}")
-            
-            response = requests.post(
-                "https://api.langsearch.com/v1/rerank",
-                json=payload,
-                headers=headers,
-                timeout=timeout
-            )
-            response.raise_for_status()
-            
-            data = response.json()
-            
-            if data.get("code") != 200:
-                logger.error(f"❌ LangSearch Rerank: API error code={data.get('code')}, msg={data.get('msg')}")
+        data = None
+        for i, key in enumerate(api_keys):
+            headers = {
+                "Authorization": f"Bearer {key}",
+                "Content-Type": "application/json"
+            }
+            try:
+                logger.info(f"🔄 LangSearch Rerank: query='{query}', docs={len(documents)}, top_n={top_n}")
+                
+                response = requests.post(
+                    "https://api.langsearch.com/v1/rerank",
+                    json=payload,
+                    headers=headers,
+                    timeout=timeout
+                )
+                response.raise_for_status()
+                data = response.json()
+                
+                if data.get("code") != 200:
+                    status_code = data.get("code")
+                    if i < len(api_keys) - 1 and status_code in (401, 403, 429):
+                        logger.warning(f"⚠️ LangSearch Rerank: API error {status_code}. Retrying with backup key...")
+                        continue
+                    logger.error(f"❌ LangSearch Rerank: API error code={status_code}, msg={data.get('msg')}")
+                    return None
+                    
+                break
+            except requests.exceptions.Timeout:
+                if i < len(api_keys) - 1:
+                    logger.warning(f"⏱️ LangSearch Rerank: attempt {i+1} timeout. Retrying with backup key...")
+                    continue
+                logger.error(f"⏱️ LangSearch Rerank: query='{query}', timeout after {timeout}s")
+                return None
+            except requests.exceptions.RequestException as e:
+                status_code = getattr(getattr(e, 'response', None), 'status_code', None)
+                if i < len(api_keys) - 1 and (status_code in (401, 403, 429) or (status_code and status_code >= 500)):
+                    logger.warning(f"⚠️ LangSearch Rerank: attempt {i+1} failed ({status_code}). Retrying with backup key...")
+                    continue
+                logger.error(f"❌ LangSearch Rerank: query='{query}', error={str(e)}")
+                return None
+            except Exception as e:
+                logger.error(f"❌ LangSearch Rerank: query='{query}', unexpected error={str(e)}")
                 return None
                 
-            results = data.get("results", [])
-            logger.info(f"✅ LangSearch Rerank: query='{query}', returned {len(results)} results")
+        if not data:
+            return None
             
-            return results
-            
-        except requests.exceptions.Timeout:
-            logger.error(f"⏱️ LangSearch Rerank: query='{query}', timeout after {timeout}s")
-            return None
-        except requests.exceptions.RequestException as e:
-            logger.error(f"❌ LangSearch Rerank: query='{query}', error={str(e)}")
-            return None
-        except Exception as e:
-            logger.error(f"❌ LangSearch Rerank: query='{query}', unexpected error={str(e)}")
-            return None
+        results = data.get("results", [])
+        logger.info(f"✅ LangSearch Rerank: query='{query}', returned {len(results)} results")
+        
+        return results
 
 
 def get_langsearch_service() -> LangSearchService:
