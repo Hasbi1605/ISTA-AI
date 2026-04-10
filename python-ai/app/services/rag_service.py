@@ -275,9 +275,11 @@ def process_document(file_path: str, filename: str, user_id: str = "unknown"):
             chunk.metadata["user_id"] = str(user_id)
             chunk.metadata["embedding_model"] = provider_name
             
-        # 4. Aggressive Batching dengan Circuit Breaker
-        logger.info(f"Step 4: Aggressive Batching & Embedding Generation...")
-        logger.info(f"Batch size: {AGGRESSIVE_BATCH_SIZE} chunks/batch (delay: {BATCH_DELAY_SECONDS}s)")
+        # 4. Smart Batching dengan Token Limit Validation
+        # OpenAI embedding API limit: 64,000 tokens per request (not per minute)
+        MAX_TOKENS_PER_BATCH = 60000  # Safe limit below 64K
+        logger.info(f"Step 4: Smart Batching & Embedding Generation...")
+        logger.info(f"Max batch size: {AGGRESSIVE_BATCH_SIZE} chunks OR {MAX_TOKENS_PER_BATCH:,} tokens (whichever is smaller)")
         logger.info(f"Total capacity: 2M TPM across 4 models (4 x 500K TPM)")
         
         vectorstore = Chroma(
@@ -288,21 +290,42 @@ def process_document(file_path: str, filename: str, user_id: str = "unknown"):
         
         successful_chunks = 0
         failed_chunks = 0
-        total_batches = (len(chunks) + AGGRESSIVE_BATCH_SIZE - 1) // AGGRESSIVE_BATCH_SIZE
         
-        for batch_num in range(0, len(chunks), AGGRESSIVE_BATCH_SIZE):
-            batch = chunks[batch_num:batch_num + AGGRESSIVE_BATCH_SIZE]
-            batch_index = batch_num // AGGRESSIVE_BATCH_SIZE + 1
+        # Create smart batches based on token count
+        smart_batches = []
+        current_batch = []
+        current_batch_tokens = 0
+        
+        for chunk in chunks:
+            chunk_tokens = count_tokens(chunk.page_content)
             
-            # Calculate batch token count
-            batch_tokens = sum(count_tokens(chunk.page_content) for chunk in batch)
+            # Check if adding this chunk would exceed limits
+            would_exceed_tokens = (current_batch_tokens + chunk_tokens) > MAX_TOKENS_PER_BATCH
+            would_exceed_count = len(current_batch) >= AGGRESSIVE_BATCH_SIZE
             
+            if (would_exceed_tokens or would_exceed_count) and current_batch:
+                # Save current batch and start new one
+                smart_batches.append((current_batch, current_batch_tokens))
+                current_batch = [chunk]
+                current_batch_tokens = chunk_tokens
+            else:
+                current_batch.append(chunk)
+                current_batch_tokens += chunk_tokens
+        
+        # Add remaining batch
+        if current_batch:
+            smart_batches.append((current_batch, current_batch_tokens))
+        
+        total_batches = len(smart_batches)
+        logger.info(f"Created {total_batches} smart batches (token-aware)")
+        
+        for batch_index, (batch, batch_tokens) in enumerate(smart_batches, 1):
             try:
                 # Add minimal delay between batches (aggressive mode)
-                if batch_num > 0:
+                if batch_index > 1:
                     time.sleep(BATCH_DELAY_SECONDS)
                 
-                logger.info(f"Processing batch {batch_index}/{total_batches}: {len(batch)} chunks, ~{batch_tokens:,} tokens...")
+                logger.info(f"Processing batch {batch_index}/{total_batches}: {len(batch)} chunks, {batch_tokens:,} tokens...")
                 vectorstore.add_documents(batch)
                 successful_chunks += len(batch)
                 logger.info(f"✅ Batch {batch_index}/{total_batches} success | Progress: {successful_chunks}/{len(chunks)} chunks")
@@ -355,8 +378,17 @@ def process_document(file_path: str, filename: str, user_id: str = "unknown"):
                             retry_error_msg = str(retry_error)
                             logger.warning(f"⚠️ Retry {retry + 1} failed: {retry_error_msg}")
                             
-                            # Check if still rate limit
-                            if any(indicator in retry_error_msg.lower() for indicator in ["429", "rate limit", "quota"]):
+                            # Check if still rate limit or token limit
+                            is_rate_limit_retry = any(indicator in retry_error_msg.lower() for indicator in ["429", "rate limit", "quota"])
+                            is_token_limit = any(indicator in retry_error_msg.lower() for indicator in ["413", "tokens_limit_reached", "too large"])
+                            
+                            if is_token_limit:
+                                # Token limit error - batch is too large, need to split
+                                logger.error(f"❌ Batch {batch_index} exceeds token limit even after smart batching")
+                                failed_chunks += len(batch)
+                                break
+                            
+                            if is_rate_limit_retry:
                                 if retry < max_retries - 1:
                                     retry_delay *= 2  # Exponential backoff
                                     continue
@@ -371,7 +403,9 @@ def process_document(file_path: str, filename: str, user_id: str = "unknown"):
                                                 embedding_function=embeddings,
                                                 persist_directory=CHROMA_PATH
                                             )
-                                            for remaining_chunk in chunks[batch_num:]:
+                                            # Update metadata for remaining chunks
+                                            remaining_start = sum(len(b[0]) for b in smart_batches[:batch_index-1])
+                                            for remaining_chunk in chunks[remaining_start:]:
                                                 remaining_chunk.metadata["embedding_model"] = provider_name
                                             continue
                             
@@ -381,9 +415,17 @@ def process_document(file_path: str, filename: str, user_id: str = "unknown"):
                                 failed_chunks += len(batch)
                             break
                 else:
-                    # Non-rate-limit error or no more fallback models
-                    logger.error(f"❌ Batch {batch_index} gagal (non-rate-limit atau no fallback)")
-                    failed_chunks += len(batch)
+                    # Check if it's a token limit error (413)
+                    is_token_limit = any(indicator in error_msg.lower() for indicator in ["413", "tokens_limit_reached", "too large", "body too large"])
+                    
+                    if is_token_limit:
+                        logger.error(f"❌ Batch {batch_index} exceeds token limit ({batch_tokens:,} tokens)")
+                        logger.error(f"💡 Suggestion: Reduce TOKEN_CHUNK_SIZE or AGGRESSIVE_BATCH_SIZE in .env")
+                        failed_chunks += len(batch)
+                    else:
+                        # Non-rate-limit error or no more fallback models
+                        logger.error(f"❌ Batch {batch_index} gagal (non-rate-limit atau no fallback)")
+                        failed_chunks += len(batch)
         
         # Summary
         success_rate = (successful_chunks / len(chunks) * 100) if len(chunks) > 0 else 0
