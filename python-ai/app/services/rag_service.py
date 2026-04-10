@@ -308,7 +308,7 @@ def delete_document_vectors(filename: str):
 
 def search_relevant_chunks(query: str, filenames: List[str] = None, top_k: int = 5, user_id: str = None) -> Tuple[List[Dict], bool]:
     """
-    Search for relevant document chunks based on query.
+    Search for relevant document chunks based on query with optional reranking.
     
     Args:
         query: User query string
@@ -348,7 +348,52 @@ def search_relevant_chunks(query: str, filenames: List[str] = None, top_k: int =
         else:
             logger.info(f"🔍 RAG: Filtering by user_id: {user_id} (all user documents)")
         
-        # Search for similar documents with filter
+        # Check if rerank is enabled
+        langsearch_service = LangSearchService()
+        rerank_enabled = os.getenv("LANGSEARCH_RERANK_ENABLED", "true").lower() == "true"
+        
+        if rerank_enabled:
+            # Get more candidates for reranking
+            doc_candidates = int(os.getenv("LANGSEARCH_RERANK_DOC_CANDIDATES", "20"))
+            # Search for more candidates than needed
+            docs = vectorstore.similarity_search_with_score(query, k=doc_candidates, filter=filter_dict)
+            
+            if len(docs) >= 2:
+                # Extract document contents for reranking
+                documents = [doc.page_content for doc, _ in docs]
+                
+                # Get rerank results
+                doc_top_n = int(os.getenv("LANGSEARCH_RERANK_DOC_TOP_N", str(top_k)))
+                rerank_results = langsearch_service.rerank_documents(
+                    query=query,
+                    documents=documents,
+                    top_n=doc_top_n,
+                    return_documents=False
+                )
+                
+                if rerank_results:
+                    # Map rerank results back to original documents
+                    reranked_chunks = []
+                    for result in rerank_results:
+                        idx = result.get("index")
+                        if idx is not None and idx < len(docs):
+                            doc, vector_score = docs[idx]
+                            chunk_info = {
+                                "content": doc.page_content,
+                                "score": float(vector_score),  # Original vector score
+                                "rerank_score": float(result.get("relevance_score", 0)),  # Rerank score
+                                "filename": doc.metadata.get("filename", "unknown"),
+                                "chunk_index": doc.metadata.get("chunk_index", 0),
+                                "embedding_model": doc.metadata.get("embedding_model", provider_name)
+                            }
+                            reranked_chunks.append(chunk_info)
+                    
+                    logger.info(f"📚 RAG: Reranked {len(reranked_chunks)} chunks using LangSearch (%s)", _query_log_meta(query))
+                    return reranked_chunks[:top_k], True
+                else:
+                    logger.warning(f"⚠️ RAG: Rerank failed, falling back to vector search (%s)", _query_log_meta(query))
+        
+        # Fallback to standard vector search (or if rerank disabled)
         docs = vectorstore.similarity_search_with_score(query, k=top_k, filter=filter_dict)
         
         results = []
@@ -823,6 +868,53 @@ def get_context_for_query(
             focused_query = f"{query} final score"
             focused_results = langsearch.search(focused_query)
             search_results = _merge_search_results(search_results, focused_results)
+            
+        # Apply rerank to web search results if enabled
+        langsearch_service = LangSearchService()
+        rerank_enabled = os.getenv("LANGSEARCH_RERANK_ENABLED", "true").lower() == "true"
+        
+        if rerank_enabled and len(search_results) >= 2:
+            # Check if we should apply rerank based on intent or force
+            web_candidates = int(os.getenv("LANGSEARCH_RERANK_WEB_CANDIDATES", "10"))
+            web_top_n = int(os.getenv("LANGSEARCH_RERANK_WEB_TOP_N", "5"))
+            
+            # Limit candidates for reranking
+            candidates = search_results[:web_candidates] if len(search_results) > web_candidates else search_results
+            
+            if len(candidates) >= 2:
+                # Prepare documents for reranking (title + snippet)
+                documents = []
+                for result in candidates:
+                    title = result.get("title", "")
+                    snippet = result.get("snippet", "")
+                    # Combine title and snippet for better reranking
+                    doc_text = f"{title}. {snippet}" if snippet else title
+                    documents.append(doc_text)
+                
+                # Get rerank results
+                rerank_results = langsearch_service.rerank_documents(
+                    query=query,
+                    documents=documents,
+                    top_n=web_top_n,
+                    return_documents=False
+                )
+                
+                if rerank_results:
+                    # Map rerank results back to original search results
+                    reranked_search_results = []
+                    for result in rerank_results:
+                        idx = result.get("index")
+                        if idx is not None and idx < len(candidates):
+                            original_result = candidates[idx].copy()
+                            # Add rerank score to the result
+                            original_result["rerank_score"] = float(result.get("relevance_score", 0))
+                            reranked_search_results.append(original_result)
+                    
+                    # Replace search results with reranked results
+                    search_results = reranked_search_results
+                    logger.info(f"🌐 Web search: Reranked {len(reranked_search_results)} results using LangSearch (%s)", _query_log_meta(query))
+                else:
+                    logger.warning(f"⚠️ Web search: Rerank failed, using original results (%s)", _query_log_meta(query))
     else:
         logger.info("🚫 Web search skipped (%s, %s)", reason_code, _query_log_meta(query))
         

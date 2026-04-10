@@ -2,6 +2,7 @@ import os
 import logging
 import requests
 import time
+import hashlib
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime
 from functools import lru_cache
@@ -185,6 +186,90 @@ class LangSearchService:
         ])
         
         return "\n".join(prompt_parts)
+
+    def rerank_documents(
+        self,
+        query: str,
+        documents: List[str],
+        top_n: Optional[int] = None,
+        return_documents: bool = False
+    ) -> Optional[List[Dict]]:
+        """
+        Rerank documents menggunakan LangSearch Semantic Rerank API.
+        
+        Args:
+            query: Search query string
+            documents: List of document strings to rerank
+            top_n: Number of top results to return (default: all)
+            return_documents: Whether to return documents in response (default: False)
+            
+        Returns:
+            List of rerank results with index and relevance_score, or None on error
+        """
+        if not self.api_key:
+            logger.warning("⚠️ LangSearch: API key not configured for rerank")
+            return None
+            
+        if not documents or len(documents) < 2:
+            logger.info("🔄 LangSearch Rerank: skipping rerank (documents < 2)")
+            return None
+            
+        # Limit documents to max 50 as per API specification
+        if len(documents) > 50:
+            logger.warning(f"⚠️ LangSearch Rerank: truncating documents from {len(documents)} to 50")
+            documents = documents[:50]
+            
+        # Get configuration from environment with defaults
+        model = os.getenv("LANGSEARCH_RERANK_MODEL", "langsearch-reranker-v1")
+        timeout = int(os.getenv("LANGSEARCH_RERANK_TIMEOUT", "8"))
+        
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": model,
+            "query": query,
+            "documents": documents,
+        }
+        
+        if top_n is not None:
+            payload["top_n"] = top_n
+        if return_documents:
+            payload["return_documents"] = return_documents
+            
+        try:
+            logger.info(f"🔄 LangSearch Rerank: query='{query}', docs={len(documents)}, top_n={top_n}")
+            
+            response = requests.post(
+                "https://api.langsearch.com/v1/rerank",
+                json=payload,
+                headers=headers,
+                timeout=timeout
+            )
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            if data.get("code") != 200:
+                logger.error(f"❌ LangSearch Rerank: API error code={data.get('code')}, msg={data.get('msg')}")
+                return None
+                
+            results = data.get("results", [])
+            logger.info(f"✅ LangSearch Rerank: query='{query}', returned {len(results)} results")
+            
+            return results
+            
+        except requests.exceptions.Timeout:
+            logger.error(f"⏱️ LangSearch Rerank: query='{query}', timeout after {timeout}s")
+            return None
+        except requests.exceptions.RequestException as e:
+            logger.error(f"❌ LangSearch Rerank: query='{query}', error={str(e)}")
+            return None
+        except Exception as e:
+            logger.error(f"❌ LangSearch Rerank: query='{query}', unexpected error={str(e)}")
+            return None
 
 
 def get_langsearch_service() -> LangSearchService:
