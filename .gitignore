@@ -3,3 +3,9 @@
 logs/
 *.log
 laravel/app/.!*.DS_Store
+
+# Kiro specs and development files
+.kiro/
+
+# Hypothesis testing cache
+.hypothesis/

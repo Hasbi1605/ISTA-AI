@@ -835,17 +835,20 @@ def get_context_for_query(
     explicit_web_request: bool = False,
 ) -> Dict:
     """
-    Get context for LLM dari LangSearch + RAG documents.
+    Get web search context for LLM dari LangSearch.
     
-    Priority: LangSearch first -> RAG fallback -> LLM knowledge
+    NOTE: This function handles ONLY web search context.
+    RAG document retrieval is handled separately by search_relevant_chunks()
+    with proper user_id and document filtering for security.
     
     Returns:
         Dict dengan keys:
             - search_results: List[Dict] dari LangSearch
-            - rag_documents: List[Document] dari ChromaDB
+            - rag_documents: List[Document] (always empty - deprecated)
             - has_search: bool
-            - has_rag: bool
+            - has_rag: bool (always False - deprecated)
             - search_context: str (formatted untuk system prompt)
+            - rag_reason_code: str (always RAG_DISABLED_FUNCTION_SCOPE)
     """
     # Step 1: Decide whether web search is allowed for this query.
     langsearch = get_langsearch_service()
@@ -939,27 +942,14 @@ def get_context_for_query(
 
         search_context = search_context + "\n" + "\n".join(score_lines)
     
-    # Step 2: Get RAG documents (existing logic)
+    # Step 2: RAG document retrieval is DISABLED in this function for security
+    # RAG retrieval is handled by search_relevant_chunks() with proper user_id/document filtering
+    # This prevents potential global document retrieval without authorization
     rag_documents = []
     has_rag = False
+    rag_reason_code = "RAG_DISABLED_FUNCTION_SCOPE"
     
-    try:
-        embeddings, provider_name = get_embeddings_with_fallback()
-        if embeddings:
-            vectorstore = Chroma(
-                collection_name="documents_collection",
-                embedding_function=embeddings,
-                persist_directory=CHROMA_PATH
-            )
-            
-            # Search for relevant documents
-            docs = vectorstore.similarity_search(query, k=3)
-            if docs:
-                rag_documents = docs
-                has_rag = True
-                logger.info("📚 RAG: Found %s relevant documents (%s)", len(docs), _query_log_meta(query))
-    except Exception as e:
-        logger.warning(f"⚠️ RAG search failed: {str(e)}")
+    logger.info("RAG_DISABLED_FUNCTION_SCOPE: RAG retrieval not performed in get_context_for_query() - use search_relevant_chunks() instead (%s)", _query_log_meta(query))
     
     return {
         "search_results": search_results,
@@ -970,6 +960,7 @@ def get_context_for_query(
         "score_signal": score_signal,
         "reason_code": reason_code,
         "realtime_intent": realtime_intent,
+        "rag_reason_code": rag_reason_code,
     }
 
 
@@ -984,12 +975,15 @@ def get_rag_context_for_prompt(
     """
     Build context string untuk inject ke system prompt.
     
+    NOTE: This function now only handles web search context.
+    RAG document context is handled separately in the main flow via search_relevant_chunks().
+    
     Args:
         query: User query
-        base_rag_prompt: Existing RAG prompt from embeddings (optional)
+        base_rag_prompt: Existing RAG prompt from embeddings (optional, deprecated)
     
     Returns:
-        Formatted context string untuk system prompt
+        Formatted context string untuk system prompt (web search only)
     """
     context_data = get_context_for_query(
         query,
@@ -1005,15 +999,7 @@ def get_rag_context_for_prompt(
     if context_data["search_context"]:
         result_parts.append(context_data["search_context"])
     
-    # Add RAG documents only if no search results
-    if context_data["has_rag"] and not context_data["has_search"] and not documents_active:
-        if base_rag_prompt:
-            result_parts.append(base_rag_prompt)
-        else:
-            result_parts.append("Relevant documents from knowledge base:")
-            result_parts.append("")
-            for doc in context_data["rag_documents"]:
-                result_parts.append(f"- {doc.page_content[:200]}...")
-            result_parts.append("")
+    # RAG documents are no longer retrieved by get_context_for_query()
+    # RAG is handled separately by search_relevant_chunks() with proper filtering
     
     return "\n".join(result_parts)
