@@ -349,7 +349,7 @@ def search_relevant_chunks(query: str, filenames: List[str] = None, top_k: int =
             logger.info(f"🔍 RAG: Filtering by user_id: {user_id} (all user documents)")
         
         # Check if rerank is enabled
-        langsearch_service = LangSearchService()
+        langsearch_service = get_langsearch_service()
         rerank_enabled = os.getenv("LANGSEARCH_RERANK_ENABLED", "true").lower() == "true"
         
         if rerank_enabled:
@@ -394,10 +394,11 @@ def search_relevant_chunks(query: str, filenames: List[str] = None, top_k: int =
                     logger.warning(f"⚠️ RAG: Rerank failed, falling back to vector search (%s)", _query_log_meta(query))
         
         # Fallback to standard vector search (or if rerank disabled)
-        docs = vectorstore.similarity_search_with_score(query, k=top_k, filter=filter_dict)
+        # Use top_k from already fetched docs to avoid redundant query
+        fallback_docs = docs[:top_k] if len(docs) >= top_k else docs
         
         results = []
-        for doc, score in docs:
+        for doc, score in fallback_docs:
             chunk_info = {
                 "content": doc.page_content,
                 "score": float(score),
@@ -870,7 +871,6 @@ def get_context_for_query(
             search_results = _merge_search_results(search_results, focused_results)
             
         # Apply rerank to web search results if enabled
-        langsearch_service = LangSearchService()
         rerank_enabled = os.getenv("LANGSEARCH_RERANK_ENABLED", "true").lower() == "true"
         
         if rerank_enabled and len(search_results) >= 2:
