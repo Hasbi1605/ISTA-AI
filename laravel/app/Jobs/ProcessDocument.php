@@ -18,6 +18,13 @@ class ProcessDocument implements ShouldQueue
 
     public $tries = 3;
     public $backoff = [30, 60, 120];
+    
+    /**
+     * The number of seconds the job can run before timing out.
+     * 
+     * @var int
+     */
+    public $timeout = 900; // 15 minutes timeout
 
     /**
      * Create a new job instance.
@@ -52,7 +59,7 @@ class ProcessDocument implements ShouldQueue
             $pythonUrl = config('services.ai_service.url', 'http://127.0.0.1:8001') . '/api/documents/process';
             $token = config('services.ai_service.token');
 
-            $response = Http::timeout(300) // 5 minutes timeout for large documents
+            $response = Http::timeout(900) // 15 minutes timeout for large documents
                 ->withHeaders([
                     'Authorization' => "Bearer {$token}",
                 ])

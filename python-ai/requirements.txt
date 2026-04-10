@@ -200,4 +200,3 @@ zipp==3.23.0
 zopfli==0.4.1
 zstandard==0.25.0
 langchain-openai>=1.1.0
-hypothesis>=6.0.0
