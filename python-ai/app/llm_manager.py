@@ -87,12 +87,18 @@ def _stream_gemini_native(model_name: str, api_key: str, messages: List[Dict[str
                     continue
 
 
-def get_llm_stream(messages: List[Dict[str, str]], force_web_search: bool = False) -> Generator[str, None, None]:
+def get_llm_stream(
+    messages: List[Dict[str, str]],
+    force_web_search: bool = False,
+    allow_auto_realtime_web: bool = True,
+    documents_active: bool = False,
+    explicit_web_request: bool = False,
+) -> Generator[str, None, None]:
     """
     Generator that yields chunks of text from the best available LLM.
-    Fallback sequence: Gemini -> Groq -> GitHub Models.
+    Fallback sequence: GPT-5 Chat -> GPT-4o -> Gemini -> Groq.
     
-    Includes LangSearch integration for real-time information.
+    Includes policy-aware LangSearch integration.
     """
     # Extract query and system prompt from messages
     # Get LAST user message (most recent query)
@@ -113,18 +119,24 @@ def get_llm_stream(messages: List[Dict[str, str]], force_web_search: bool = Fals
     search_context = ""
     if query:
         try:
-            search_context = get_rag_context_for_prompt(query, force_web_search=force_web_search)
+            search_context = get_rag_context_for_prompt(
+                query,
+                force_web_search=force_web_search,
+                allow_auto_realtime_web=allow_auto_realtime_web,
+                documents_active=documents_active,
+                explicit_web_request=explicit_web_request,
+            )
         except Exception as e:
             print(f"[Warning] Search/RAG context failed: {e}")
     
     # Build enhanced system prompt with search results
     if search_context:
         assertive_instruction = (
-            "\n\n🔴 INSTRUKSI WAJIB 🔴\n"
-            "PRIORITASKAN informasi dari web search results di atas untuk menjawab pertanyaan user.\n"
-            "Web search results berisi data REAL-TIME yang lebih akurat daripada pengetahuan internal Anda.\n"
-            "Jika ada konflik antara search results dan pengetahuan internal, SELALU gunakan search results.\n"
-            "Pengetahuan internal Anda mungkin outdated (terakhir update 2024)."
+            "\n\nInstruksi tambahan:\n"
+            "- Gunakan informasi web terbaru di atas hanya jika relevan dengan pertanyaan user.\n"
+            "- Jika sumber web tersedia, utamakan data faktual dari sumber tersebut untuk bagian yang bersifat real-time.\n"
+            "- Jika ada bagian 'FAKTA TERSTRUKTUR' dengan skor pertandingan, sebutkan skor tersebut secara eksplisit.\n"
+            "- Jawab secara ringkas, jelas, dan hindari istilah teknis internal sistem."
         )
         if system_prompt_base:
             enhanced_system = search_context + system_prompt_base + assertive_instruction
