@@ -40,6 +40,28 @@ class DocumentIndex extends Component
         ],
     ];
 
+    public function updatingFile($value)
+    {
+        logger()->info('Livewire is starting to handle a file upload: ', [
+            'filename' => is_object($value) ? $value->getClientOriginalName() : 'unknown',
+            'size' => is_object($value) ? $value->getSize() : 'unknown',
+        ]);
+    }
+
+    public function updatedFile()
+    {
+        if ($this->file) {
+            logger()->info('Livewire successfully received temporary file:', [
+                'name' => $this->file->getClientOriginalName(),
+                'size' => $this->file->getSize(),
+                'mime' => $this->file->getMimeType(),
+                'error' => $this->file->getError()
+            ]);
+        } else {
+            logger()->warning('Livewire updated file property, but it is null or empty.');
+        }
+    }
+
     public function saveDocument()
     {
         $this->validate();
