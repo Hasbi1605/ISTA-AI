@@ -382,6 +382,9 @@ class ChatIndex extends Component
         // Mencegah PHP kill process (Time Limit Exceeded) akibat lamanya process LLM
         set_time_limit(120);
 
+        // Reset pointer typewriter agar hanya pesan assistant terbaru yang dianimasikan.
+        $this->newMessageId = null;
+
         $this->validate([
             'prompt' => 'required|string|min:1',
         ]);
@@ -432,8 +435,21 @@ class ChatIndex extends Component
                 ->toArray();
         }
 
+        $hasDocumentContext = !empty($documentFilenames);
+        $sourcePolicy = $hasDocumentContext ? 'document_context' : 'hybrid_realtime_auto';
+        $allowAutoRealtimeWeb = !$hasDocumentContext;
+
         // Fetch stream from AIService
-        foreach ($aiService->sendChat($history, $documentFilenames, (string) Auth::id(), $this->webSearchMode) as $chunk) {
+        foreach (
+            $aiService->sendChat(
+                $history,
+                $documentFilenames,
+                (string) Auth::id(),
+                $this->webSearchMode,
+                $sourcePolicy,
+                $allowAutoRealtimeWeb
+            ) as $chunk
+        ) {
             // Parse model indicator from the first chunk
             if (preg_match('/\[MODEL:(.+?)\]\n?/', $chunk, $matches)) {
                 $modelName = $matches[1];
@@ -454,6 +470,8 @@ class ChatIndex extends Component
                 $chunk = preg_replace('/\[SOURCES:\[.+?\]\]/s', '', $chunk);
             }
 
+            $chunk = $this->sanitizeAssistantOutput((string) $chunk);
+
             if ($chunk !== '') {
                 $fullResponse .= $chunk;
                 $this->stream('assistant-output', $chunk);
@@ -463,6 +481,7 @@ class ChatIndex extends Component
         // 5. Finalize: Save AI Message to DB (remove sources metadata completely)
         // Clean up any remaining source markers
         $cleanContent = preg_replace('/\[SOURCES:\[.+?\]\]/s', '', $fullResponse);
+        $cleanContent = $this->sanitizeAssistantOutput((string) $cleanContent);
         $cleanContent = trim($cleanContent);
 
         $assistantMsg = Message::create([
@@ -476,6 +495,31 @@ class ChatIndex extends Component
         // Refresh state
         $this->loadConversation($this->currentConversationId);
         $this->loadConversations();
+        $this->dispatch('assistant-message-persisted');
+    }
+
+    private function sanitizeAssistantOutput(string $text): string
+    {
+        if ($text === '') {
+            return $text;
+        }
+
+        $replacements = [
+            '/\bchunks?\b/i' => 'bagian dokumen',
+            '/\bchunk(?:ing|ed)?\b/i' => 'bagian dokumen',
+            '/\bembeddings?\b/i' => 'representasi dokumen',
+            '/\bvectors?\b/i' => 'indeks dokumen',
+            '/\brag\b/i' => 'konteks dokumen',
+            '/\bretrieval\b/i' => 'pencarian dokumen',
+            '/\btop\s*[- ]?k\b/i' => 'hasil teratas',
+        ];
+
+        $sanitized = $text;
+        foreach ($replacements as $pattern => $replacement) {
+            $sanitized = preg_replace($pattern, $replacement, (string) $sanitized);
+        }
+
+        return (string) $sanitized;
     }
 
     public function render()

@@ -457,6 +457,7 @@
                     $wire.on('assistant-output', (data) => { text += data[0]; streaming = true; });
                     $wire.on('model-name', (data) => { modelName = data[0]; });
                     $wire.on('assistant-sources', (data) => { sources = data[0]; });
+                          $wire.on('assistant-message-persisted', () => { streaming = false; text = ''; modelName = ''; sources = []; });
                   "
                  class="flex justify-start"
                  x-show="streaming">

@@ -1,19 +1,27 @@
 import os
+import logging
 from dotenv import load_dotenv
 
 # Load .env from the project root (python-ai/.env)
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
 
 import socket
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 from fastapi import FastAPI, Depends, HTTPException, Header
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from app.llm_manager import get_llm_stream, get_llm_stream_with_sources
 from app.routers import documents
-from app.services.rag_service import search_relevant_chunks, build_rag_prompt
+from app.services.rag_service import (
+    search_relevant_chunks,
+    build_rag_prompt,
+    detect_explicit_web_request,
+    should_use_web_search,
+    get_context_for_query,
+)
 
 app = FastAPI(title="ISTA AI Microservice", version="1.1.5")
+logger = logging.getLogger(__name__)
 
 # Include Routers
 app.include_router(documents.router)
@@ -35,6 +43,51 @@ class ChatRequest(BaseModel):
     document_filenames: Optional[List[str]] = None
     user_id: Optional[str] = None  # For authorization in RAG mode
     force_web_search: bool = False
+    source_policy: Optional[str] = None
+    allow_auto_realtime_web: bool = True
+    explicit_web_request: bool = False
+
+
+def _resolve_policy_flags(request: ChatRequest, documents_active: bool) -> Tuple[bool, str]:
+    """
+    Resolve routing policy flags so Laravel source_policy is applied consistently.
+    """
+    source_policy = (request.source_policy or "").strip().lower()
+    allow_auto_realtime_web = request.allow_auto_realtime_web
+
+    if source_policy == "document_context":
+        # Document-first mode should not auto-escalate to web unless explicitly requested.
+        allow_auto_realtime_web = False
+    elif source_policy == "hybrid_realtime_auto":
+        allow_auto_realtime_web = True
+    elif source_policy:
+        logger.warning("Unknown source_policy received: %s", source_policy)
+
+    if source_policy == "document_context" and not documents_active:
+        logger.warning("source_policy=document_context received without active document_filenames")
+
+    return allow_auto_realtime_web, source_policy
+
+
+def _get_latest_user_query(messages: List[Dict[str, str]]) -> str:
+    for msg in reversed(messages):
+        if msg.get("role") == "user":
+            return (msg.get("content") or "").strip()
+    return ""
+
+
+def _document_permission_message() -> str:
+    return (
+        "Informasi yang Anda tanyakan tidak ditemukan pada dokumen yang aktif. "
+        "Apakah Anda mengizinkan saya menggunakan web search atau pengetahuan umum untuk melanjutkan?"
+    )
+
+
+def _document_context_error_message() -> str:
+    return (
+        "Saya belum bisa mengambil konteks dari dokumen yang dipilih. "
+        "Apakah Anda mengizinkan saya menggunakan web search atau pengetahuan umum untuk melanjutkan?"
+    )
 
 @app.get("/api/health", response_model=HealthResponse)
 async def health_check():
@@ -54,52 +107,104 @@ async def chat_stream(request: ChatRequest):
     
     user_id is required for RAG mode to verify document ownership.
     """
-    # Check if RAG mode is requested
-    if request.document_filenames:
-        # RAG mode: search relevant chunks and include in context
-        query = None
-        for msg in reversed(request.messages):
-            if msg["role"] == "user":
-                query = msg["content"]
-                break
-        
-        if query:
-            chunks, success = search_relevant_chunks(
-                query, 
-                request.document_filenames, 
-                top_k=5,
-                user_id=request.user_id
-            )
-            
-            if success and chunks:
-                rag_prompt, sources = build_rag_prompt(query, chunks)
-                
-                # Insert RAG prompt as system message
-                request.messages = [
-                    {"role": "system", "content": rag_prompt}
-                ] + request.messages
-                
-                return StreamingResponse(
-                    get_llm_stream_with_sources(request.messages, sources),
-                    media_type="text/event-stream"
+    query = _get_latest_user_query(request.messages)
+    documents_active = bool(request.document_filenames)
+    allow_auto_realtime_web, source_policy = _resolve_policy_flags(request, documents_active)
+    explicit_web_request = request.explicit_web_request or detect_explicit_web_request(query)
+
+    should_web_search, reason_code, realtime_intent = should_use_web_search(
+        query=query,
+        force_web_search=request.force_web_search,
+        explicit_web_request=explicit_web_request,
+        allow_auto_realtime_web=allow_auto_realtime_web,
+        documents_active=documents_active,
+    )
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug(
+            "Policy reason=%s realtime_intent=%s docs_active=%s explicit_web=%s source_policy=%s",
+            reason_code,
+            realtime_intent,
+            documents_active,
+            explicit_web_request,
+            source_policy or "unset",
+        )
+
+    # RAG mode with document-first guardrails
+    if documents_active and query:
+        chunks, success = search_relevant_chunks(
+            query,
+            request.document_filenames,
+            top_k=5,
+            user_id=request.user_id,
+        )
+
+        if success and chunks:
+            web_context = ""
+            if should_web_search:
+                context_data = get_context_for_query(
+                    query,
+                    force_web_search=request.force_web_search,
+                    allow_auto_realtime_web=allow_auto_realtime_web,
+                    documents_active=True,
+                    explicit_web_request=explicit_web_request,
                 )
-            elif success and not chunks:
-                # RAG search succeeded but no relevant chunks found
-                def rag_warning_stream():
-                    yield "[⚠️ RAG: Tidak ada konteks relevan ditemukan dari dokumen yang dipilih. Menjawab berdasarkan pengetahuan umum...]\n\n"
-                    for chunk in get_llm_stream(request.messages, force_web_search=request.force_web_search):
-                        yield chunk
-                return StreamingResponse(rag_warning_stream(), media_type="text/event-stream")
-            else:
-                # RAG search failed - user_id might be missing or other error
-                def rag_error_stream():
-                    yield "[⚠️ RAG: Tidak dapat mencari konteks dari dokumen. Pastikan Anda memiliki akses ke dokumen yang dipilih.]\n\n"
-                    for chunk in get_llm_stream(request.messages, force_web_search=request.force_web_search):
-                        yield chunk
-                return StreamingResponse(rag_error_stream(), media_type="text/event-stream")
-    
-    # Regular chat mode (no RAG)
-    return StreamingResponse(get_llm_stream(request.messages, force_web_search=request.force_web_search), media_type="text/event-stream")
+                web_context = context_data.get("search_context", "")
+
+            rag_prompt, sources = build_rag_prompt(query, chunks, web_context=web_context)
+
+            messages_with_rag = [{"role": "system", "content": rag_prompt}] + request.messages
+            return StreamingResponse(
+                get_llm_stream_with_sources(messages_with_rag, sources),
+                media_type="text/event-stream",
+            )
+
+        if success and not chunks:
+            if should_web_search:
+                return StreamingResponse(
+                    get_llm_stream(
+                        request.messages,
+                        force_web_search=request.force_web_search,
+                        allow_auto_realtime_web=allow_auto_realtime_web,
+                        documents_active=True,
+                        explicit_web_request=explicit_web_request,
+                    ),
+                    media_type="text/event-stream",
+                )
+
+            def document_not_found_stream():
+                yield _document_permission_message()
+
+            return StreamingResponse(document_not_found_stream(), media_type="text/event-stream")
+
+        # RAG search failed (authorization, vector db issue, etc.)
+        if should_web_search:
+            return StreamingResponse(
+                get_llm_stream(
+                    request.messages,
+                    force_web_search=request.force_web_search,
+                    allow_auto_realtime_web=allow_auto_realtime_web,
+                    documents_active=True,
+                    explicit_web_request=explicit_web_request,
+                ),
+                media_type="text/event-stream",
+            )
+
+        def document_error_stream():
+            yield _document_context_error_message()
+
+        return StreamingResponse(document_error_stream(), media_type="text/event-stream")
+
+    # Regular chat mode (no document context)
+    return StreamingResponse(
+        get_llm_stream(
+            request.messages,
+            force_web_search=request.force_web_search,
+            allow_auto_realtime_web=allow_auto_realtime_web,
+            documents_active=False,
+            explicit_web_request=explicit_web_request,
+        ),
+        media_type="text/event-stream",
+    )
 
 if __name__ == "__main__":
     import uvicorn
