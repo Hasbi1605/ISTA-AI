@@ -108,7 +108,7 @@ class LangSearchService:
                 return []
             except requests.exceptions.RequestException as e:
                 status_code = getattr(getattr(e, 'response', None), 'status_code', None)
-                if i < len(api_keys) - 1 and (status_code in (401, 403, 429) or status_code >= 500):
+                if i < len(api_keys) - 1 and (status_code in (401, 403, 429) or (status_code and status_code >= 500)):
                     logger.warning(f"⚠️ LangSearch: attempt {i+1} failed ({status_code}). Retrying with backup key...")
                     continue
                 logger.error(f"❌ LangSearch: query='{query}', error={str(e)}")
@@ -121,24 +121,24 @@ class LangSearchService:
             return []
             
         # LangSearch response format: data.webPages.value[]
-            web_pages = data.get("data", {}).get("webPages", {})
-            results = web_pages.get("value", [])
-            
-            formatted_results = []
-            for item in results:
-                formatted_results.append({
-                    "title": item.get("name", ""),
-                    "snippet": item.get("snippet", item.get("summary", "")),
-                    "url": item.get("url", ""),
-                    "datePublished": item.get("datePublished", "")
-                })
-            
-            logger.info(f"✅ LangSearch: query='{query}', results={len(formatted_results)}")
-            
-            # Cache the result
-            self._cache_result(query, time_bucket, formatted_results)
-            
-            return formatted_results
+        web_pages = data.get("data", {}).get("webPages", {})
+        results = web_pages.get("value", [])
+        
+        formatted_results = []
+        for item in results:
+            formatted_results.append({
+                "title": item.get("name", ""),
+                "snippet": item.get("snippet", item.get("summary", "")),
+                "url": item.get("url", ""),
+                "datePublished": item.get("datePublished", "")
+            })
+        
+        logger.info(f"✅ LangSearch: query='{query}', results={len(formatted_results)}")
+        
+        # Cache the result
+        self._cache_result(query, time_bucket, formatted_results)
+        
+        return formatted_results
     
     def build_search_context(self, results: List[Dict]) -> str:
         """
