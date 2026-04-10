@@ -373,10 +373,8 @@ class ChatIndex extends Component
         }
     }
 
-    public function sendMessage(?string $prompt = null, ?AIService $aiService = null)
+    public function sendMessage(?string $prompt = null, AIService $aiService)
     {
-        $aiService = $aiService ?? app(AIService::class);
-
         if ($prompt !== null) {
             $this->prompt = $prompt;
         }
@@ -409,6 +407,7 @@ class ChatIndex extends Component
 
         $this->messages[] = $userMessage->toArray();
         $this->dispatch('user-message-acked');
+        $userPrompt = $this->prompt;
         $this->prompt = '';
         $this->sources = [];
 
