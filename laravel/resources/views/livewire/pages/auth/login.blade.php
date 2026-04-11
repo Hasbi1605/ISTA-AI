@@ -82,7 +82,14 @@ new #[Layout('layouts.auth-canvas')] class extends Component
             'name' => ['required', 'string', 'max:255'],
             'register_email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class.',email'],
             'register_password' => ['required', 'string', 'confirmed', Rules\Password::defaults()],
-        ], [], [
+        ], [
+            'name.required' => 'Nama lengkap wajib diisi.',
+            'register_email.required' => 'Alamat email wajib diisi.',
+            'register_email.unique' => 'Email ini sudah terdaftar.',
+            'register_email.email' => 'Format email tidak valid.',
+            'register_password.required' => 'Kata sandi wajib diisi.',
+            'register_password.confirmed' => 'Konfirmasi kata sandi tidak cocok.',
+        ], [
             'register_email' => 'email',
             'register_password' => 'password',
         ]);
