@@ -553,9 +553,9 @@
                         
                         <div class="flex items-center gap-2 pl-2">
                             <!-- Toggle Search -->
-                            <button type="button" wire:click="toggleWebSearch" class="group h-[30px] px-[13px] border border-transparent rounded-full text-[11.4px] font-normal flex items-center gap-[6px] transition-all duration-300 hover:scale-105 hover:shadow-md hover:bg-ista-primary hover:text-white {{ $webSearchMode ? 'bg-[#E2E8F0] text-stone-700 dark:bg-[#314158] dark:text-[#E2E8F0]' : 'bg-[#F1F5F9] text-[#62748E] dark:bg-[#1D293D] dark:text-[#62748E]' }}">
-                                <img src="{{ $uiIcons['searchLight'] }}" alt="" class="w-[14px] h-[14px] dark:hidden group-hover:brightness-0 group-hover:invert transition-all duration-300" />
-                                <img src="{{ $uiIcons['searchDark'] }}" alt="" class="w-[14px] h-[14px] hidden dark:block group-hover:brightness-0 group-hover:invert transition-all duration-300" />
+                            <button type="button" wire:click="toggleWebSearch" class="group h-[30px] px-[13px] border border-transparent rounded-full text-[11.4px] font-normal flex items-center gap-[6px] transition-all duration-300 hover:scale-105 hover:shadow-md hover:!bg-ista-primary hover:!text-white {{ $webSearchMode ? 'bg-[#E2E8F0] text-stone-700 dark:bg-[#314158] dark:text-[#E2E8F0]' : 'bg-[#F1F5F9] text-[#62748E] dark:bg-[#1D293D] dark:text-[#62748E]' }}">
+                                <img src="{{ $uiIcons['searchLight'] }}" alt="" class="w-[14px] h-[14px] dark:hidden group-hover:!brightness-0 group-hover:!invert transition-all duration-300" />
+                                <img src="{{ $uiIcons['searchDark'] }}" alt="" class="w-[14px] h-[14px] hidden dark:block group-hover:!brightness-0 group-hover:!invert transition-all duration-300" />
                                 <span>Search</span>
                             </button>
 
@@ -567,9 +567,9 @@
                             <!-- Send -->
                             <button type="submit" 
                                     :disabled="isSendingMessage"
-                                    class="bg-[#F1F5F9] dark:bg-[#1D293D] hover:bg-ista-primary hover:text-white disabled:opacity-50 rounded-full transition-all duration-300 hover:scale-105 hover:shadow-md h-[32px] w-[32px] flex items-center justify-center group">
-                                <img src="{{ $uiIcons['sendLight'] }}" alt="" class="h-[17px] w-[17px] dark:hidden group-hover:brightness-0 group-hover:invert transition-all duration-300" />
-                                <img src="{{ $uiIcons['sendDark'] }}" alt="" class="h-[17px] w-[17px] hidden dark:block group-hover:brightness-0 group-hover:invert transition-all duration-300" />
+                                    class="bg-[#F1F5F9] dark:bg-[#1D293D] hover:!bg-ista-primary hover:!text-white disabled:opacity-50 rounded-full transition-all duration-300 hover:scale-105 hover:shadow-md h-[32px] w-[32px] flex items-center justify-center group">
+                                <img src="{{ $uiIcons['sendLight'] }}" alt="" class="h-[17px] w-[17px] dark:hidden group-hover:!brightness-0 group-hover:!invert transition-all duration-300" />
+                                <img src="{{ $uiIcons['sendDark'] }}" alt="" class="h-[17px] w-[17px] hidden dark:block group-hover:!brightness-0 group-hover:!invert transition-all duration-300" />
                             </button>
                         </div>
                     </div>
