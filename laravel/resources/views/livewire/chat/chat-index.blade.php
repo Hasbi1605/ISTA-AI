@@ -155,7 +155,7 @@
      x-on:dragleave.window.prevent="onDragLeave($event)"
      x-on:drop.window.prevent="onDropFile($event)"
      x-init="initChatBehavior(); if(promptDraft) { setTimeout(() => submitPrompt(), 100); }"
-     class="flex h-screen w-full overflow-hidden text-stone-800 font-sans transition-colors duration-300 relative ista-display-sans bg-stone-50/50" style="background-image: radial-gradient(circle at 0 0, rgba(245, 158, 11, 0.08) 0%, rgba(245, 158, 11, 0) 30%), radial-gradient(circle at 100% 100%, rgba(76, 5, 25, 0.08) 0%, rgba(76, 5, 25, 0) 35%), url('{{ asset('images/ista/dashboard-grid.png') }}'); background-size: auto, auto, 8px 8px;"
+     class="flex h-screen w-full overflow-hidden text-stone-800 font-sans transition-colors duration-300 relative ista-display-sans bg-stone-50/50" style="background-image: url('{{ asset('images/ista/dashboard-grid.png') }}'); background-size: 8px 8px;"
     @php
         $uiIcons = [
             'historyLight' => asset('images/icons/history-light.svg'),
