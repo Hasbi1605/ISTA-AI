@@ -6,7 +6,7 @@
         dropError: '',
         sendError: '',
         messageAcked: false,
-        promptDraft: '',
+        promptDraft: @js($prompt),
         isSendingMessage: false,
         optimisticUserMessage: '',
         scrollToBottom(smooth = false) {
@@ -154,7 +154,7 @@
      x-on:dragover.window.prevent="onDragOver($event)"
      x-on:dragleave.window.prevent="onDragLeave($event)"
      x-on:drop.window.prevent="onDropFile($event)"
-    x-init="initChatBehavior()"
+     x-init="initChatBehavior(); if(promptDraft) { setTimeout(() => submitPrompt(), 100); }"
      class="flex h-screen w-full overflow-hidden bg-white dark:bg-[#020618] text-gray-800 dark:text-gray-100 font-sans transition-colors duration-300">
     @php
         $uiIcons = [

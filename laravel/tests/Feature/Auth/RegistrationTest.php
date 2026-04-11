@@ -29,7 +29,7 @@ class RegistrationTest extends TestCase
 
         $component->call('register');
 
-        $component->assertRedirect(route('chat', absolute: false));
+        $component->assertRedirect(route('dashboard', absolute: false));
 
         $this->assertAuthenticated();
     }

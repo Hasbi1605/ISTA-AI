@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
@@ -18,6 +19,9 @@ use Livewire\WithFileUploads;
 class ChatIndex extends Component
 {
     use WithFileUploads;
+
+    #[Url]
+    public $q = '';
 
     public $prompt = '';
     public $currentConversationId;
@@ -54,6 +58,15 @@ class ChatIndex extends Component
 
         if ($id) {
             $this->loadConversation($id);
+        }
+
+        if ($this->q) {
+            $this->prompt = $this->q;
+            $this->q = ''; // clear from URL so it doesn't persist
+        }
+
+        if (session()->has('pending_prompt')) {
+            $this->prompt = session()->pull('pending_prompt');
         }
     }
 
