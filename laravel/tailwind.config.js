@@ -61,6 +61,9 @@ export default {
                 "on-primary": "#ffffff",
                 "outline-variant": "#d8d0c8",
                 "on-tertiary-container": "#3a2020",
+                "ista-primary": "#8b0836",
+                "ista-gold": "#d4af37",
+                "ista-dark": "#4d0218",
             },
             fontFamily: {
                 sans: ["Inter", ...defaultTheme.fontFamily.sans],

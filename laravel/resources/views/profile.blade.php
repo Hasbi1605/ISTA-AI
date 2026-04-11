@@ -17,7 +17,7 @@
             <div class="absolute inset-0 z-0">
                 <div class="h-full w-full animate-breathe bg-cover bg-center opacity-100" style="background-image: url('/images/ista/login-bg.png');"></div>
                 <div class="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(212,175,55,0.15)_0%,rgba(250,250,249,0.4)_80%)]"></div>
-                <div class="absolute inset-0 bg-gradient-to-t from-[#d4af37]/20 via-white/5 to-transparent"></div>
+                <div class="absolute inset-0 bg-gradient-to-t from-ista-gold/20 via-white/5 to-transparent"></div>
             </div>
 
             <div class="pointer-events-none absolute inset-0 z-0 overflow-hidden">
@@ -34,7 +34,7 @@
                 <div class="mx-auto flex w-full max-w-7xl items-center justify-between px-5 py-4 sm:px-10">
                     <a href="{{ route('dashboard') }}" class="group flex items-center gap-3">
                         <img src="{{ asset('images/ista/logo.png') }}" alt="ISTA AI" class="h-8 w-8 object-contain transition-transform duration-300 group-hover:rotate-6 group-hover:scale-110">
-                        <div class="ista-brand-title text-xl text-[#8b0836] not-italic">ISTA <span class="font-light italic text-[#d4af37]">AI</span></div>
+                        <div class="ista-brand-title text-xl text-ista-primary not-italic">ISTA <span class="font-light italic text-ista-gold">AI</span></div>
                     </a>
                     <div class="flex items-center gap-4 sm:gap-8">
                         <livewire:dashboard-nav-profile />
@@ -49,7 +49,7 @@
 
                         <div class="relative z-20 px-10 pb-6 pt-8 text-center">
                             <h1 class="ista-brand-title mb-1 flex items-center justify-center gap-2 cursor-default text-4xl tracking-tight drop-shadow-sm transition-all duration-300 not-italic">
-                                <span class="text-stone-900 not-italic">Pengaturan</span> <span class="text-[#8b0836] not-italic">Profil</span>
+                                <span class="text-stone-900 not-italic">Pengaturan</span> <span class="text-ista-primary not-italic">Profil</span>
                             </h1>
                             <p class="cursor-default text-[13px] font-medium text-stone-600 opacity-90">Kelola informasi akun dan keamanan Anda.</p>
                         </div>
@@ -57,17 +57,17 @@
                         <!-- Tab Navigation -->
                         <div class="relative z-20 flex border-b border-white/30 px-4 mt-2">
                             <button @click="activeTab = 'profile'"
-                                    :class="{ 'border-[#8b0836] text-[#8b0836]': activeTab === 'profile', 'border-transparent text-stone-500 hover:text-stone-700 hover:border-stone-300/50': activeTab !== 'profile' }"
+                                    :class="{ 'border-ista-primary text-ista-primary': activeTab === 'profile', 'border-transparent text-stone-500 hover:text-stone-700 hover:border-stone-300/50': activeTab !== 'profile' }"
                                     class="flex-1 border-b-2 px-4 py-3 text-sm font-bold transition-all duration-300 outline-none focus:outline-none focus:ring-0 focus:bg-transparent active:bg-transparent [-webkit-tap-highlight-color:transparent]">
                                 Informasi Profil
                             </button>
                             <button @click="activeTab = 'password'"
-                                    :class="{ 'border-[#8b0836] text-[#8b0836]': activeTab === 'password', 'border-transparent text-stone-500 hover:text-stone-700 hover:border-stone-300/50': activeTab !== 'password' }"
+                                    :class="{ 'border-ista-primary text-ista-primary': activeTab === 'password', 'border-transparent text-stone-500 hover:text-stone-700 hover:border-stone-300/50': activeTab !== 'password' }"
                                     class="flex-1 border-b-2 px-4 py-3 text-sm font-bold transition-all duration-300 outline-none focus:outline-none focus:ring-0 focus:bg-transparent active:bg-transparent [-webkit-tap-highlight-color:transparent]">
                                 Ubah Kata Sandi
                             </button>
                             <button @click="activeTab = 'delete'"
-                                    :class="{ 'border-[#8b0836] text-[#8b0836]': activeTab === 'delete', 'border-transparent text-stone-500 hover:text-stone-700 hover:border-stone-300/50': activeTab !== 'delete' }"
+                                    :class="{ 'border-ista-primary text-ista-primary': activeTab === 'delete', 'border-transparent text-stone-500 hover:text-stone-700 hover:border-stone-300/50': activeTab !== 'delete' }"
                                     class="flex-1 border-b-2 px-4 py-3 text-sm font-bold transition-all duration-300 outline-none focus:outline-none focus:ring-0 focus:bg-transparent active:bg-transparent [-webkit-tap-highlight-color:transparent]">
                                 Hapus Akun
                             </button>

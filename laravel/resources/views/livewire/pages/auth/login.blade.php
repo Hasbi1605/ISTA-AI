@@ -114,7 +114,7 @@ new #[Layout('layouts.auth-canvas')] class extends Component
     <div class="absolute inset-0 z-0">
         <div class="h-full w-full animate-breathe bg-cover bg-center opacity-100" style="background-image: url('/images/ista/login-bg.png');"></div>
         <div class="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(212,175,55,0.15)_0%,rgba(250,250,249,0.4)_80%)]"></div>
-        <div class="absolute inset-0 bg-gradient-to-t from-[#d4af37]/20 via-white/5 to-transparent"></div>
+        <div class="absolute inset-0 bg-gradient-to-t from-ista-gold/20 via-white/5 to-transparent"></div>
     </div>
 
     <div class="pointer-events-none absolute inset-0 z-0 overflow-hidden">
@@ -137,7 +137,7 @@ new #[Layout('layouts.auth-canvas')] class extends Component
                 </div>
 
                 <h1 class="ista-brand-title mb-1 flex items-center justify-center gap-2 cursor-default text-4xl tracking-tight drop-shadow-sm transition-all duration-300 not-italic">
-                    <span class="text-stone-900 not-italic">Login</span> <span class="text-[#8b0836] not-italic">ISTA <span class="font-light italic text-[#d4af37]">AI</span></span>
+                    <span class="text-stone-900 not-italic">Login</span> <span class="text-ista-primary not-italic">ISTA <span class="font-light italic text-ista-gold">AI</span></span>
                 </h1>
                 <p class="cursor-default text-[13px] font-medium text-stone-600 opacity-90">Asisten Istana Pintar</p>
             </div>

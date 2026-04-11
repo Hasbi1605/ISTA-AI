@@ -25,7 +25,7 @@ new class extends Component
 
 <section class="space-y-6">
     <header>
-        <h2 class="text-xl font-bold text-[#8b0836]">
+        <h2 class="text-xl font-bold text-ista-primary">
             Hapus Akun
         </h2>
 

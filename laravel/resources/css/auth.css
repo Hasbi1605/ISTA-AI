@@ -8,11 +8,11 @@
 }
 
 .ista-input {
-    @apply block w-full rounded-2xl border border-white/60 bg-stone-50/60 px-14 py-4 text-[15px] font-medium text-rose-950 placeholder-stone-400/80 shadow-sm outline-none transition-all duration-300 hover:bg-white/50 focus:border-[#d4af37]/80 focus:bg-white/90 focus:ring-2 focus:ring-[#d4af37]/20;
+    @apply block w-full rounded-2xl border border-white/60 bg-stone-50/60 px-14 py-4 text-[15px] font-medium text-ista-dark placeholder-stone-400/80 shadow-sm outline-none transition-all duration-300 hover:bg-white/50 focus:border-ista-gold/80 focus:bg-white/90 focus:ring-2 focus:ring-ista-gold/20;
 }
 
 .ista-login-button {
-    @apply relative w-full overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-rose-900 to-rose-950 px-4 py-4 text-[15px] font-semibold text-white transition-all duration-500 hover:scale-[1.02] hover:border-white/30 hover:shadow-[0_20px_50px_-10px_rgba(225,29,72,0.6)] active:scale-[0.98] active:shadow-none;
+    @apply relative w-full overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-ista-primary to-ista-dark px-4 py-4 text-[15px] font-semibold text-white transition-all duration-500 hover:scale-[1.02] hover:border-white/30 hover:shadow-[0_20px_50px_-10px_rgba(225,29,72,0.6)] active:scale-[0.98] active:shadow-none;
 }
 
 .animate-float { animation: float 6s ease-in-out infinite; }

@@ -14,7 +14,7 @@ new class extends Component {
 <div class="relative" x-data="{ open: false }" @click.outside="open = false" @close.stop="open = false">
     @auth
     <button @click="open = ! open" class="flex items-center gap-2 rounded-full p-1 transition hover:bg-stone-100 focus:outline-none">
-        <div class="flex h-8 w-8 items-center justify-center rounded-full bg-[#8b0836] text-sm font-bold text-amber-400">
+        <div class="flex h-8 w-8 items-center justify-center rounded-full bg-ista-primary text-sm font-bold text-amber-400">
             {{ substr(auth()->user()->name, 0, 1) }}
         </div>
         <div class="hidden items-center gap-1 pr-2 sm:flex">
@@ -40,11 +40,11 @@ new class extends Component {
             <p class="truncate text-xs text-stone-500">{{ auth()->user()->email }}</p>
         </div>
 
-        <a href="{{ route('profile') }}" class="block px-4 py-2 text-sm text-stone-700 transition hover:bg-stone-50 hover:text-[#8b0836]">
+        <a href="{{ route('profile') }}" class="block px-4 py-2 text-sm text-stone-700 transition hover:bg-stone-50 hover:text-ista-primary">
             Profil
         </a>
         
-        <button wire:click="logout" class="block w-full px-4 py-2 text-left text-sm text-stone-700 transition hover:bg-stone-50 hover:text-[#8b0836]">
+        <button wire:click="logout" class="block w-full px-4 py-2 text-left text-sm text-stone-700 transition hover:bg-stone-50 hover:text-ista-primary">
             Keluar
         </button>
     </div>
@@ -71,7 +71,7 @@ new class extends Component {
          class="absolute right-0 z-50 mt-2 w-48 origin-top-right rounded-xl border border-stone-100 bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5"
          style="display: none;">
         
-        <a href="{{ route('login') }}" class="block px-4 py-2 text-sm text-stone-700 transition hover:bg-stone-50 hover:text-[#8b0836]">
+        <a href="{{ route('login') }}" class="block px-4 py-2 text-sm text-stone-700 transition hover:bg-stone-50 hover:text-ista-primary">
             Login
         </a>
     </div>
