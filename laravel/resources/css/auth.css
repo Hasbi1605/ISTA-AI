@@ -1,0 +1,47 @@
+.ista-login-bg {
+    @apply relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10 sm:px-8;
+    background-color: transparent;
+}
+
+.ista-glass-card {
+    @apply relative w-full max-w-[640px] overflow-hidden rounded-[3rem] border border-white/60 bg-white/50 shadow-[0_30px_70px_-15px_rgba(159,18,57,0.15)] backdrop-blur-xl transition-all duration-500 hover:-translate-y-1 hover:shadow-[0_40px_80px_-15px_rgba(159,18,57,0.25)];
+}
+
+.ista-input {
+    @apply block w-full rounded-2xl border border-white/60 bg-stone-50/60 px-14 py-4 text-[15px] font-medium text-rose-950 placeholder-stone-400/80 shadow-sm outline-none transition-all duration-300 hover:bg-white/50 focus:border-[#d4af37]/80 focus:bg-white/90 focus:ring-2 focus:ring-[#d4af37]/20;
+}
+
+.ista-login-button {
+    @apply relative w-full overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-rose-900 to-rose-950 px-4 py-4 text-[15px] font-semibold text-white transition-all duration-500 hover:scale-[1.02] hover:border-white/30 hover:shadow-[0_20px_50px_-10px_rgba(225,29,72,0.6)] active:scale-[0.98] active:shadow-none;
+}
+
+.animate-float { animation: float 6s ease-in-out infinite; }
+.animate-float-slow { animation: float 12s ease-in-out infinite; }
+.animate-float-reverse { animation: float-reverse 15s ease-in-out infinite; }
+.animate-twinkle { animation: twinkle 4s ease-in-out infinite; }
+.animate-breathe { animation: breathe 10s ease-in-out infinite; }
+.animate-enter-1 { animation: fade-in-up 0.8s ease-out 0.1s both; }
+.animate-enter-2 { animation: fade-in-up 0.8s ease-out 0.2s both; }
+.animate-enter-3 { animation: fade-in-up 0.8s ease-out 0.3s both; }
+.animate-enter-4 { animation: fade-in-up 0.8s ease-out 0.4s both; }
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-20px); }
+}
+@keyframes float-reverse {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(20px); }
+}
+@keyframes twinkle {
+    0%, 100% { opacity: 0.2; transform: scale(0.8); }
+    50% { opacity: 1; transform: scale(1.2); }
+}
+@keyframes breathe {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+@keyframes fade-in-up {
+    0% { opacity: 0; transform: translateY(20px); }
+    100% { opacity: 1; transform: translateY(0); }
+}

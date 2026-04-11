@@ -13,39 +13,6 @@ export default {
 
     theme: {
         extend: {
-            animation: {
-                float: "float 6s ease-in-out infinite",
-                "float-slow": "float 12s ease-in-out infinite",
-                "float-reverse": "float-reverse 15s ease-in-out infinite",
-                twinkle: "twinkle 4s ease-in-out infinite",
-                breathe: "breathe 10s ease-in-out infinite",
-                "enter-1": "fade-in-up 0.8s ease-out 0.1s both",
-                "enter-2": "fade-in-up 0.8s ease-out 0.2s both",
-                "enter-3": "fade-in-up 0.8s ease-out 0.3s both",
-                "enter-4": "fade-in-up 0.8s ease-out 0.4s both",
-            },
-            keyframes: {
-                float: {
-                    "0%, 100%": { transform: "translateY(0)" },
-                    "50%": { transform: "translateY(-20px)" },
-                },
-                "float-reverse": {
-                    "0%, 100%": { transform: "translateY(0)" },
-                    "50%": { transform: "translateY(20px)" },
-                },
-                twinkle: {
-                    "0%, 100%": { opacity: "0.2", transform: "scale(0.8)" },
-                    "50%": { opacity: "1", transform: "scale(1.2)" },
-                },
-                breathe: {
-                    "0%, 100%": { transform: "scale(1)" },
-                    "50%": { transform: "scale(1.05)" },
-                },
-                "fade-in-up": {
-                    "0%": { opacity: "0", transform: "translateY(20px)" },
-                    "100%": { opacity: "1", transform: "translateY(0)" },
-                },
-            },
             colors: {
                 "surface-container-high": "#ece6dc",
                 secondary: "#78706a",
