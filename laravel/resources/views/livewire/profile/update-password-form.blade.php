@@ -40,7 +40,7 @@ new class extends Component
 
 <section>
     <header>
-        <h2 class="text-xl font-bold text-[#8b0836]">
+        <h2 class="text-xl font-bold text-ista-primary">
             Perbarui Kata Sandi
         </h2>
 
@@ -103,7 +103,7 @@ new class extends Component
                 <div class="absolute inset-0 z-0 -translate-x-[150%] skew-x-12 bg-gradient-to-r from-transparent via-white/40 to-transparent transition-transform duration-1000 ease-in-out group-hover:translate-x-[150%]"></div>
             </button>
 
-            <x-action-message class="me-3 text-[#d4af37] text-sm font-bold" on="password-updated">
+            <x-action-message class="me-3 text-ista-gold text-sm font-bold" on="password-updated">
                 Tersimpan.
             </x-action-message>
         </div>

@@ -49,10 +49,10 @@
 
         <div class="mt-4 flex flex-col items-center gap-2 sm:flex-row sm:justify-center sm:gap-4">
             @if (Route::has('password.request'))
-                <button type="button" wire:click="setView('forgot-password')" class="text-[13px] font-bold text-[#8b0836] transition-colors hover:text-[#d4af37]">Lupa kata sandi?</button>
+                <button type="button" wire:click="setView('forgot-password')" class="text-[13px] font-bold text-ista-primary transition-colors hover:text-ista-gold">Lupa kata sandi?</button>
             @endif
             <span class="hidden text-stone-300 sm:inline">•</span>
-            <button type="button" wire:click="toggleRegister" class="text-[13px] font-bold text-[#8b0836] transition-colors hover:text-[#d4af37]">Belum punya akun? Daftar</button>
+            <button type="button" wire:click="toggleRegister" class="text-[13px] font-bold text-ista-primary transition-colors hover:text-ista-gold">Belum punya akun? Daftar</button>
         </div>
     </div>
 </form>

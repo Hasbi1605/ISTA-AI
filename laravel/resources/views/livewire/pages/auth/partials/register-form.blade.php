@@ -68,7 +68,7 @@
         </button>
 
         <div class="mt-4 text-center">
-            <button type="button" wire:click="toggleRegister" class="text-[13px] font-bold text-[#8b0836] transition-colors hover:text-[#d4af37]">Sudah punya akun? Masuk Portal</button>
+            <button type="button" wire:click="toggleRegister" class="text-[13px] font-bold text-ista-primary transition-colors hover:text-ista-gold">Sudah punya akun? Masuk Portal</button>
         </div>
     </div>
 </form>

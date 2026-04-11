@@ -64,7 +64,7 @@ new class extends Component
 
 <section>
     <header>
-        <h2 class="text-xl font-bold text-[#8b0836]">
+        <h2 class="text-xl font-bold text-ista-primary">
             Informasi Profil
         </h2>
 
@@ -108,7 +108,7 @@ new class extends Component
                     <p class="text-[13px] mt-2 text-stone-800 font-medium">
                         Alamat email Anda belum terverifikasi.
 
-                        <button wire:click.prevent="sendVerification" class="underline text-sm text-[#8b0836] hover:text-[#d4af37] rounded-md focus:outline-none">
+                        <button wire:click.prevent="sendVerification" class="underline text-sm text-ista-primary hover:text-ista-gold rounded-md focus:outline-none">
                             Klik di sini untuk mengirim ulang email verifikasi.
                         </button>
                     </p>
@@ -130,7 +130,7 @@ new class extends Component
                 <div class="absolute inset-0 z-0 -translate-x-[150%] skew-x-12 bg-gradient-to-r from-transparent via-white/40 to-transparent transition-transform duration-1000 ease-in-out group-hover:translate-x-[150%]"></div>
             </button>
 
-            <x-action-message class="me-3 text-[#d4af37] text-sm font-bold" on="profile-updated">
+            <x-action-message class="me-3 text-ista-gold text-sm font-bold" on="profile-updated">
                 Tersimpan.
             </x-action-message>
         </div>
