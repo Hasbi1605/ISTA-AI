@@ -9,3 +9,11 @@ laravel/app/.!*.DS_Store
 
 # Hypothesis testing cache
 .hypothesis/
+
+# Security and Best Practices Exclusions
+.env
+vendor/
+node_modules/
+__pycache__/
+chroma_data/
+*.sqlite
