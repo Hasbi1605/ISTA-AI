@@ -73,21 +73,55 @@ def get_rerank_config() -> Dict[str, Any]:
     return config.get('retrieval', {}).get('semantic_rerank', {})
 
 
-def get_system_prompt() -> str:
-    """Get default system prompt."""
-    config = load_config()
-    return config.get('system', {}).get('default_prompt', '')
-
-
 def get_chunking_config() -> Dict[str, Any]:
     """Get chunking configuration."""
-    # TODO: implement when needed
     config = load_config()
     return config.get('chunking', {})
 
 
 def get_smtp_config() -> Dict[str, Any]:
     """Get SMTP Gmail configuration."""
-    # TODO: implement when needed
     config = load_config()
     return config.get('integrations', {}).get('smtp_gmail', {})
+
+
+def get_system_prompt() -> str:
+    """Get default system prompt."""
+    config = load_config()
+    return config.get('prompts', {}).get('system', {}).get('default', '')
+
+
+def get_rag_prompt() -> str:
+    """Get RAG document prompt."""
+    config = load_config()
+    return config.get('prompts', {}).get('rag', {}).get('document', '')
+
+
+def get_web_search_context_prompt() -> str:
+    """Get web search context prompt template."""
+    config = load_config()
+    return config.get('prompts', {}).get('web_search', {}).get('context', '')
+
+
+def get_assertive_instruction() -> str:
+    """Get assertive instruction for web search."""
+    config = load_config()
+    return config.get('prompts', {}).get('web_search', {}).get('assertive_instruction', '')
+
+
+def get_summarize_single_prompt() -> str:
+    """Get single document summarization prompt."""
+    config = load_config()
+    return config.get('prompts', {}).get('summarization', {}).get('single', '')
+
+
+def get_summarize_partial_prompt() -> str:
+    """Get partial (multi-batch) summarization prompt."""
+    config = load_config()
+    return config.get('prompts', {}).get('summarization', {}).get('partial', '')
+
+
+def get_summarize_final_prompt() -> str:
+    """Get final combined summarization prompt."""
+    config = load_config()
+    return config.get('prompts', {}).get('summarization', {}).get('final', '')

@@ -22,6 +22,7 @@ from langchain_core.embeddings import Embeddings
 from langchain_openai import OpenAIEmbeddings
 from langchain_core.documents import Document
 from app.services.langsearch_service import LangSearchService
+from app.config_loader import get_rag_prompt
 
 EXPLICIT_WEB_PATTERNS = [
     r"\bweb\s*search\b",
@@ -630,24 +631,12 @@ Informasi web terbaru (digunakan jika relevan):
 {web_context}
 """
 
-    rag_prompt = f"""Anda adalah asisten AI cerdas. Jawab pertanyaan user berdasarkan referensi berikut.
-
-SUMBER DOKUMEN REFERENSI:
-{context_str}
-{web_section}
----
-
-Pertanyaan: {question}
-
-INSTRUKSI PENTING UNTUK FORMAT JAWABAN:
-1. JANGAN PERNAH menyebut istilah internal seperti "Kutipan 1", "Kutipan Dokumen 2", dsb. Gantikan secara natural dengan menyebut nama file atau merujuk ke isi dokumen tersebut.
-2. Jika di dalam teks/isi dokumen rujukan terdapat Judul Dokumen yang spesifik, sebutkan dan cetak TEBAL (BOLD).
-3. WAJIB cetak TEBAL (BOLD) setiap kali Anda menyebutkan nama file rujukan (contoh: "Berdasarkan dokumen **nama_dokumen.pdf**, ...").
-4. Utamakan informasi dari sumber dokumen di atas. Jika konteks web tersedia, gunakan hanya sebagai tambahan pelengkap yang memperkaya jawaban.
-5. Jika jawaban tidak ditemukan sama sekali di dalam dokumen rujukan, katakan secara langsung bahwa informasi tersebut tidak tersedia pada dokumen yang Anda baca.
-6. Hindari mencantumkan daftar pustaka di bagian akhir jawaban yang berbentuk "Sumber referensi: Kutipan X". Langsung saja integrasikan penyebutan nama rujukan secara natural ke dalam teks kalimat Anda.
-
-Jawaban:"""
+    rag_prompt_template = get_rag_prompt()
+    rag_prompt = rag_prompt_template.format(
+        context_str=context_str,
+        web_section=web_section,
+        question=question
+    )
     
     return rag_prompt, sources
 

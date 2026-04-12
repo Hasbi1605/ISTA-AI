@@ -158,3 +158,117 @@ integrations:
     username_env: "MAIL_USERNAME"
     # Password tidak di-hardcode - gunakan env variable
     password_env: "MAIL_PASSWORD"
+
+# ============================================
+# PROMPTS - Single source of truth untuk semua prompt AI
+# ============================================
+# Ubah nilai di sini untuk mengkustomisasi behavior AI
+# tanpa perlu mengubah logika kode aplikasi
+# ============================================
+prompts:
+  # ============================================
+  # SYSTEM PROMPT UTAMA
+  # ============================================
+  system:
+    default: "Anda adalah ISTA AI, asisten virtual istana pintar. Jawablah dengan sopan dan membantu."
+
+  # ============================================
+  # RAG PROMPT - Untuk chat dengan dokumen
+  # ============================================
+  rag:
+    document: |
+      Anda adalah asisten AI cerdas. Jawab pertanyaan user berdasarkan referensi berikut.
+
+      SUMBER DOKUMEN REFERENSI:
+      {context_str}
+      {web_section}
+      ---
+
+      Pertanyaan: {question}
+
+      INSTRUKSI PENTING UNTUK FORMAT JAWABAN:
+      1. JANGAN PERNAH menyebut istilah internal seperti "Kutipan 1", "Kutipan Dokumen 2", dsb. Gantikan secara natural dengan menyebut nama file atau merujuk ke isi dokumen tersebut.
+      2. Jika di dalam teks/isi dokumen rujukan terdapat Judul Dokumen yang spesifik, sebutkan dan cetak TEBAL (BOLD).
+      3. WAJIB cetak TEBAL (BOLD) setiap kali Anda menyebutkan nama file rujukan (contoh: "Berdasarkan dokumen **nama_dokumen.pdf**, ...").
+      4. Utamakan informasi dari sumber dokumen di atas. Jika konteks web tersedia, gunakan hanya sebagai tambahan pelengkap yang memperkaya jawaban.
+      5. Jika jawaban tidak ditemukan sama sekali di dalam dokumen rujukan, katakan secara langsung bahwa informasi tersebut tidak tersedia pada dokumen yang Anda baca.
+      6. Hindari mencantumkan daftar pustaka di bagian akhir jawaban yang berbentuk "Sumber referensi: Kutipan X". Langsung saja integrasikan penyebutan nama rujukan secara natural ke dalam teks kalimat Anda.
+
+      Jawaban:
+
+  # ============================================
+  # WEB SEARCH CONTEXT - Untuk informasi real-time dari web
+  # ============================================
+  web_search:
+    context: |
+      ================================================================================
+      🔴 INFORMASI TERBARU DARI WEB - PRIORITAS TERTINGGI 🔴
+      ================================================================================
+
+      📅 Tanggal Hari Ini: {current_date}
+
+      ⚠️ PERHATIAN PENTING:
+      - Pengetahuan internal Anda terakhir diperbarui tahun 2024
+      - Sekarang adalah tahun {current_year}
+      - Data di bawah ini adalah informasi TERBARU dari web (real-time)
+      - WAJIB gunakan informasi ini untuk menjawab pertanyaan tentang:
+        * Pejabat pemerintahan (presiden, menteri, gubernur, dll)
+        * Berita terkini dan kejadian terbaru
+        * Data yang berubah dari waktu ke waktu
+      - JANGAN mengandalkan pengetahuan internal untuk fakta yang bisa outdated
+
+      📰 HASIL PENCARIAN WEB:
+      =================================================================================
+
+      {results}
+
+      ================================================================================
+      🔴 AKHIR INFORMASI TERBARU DARI WEB 🔴
+      ================================================================================
+
+    assertive_instruction: |
+      Instruksi tambahan:
+      - Gunakan informasi web terbaru di atas hanya jika relevan dengan pertanyaan user.
+      - Jika sumber web tersedia, utamakan data faktual dari sumber tersebut untuk bagian yang bersifat real-time.
+      - Jika ada bagian 'FAKTA TERSTRUKTUR' dengan skor pengadilan, sebutkan skor tersebut secara eksplisit.
+      - Jawab secara ringkas, jelas, dan hindari istilah teknis internal sistem.
+
+  # ============================================
+  # SUMMARIZATION PROMPTS - Untuk ringkasan dokumen
+  # ============================================
+  summarization:
+    single: |
+      Buatkan ringkasan yang jelas dan padat dari dokumen berikut.
+      Ringkasan harus mencakup poin-poin utama dan informasi penting.
+
+      Dokumen:
+      {document}
+
+      ---
+
+      Buat ringkasan dalam Bahasa Indonesia (maksimal 500 kata):
+
+    partial: |
+      Buatkan ringkasan singkat dari bagian dokumen berikut.
+      Ini adalah bagian {part_number} dari {total_parts} bagian dokumen.
+
+      Dokumen:
+      {batch}
+
+      ---
+
+      Berikan ringkasan singkat (maksimal 100 kata) dari bagian ini dalam Bahasa Indonesia:
+
+    final: |
+      Berdasarkan ringkasan bagian-bagian berikut, buat ringkasan keseluruhan yang komprehensif.
+
+      Ringkasan Bagian:
+      {combined_summaries}
+
+      ---
+
+      Buat ringkasan keseluruhan yang jelas dan terstruktur dalam Bahasa Indonesia (maksimal 500 kata):
+
+# ============================================
+# END OF CONFIGURATION
+# ============================================

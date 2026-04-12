@@ -6,6 +6,14 @@ from typing import Dict, List, Optional
 from pydantic import BaseModel
 from app.services.rag_service import process_document, delete_document_vectors, summarize_document, get_document_chunks_for_summarization
 
+try:
+    from app.llm_manager import get_llm_stream
+    from app.config_loader import get_summarize_single_prompt, get_summarize_partial_prompt, get_summarize_final_prompt
+    CONFIG_AVAILABLE = True
+except ImportError:
+    from app.llm_manager import get_llm_stream
+    CONFIG_AVAILABLE = False
+
 router = APIRouter(prefix="/api/documents", tags=["Documents"])
 
 # Security
@@ -105,26 +113,59 @@ async def summarize_document_endpoint(request: SummarizeRequest):
     if not success:
         raise HTTPException(status_code=403, detail="Dokumen tidak ditemukan atau Anda tidak memiliki akses.")
     
-    # Single batch - simple summarization
-    if len(batches) == 1:
-        summarize_prompt = f"""Buatkan ringkasan yang jelas dan padat dari dokumen berikut. 
+    def get_single_prompt(doc_content: str) -> str:
+        if CONFIG_AVAILABLE:
+            template = get_summarize_single_prompt()
+            if template:
+                return template.format(document=doc_content)
+        return f"""Buatkan ringkasan yang jelas dan padat dari dokumen berikut. 
 Ringkasan harus mencakup poin-poin utama dan informasi penting.
 
 Dokumen:
-{batches[0]}
+{doc_content}
 
 ---
 
 Buat ringkasan dalam Bahasa Indonesia (maksimal 500 kata):"""
+
+    def get_partial_prompt(batch: str, part_num: int, total: int) -> str:
+        if CONFIG_AVAILABLE:
+            template = get_summarize_partial_prompt()
+            if template:
+                return template.format(batch=batch, part_number=part_num, total_parts=total)
+        return f"""Buatkan ringkasan singkat dari bagian dokumen berikut.
+Ini adalah bagian {part_num} dari {total} bagian dokumen.
+
+Dokumen:
+{batch}
+
+---
+
+Berikan ringkasan singkat (maksimal 100 kata) dari bagian ini dalam Bahasa Indonesia:"""
+
+    def get_final_prompt(combined: str) -> str:
+        if CONFIG_AVAILABLE:
+            template = get_summarize_final_prompt()
+            if template:
+                return template.format(combined_summaries=combined)
+        return f"""Berdasarkan ringkasan bagian-bagian berikut, buat ringkasan keseluruhan yang komprehensif.
+
+Ringkasan Bagian:
+{combined}
+
+---
+
+Buat ringkasan keseluruhan yang jelas dan terstruktur dalam Bahasa Indonesia (maksimal 500 kata):"""
+
+    if len(batches) == 1:
+        summarize_prompt = get_single_prompt(batches[0])
         
         messages = [{"role": "user", "content": summarize_prompt}]
         
-        # Collect the full response
         full_response = ""
         for chunk in get_llm_stream(messages):
             full_response += chunk
         
-        # Remove any model prefix
         if "[MODEL:" in full_response:
             full_response = full_response.split("]", 1)[1] if "]" in full_response else full_response
         
@@ -136,19 +177,9 @@ Buat ringkasan dalam Bahasa Indonesia (maksimal 500 kata):"""
             "total_chunks": total_chunks
         }
     
-    # Multiple batches - hierarchical summarization
-    # Step 1: Summarize each batch
     partial_summaries = []
     for i, batch in enumerate(batches):
-        partial_prompt = f"""Buatkan ringkasan singkat dari bagian dokumen berikut.
-Ini adalah bagian {i+1} dari {len(batches)} bagian dokumen.
-
-Dokumen:
-{batch}
-
----
-
-Berikan ringkasan singkat (maksimal 100 kata) dari bagian ini dalam Bahasa Indonesia:"""
+        partial_prompt = get_partial_prompt(batch, i + 1, len(batches))
         
         batch_messages = [{"role": "user", "content": partial_prompt}]
         partial_response = ""
@@ -166,14 +197,7 @@ Berikan ringkasan singkat (maksimal 100 kata) dari bagian ini dalam Bahasa Indon
     # Step 2: Combine partial summaries into final summary
     combined_summaries = "\n\n".join([f"Ringkasan Bagian {i+1}:\n{s}" for i, s in enumerate(partial_summaries)])
     
-    final_prompt = f"""Berdasarkan ringkasan bagian-bagian berikut, buat ringkasan keseluruhan yang komprehensif.
-
-Ringkasan Bagian:
-{combined_summaries}
-
----
-
-Buat ringkasan keseluruhan yang jelas dan terstruktur dalam Bahasa Indonesia (maksimal 500 kata):"""
+    final_prompt = get_final_prompt(combined_summaries)
     
     final_messages = [{"role": "user", "content": final_prompt}]
     

@@ -7,6 +7,8 @@ from typing import List, Dict, Optional, Tuple
 from datetime import datetime
 from functools import lru_cache
 
+from app.config_loader import get_web_search_context_prompt, get_assertive_instruction
+
 logger = logging.getLogger(__name__)
 
 LANGSEARCH_TIMEOUT = int(os.getenv("LANGSEARCH_TIMEOUT", "10"))
@@ -156,51 +158,31 @@ class LangSearchService:
         current_date = datetime.now().strftime("%A, %d %B %Y")
         current_year = datetime.now().year
         
-        prompt_parts = [
-            "=" * 80,
-            "🔴 INFORMASI TERBARU DARI WEB - PRIORITAS TERTINGGI 🔴",
-            "=" * 80,
-            "",
-            f"📅 Tanggal Hari Ini: {current_date}",
-            "",
-            f"⚠️ PERHATIAN PENTING:",
-            f"- Pengetahuan internal Anda terakhir diperbarui tahun 2024",
-            f"- Sekarang adalah tahun {current_year}",
-            f"- Data di bawah ini adalah informasi TERBARU dari web (real-time)",
-            f"- WAJIB gunakan informasi ini untuk menjawab pertanyaan tentang:",
-            f"  * Pejabat pemerintahan (presiden, menteri, gubernur, dll)",
-            f"  * Berita terkini dan kejadian terbaru",
-            f"  * Data yang berubah dari waktu ke waktu",
-            f"- JANGAN mengandalkan pengetahuan internal untuk fakta yang bisa outdated",
-            "",
-            "📰 HASIL PENCARIAN WEB:",
-            "=" * 80,
-            ""
-        ]
+        template = get_web_search_context_prompt()
         
+        results_formatted = []
         for idx, result in enumerate(results, 1):
             title = result.get("title", "No title")
             snippet = result.get("snippet", "No description")
             url = result.get("url", "")
             date = result.get("datePublished", "")
             
-            prompt_parts.append(f"🔍 Hasil #{idx}:")
-            prompt_parts.append(f"   📌 Judul: {title}")
-            prompt_parts.append(f"   📝 Isi: {snippet}")
+            result_str = f"""🔍 Hasil #{idx}:
+   📌 Judul: {title}
+   📝 Isi: {snippet}"""
             if url:
-                prompt_parts.append(f"   🔗 Sumber: {url}")
+                result_str += f"\n   🔗 Sumber: {url}"
             if date:
-                prompt_parts.append(f"   📅 Tanggal Publikasi: {date}")
-            prompt_parts.append("")
+                result_str += f"\n   📅 Tanggal Publikasi: {date}"
+            results_formatted.append(result_str)
         
-        prompt_parts.extend([
-            "=" * 80,
-            "🔴 AKHIR INFORMASI TERBARU DARI WEB 🔴",
-            "=" * 80,
-            ""
-        ])
+        results_str = "\n\n".join(results_formatted)
         
-        return "\n".join(prompt_parts)
+        return template.format(
+            current_date=current_date,
+            current_year=current_year,
+            results=results_str
+        )
 
     def rerank_documents(
         self,

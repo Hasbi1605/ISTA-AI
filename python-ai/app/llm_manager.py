@@ -12,6 +12,7 @@ try:
         get_reasoning_model,
         get_system_prompt,
         get_global_config,
+        get_assertive_instruction,
     )
     CONFIG_AVAILABLE = True
 except ImportError:
@@ -120,13 +121,20 @@ def get_llm_stream(
             print(f"[Warning] Search/RAG context failed: {e}")
     
     if search_context:
-        assertive_instruction = (
-            "\n\nInstruksi tambahan:\n"
-            "- Gunakan informasi web terbaru di atas hanya jika relevan dengan pertanyaan user.\n"
-            "- Jika sumber web tersedia, utamakan data faktual dari sumber tersebut untuk bagian yang bersifat real-time.\n"
-            "- Jika ada bagian 'FAKTA TERSTRUKTUR' dengan skor pengadilan, sebutkan skor tersebut secara eksplisit.\n"
-            "- Jawab secara ringkas, jelas, dan hindari istilah teknis internal sistem."
-        )
+        if CONFIG_AVAILABLE:
+            try:
+                assertive_instruction = get_assertive_instruction()
+            except Exception:
+                assertive_instruction = ""
+        else:
+            assertive_instruction = (
+                "\n\nInstruksi tambahan:\n"
+                "- Gunakan informasi web terbaru di atas hanya jika relevan dengan pertanyaan user.\n"
+                "- Jika sumber web tersedia, utamakan data faktual dari sumber tersebut untuk bagian yang bersifat real-time.\n"
+                "- Jika ada bagian 'FAKTA TERSTRUKTUR' dengan skor pengadilan, sebutkan skor tersebut secara eksplisit.\n"
+                "- Jawab secara ringkas, jelas, dan hindari istilah teknis internal sistem."
+            )
+        
         if system_prompt_base:
             enhanced_system = search_context + system_prompt_base + assertive_instruction
         else:
