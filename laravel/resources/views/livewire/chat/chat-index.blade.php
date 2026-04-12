@@ -148,6 +148,13 @@
             if (!$refs.chatAttachmentInput) return;
             $refs.chatAttachmentInput.value = '';
             $refs.chatAttachmentInput.click();
+        },
+        autoResizeTextarea(el) {
+            el.style.height = 'auto';
+            const minHeight = 44;
+            const maxHeight = 200;
+            el.style.height = Math.min(Math.max(el.scrollHeight, minHeight), maxHeight) + 'px';
+            el.style.overflowY = el.scrollHeight > maxHeight ? 'auto' : 'hidden';
         }
      }"
      x-on:dragenter.window.prevent="onDragEnter($event)"
@@ -180,9 +187,9 @@
         class="h-full flex-shrink-0 overflow-hidden bg-white/60 backdrop-blur-[10px] flex flex-col z-10 transform-gpu will-change-[width,transform,opacity] transition-[width,transform,opacity,border-color] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]">
         
         <!-- Kembali ke Beranda Button -->
-        <div class="p-4 pb-0 pt-4">
-            <a href="{{ route('dashboard') }}" class="w-full flex items-center justify-start px-4 py-2.5 rounded-lg border border-transparent hover:border-stone-200/60 dark:hover:border-[#334155] bg-transparent hover:bg-gray-50 dark:hover:bg-white/5 font-medium text-[13px] text-gray-700 dark:text-gray-200 transition-all duration-200">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-[#64748B] dark:text-[#CBD5E1]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div class="px-4 pb-2 pt-3">
+            <a href="{{ route('dashboard') }}" class="inline-flex items-center px-4 py-2.5 font-medium text-[13px] text-gray-700 dark:text-gray-200 hover:text-amber-800 dark:hover:text-amber-300 transition-colors duration-200">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                 </svg>
                 Kembali ke Beranda
@@ -506,7 +513,7 @@
                 accept=".pdf,.docx,.xlsx"
                 class="hidden"
             >
-            <form x-on:submit.prevent="submitPrompt($event)" class="max-w-3xl mx-auto relative rounded-xl shadow-sm bg-white dark:bg-white/80 border border-stone-200/60 dark:border-[#1E293B] focus-within:border-ista-primary dark:focus-within:border-ista-primary transition-colors">
+            <form x-on:submit.prevent="submitPrompt($event)" class="chat-form max-w-3xl mx-auto relative rounded-xl shadow-sm bg-white dark:bg-white/80 border border-stone-200/60 dark:border-[#1E293B] transition-colors">
                 <div class="flex flex-col w-full">
                     <div wire:loading.flex wire:target="chatAttachment" class="px-5 pt-4 items-center gap-2 text-[12px] text-ista-primary dark:text-[#8E81FF]">
                         <span class="h-2 w-2 rounded-full bg-current animate-ping"></span>
@@ -520,10 +527,21 @@
                     @if($chatDocuments->count() > 0)
                         <div class="px-5 pt-5 pb-1 flex flex-wrap gap-3">
                             @foreach($chatDocuments as $doc)
+                                @php
+                                    $fileExt = $doc->extension ?? strtolower(pathinfo($doc->original_name, PATHINFO_EXTENSION));
+                                @endphp
                                 <span class="inline-flex items-center gap-2 bg-[#E2E8F0] dark:bg-[#1D293D] text-[#314158] dark:text-[#CAD5E2] rounded-2xl px-4 py-2 text-[14px]">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 3h7l5 5v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1zm7 1v4h4" />
-                                    </svg>
+                                    @if($fileExt === 'pdf')
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#FF2056]" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"></path></svg>
+                                    @elseif($fileExt === 'xlsx')
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="#32CD32"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 3h7l5 5v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1zm7 1v4h4M8 13h8M8 17h8" /></svg>
+                                    @elseif($fileExt === 'docx')
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#2B7FFF]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 3h7l5 5v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1zm7 1v4h4M8 13h8M8 17h6" /></svg>
+                                    @else
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 3h7l5 5v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1zm7 1v4h4" />
+                                        </svg>
+                                    @endif
                                     <span class="max-w-[180px] truncate">{{ $doc->original_name }}</span>
                                     <button type="button" wire:click="removeConversationDocument({{ $doc->id }})" class="text-[#7C8DA8] hover:text-[#314158] dark:hover:text-white" title="Remove">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -542,35 +560,44 @@
                             </span>
                         </div>
                     @endif
-                    <div x-show="!isDraggingFile" class="flex items-end px-3 pb-3 pt-3 w-full">
+                    <div x-show="!isDraggingFile" class="px-3 pb-3 pt-3 w-full">
                         <textarea 
+                            x-ref="chatInput"
                             x-model="promptDraft"
                             x-on:keydown.enter.prevent="if($event.shiftKey) return; submitPrompt($event)"
+                            x-on:input="autoResizeTextarea($el)"
                             placeholder="Message ISTA AI..." 
-                            class="flex-1 max-h-[200px] min-h-[44px] bg-transparent border-none focus:ring-0 resize-none text-[14.5px] text-stone-800 dark:text-[#F8FAFC] placeholder-[#94A3B8] dark:placeholder-[#64748B] outline-none px-2"
+                            class="chat-input w-full max-h-[200px] min-h-[44px] bg-transparent border-none focus:ring-0 focus:outline-none focus:border-transparent focus-visible:ring-0 focus-visible:outline-none resize-none text-[14.5px] text-stone-800 dark:text-[#F8FAFC] placeholder-[#94A3B8] dark:placeholder-[#64748B] px-2 py-[10px] hover:bg-transparent focus:bg-transparent"
                             rows="1"
+                            style="outline: none !important; box-shadow: none !important;"
                         ></textarea>
                         
-                        <div class="flex items-center gap-2 pl-2">
-                            <!-- Toggle Search -->
-                            <button type="button" wire:click="toggleWebSearch" class="group h-[30px] px-[13px] border border-transparent rounded-full text-[11.4px] font-normal flex items-center gap-[6px] transition-all duration-300 hover:scale-105 hover:shadow-md hover:!bg-ista-primary hover:!text-white {{ $webSearchMode ? 'bg-[#E2E8F0] text-stone-700 dark:bg-[#314158] dark:text-[#E2E8F0]' : 'bg-[#F1F5F9] text-[#62748E] dark:bg-[#1D293D] dark:text-[#62748E]' }}">
-                                <img src="{{ $uiIcons['searchLight'] }}" alt="" class="w-[14px] h-[14px] dark:hidden group-hover:!brightness-0 group-hover:!invert transition-all duration-300" />
-                                <img src="{{ $uiIcons['searchDark'] }}" alt="" class="w-[14px] h-[14px] hidden dark:block group-hover:!brightness-0 group-hover:!invert transition-all duration-300" />
+                        <div class="flex items-center justify-between mt-2">
+                            <!-- Toggle Search (kiri) -->
+                            <button type="button" wire:click="toggleWebSearch" class="h-[30px] px-[13px] rounded-full text-[11.4px] font-normal flex items-center gap-[6px] transition-all duration-300 {{ $webSearchMode ? 'bg-blue-50 dark:bg-blue-500/10 border border-blue-400 dark:border-blue-500 text-blue-600 dark:text-blue-400' : 'bg-transparent border border-stone-200 dark:border-[#334155] text-[#62748E] dark:text-[#94A3B8]' }}">
+                                <svg class="w-[14px] h-[14px] text-current" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M7 12.8333C10.2217 12.8333 12.8333 10.2217 12.8333 7C12.8333 3.77834 10.2217 1.16667 7 1.16667C3.77834 1.16667 1.16667 3.77834 1.16667 7C1.16667 10.2217 3.77834 12.8333 7 12.8333Z" stroke="currentColor" stroke-width="1.16667" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M7 1.16667C5.50214 2.73942 4.66667 4.8281 4.66667 7C4.66667 9.1719 5.50214 11.2606 7 12.8333C8.49786 11.2606 9.33333 9.1719 9.33333 7C9.33333 4.8281 8.49786 2.73942 7 1.16667Z" stroke="currentColor" stroke-width="1.16667" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M1.16667 7H12.8333" stroke="currentColor" stroke-width="1.16667" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
                                 <span>Search</span>
                             </button>
 
-                            <button type="button" @click="openAttachmentPicker()" wire:loading.attr="disabled" wire:target="chatAttachment" class="h-[34px] w-[34px] rounded-full transition-colors flex items-center justify-center hover:bg-[#F1F5F9] dark:hover:bg-[#1D293D] disabled:opacity-60" title="Attach file">
-                                <img src="{{ $uiIcons['uploadLight'] }}" alt="" class="h-[18px] w-[18px] dark:hidden" />
-                                <img src="{{ $uiIcons['uploadDark'] }}" alt="" class="h-[18px] w-[18px] hidden dark:block" />
-                            </button>
+                            <!-- Action buttons (kanan) -->
+                            <div class="flex items-center gap-2">
+                                <button type="button" @click="openAttachmentPicker()" wire:loading.attr="disabled" wire:target="chatAttachment" class="h-[34px] w-[34px] rounded-full transition-colors flex items-center justify-center bg-transparent hover:bg-[#F1F5F9] dark:hover:bg-[#1D293D] disabled:opacity-60" title="Attach file">
+                                    <img src="{{ $uiIcons['uploadLight'] }}" alt="" class="h-[18px] w-[18px] dark:hidden" />
+                                    <img src="{{ $uiIcons['uploadDark'] }}" alt="" class="h-[18px] w-[18px] hidden dark:block" />
+                                </button>
 
-                            <!-- Send -->
-                            <button type="submit" 
-                                    :disabled="isSendingMessage"
-                                    class="bg-[#F1F5F9] dark:bg-[#1D293D] hover:!bg-ista-primary hover:!text-white disabled:opacity-50 rounded-full transition-all duration-300 hover:scale-105 hover:shadow-md h-[32px] w-[32px] flex items-center justify-center group">
-                                <img src="{{ $uiIcons['sendLight'] }}" alt="" class="h-[17px] w-[17px] dark:hidden group-hover:!brightness-0 group-hover:!invert transition-all duration-300" />
-                                <img src="{{ $uiIcons['sendDark'] }}" alt="" class="h-[17px] w-[17px] hidden dark:block group-hover:!brightness-0 group-hover:!invert transition-all duration-300" />
-                            </button>
+                                <!-- Send -->
+                                <button type="submit" 
+                                        :disabled="isSendingMessage"
+                                        class="bg-ista-primary hover:bg-ista-dark dark:bg-ista-primary dark:hover:bg-ista-dark disabled:opacity-50 rounded-full transition-all duration-300 h-[32px] w-[32px] flex items-center justify-center group">
+                                    <img src="{{ $uiIcons['sendLight'] }}" alt="" class="h-[17px] w-[17px] dark:hidden brightness-0 invert" />
+                                    <img src="{{ $uiIcons['sendDark'] }}" alt="" class="h-[17px] w-[17px] hidden dark:block brightness-0 invert" />
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -596,17 +623,16 @@
         :class="showRightSidebar ? 'w-[288px] opacity-100 translate-x-0 border-l border-stone-200/60 dark:border-[#1E293B]' : 'w-0 opacity-0 translate-x-3 border-l border-transparent pointer-events-none'"
         class="h-full flex-shrink-0 overflow-hidden bg-white/60 backdrop-blur-[10px] flex flex-col z-10 transform-gpu will-change-[width,transform,opacity] transition-[width,transform,opacity,border-color] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]">
         
-        <div class="h-[53px] px-4 flex items-center">
-            <h3 class="text-[13.8px] font-bold text-stone-800 dark:text-[#F8FAFC] flex items-center gap-2">
-                <svg class="w-4 h-4 text-ista-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z"/></svg>
+        <div class="px-4 pt-5 pb-0">
+            <span class="inline-flex items-center font-medium text-[13px] text-gray-700 dark:text-gray-200">
+                <svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z"/></svg>
                 Semua Dokumen Saya
-            </h3>
+            </span>
         </div>
         
-        <div class="flex-1 overflow-y-auto px-4 pt-4" @if($hasDocumentsInProgress) wire:poll.3s="loadAvailableDocuments" @else wire:poll.20s="loadAvailableDocuments" @endif>
-             <div class="mb-4">
-                 <h4 class="text-[12px] font-bold text-[#64748B] dark:text-[#94A3B8] uppercase tracking-wider mb-3">Active Files</h4>
-                 @php
+<div class="flex-1 overflow-y-auto px-4 pt-4" @if($hasDocumentsInProgress) wire:poll.3s="loadAvailableDocuments" @else wire:poll.20s="loadAvailableDocuments" @endif>
+              <div class="mb-4">
+                  @php
                      $readyDocumentIds = $availableDocuments->where('status', 'ready')->pluck('id')->map(fn ($id) => (int) $id)->toArray();
                      $selectedIds = array_map('intval', $selectedDocuments);
                      $selectedInAvailableCount = count(array_intersect($selectedIds, $readyDocumentIds));
@@ -667,11 +693,13 @@
                                          <svg class="w-[18px] h-[18px] text-[#FF2056] shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"></path></svg>
                                      @elseif($ext === 'txt')
                                          <svg class="w-[18px] h-[18px] text-[#62748E] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 3h7l5 5v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1zm7 1v4h4M8 13h8M8 17h6" /></svg>
-                                     @elseif(in_array($ext, ['png', 'jpg', 'jpeg', 'gif', 'webp', 'img']))
-                                         <svg class="w-[18px] h-[18px] text-[#FD9A00] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 5h16a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V6a1 1 0 011-1zm4 4h.01M21 15l-5-5-7 7-3-3-3 3" /></svg>
-                                     @else
-                                         <svg class="w-[18px] h-[18px] text-[#2B7FFF] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 3h7l5 5v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1zm7 1v4h4M8 13h8M8 17h8" /></svg>
-                                     @endif
+                                      @elseif($ext === 'xlsx')
+                                          <svg class="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="#32CD32"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 3h7l5 5v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1zm7 1v4h4M8 13h8M8 17h8" /></svg>
+                                      @elseif(in_array($ext, ['png', 'jpg', 'jpeg', 'gif', 'webp', 'img']))
+                                          <svg class="w-[18px] h-[18px] text-[#FD9A00] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 5h16a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V6a1 1 0 011-1zm4 4h.01M21 15l-5-5-7 7-3-3-3 3" /></svg>
+                                      @else
+                                          <svg class="w-[18px] h-[18px] text-[#2B7FFF] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 3h7l5 5v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1zm7 1v4h4M8 13h8M8 17h8" /></svg>
+                                      @endif
                                  </div>
                                  <div class="min-w-0 flex-1 flex flex-col gap-0.5">
                                      <div class="flex items-center gap-2">

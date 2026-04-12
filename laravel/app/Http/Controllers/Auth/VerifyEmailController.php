@@ -17,12 +17,25 @@ class VerifyEmailController extends Controller
         abort_if(!hash_equals((string) $request->route('id'), (string) $request->user()->getKey()), 403);
         abort_if(!hash_equals((string) $request->route('hash'), sha1($request->user()->getEmailForVerification())), 403);
 
-        if ($request->user()->hasVerifiedEmail()) {
+        $user = $request->user();
+
+        if ($request->has('verification_code')) {
+            $hashedCode = hash('sha256', $request->verification_code);
+            abort_if(!hash_equals((string) $user->verification_code, $hashedCode), 403, 'Invalid verification code.');
+            abort_if($user->verification_code_expires_at && now()->greaterThan($user->verification_code_expires_at), 403, 'Verification code expired.');
+        }
+
+        if ($user->hasVerifiedEmail()) {
             return redirect()->intended(route('dashboard', absolute: false) . '?verified=1');
         }
 
-        if ($request->user()->markEmailAsVerified()) {
-            event(new Verified($request->user()));
+        if ($user->markEmailAsVerified()) {
+            event(new Verified($user));
+
+            $user->forceFill([
+                'verification_code' => null,
+                'verification_code_expires_at' => null,
+            ])->save();
         }
 
         return redirect()->intended(route('dashboard', absolute: false) . '?verified=1');

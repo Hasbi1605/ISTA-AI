@@ -21,6 +21,8 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'verification_code',
+        'verification_code_expires_at',
     ];
 
     /**
@@ -47,5 +49,22 @@ class User extends Authenticatable
     public function conversations()
     {
         return $this->hasMany(Conversation::class);
+    }
+
+    /**
+     * Send the email verification notification.
+     *
+     * @return void
+     */
+    public function sendEmailVerificationNotification()
+    {
+        $plainCode = (string) random_int(100000, 999999);
+
+        $this->update([
+            'verification_code' => hash('sha256', $plainCode),
+            'verification_code_expires_at' => now()->addMinutes(60),
+        ]);
+
+        \Illuminate\Support\Facades\Mail::to($this->email)->send(new \App\Mail\VerificationCodeMail($plainCode));
     }
 }

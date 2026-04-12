@@ -77,5 +77,5 @@ export default {
         },
     },
 
-    plugins: [forms, require("@tailwindcss/typography")],
+    plugins: [forms({ strategy: 'class' }), require("@tailwindcss/typography")],
 };

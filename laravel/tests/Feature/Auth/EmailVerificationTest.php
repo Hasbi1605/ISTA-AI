@@ -26,14 +26,17 @@ class EmailVerificationTest extends TestCase
 
     public function test_email_can_be_verified(): void
     {
-        $user = User::factory()->unverified()->create();
+        $user = User::factory()->unverified()->create([
+            'verification_code' => hash('sha256', '123456'),
+            'verification_code_expires_at' => now()->addMinutes(60),
+        ]);
 
         Event::fake();
 
         $verificationUrl = URL::temporarySignedRoute(
             'verification.verify',
             now()->addMinutes(60),
-            ['id' => $user->id, 'hash' => sha1($user->email)]
+            ['id' => $user->id, 'hash' => sha1($user->email), 'verification_code' => '123456']
         );
 
         $response = $this->actingAs($user)->get($verificationUrl);
@@ -45,12 +48,34 @@ class EmailVerificationTest extends TestCase
 
     public function test_email_is_not_verified_with_invalid_hash(): void
     {
-        $user = User::factory()->unverified()->create();
+        $user = User::factory()->unverified()->create([
+            'verification_code' => hash('sha256', '123456'),
+            'verification_code_expires_at' => now()->addMinutes(60),
+        ]);
 
         $verificationUrl = URL::temporarySignedRoute(
             'verification.verify',
             now()->addMinutes(60),
-            ['id' => $user->id, 'hash' => sha1('wrong-email')]
+            ['id' => $user->id, 'hash' => sha1('wrong-email'), 'verification_code' => '123456']
+        );
+
+        $response = $this->actingAs($user)->get($verificationUrl);
+
+        $this->assertFalse($user->fresh()->hasVerifiedEmail());
+        $response->assertForbidden();
+    }
+
+    public function test_email_is_not_verified_with_invalid_code(): void
+    {
+        $user = User::factory()->unverified()->create([
+            'verification_code' => hash('sha256', '123456'),
+            'verification_code_expires_at' => now()->addMinutes(60),
+        ]);
+
+        $verificationUrl = URL::temporarySignedRoute(
+            'verification.verify',
+            now()->addMinutes(60),
+            ['id' => $user->id, 'hash' => sha1($user->email), 'verification_code' => 'wrong']
         );
 
         $response = $this->actingAs($user)->get($verificationUrl);

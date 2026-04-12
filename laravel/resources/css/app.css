@@ -2,6 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
+.chat-form:focus-within,
+.chat-input:focus,
+.chat-input:hover,
+.chat-input:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+    --tw-ring-color: transparent !important;
+    --tw-ring-shadow: none !important;
+    border-color: inherit !important;
+}
+
 @layer components {
     .ista-shell {
         @apply min-h-screen w-full;

@@ -1,0 +1,1093 @@
+{
+  "meta": {
+    "api_url": "https://models.github.ai/inference/chat/completions",
+    "run_at_utc": "2026-04-12T06:37:40.844635+00:00",
+    "models": [
+      "openai/o3",
+      "deepseek/deepseek-r1",
+      "openai/gpt-5",
+      "openai/gpt-5-chat",
+      "openai/gpt-4o",
+      "openai/gpt-4.1"
+    ],
+    "cases": [
+      {
+        "key": "reason_math",
+        "category": "reasoning",
+        "prompt": "Selesaikan tepat, lalu jawab ANGKA SAJA tanpa teks lain.\nHitung nilai: ((27*14) - (18*9) + (7^2)) / 5 + 13",
+        "max_out": 80
+      },
+      {
+        "key": "reason_combinatoric",
+        "category": "reasoning",
+        "prompt": "Jawab ANGKA SAJA tanpa teks lain.\nBerapa banyak susunan berbeda huruf pada kata STATISTIK?",
+        "max_out": 80
+      },
+      {
+        "key": "json_strict",
+        "category": "coding_structured",
+        "prompt": "Ekstrak informasi dari kalimat berikut dan kembalikan HANYA JSON valid satu baris.\nKalimat: 'Sejak pagi API pembayaran sering timeout, pelanggan enterprise mulai komplain, mohon prioritas hari ini.'\nSkema wajib:\n{\"sentiment\":\"positive|neutral|negative\",\"urgency\":0-3,\"entities\":[string],\"action\":string}\nAturan: entities harus huruf kecil, tanpa duplikasi.",
+        "max_out": 220
+      },
+      {
+        "key": "bugfix_mini",
+        "category": "coding_structured",
+        "prompt": "Perbaiki bug fungsi Python berikut. Kembalikan hanya kode fungsi final, tanpa penjelasan.\ndef fib(n):\n    if n <= 1:\n        return 1\n    a, b = 0, 1\n    for _ in range(n):\n        a = b\n        b = a + b\n    return b\nTarget perilaku benar: fib(0)=0, fib(1)=1, fib(7)=13",
+        "max_out": 260
+      },
+      {
+        "key": "rag_needle",
+        "category": "rag_long_context",
+        "prompt": "Baca konteks panjang berikut. Jawab persis nilai kode akses, tanpa kata tambahan.\n\nBlok 01 | proyek atlas | catatan operasional rutin | nilai checksum 37 | status sinkron.\nBlok 02 | proyek atlas | catatan operasional rutin | nilai checksum 74 | status sinkron.\nBlok 03 | proyek atlas | catatan operasional rutin | nilai checksum 111 | status sinkron.\nBlok 04 | proyek atlas | catatan operasional rutin | nilai checksum 148 | status sinkron.\nBlok 05 | proyek atlas | catatan operasional rutin | nilai checksum 185 | status sinkron.\nBlok 06 | proyek atlas | catatan operasional rutin | nilai checksum 222 | status sinkron.\nBlok 07 | proyek atlas | catatan operasional rutin | nilai checksum 259 | status sinkron.\nBlok 08 | proyek atlas | catatan operasional rutin | nilai checksum 296 | status sinkron.\nBlok 09 | proyek atlas | catatan operasional rutin | nilai checksum 333 | status sinkron.\nBlok 10 | proyek atlas | catatan operasional rutin | nilai checksum 370 | status sinkron.\nBlok 11 | proyek atlas | catatan operasional rutin | nilai checksum 407 | status sinkron.\nBlok 12 | proyek atlas | catatan operasional rutin | nilai checksum 444 | status sinkron.\nBlok 13 | proyek atlas | catatan operasional rutin | nilai checksum 481 | status sinkron.\nBlok 14 | proyek atlas | catatan operasional rutin | nilai checksum 518 | status sinkron.\nBlok 15 | proyek atlas | catatan operasional rutin | nilai checksum 555 | status sinkron.\nBlok 16 | proyek atlas | catatan operasional rutin | nilai checksum 592 | status sinkron.\nBlok 17 | proyek atlas | catatan operasional rutin | nilai checksum 629 | status sinkron.\nBlok 18 | proyek atlas | catatan operasional rutin | nilai checksum 666 | status sinkron.\nBlok 19 | proyek atlas | catatan operasional rutin | nilai checksum 703 | status sinkron.\nBlok 20 | proyek atlas | catatan operasional rutin | nilai checksum 740 | status sinkron.\nBlok 21 | proyek atlas | catatan operasional rutin | nilai checksum 777 | status sinkron.\nBlok 22 | proyek atlas | catatan operasional rutin | nilai checksum 814 | status sinkron.\nBlok 23 | proyek atlas | catatan operasional rutin | nilai checksum 851 | status sinkron.\nBlok 24 | proyek atlas | catatan operasional rutin | nilai checksum 888 | status sinkron.\nBlok 25 | proyek atlas | catatan operasional rutin | nilai checksum 925 | status sinkron.\nBlok 26 | proyek atlas | catatan operasional rutin | nilai checksum 962 | status sinkron.\nBlok 27 | proyek atlas | catatan operasional rutin | nilai checksum 999 | status sinkron.\nBlok 28 | proyek atlas | catatan operasional rutin | nilai checksum 1036 | status sinkron.\nBlok 29 | proyek atlas | catatan operasional rutin | nilai checksum 1073 | status sinkron.\nBlok 30 | proyek atlas | catatan operasional rutin | nilai checksum 1110 | status sinkron.\nBlok 31 | proyek atlas | catatan operasional rutin | nilai checksum 1147 | status sinkron.\nBlok 32 | proyek atlas | catatan operasional rutin | nilai checksum 1184 | status sinkron.\nBlok 33 | proyek atlas | catatan operasional rutin | nilai checksum 1221 | status sinkron.\nBlok 34 | proyek atlas | catatan operasional rutin | nilai checksum 1258 | status sinkron.\nBlok 35 | proyek atlas | catatan operasional rutin | nilai checksum 1295 | status sinkron.\nBlok 36 | proyek atlas | catatan operasional rutin | nilai checksum 1332 | status sinkron.\nBlok 37 | proyek atlas | catatan operasional rutin | nilai checksum 1369 | status sinkron.\nBlok 38 | proyek atlas | catatan operasional rutin | nilai checksum 1406 | status sinkron.\nBlok 39 | proyek atlas | catatan operasional rutin | nilai checksum 1443 | status sinkron.\nBlok 40 | proyek atlas | catatan operasional rutin | nilai checksum 1480 | status sinkron.\nBlok 41 | proyek atlas | catatan operasional rutin | nilai checksum 1517 | status sinkron.\nCatatan kritikal internal: KODE_AKSES=ALPHA-7391-ZETA\nBlok 42 | proyek atlas | catatan operasional rutin | nilai checksum 1554 | status sinkron.\nBlok 43 | proyek atlas | catatan operasional rutin | nilai checksum 1591 | status sinkron.\nBlok 44 | proyek atlas | catatan operasional rutin | nilai checksum 1628 | status sinkron.\nBlok 45 | proyek atlas | catatan operasional rutin | nilai checksum 1665 | status sinkron.\nBlok 46 | proyek atlas | catatan operasional rutin | nilai checksum 1702 | status sinkron.\nBlok 47 | proyek atlas | catatan operasional rutin | nilai checksum 1739 | status sinkron.\nBlok 48 | proyek atlas | catatan operasional rutin | nilai checksum 1776 | status sinkron.\nBlok 49 | proyek atlas | catatan operasional rutin | nilai checksum 1813 | status sinkron.\nBlok 50 | proyek atlas | catatan operasional rutin | nilai checksum 1850 | status sinkron.\nBlok 51 | proyek atlas | catatan operasional rutin | nilai checksum 1887 | status sinkron.\nBlok 52 | proyek atlas | catatan operasional rutin | nilai checksum 1924 | status sinkron.\nBlok 53 | proyek atlas | catatan operasional rutin | nilai checksum 1961 | status sinkron.\nBlok 54 | proyek atlas | catatan operasional rutin | nilai checksum 1998 | status sinkron.\nBlok 55 | proyek atlas | catatan operasional rutin | nilai checksum 2035 | status sinkron.\nBlok 56 | proyek atlas | catatan operasional rutin | nilai checksum 2072 | status sinkron.\nBlok 57 | proyek atlas | catatan operasional rutin | nilai checksum 2109 | status sinkron.\nBlok 58 | proyek atlas | catatan operasional rutin | nilai checksum 2146 | status sinkron.\nBlok 59 | proyek atlas | catatan operasional rutin | nilai checksum 2183 | status sinkron.\nBlok 60 | proyek atlas | catatan operasional rutin | nilai checksum 2220 | status sinkron.\nBlok 61 | proyek atlas | catatan operasional rutin | nilai checksum 2257 | status sinkron.\nBlok 62 | proyek atlas | catatan operasional rutin | nilai checksum 2294 | status sinkron.\nBlok 63 | proyek atlas | catatan operasional rutin | nilai checksum 2331 | status sinkron.\nBlok 64 | proyek atlas | catatan operasional rutin | nilai checksum 2368 | status sinkron.",
+        "max_out": 80
+      },
+      {
+        "key": "rag_compute",
+        "category": "rag_long_context",
+        "prompt": "Dari konteks, temukan NILAI_X dan NILAI_Y lalu jawab jumlahnya sebagai ANGKA SAJA.\n\nBlok 01 | proyek orion | catatan operasional rutin | nilai checksum 37 | status sinkron.\nBlok 02 | proyek orion | catatan operasional rutin | nilai checksum 74 | status sinkron.\nBlok 03 | proyek orion | catatan operasional rutin | nilai checksum 111 | status sinkron.\nBlok 04 | proyek orion | catatan operasional rutin | nilai checksum 148 | status sinkron.\nBlok 05 | proyek orion | catatan operasional rutin | nilai checksum 185 | status sinkron.\nBlok 06 | proyek orion | catatan operasional rutin | nilai checksum 222 | status sinkron.\nBlok 07 | proyek orion | catatan operasional rutin | nilai checksum 259 | status sinkron.\nBlok 08 | proyek orion | catatan operasional rutin | nilai checksum 296 | status sinkron.\nBlok 09 | proyek orion | catatan operasional rutin | nilai checksum 333 | status sinkron.\nBlok 10 | proyek orion | catatan operasional rutin | nilai checksum 370 | status sinkron.\nBlok 11 | proyek orion | catatan operasional rutin | nilai checksum 407 | status sinkron.\nBlok 12 | proyek orion | catatan operasional rutin | nilai checksum 444 | status sinkron.\nBlok 13 | proyek orion | catatan operasional rutin | nilai checksum 481 | status sinkron.\nBlok 14 | proyek orion | catatan operasional rutin | nilai checksum 518 | status sinkron.\nBlok 15 | proyek orion | catatan operasional rutin | nilai checksum 555 | status sinkron.\nBlok 16 | proyek orion | catatan operasional rutin | nilai checksum 592 | status sinkron.\nBlok 17 | proyek orion | catatan operasional rutin | nilai checksum 629 | status sinkron.\nBlok 18 | proyek orion | catatan operasional rutin | nilai checksum 666 | status sinkron.\nBlok 19 | proyek orion | catatan operasional rutin | nilai checksum 703 | status sinkron.\nBlok 20 | proyek orion | catatan operasional rutin | nilai checksum 740 | status sinkron.\nBlok 21 | proyek orion | catatan operasional rutin | nilai checksum 777 | status sinkron.\nBlok 22 | proyek orion | catatan operasional rutin | nilai checksum 814 | status sinkron.\nBlok 23 | proyek orion | catatan operasional rutin | nilai checksum 851 | status sinkron.\nBlok 24 | proyek orion | catatan operasional rutin | nilai checksum 888 | status sinkron.\nBlok 25 | proyek orion | catatan operasional rutin | nilai checksum 925 | status sinkron.\nBlok 26 | proyek orion | catatan operasional rutin | nilai checksum 962 | status sinkron.\nBlok 27 | proyek orion | catatan operasional rutin | nilai checksum 999 | status sinkron.\nBlok 28 | proyek orion | catatan operasional rutin | nilai checksum 1036 | status sinkron.\nBlok 29 | proyek orion | catatan operasional rutin | nilai checksum 1073 | status sinkron.\nBlok 30 | proyek orion | catatan operasional rutin | nilai checksum 1110 | status sinkron.\nBlok 31 | proyek orion | catatan operasional rutin | nilai checksum 1147 | status sinkron.\nBlok 32 | proyek orion | catatan operasional rutin | nilai checksum 1184 | status sinkron.\nBlok 33 | proyek orion | catatan operasional rutin | nilai checksum 1221 | status sinkron.\nBlok 34 | proyek orion | catatan operasional rutin | nilai checksum 1258 | status sinkron.\nBlok 35 | proyek orion | catatan operasional rutin | nilai checksum 1295 | status sinkron.\nBlok 36 | proyek orion | catatan operasional rutin | nilai checksum 1332 | status sinkron.\nBlok 37 | proyek orion | catatan operasional rutin | nilai checksum 1369 | status sinkron.\nBlok 38 | proyek orion | catatan operasional rutin | nilai checksum 1406 | status sinkron.\nBlok 39 | proyek orion | catatan operasional rutin | nilai checksum 1443 | status sinkron.\nBlok 40 | proyek orion | catatan operasional rutin | nilai checksum 1480 | status sinkron.\nBlok 41 | proyek orion | catatan operasional rutin | nilai checksum 1517 | status sinkron.\nCatatan kritikal internal: NILAI_X=271 dan NILAI_Y=154\nBlok 42 | proyek orion | catatan operasional rutin | nilai checksum 1554 | status sinkron.\nBlok 43 | proyek orion | catatan operasional rutin | nilai checksum 1591 | status sinkron.\nBlok 44 | proyek orion | catatan operasional rutin | nilai checksum 1628 | status sinkron.\nBlok 45 | proyek orion | catatan operasional rutin | nilai checksum 1665 | status sinkron.\nBlok 46 | proyek orion | catatan operasional rutin | nilai checksum 1702 | status sinkron.\nBlok 47 | proyek orion | catatan operasional rutin | nilai checksum 1739 | status sinkron.\nBlok 48 | proyek orion | catatan operasional rutin | nilai checksum 1776 | status sinkron.\nBlok 49 | proyek orion | catatan operasional rutin | nilai checksum 1813 | status sinkron.\nBlok 50 | proyek orion | catatan operasional rutin | nilai checksum 1850 | status sinkron.\nBlok 51 | proyek orion | catatan operasional rutin | nilai checksum 1887 | status sinkron.\nBlok 52 | proyek orion | catatan operasional rutin | nilai checksum 1924 | status sinkron.\nBlok 53 | proyek orion | catatan operasional rutin | nilai checksum 1961 | status sinkron.\nBlok 54 | proyek orion | catatan operasional rutin | nilai checksum 1998 | status sinkron.\nBlok 55 | proyek orion | catatan operasional rutin | nilai checksum 2035 | status sinkron.\nBlok 56 | proyek orion | catatan operasional rutin | nilai checksum 2072 | status sinkron.\nBlok 57 | proyek orion | catatan operasional rutin | nilai checksum 2109 | status sinkron.\nBlok 58 | proyek orion | catatan operasional rutin | nilai checksum 2146 | status sinkron.\nBlok 59 | proyek orion | catatan operasional rutin | nilai checksum 2183 | status sinkron.\nBlok 60 | proyek orion | catatan operasional rutin | nilai checksum 2220 | status sinkron.\nBlok 61 | proyek orion | catatan operasional rutin | nilai checksum 2257 | status sinkron.\nBlok 62 | proyek orion | catatan operasional rutin | nilai checksum 2294 | status sinkron.\nBlok 63 | proyek orion | catatan operasional rutin | nilai checksum 2331 | status sinkron.\nBlok 64 | proyek orion | catatan operasional rutin | nilai checksum 2368 | status sinkron.",
+        "max_out": 80
+      },
+      {
+        "key": "id_instruction",
+        "category": "instruction_id",
+        "prompt": "Tulis jawaban dalam Bahasa Indonesia formal, tepat 2 kalimat, total maksimal 36 kata. Jangan gunakan kata 'namun'. Topik: rekomendasi mitigasi saat API rate limit sering muncul.",
+        "max_out": 120
+      }
+    ],
+    "burst_requests_per_model": 6
+  },
+  "results": [
+    {
+      "model": "openai/o3",
+      "cases": [
+        {
+          "case": "reason_math",
+          "category": "reasoning",
+          "success": false,
+          "status": 429,
+          "latency_ms": 882.8,
+          "usage": null,
+          "quality_score_1_5": null,
+          "quality_note": "",
+          "answer": "",
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "case": "reason_combinatoric",
+          "category": "reasoning",
+          "success": false,
+          "status": 429,
+          "latency_ms": 988.21,
+          "usage": null,
+          "quality_score_1_5": null,
+          "quality_note": "",
+          "answer": "",
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "case": "json_strict",
+          "category": "coding_structured",
+          "success": false,
+          "status": 429,
+          "latency_ms": 910.15,
+          "usage": null,
+          "quality_score_1_5": null,
+          "quality_note": "",
+          "answer": "",
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "case": "bugfix_mini",
+          "category": "coding_structured",
+          "success": false,
+          "status": 429,
+          "latency_ms": 967.3,
+          "usage": null,
+          "quality_score_1_5": null,
+          "quality_note": "",
+          "answer": "",
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "case": "rag_needle",
+          "category": "rag_long_context",
+          "success": false,
+          "status": 429,
+          "latency_ms": 931.83,
+          "usage": null,
+          "quality_score_1_5": null,
+          "quality_note": "",
+          "answer": "",
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "case": "rag_compute",
+          "category": "rag_long_context",
+          "success": false,
+          "status": 429,
+          "latency_ms": 947.02,
+          "usage": null,
+          "quality_score_1_5": null,
+          "quality_note": "",
+          "answer": "",
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "case": "id_instruction",
+          "category": "instruction_id",
+          "success": false,
+          "status": 429,
+          "latency_ms": 2003.47,
+          "usage": null,
+          "quality_score_1_5": null,
+          "quality_note": "",
+          "answer": "",
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        }
+      ],
+      "burst": [
+        {
+          "success": false,
+          "status": 429,
+          "latency_ms": 1051.0,
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "success": false,
+          "status": 429,
+          "latency_ms": 1032.21,
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "success": false,
+          "status": 429,
+          "latency_ms": 974.56,
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "success": false,
+          "status": 429,
+          "latency_ms": 1013.23,
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "success": false,
+          "status": 429,
+          "latency_ms": 990.71,
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "success": false,
+          "status": 429,
+          "latency_ms": 868.39,
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        }
+      ]
+    },
+    {
+      "model": "deepseek/deepseek-r1",
+      "cases": [
+        {
+          "case": "reason_math",
+          "category": "reasoning",
+          "success": true,
+          "status": 200,
+          "latency_ms": 2127.22,
+          "usage": {
+            "prompt_tokens": 49,
+            "completion_tokens": 80,
+            "total_tokens": 129,
+            "audio_prompt_tokens": 0
+          },
+          "quality_score_1_5": 2,
+          "quality_note": "Nilai tidak tepat",
+          "answer": "<think>\nOkay, let's tackle this math problem step by step. The expression given is ((27*14) - (18*9) + (7²)) / 5 + 13. I need to calculate this accurately.\n\nFirst, I'll handle the multiplication and exponentiation inside the parentheses. Starting with 27 multiplied by 14. Let me do that: 27*",
+          "error": null
+        },
+        {
+          "case": "reason_combinatoric",
+          "category": "reasoning",
+          "success": false,
+          "status": 429,
+          "latency_ms": 2138.46,
+          "usage": null,
+          "quality_score_1_5": null,
+          "quality_note": "",
+          "answer": "",
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "case": "json_strict",
+          "category": "coding_structured",
+          "success": false,
+          "status": 429,
+          "latency_ms": 1058.48,
+          "usage": null,
+          "quality_score_1_5": null,
+          "quality_note": "",
+          "answer": "",
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "case": "bugfix_mini",
+          "category": "coding_structured",
+          "success": false,
+          "status": 429,
+          "latency_ms": 1124.38,
+          "usage": null,
+          "quality_score_1_5": null,
+          "quality_note": "",
+          "answer": "",
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "case": "rag_needle",
+          "category": "rag_long_context",
+          "success": false,
+          "status": 429,
+          "latency_ms": 908.12,
+          "usage": null,
+          "quality_score_1_5": null,
+          "quality_note": "",
+          "answer": "",
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "case": "rag_compute",
+          "category": "rag_long_context",
+          "success": false,
+          "status": 429,
+          "latency_ms": 918.29,
+          "usage": null,
+          "quality_score_1_5": null,
+          "quality_note": "",
+          "answer": "",
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "case": "id_instruction",
+          "category": "instruction_id",
+          "success": false,
+          "status": 429,
+          "latency_ms": 1523.51,
+          "usage": null,
+          "quality_score_1_5": null,
+          "quality_note": "",
+          "answer": "",
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        }
+      ],
+      "burst": [
+        {
+          "success": false,
+          "status": 429,
+          "latency_ms": 2794.64,
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "success": false,
+          "status": 429,
+          "latency_ms": 919.62,
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "success": true,
+          "status": 200,
+          "latency_ms": 2112.2,
+          "error": null
+        },
+        {
+          "success": false,
+          "status": 429,
+          "latency_ms": 910.56,
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "success": false,
+          "status": 429,
+          "latency_ms": 889.29,
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "success": false,
+          "status": 429,
+          "latency_ms": 891.87,
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        }
+      ]
+    },
+    {
+      "model": "openai/gpt-5",
+      "cases": [
+        {
+          "case": "reason_math",
+          "category": "reasoning",
+          "success": false,
+          "status": 429,
+          "latency_ms": 1104.98,
+          "usage": null,
+          "quality_score_1_5": null,
+          "quality_note": "",
+          "answer": "",
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "case": "reason_combinatoric",
+          "category": "reasoning",
+          "success": false,
+          "status": 429,
+          "latency_ms": 956.67,
+          "usage": null,
+          "quality_score_1_5": null,
+          "quality_note": "",
+          "answer": "",
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "case": "json_strict",
+          "category": "coding_structured",
+          "success": false,
+          "status": 429,
+          "latency_ms": 903.32,
+          "usage": null,
+          "quality_score_1_5": null,
+          "quality_note": "",
+          "answer": "",
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "case": "bugfix_mini",
+          "category": "coding_structured",
+          "success": false,
+          "status": 429,
+          "latency_ms": 896.76,
+          "usage": null,
+          "quality_score_1_5": null,
+          "quality_note": "",
+          "answer": "",
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "case": "rag_needle",
+          "category": "rag_long_context",
+          "success": false,
+          "status": 429,
+          "latency_ms": 1071.13,
+          "usage": null,
+          "quality_score_1_5": null,
+          "quality_note": "",
+          "answer": "",
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "case": "rag_compute",
+          "category": "rag_long_context",
+          "success": false,
+          "status": 429,
+          "latency_ms": 3240.08,
+          "usage": null,
+          "quality_score_1_5": null,
+          "quality_note": "",
+          "answer": "",
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "case": "id_instruction",
+          "category": "instruction_id",
+          "success": false,
+          "status": 429,
+          "latency_ms": 1007.41,
+          "usage": null,
+          "quality_score_1_5": null,
+          "quality_note": "",
+          "answer": "",
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        }
+      ],
+      "burst": [
+        {
+          "success": false,
+          "status": 429,
+          "latency_ms": 895.92,
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "success": false,
+          "status": 429,
+          "latency_ms": 986.55,
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "success": false,
+          "status": 429,
+          "latency_ms": 923.97,
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "success": false,
+          "status": 429,
+          "latency_ms": 894.48,
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "success": false,
+          "status": 429,
+          "latency_ms": 973.06,
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "success": false,
+          "status": 429,
+          "latency_ms": 975.54,
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        }
+      ]
+    },
+    {
+      "model": "openai/gpt-5-chat",
+      "cases": [
+        {
+          "case": "reason_math",
+          "category": "reasoning",
+          "success": false,
+          "status": 429,
+          "latency_ms": 972.4,
+          "usage": null,
+          "quality_score_1_5": null,
+          "quality_note": "",
+          "answer": "",
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "case": "reason_combinatoric",
+          "category": "reasoning",
+          "success": false,
+          "status": 429,
+          "latency_ms": 1087.52,
+          "usage": null,
+          "quality_score_1_5": null,
+          "quality_note": "",
+          "answer": "",
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "case": "json_strict",
+          "category": "coding_structured",
+          "success": false,
+          "status": 429,
+          "latency_ms": 993.73,
+          "usage": null,
+          "quality_score_1_5": null,
+          "quality_note": "",
+          "answer": "",
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "case": "bugfix_mini",
+          "category": "coding_structured",
+          "success": false,
+          "status": 429,
+          "latency_ms": 868.82,
+          "usage": null,
+          "quality_score_1_5": null,
+          "quality_note": "",
+          "answer": "",
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "case": "rag_needle",
+          "category": "rag_long_context",
+          "success": false,
+          "status": 429,
+          "latency_ms": 884.58,
+          "usage": null,
+          "quality_score_1_5": null,
+          "quality_note": "",
+          "answer": "",
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "case": "rag_compute",
+          "category": "rag_long_context",
+          "success": false,
+          "status": 429,
+          "latency_ms": 1156.4,
+          "usage": null,
+          "quality_score_1_5": null,
+          "quality_note": "",
+          "answer": "",
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "case": "id_instruction",
+          "category": "instruction_id",
+          "success": false,
+          "status": 429,
+          "latency_ms": 991.63,
+          "usage": null,
+          "quality_score_1_5": null,
+          "quality_note": "",
+          "answer": "",
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        }
+      ],
+      "burst": [
+        {
+          "success": false,
+          "status": 429,
+          "latency_ms": 916.32,
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "success": false,
+          "status": 429,
+          "latency_ms": 1001.3,
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "success": false,
+          "status": 429,
+          "latency_ms": 1065.2,
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "success": false,
+          "status": 429,
+          "latency_ms": 1079.73,
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "success": false,
+          "status": 429,
+          "latency_ms": 979.58,
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "success": false,
+          "status": 429,
+          "latency_ms": 942.91,
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        }
+      ]
+    },
+    {
+      "model": "openai/gpt-4o",
+      "cases": [
+        {
+          "case": "reason_math",
+          "category": "reasoning",
+          "success": true,
+          "status": 200,
+          "latency_ms": 1842.55,
+          "usage": {
+            "completion_tokens": 2,
+            "completion_tokens_details": {
+              "accepted_prediction_tokens": 0,
+              "audio_tokens": 0,
+              "reasoning_tokens": 0,
+              "rejected_prediction_tokens": 0
+            },
+            "prompt_tokens": 49,
+            "prompt_tokens_details": {
+              "audio_tokens": 0,
+              "cached_tokens": 0
+            },
+            "total_tokens": 51
+          },
+          "quality_score_1_5": 2,
+          "quality_note": "Nilai tidak tepat",
+          "answer": "78",
+          "error": null
+        },
+        {
+          "case": "reason_combinatoric",
+          "category": "reasoning",
+          "success": false,
+          "status": 429,
+          "latency_ms": 967.25,
+          "usage": null,
+          "quality_score_1_5": null,
+          "quality_note": "",
+          "answer": "",
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "case": "json_strict",
+          "category": "coding_structured",
+          "success": true,
+          "status": 200,
+          "latency_ms": 2485.26,
+          "usage": {
+            "completion_tokens": 30,
+            "completion_tokens_details": {
+              "accepted_prediction_tokens": 0,
+              "audio_tokens": 0,
+              "reasoning_tokens": 0,
+              "rejected_prediction_tokens": 0
+            },
+            "prompt_tokens": 96,
+            "prompt_tokens_details": {
+              "audio_tokens": 0,
+              "cached_tokens": 0
+            },
+            "total_tokens": 126
+          },
+          "quality_score_1_5": 5,
+          "quality_note": "Skema dan isi sesuai",
+          "answer": "{\"sentiment\":\"negative\",\"urgency\":3,\"entities\":[\"api pembayaran\",\"pelanggan enterprise\"],\"action\":\"prioritaskan hari ini\"}",
+          "error": null
+        },
+        {
+          "case": "bugfix_mini",
+          "category": "coding_structured",
+          "success": true,
+          "status": 200,
+          "latency_ms": 2057.09,
+          "usage": {
+            "completion_tokens": 72,
+            "completion_tokens_details": {
+              "accepted_prediction_tokens": 0,
+              "audio_tokens": 0,
+              "reasoning_tokens": 0,
+              "rejected_prediction_tokens": 0
+            },
+            "prompt_tokens": 101,
+            "prompt_tokens_details": {
+              "audio_tokens": 0,
+              "cached_tokens": 0
+            },
+            "total_tokens": 173
+          },
+          "quality_score_1_5": 3,
+          "quality_note": "Perbaikan parsial",
+          "answer": "```python\ndef fib(n):\n    if n == 0:\n        return 0\n    elif n == 1:\n        return 1\n    a, b = 0, 1\n    for _ in range(2, n + 1):\n        a, b = b, a + b\n    return b\n```",
+          "error": null
+        },
+        {
+          "case": "rag_needle",
+          "category": "rag_long_context",
+          "success": true,
+          "status": 200,
+          "latency_ms": 1591.03,
+          "usage": {
+            "completion_tokens": 8,
+            "completion_tokens_details": {
+              "accepted_prediction_tokens": 0,
+              "audio_tokens": 0,
+              "reasoning_tokens": 0,
+              "rejected_prediction_tokens": 0
+            },
+            "prompt_tokens": 1555,
+            "prompt_tokens_details": {
+              "audio_tokens": 0,
+              "cached_tokens": 1536
+            },
+            "total_tokens": 1563
+          },
+          "quality_score_1_5": 5,
+          "quality_note": "Needle ditemukan tepat",
+          "answer": "ALPHA-7391-ZETA",
+          "error": null
+        },
+        {
+          "case": "rag_compute",
+          "category": "rag_long_context",
+          "success": true,
+          "status": 200,
+          "latency_ms": 1652.14,
+          "usage": {
+            "completion_tokens": 2,
+            "completion_tokens_details": {
+              "accepted_prediction_tokens": 0,
+              "audio_tokens": 0,
+              "reasoning_tokens": 0,
+              "rejected_prediction_tokens": 0
+            },
+            "prompt_tokens": 1622,
+            "prompt_tokens_details": {
+              "audio_tokens": 0,
+              "cached_tokens": 1536
+            },
+            "total_tokens": 1624
+          },
+          "quality_score_1_5": 5,
+          "quality_note": "Kalkulasi tepat",
+          "answer": "425",
+          "error": null
+        },
+        {
+          "case": "id_instruction",
+          "category": "instruction_id",
+          "success": true,
+          "status": 200,
+          "latency_ms": 2346.97,
+          "usage": {
+            "completion_tokens": 43,
+            "completion_tokens_details": {
+              "accepted_prediction_tokens": 0,
+              "audio_tokens": 0,
+              "reasoning_tokens": 0,
+              "rejected_prediction_tokens": 0
+            },
+            "prompt_tokens": 50,
+            "prompt_tokens_details": {
+              "audio_tokens": 0,
+              "cached_tokens": 0
+            },
+            "total_tokens": 93
+          },
+          "quality_score_1_5": 5,
+          "quality_note": "Instruksi diikuti",
+          "answer": "Untuk mengatasi API rate limit yang sering muncul, optimalkan penggunaan API dengan menerapkan teknik caching dan membatasi frekuensi permintaan. Selain itu, gunakan mekanisme retry dengan interval waktu yang terukur.",
+          "error": null
+        }
+      ],
+      "burst": [
+        {
+          "success": true,
+          "status": 200,
+          "latency_ms": 1863.89,
+          "error": null
+        },
+        {
+          "success": true,
+          "status": 200,
+          "latency_ms": 1855.04,
+          "error": null
+        },
+        {
+          "success": true,
+          "status": 200,
+          "latency_ms": 2145.81,
+          "error": null
+        },
+        {
+          "success": true,
+          "status": 200,
+          "latency_ms": 1648.06,
+          "error": null
+        },
+        {
+          "success": false,
+          "status": 429,
+          "latency_ms": 896.91,
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "success": false,
+          "status": 429,
+          "latency_ms": 2392.65,
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        }
+      ]
+    },
+    {
+      "model": "openai/gpt-4.1",
+      "cases": [
+        {
+          "case": "reason_math",
+          "category": "reasoning",
+          "success": true,
+          "status": 200,
+          "latency_ms": 2289.34,
+          "usage": {
+            "completion_tokens": 2,
+            "completion_tokens_details": {
+              "accepted_prediction_tokens": 0,
+              "audio_tokens": 0,
+              "reasoning_tokens": 0,
+              "rejected_prediction_tokens": 0
+            },
+            "prompt_tokens": 49,
+            "prompt_tokens_details": {
+              "audio_tokens": 0,
+              "cached_tokens": 0
+            },
+            "total_tokens": 51
+          },
+          "quality_score_1_5": 2,
+          "quality_note": "Nilai tidak tepat",
+          "answer": "62",
+          "error": null
+        },
+        {
+          "case": "reason_combinatoric",
+          "category": "reasoning",
+          "success": true,
+          "status": 200,
+          "latency_ms": 2759.95,
+          "usage": {
+            "completion_tokens": 3,
+            "completion_tokens_details": {
+              "accepted_prediction_tokens": 0,
+              "audio_tokens": 0,
+              "reasoning_tokens": 0,
+              "rejected_prediction_tokens": 0
+            },
+            "prompt_tokens": 31,
+            "prompt_tokens_details": {
+              "audio_tokens": 0,
+              "cached_tokens": 0
+            },
+            "total_tokens": 34
+          },
+          "quality_score_1_5": 2,
+          "quality_note": "Nilai tidak tepat",
+          "answer": "45360",
+          "error": null
+        },
+        {
+          "case": "json_strict",
+          "category": "coding_structured",
+          "success": true,
+          "status": 200,
+          "latency_ms": 2503.93,
+          "usage": {
+            "completion_tokens": 36,
+            "completion_tokens_details": {
+              "accepted_prediction_tokens": 0,
+              "audio_tokens": 0,
+              "reasoning_tokens": 0,
+              "rejected_prediction_tokens": 0
+            },
+            "prompt_tokens": 96,
+            "prompt_tokens_details": {
+              "audio_tokens": 0,
+              "cached_tokens": 0
+            },
+            "total_tokens": 132
+          },
+          "quality_score_1_5": 5,
+          "quality_note": "Skema dan isi sesuai",
+          "answer": "{\"sentiment\":\"negative\",\"urgency\":3,\"entities\":[\"api pembayaran\",\"pelanggan enterprise\"],\"action\":\"prioritaskan penanganan timeout api pembayaran hari ini\"}",
+          "error": null
+        },
+        {
+          "case": "bugfix_mini",
+          "category": "coding_structured",
+          "success": true,
+          "status": 200,
+          "latency_ms": 2619.76,
+          "usage": {
+            "completion_tokens": 52,
+            "completion_tokens_details": {
+              "accepted_prediction_tokens": 0,
+              "audio_tokens": 0,
+              "reasoning_tokens": 0,
+              "rejected_prediction_tokens": 0
+            },
+            "prompt_tokens": 101,
+            "prompt_tokens_details": {
+              "audio_tokens": 0,
+              "cached_tokens": 0
+            },
+            "total_tokens": 153
+          },
+          "quality_score_1_5": 3,
+          "quality_note": "Perbaikan parsial",
+          "answer": "def fib(n):\n    if n == 0:\n        return 0\n    a, b = 0, 1\n    for _ in range(1, n):\n        a, b = b, a + b\n    return b",
+          "error": null
+        },
+        {
+          "case": "rag_needle",
+          "category": "rag_long_context",
+          "success": true,
+          "status": 200,
+          "latency_ms": 2074.35,
+          "usage": {
+            "completion_tokens": 8,
+            "completion_tokens_details": {
+              "accepted_prediction_tokens": 0,
+              "audio_tokens": 0,
+              "reasoning_tokens": 0,
+              "rejected_prediction_tokens": 0
+            },
+            "prompt_tokens": 1555,
+            "prompt_tokens_details": {
+              "audio_tokens": 0,
+              "cached_tokens": 1536
+            },
+            "total_tokens": 1563
+          },
+          "quality_score_1_5": 5,
+          "quality_note": "Needle ditemukan tepat",
+          "answer": "ALPHA-7391-ZETA",
+          "error": null
+        },
+        {
+          "case": "rag_compute",
+          "category": "rag_long_context",
+          "success": true,
+          "status": 200,
+          "latency_ms": 2167.31,
+          "usage": {
+            "completion_tokens": 2,
+            "completion_tokens_details": {
+              "accepted_prediction_tokens": 0,
+              "audio_tokens": 0,
+              "reasoning_tokens": 0,
+              "rejected_prediction_tokens": 0
+            },
+            "prompt_tokens": 1622,
+            "prompt_tokens_details": {
+              "audio_tokens": 0,
+              "cached_tokens": 1536
+            },
+            "total_tokens": 1624
+          },
+          "quality_score_1_5": 5,
+          "quality_note": "Kalkulasi tepat",
+          "answer": "425",
+          "error": null
+        },
+        {
+          "case": "id_instruction",
+          "category": "instruction_id",
+          "success": true,
+          "status": 200,
+          "latency_ms": 3222.43,
+          "usage": {
+            "completion_tokens": 47,
+            "completion_tokens_details": {
+              "accepted_prediction_tokens": 0,
+              "audio_tokens": 0,
+              "reasoning_tokens": 0,
+              "rejected_prediction_tokens": 0
+            },
+            "prompt_tokens": 50,
+            "prompt_tokens_details": {
+              "audio_tokens": 0,
+              "cached_tokens": 0
+            },
+            "total_tokens": 97
+          },
+          "quality_score_1_5": 5,
+          "quality_note": "Instruksi diikuti",
+          "answer": "Disarankan untuk mengimplementasikan mekanisme caching agar permintaan berulang dapat diminimalkan. Selain itu, atur jeda waktu antar permintaan melalui teknik exponential backoff untuk menghindari pelanggaran batas API.",
+          "error": null
+        }
+      ],
+      "burst": [
+        {
+          "success": true,
+          "status": 200,
+          "latency_ms": 2375.5,
+          "error": null
+        },
+        {
+          "success": false,
+          "status": 429,
+          "latency_ms": 986.09,
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "success": false,
+          "status": 429,
+          "latency_ms": 992.08,
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "success": false,
+          "status": 429,
+          "latency_ms": 917.74,
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "success": false,
+          "status": 429,
+          "latency_ms": 1005.07,
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        },
+        {
+          "success": false,
+          "status": 429,
+          "latency_ms": 993.8,
+          "error": "Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
+        }
+      ]
+    }
+  ],
+  "aggregates": [
+    {
+      "model": "openai/o3",
+      "prompt_success_rate": 0.0,
+      "median_latency_ms": null,
+      "avg_quality_score": null,
+      "burst_success_rate": 0.0,
+      "burst_status_hist": {
+        "429": 6
+      },
+      "usage_prompt_tokens_median": null,
+      "usage_completion_tokens_median": null,
+      "usage_total_tokens_median": null
+    },
+    {
+      "model": "deepseek/deepseek-r1",
+      "prompt_success_rate": 14.29,
+      "median_latency_ms": 2127.22,
+      "avg_quality_score": 2.0,
+      "burst_success_rate": 16.67,
+      "burst_status_hist": {
+        "429": 5,
+        "200": 1
+      },
+      "usage_prompt_tokens_median": 49,
+      "usage_completion_tokens_median": 80,
+      "usage_total_tokens_median": 129
+    },
+    {
+      "model": "openai/gpt-5",
+      "prompt_success_rate": 0.0,
+      "median_latency_ms": null,
+      "avg_quality_score": null,
+      "burst_success_rate": 0.0,
+      "burst_status_hist": {
+        "429": 6
+      },
+      "usage_prompt_tokens_median": null,
+      "usage_completion_tokens_median": null,
+      "usage_total_tokens_median": null
+    },
+    {
+      "model": "openai/gpt-5-chat",
+      "prompt_success_rate": 0.0,
+      "median_latency_ms": null,
+      "avg_quality_score": null,
+      "burst_success_rate": 0.0,
+      "burst_status_hist": {
+        "429": 6
+      },
+      "usage_prompt_tokens_median": null,
+      "usage_completion_tokens_median": null,
+      "usage_total_tokens_median": null
+    },
+    {
+      "model": "openai/gpt-4o",
+      "prompt_success_rate": 85.71,
+      "median_latency_ms": 1949.82,
+      "avg_quality_score": 4.17,
+      "burst_success_rate": 66.67,
+      "burst_status_hist": {
+        "200": 4,
+        "429": 2
+      },
+      "usage_prompt_tokens_median": 98.5,
+      "usage_completion_tokens_median": 19.0,
+      "usage_total_tokens_median": 149.5
+    },
+    {
+      "model": "openai/gpt-4.1",
+      "prompt_success_rate": 100.0,
+      "median_latency_ms": 2503.93,
+      "avg_quality_score": 3.86,
+      "burst_success_rate": 16.67,
+      "burst_status_hist": {
+        "200": 1,
+        "429": 5
+      },
+      "usage_prompt_tokens_median": 96,
+      "usage_completion_tokens_median": 8,
+      "usage_total_tokens_median": 132
+    }
+  ]
+}

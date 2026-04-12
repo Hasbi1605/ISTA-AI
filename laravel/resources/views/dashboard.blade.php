@@ -64,6 +64,8 @@
                     <div class="mx-auto mt-10 grid max-w-sm gap-3">
                         @auth
                         <a href="{{ route('chat') }}" class="rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-sm font-semibold text-stone-700 transition hover:border-ista-primary/30 hover:text-ista-primary">Buka Chat</a>
+                        @else
+                        <a href="{{ route('guest-chat') }}" class="rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-sm font-semibold text-stone-700 transition hover:border-ista-primary/30 hover:text-ista-primary">Buka Chat</a>
                         @endauth
                     </div>
                 </section>
