@@ -1,0 +1,160 @@
+# ============================================
+# ISTA AI Configuration File
+# ============================================
+# Single source of truth untuk seluruh konfigurasi AI
+# Ubah nilai di sini untuk pergantian operasional
+# 
+# Dokumentasi cara mengganti konfigurasi:
+# 1. Chat models: ubah di lanes.chat.models
+# 2. Embedding models: ubah di lanes.embedding.models  
+# 3. Reasoning model: ubah di lanes.reasoning.model (null = disabled)
+# 4. Search: ubah di retrieval.search
+# 5. Rerank: ubah di retrieval.semantic_rerank
+# 6. SMTP Gmail: ubah di integrations.smtp_gmail
+# ============================================
+
+# ============================================
+# GLOBAL SETTINGS
+# ============================================
+global:
+  timeout: 30
+  connect_timeout: 10
+  read_timeout: 120
+  retry_attempts: 2
+  retry_delay_ms: 400
+
+# ============================================
+# LANES (Jalur AI)
+# ============================================
+lanes:
+  # ============================================
+  # LANE: CHAT (Model utama untuk percakapan)
+  # ============================================
+  chat:
+    models:
+      - label: "GPT-4.1 (Primary)"
+        provider: "litellm"
+        model_name: "openai/gpt-4.1"
+        api_key_env: "GITHUB_TOKEN"
+        base_url: "https://models.inference.ai.azure.com"
+        
+      - label: "GPT-4.1 (Backup Node)"
+        provider: "litellm"
+        model_name: "openai/gpt-4.1"
+        api_key_env: "GITHUB_TOKEN_2"
+        base_url: "https://models.inference.ai.azure.com"
+        
+      - label: "GPT-4o (Primary)"
+        provider: "litellm"
+        model_name: "openai/gpt-4o"
+        api_key_env: "GITHUB_TOKEN"
+        base_url: "https://models.inference.ai.azure.com"
+        
+      - label: "GPT-4o (Backup Node)"
+        provider: "litellm"
+        model_name: "openai/gpt-4o"
+        api_key_env: "GITHUB_TOKEN_2"
+        base_url: "https://models.inference.ai.azure.com"
+        
+      - label: "Gemini 3 Flash"
+        provider: "gemini_native"
+        model_name: "gemini-3-flash-preview"
+        api_key_env: "GEMINI_API_KEY"
+        
+      - label: "Llama 3.3 70B (Groq)"
+        provider: "litellm"
+        model_name: "groq/llama-3.3-70b-versatile"
+        api_key_env: "GROQ_API_KEY"
+
+  # ============================================
+  # LANE: REASONING (Model untuk reasoning complex)
+  # ============================================
+  reasoning:
+    # Default null - lane tidak aktif sampai model diisi
+    # Contoh aktivasi:
+    # model:
+    #   label: "DeepSeek R1"
+    #   provider: "litellm"
+    #   model_name: "deepseek/deepseek-reasoner"
+    #   api_key_env: "DEEPSEEK_API_KEY"
+    #   base_url: "https://api.deepseek.com"
+    model: null
+
+  # ============================================
+  # LANE: EMBEDDING
+  # ============================================
+  embedding:
+    models:
+      - name: "GitHub Models (OpenAI Large) - Primary"
+        provider: "github"
+        model: "text-embedding-3-large"
+        api_key_env: "GITHUB_TOKEN"
+        tpm_limit: 500000
+        dimensions: 3072
+        
+      - name: "GitHub Models (OpenAI Large) - Backup"
+        provider: "github"
+        model: "text-embedding-3-large"
+        api_key_env: "GITHUB_TOKEN_2"
+        tpm_limit: 500000
+        dimensions: 3072
+        
+      - name: "GitHub Models (OpenAI Small) - Fallback 1"
+        provider: "github"
+        model: "text-embedding-3-small"
+        api_key_env: "GITHUB_TOKEN"
+        tpm_limit: 500000
+        dimensions: 1536
+        
+      - name: "GitHub Models (OpenAI Small) - Fallback 2"
+        provider: "github"
+        model: "text-embedding-3-small"
+        api_key_env: "GITHUB_TOKEN_2"
+        tpm_limit: 500000
+        dimensions: 1536
+
+# ============================================
+# RETRIEVAL
+# ============================================
+retrieval:
+  search:
+    enabled: true
+    api_url: "https://api.langsearch.com/v1/web-search"
+    timeout: 10
+    cache_ttl: 300
+    default_count: 5
+    default_freshness: "oneWeek"
+
+  semantic_rerank:
+    enabled: true
+    api_url: "https://api.langsearch.com/v1/rerank"
+    model: "langsearch-reranker-v1"
+    timeout: 8
+
+# ============================================
+# SYSTEM
+# ============================================
+system:
+  default_prompt: "Anda adalah ISTA AI, asisten virtual istana pintar. Jawablah dengan sopan dan membantu."
+
+# ============================================
+# CHUNKING
+# ============================================
+chunking:
+  token_chunk_size: 1500
+  token_chunk_overlap: 150
+  aggressive_batch_size: 200
+  batch_delay_seconds: 0.5
+  embedding_timeout: 30
+
+# ============================================
+# INTEGRATIONS
+# ============================================
+integrations:
+  smtp_gmail:
+    host: "smtp.gmail.com"
+    port: 587
+    encryption: "tls"
+    username: "terry.delvon0805@gmail.com"
+    # Password tidak di-hardcode - gunakan env variable
+    password_env: "MAIL_PASSWORD"
