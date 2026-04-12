@@ -155,6 +155,6 @@ integrations:
     host: "smtp.gmail.com"
     port: 587
     encryption: "tls"
-    username: "terry.delvon0805@gmail.com"
+    username_env: "MAIL_USERNAME"
     # Password tidak di-hardcode - gunakan env variable
     password_env: "MAIL_PASSWORD"

@@ -22,54 +22,13 @@ litellm.set_verbose = False
 
 
 def _get_chat_models_fallback():
-    """Get chat models - tries config first, falls back to env."""
+    """Get chat models from config (source of truth)."""
     if CONFIG_AVAILABLE:
         models = get_chat_models()
         if models:
             return models
     
-    return [
-        {
-            "label": "GPT-5 Chat (Primary)",
-            "provider": "litellm",
-            "model_name": "openai/gpt-5-chat",
-            "api_key_env": "GITHUB_TOKEN",
-            "base_url": "https://models.inference.ai.azure.com",
-        },
-        {
-            "label": "GPT-5 Chat (Backup Node)",
-            "provider": "litellm",
-            "model_name": "openai/gpt-5-chat",
-            "api_key_env": "GITHUB_TOKEN_2",
-            "base_url": "https://models.inference.ai.azure.com",
-        },
-        {
-            "label": "GPT-4o (Primary)",
-            "provider": "litellm",
-            "model_name": "openai/gpt-4o",
-            "api_key_env": "GITHUB_TOKEN",
-            "base_url": "https://models.inference.ai.azure.com",
-        },
-        {
-            "label": "GPT-4o (Backup Node)",
-            "provider": "litellm",
-            "model_name": "openai/gpt-4o",
-            "api_key_env": "GITHUB_TOKEN_2",
-            "base_url": "https://models.inference.ai.azure.com",
-        },
-        {
-            "label": "Gemini 3 Flash",
-            "provider": "gemini_native",
-            "model_name": "gemini-3-flash-preview",
-            "api_key_env": "GEMINI_API_KEY",
-        },
-        {
-            "label": "Llama 3.3 70B (Groq)",
-            "provider": "litellm",
-            "model_name": "groq/llama-3.3-70b-versatile",
-            "api_key_env": "GROQ_API_KEY",
-        },
-    ]
+    return []
 
 
 def _get_reasoning_model_fallback():

@@ -56,6 +56,7 @@ def get_reasoning_model() -> Optional[Dict[str, Any]]:
 
 def get_embedding_models() -> List[Dict[str, Any]]:
     """Get embedding lane models."""
+    # TODO: implement when needed
     config = load_config()
     return config.get('lanes', {}).get('embedding', {}).get('models', [])
 
@@ -80,11 +81,13 @@ def get_system_prompt() -> str:
 
 def get_chunking_config() -> Dict[str, Any]:
     """Get chunking configuration."""
+    # TODO: implement when needed
     config = load_config()
     return config.get('chunking', {})
 
 
 def get_smtp_config() -> Dict[str, Any]:
     """Get SMTP Gmail configuration."""
+    # TODO: implement when needed
     config = load_config()
     return config.get('integrations', {}).get('smtp_gmail', {})
