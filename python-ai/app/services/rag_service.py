@@ -633,9 +633,9 @@ Informasi web terbaru (digunakan jika relevan):
 
     rag_prompt_template = get_rag_prompt()
     rag_prompt = rag_prompt_template.format(
-        context_str=context_str,
-        web_section=web_section,
-        question=question
+        context_str=context_str or "",
+        web_section=web_section or "",
+        question=question or ""
     )
     
     return rag_prompt, sources

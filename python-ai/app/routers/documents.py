@@ -115,9 +115,12 @@ async def summarize_document_endpoint(request: SummarizeRequest):
     
     def get_single_prompt(doc_content: str) -> str:
         if CONFIG_AVAILABLE:
-            template = get_summarize_single_prompt()
-            if template:
-                return template.format(document=doc_content)
+            try:
+                template = get_summarize_single_prompt()
+                if template:
+                    return template.format(document=doc_content or "")
+            except Exception:
+                pass
         return f"""Buatkan ringkasan yang jelas dan padat dari dokumen berikut. 
 Ringkasan harus mencakup poin-poin utama dan informasi penting.
 
@@ -130,9 +133,12 @@ Buat ringkasan dalam Bahasa Indonesia (maksimal 500 kata):"""
 
     def get_partial_prompt(batch: str, part_num: int, total: int) -> str:
         if CONFIG_AVAILABLE:
-            template = get_summarize_partial_prompt()
-            if template:
-                return template.format(batch=batch, part_number=part_num, total_parts=total)
+            try:
+                template = get_summarize_partial_prompt()
+                if template:
+                    return template.format(batch=batch or "", part_number=part_num, total_parts=total)
+            except Exception:
+                pass
         return f"""Buatkan ringkasan singkat dari bagian dokumen berikut.
 Ini adalah bagian {part_num} dari {total} bagian dokumen.
 
@@ -145,9 +151,12 @@ Berikan ringkasan singkat (maksimal 100 kata) dari bagian ini dalam Bahasa Indon
 
     def get_final_prompt(combined: str) -> str:
         if CONFIG_AVAILABLE:
-            template = get_summarize_final_prompt()
-            if template:
-                return template.format(combined_summaries=combined)
+            try:
+                template = get_summarize_final_prompt()
+                if template:
+                    return template.format(combined_summaries=combined or "")
+            except Exception:
+                pass
         return f"""Berdasarkan ringkasan bagian-bagian berikut, buat ringkasan keseluruhan yang komprehensif.
 
 Ringkasan Bagian:

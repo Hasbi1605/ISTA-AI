@@ -164,6 +164,19 @@ integrations:
 # ============================================
 # Ubah nilai di sini untuk mengkustomisasi behavior AI
 # tanpa perlu mengubah logika kode aplikasi
+#
+# Template Variables yang tersedia:
+# - {context_str} : Isi dokumen/isi konteks dari RAG
+# - {web_section} : Bagian untuk konteks hasil pencarian web
+# - {question} : Pertanyaan user
+# - {current_date} : Tanggal hari ini (format: Hari, DD Bulan YYYY)
+# - {current_year} : Tahun saat ini
+# - {results} : Hasil pencarian web yang diformat
+# - {document} : Isi dokumen untuk summarization
+# - {batch} : Bagian dokumen untuk partial summarization
+# - {part_number} : Nomor bagian (1, 2, 3, ...)
+# - {total_parts} : Total jumlah bagian
+# - {combined_summaries} : Gabungan ringkasan bagian-bagian
 # ============================================
 prompts:
   # ============================================
