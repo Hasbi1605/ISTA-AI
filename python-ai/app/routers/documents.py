@@ -8,7 +8,7 @@ from app.services.rag_service import process_document, delete_document_vectors, 
 
 try:
     from app.llm_manager import get_llm_stream
-    from app.config_loader import get_summarize_single_prompt, get_summarize_partial_prompt, get_summarize_final_prompt
+    from app.config_loader import get_summarize_single_prompt, get_summarize_partial_prompt, get_summarize_final_prompt, get_summarization_max_tokens
     CONFIG_AVAILABLE = True
 except ImportError:
     from app.llm_manager import get_llm_stream
@@ -107,7 +107,7 @@ async def summarize_document_endpoint(request: SummarizeRequest):
     success, batches, total_chunks = get_document_chunks_for_summarization(
         request.filename, 
         user_id=request.user_id,
-        max_tokens=8000  # Approximate token limit per LLM batch
+        max_tokens=get_summarization_max_tokens()
     )
     
     if not success:

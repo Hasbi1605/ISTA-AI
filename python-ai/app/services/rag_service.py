@@ -621,10 +621,13 @@ def search_relevant_chunks(query: str, filenames: List[str] = None, top_k: int =
             # Get rerank config from YAML first, then ENV override
             rerank_doc_config = get_chunking_rerank_config(document=True)
             doc_candidates = int(os.getenv("LANGSEARCH_RERANK_DOC_CANDIDATES", str(rerank_doc_config.get('candidates', 20))))
-            # Search for more candidates than needed
-            docs = vectorstore.similarity_search_with_score(query, k=doc_candidates, filter=filter_dict)
-            
-            if len(docs) >= 2:
+        else:
+            doc_candidates = top_k
+        
+        # Always search first (before rerank check to avoid UnboundLocalError when rerank disabled)
+        docs = vectorstore.similarity_search_with_score(query, k=doc_candidates, filter=filter_dict)
+        
+        if rerank_enabled and len(docs) >= 2:
                 # Extract document contents for reranking
                 documents = [doc.page_content for doc, _ in docs]
                 
