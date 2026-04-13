@@ -104,10 +104,12 @@ async def summarize_document_endpoint(request: SummarizeRequest):
         raise HTTPException(status_code=400, detail="user_id is required for authorization")
     
     # Get document chunks with authorization check
+    # Use config loader if available, otherwise use default
+    max_tokens = get_summarization_max_tokens() if CONFIG_AVAILABLE else 8000
     success, batches, total_chunks = get_document_chunks_for_summarization(
         request.filename, 
         user_id=request.user_id,
-        max_tokens=get_summarization_max_tokens()
+        max_tokens=max_tokens
     )
     
     if not success:
