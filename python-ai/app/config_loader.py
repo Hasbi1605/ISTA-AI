@@ -315,8 +315,8 @@ def get_semantic_rerank_config() -> Dict[str, Any]:
     return config.get('semantic_rerank', {})
 
 
-def get_rerank_config(document: bool = True) -> Dict[str, Any]:
-    """Get rerank configuration for documents or web."""
+def get_chunking_rerank_config(document: bool = True) -> Dict[str, Any]:
+    """Get rerank configuration for documents or web from chunking_summarization.yaml."""
     config = load_chunking_config()
     rerank_config = config.get('rerank', {})
     if document:
@@ -349,6 +349,12 @@ def get_adaptive_chunking_params(
     """
     Get adaptive chunking parameters based on model and document size.
     
+    Priority:
+    1. Document profile (dari categorize document) - highest priority
+    2. Defaults - fallback jika tidak ada profile
+    
+    Model profile only used as fallback if document has no category.
+    
     Args:
         model_name: Name of the embedding model (e.g., 'text-embedding-3-large')
         document_tokens: Estimated token count of the document
@@ -373,7 +379,7 @@ def get_adaptive_chunking_params(
         else:
             doc_category = 'very_long_document'
     
-    # Determine model category
+    # Determine model category (for fallback only)
     model_category = None
     if model_name:
         if 'large' in model_name.lower():
@@ -381,7 +387,7 @@ def get_adaptive_chunking_params(
         elif 'small' in model_name.lower():
             model_category = 'small_model'
     
-    # Apply document-based profile
+    # Apply document-based profile (highest priority - tidak dioverride oleh model)
     if doc_category:
         doc_profile = profiles.get(doc_category, {})
         profile_to_use = doc_profile.get('use_profile', 'large_model')
@@ -391,9 +397,8 @@ def get_adaptive_chunking_params(
                 'token_chunk_size': profile_params.get('token_chunk_size', result.get('token_chunk_size')),
                 'token_chunk_overlap': profile_params.get('token_chunk_overlap', result.get('token_chunk_overlap')),
             })
-    
-    # Apply model-based profile (overrides document profile if specified)
-    if model_category:
+    # Model profile only as fallback jika dokumen tidak punya kategori
+    elif model_category:
         model_profile = profiles.get(model_category, {})
         if model_profile:
             result.update({

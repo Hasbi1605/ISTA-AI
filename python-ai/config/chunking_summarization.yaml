@@ -247,5 +247,15 @@ defaults:
   embedding_timeout: 30
 
 # ============================================
+# SUMMARIZATION DEFAULTS (for non-secret tuning)
+# ============================================
+summarization_defaults:
+  threshold_document_tokens: 8000
+  single_pass_max_tokens: 8000
+  multi_pass_batch_max_tokens: 8000
+  max_batches: 20
+  final_summary_max_tokens: 2000
+
+# ============================================
 # END OF CONFIGURATION
 # ============================================
