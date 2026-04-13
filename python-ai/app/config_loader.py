@@ -6,6 +6,9 @@ from typing import Dict, Any, List, Optional
 logger = logging.getLogger(__name__)
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), '..', 'config', 'ai_config.yaml')
+CHUNKING_CONFIG_PATH = os.path.join(os.path.dirname(__file__), '..', 'config', 'chunking_summarization.yaml')
+
+_chunking_config_cache: Optional[Dict[str, Any]] = None
 
 _config_cache: Optional[Dict[str, Any]] = None
 
@@ -48,6 +51,7 @@ Jawaban:"""
   * Pejabat pemerintahan (presiden, menteri, gubernur, dll)
   * Berita terkini dan kejadian terbaru
   * Data yang berubah dari waktu ke waktu
+  * Informasi yang bersifat real-time
 - JANGAN mengandalkan pengetahuan internal untuk fakta yang bisa outdated
 
 📰 HASIL PENCARIAN WEB:
@@ -244,3 +248,164 @@ def get_summarize_final_prompt() -> str:
         logger.warning("Summarize final prompt empty, using default fallback")
         prompt = DEFAULT_PROMPTS.get('summarization', {}).get('final', '')
     return prompt
+
+
+# ============================================
+# Chunking & Summarization Config Functions
+# ============================================
+
+def load_chunking_config() -> Dict[str, Any]:
+    """Load chunking and summarization configuration from YAML file."""
+    global _chunking_config_cache
+    
+    if _chunking_config_cache is not None:
+        return _chunking_config_cache
+    
+    try:
+        with open(CHUNKING_CONFIG_PATH, 'r') as f:
+            _chunking_config_cache = yaml.safe_load(f)
+            return _chunking_config_cache
+    except FileNotFoundError:
+        logger.warning(f"Chunking config file not found: {CHUNKING_CONFIG_PATH}, using internal defaults")
+        return {}
+    except yaml.YAMLError as e:
+        logger.error(f"Failed to parse chunking config: {e}")
+        return {}
+
+
+def get_chunking_profiles() -> Dict[str, Any]:
+    """Get chunking profiles for model-aware adaptive chunking."""
+    config = load_chunking_config()
+    return config.get('chunking_profiles', {})
+
+
+def get_chunking_profile(profile_name: str) -> Dict[str, Any]:
+    """Get a specific chunking profile by name."""
+    profiles = get_chunking_profiles()
+    return profiles.get(profile_name, {})
+
+
+def get_embedding_batching_config() -> Dict[str, Any]:
+    """Get embedding batching configuration."""
+    config = load_chunking_config()
+    return config.get('embedding_batching', {})
+
+
+def get_embedding_fallback_chain() -> List[Dict[str, Any]]:
+    """Get embedding model fallback chain."""
+    config = load_chunking_config()
+    return config.get('embedding_fallback', {}).get('chain', [])
+
+
+def get_summarization_fallback_chain() -> List[Dict[str, Any]]:
+    """Get summarization model fallback chain."""
+    config = load_chunking_config()
+    return config.get('summarization_fallback', {}).get('chain', [])
+
+
+def get_summarization_thresholds() -> Dict[str, Any]:
+    """Get summarization thresholds configuration."""
+    config = load_chunking_config()
+    return config.get('summarization_thresholds', {})
+
+
+def get_semantic_rerank_config() -> Dict[str, Any]:
+    """Get semantic rerank configuration."""
+    config = load_chunking_config()
+    return config.get('semantic_rerank', {})
+
+
+def get_rerank_config(document: bool = True) -> Dict[str, Any]:
+    """Get rerank configuration for documents or web."""
+    config = load_chunking_config()
+    rerank_config = config.get('rerank', {})
+    if document:
+        return rerank_config.get('document', {})
+    return rerank_config.get('web', {})
+
+
+def get_fallback_policy() -> Dict[str, Any]:
+    """Get fallback policy configuration."""
+    config = load_chunking_config()
+    return config.get('fallback_policy', {})
+
+
+def get_chunking_timeouts() -> Dict[str, Any]:
+    """Get timeout configuration for chunking operations."""
+    config = load_chunking_config()
+    return config.get('timeouts', {})
+
+
+def get_chunking_defaults() -> Dict[str, Any]:
+    """Get default chunking configuration."""
+    config = load_chunking_config()
+    return config.get('defaults', {})
+
+
+def get_adaptive_chunking_params(
+    model_name: str = None,
+    document_tokens: int = None
+) -> Dict[str, Any]:
+    """
+    Get adaptive chunking parameters based on model and document size.
+    
+    Args:
+        model_name: Name of the embedding model (e.g., 'text-embedding-3-large')
+        document_tokens: Estimated token count of the document
+        
+    Returns:
+        Dict with chunking parameters
+    """
+    profiles = get_chunking_profiles()
+    defaults = get_chunking_defaults()
+    
+    result = defaults.copy()
+    
+    # Determine document size category
+    doc_category = None
+    if document_tokens is not None:
+        if document_tokens < profiles.get('short_document', {}).get('max_tokens', 4000):
+            doc_category = 'short_document'
+        elif document_tokens < profiles.get('medium_document', {}).get('max_tokens', 15000):
+            doc_category = 'medium_document'
+        elif document_tokens < profiles.get('long_document', {}).get('max_tokens', 50000):
+            doc_category = 'long_document'
+        else:
+            doc_category = 'very_long_document'
+    
+    # Determine model category
+    model_category = None
+    if model_name:
+        if 'large' in model_name.lower():
+            model_category = 'large_model'
+        elif 'small' in model_name.lower():
+            model_category = 'small_model'
+    
+    # Apply document-based profile
+    if doc_category:
+        doc_profile = profiles.get(doc_category, {})
+        profile_to_use = doc_profile.get('use_profile', 'large_model')
+        profile_params = profiles.get(profile_to_use, {})
+        if profile_params:
+            result.update({
+                'token_chunk_size': profile_params.get('token_chunk_size', result.get('token_chunk_size')),
+                'token_chunk_overlap': profile_params.get('token_chunk_overlap', result.get('token_chunk_overlap')),
+            })
+    
+    # Apply model-based profile (overrides document profile if specified)
+    if model_category:
+        model_profile = profiles.get(model_category, {})
+        if model_profile:
+            result.update({
+                'token_chunk_size': model_profile.get('token_chunk_size', result.get('token_chunk_size')),
+                'token_chunk_overlap': model_profile.get('token_chunk_overlap', result.get('token_chunk_overlap')),
+            })
+    
+    return result
+
+
+def reload_chunking_config() -> Dict[str, Any]:
+    """Force reload chunking configuration (useful for testing)."""
+    global _chunking_config_cache
+    _chunking_config_cache = None
+    return load_chunking_config()

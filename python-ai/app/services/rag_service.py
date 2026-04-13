@@ -4,7 +4,7 @@ import hashlib
 import logging
 import time
 import requests
-from typing import List, Tuple, Optional, Dict
+from typing import List, Tuple, Optional, Dict, Any
 import re
 import unicodedata
 from dotenv import load_dotenv
@@ -22,7 +22,15 @@ from langchain_core.embeddings import Embeddings
 from langchain_openai import OpenAIEmbeddings
 from langchain_core.documents import Document
 from app.services.langsearch_service import LangSearchService
-from app.config_loader import get_rag_prompt
+from app.config_loader import (
+    get_rag_prompt,
+    get_chunking_profiles,
+    get_embedding_fallback_chain,
+    get_embedding_batching_config,
+    get_chunking_defaults,
+    get_adaptive_chunking_params,
+    load_chunking_config,
+)
 
 EXPLICIT_WEB_PATTERNS = [
     r"\bweb\s*search\b",
@@ -89,49 +97,117 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 CHROMA_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "chroma_data")
-EMBEDDING_TIMEOUT = int(os.getenv("EMBEDDING_TIMEOUT", "30"))
 
-# Token-aware chunking configuration
-TOKEN_CHUNK_SIZE = int(os.getenv("TOKEN_CHUNK_SIZE", "1500"))  # Max tokens per chunk
-TOKEN_CHUNK_OVERLAP = int(os.getenv("TOKEN_CHUNK_OVERLAP", "150"))  # Token overlap
-AGGRESSIVE_BATCH_SIZE = int(os.getenv("AGGRESSIVE_BATCH_SIZE", "200"))  # Chunks per batch (aggressive)
-BATCH_DELAY_SECONDS = float(os.getenv("BATCH_DELAY_SECONDS", "0.5"))  # Delay between batches
+def _get_embedding_timeout() -> int:
+    """Get embedding timeout from config or env."""
+    chunking_config = load_chunking_config()
+    if chunking_config:
+        timeout = chunking_config.get('timeouts', {}).get('embedding_timeout')
+        if timeout:
+            return timeout
+    return int(os.getenv("EMBEDDING_TIMEOUT", "30"))
 
-# Embedding model list untuk cascading fallback (4-tier system)
-EMBEDDING_MODELS = [
-    {
-        "name": "GitHub Models (OpenAI Large) - Primary",
-        "provider": "github",
-        "model": "text-embedding-3-large",
-        "api_key_env": "GITHUB_TOKEN",
-        "tpm_limit": 500000,  # 500K TPM
-        "dimensions": 3072,
-    },
-    {
-        "name": "GitHub Models (OpenAI Large) - Backup",
-        "provider": "github",
-        "model": "text-embedding-3-large",
-        "api_key_env": "GITHUB_TOKEN_2",
-        "tpm_limit": 500000,  # 500K TPM
-        "dimensions": 3072,
-    },
-    {
-        "name": "GitHub Models (OpenAI Small) - Fallback 1",
-        "provider": "github",
-        "model": "text-embedding-3-small",
-        "api_key_env": "GITHUB_TOKEN",
-        "tpm_limit": 500000,  # 500K TPM
-        "dimensions": 1536,
-    },
-    {
-        "name": "GitHub Models (OpenAI Small) - Fallback 2",
-        "provider": "github",
-        "model": "text-embedding-3-small",
-        "api_key_env": "GITHUB_TOKEN_2",
-        "tpm_limit": 500000,  # 500K TPM
-        "dimensions": 1536,
+EMBEDDING_TIMEOUT = _get_embedding_timeout()
+
+
+def _get_chunking_config() -> Dict[str, Any]:
+    """Get chunking configuration from config loader."""
+    defaults = get_chunking_defaults()
+    if defaults:
+        return defaults
+    return {
+        'token_chunk_size': 1500,
+        'token_chunk_overlap': 150,
+        'aggressive_batch_size': 200,
+        'batch_delay_seconds': 0.5,
+        'embedding_timeout': 30,
     }
-]
+
+
+def _get_token_chunk_size() -> int:
+    """Get token chunk size from config or env."""
+    config = _get_chunking_config()
+    env_override = os.getenv("TOKEN_CHUNK_SIZE")
+    if env_override:
+        return int(env_override)
+    return config.get('token_chunk_size', 1500)
+
+
+def _get_token_chunk_overlap() -> int:
+    """Get token chunk overlap from config or env."""
+    config = _get_chunking_config()
+    env_override = os.getenv("TOKEN_CHUNK_OVERLAP")
+    if env_override:
+        return int(env_override)
+    return config.get('token_chunk_overlap', 150)
+
+
+def _get_aggressive_batch_size() -> int:
+    """Get aggressive batch size from config or env."""
+    config = _get_chunking_config()
+    env_override = os.getenv("AGGRESSIVE_BATCH_SIZE")
+    if env_override:
+        return int(env_override)
+    return config.get('aggressive_batch_size', 200)
+
+
+def _get_batch_delay_seconds() -> float:
+    """Get batch delay from config or env."""
+    config = _get_chunking_config()
+    env_override = os.getenv("BATCH_DELAY_SECONDS")
+    if env_override:
+        return float(env_override)
+    return config.get('batch_delay_seconds', 0.5)
+
+
+TOKEN_CHUNK_SIZE = _get_token_chunk_size()
+TOKEN_CHUNK_OVERLAP = _get_token_chunk_overlap()
+AGGRESSIVE_BATCH_SIZE = _get_aggressive_batch_size()
+BATCH_DELAY_SECONDS = _get_batch_delay_seconds()
+
+
+def _get_embedding_fallback_chain() -> List[Dict[str, Any]]:
+    """Get embedding model fallback chain from config."""
+    chain = get_embedding_fallback_chain()
+    if chain:
+        return chain
+    return [
+        {
+            "name": "GitHub Models (OpenAI Large) - Primary",
+            "provider": "github",
+            "model": "text-embedding-3-large",
+            "api_key_env": "GITHUB_TOKEN",
+            "tpm_limit": 500000,
+            "dimensions": 3072,
+        },
+        {
+            "name": "GitHub Models (OpenAI Large) - Backup",
+            "provider": "github",
+            "model": "text-embedding-3-large",
+            "api_key_env": "GITHUB_TOKEN_2",
+            "tpm_limit": 500000,
+            "dimensions": 3072,
+        },
+        {
+            "name": "GitHub Models (OpenAI Small) - Fallback 1",
+            "provider": "github",
+            "model": "text-embedding-3-small",
+            "api_key_env": "GITHUB_TOKEN",
+            "tpm_limit": 500000,
+            "dimensions": 1536,
+        },
+        {
+            "name": "GitHub Models (OpenAI Small) - Fallback 2",
+            "provider": "github",
+            "model": "text-embedding-3-small",
+            "api_key_env": "GITHUB_TOKEN_2",
+            "tpm_limit": 500000,
+            "dimensions": 1536,
+        }
+    ]
+
+
+EMBEDDING_MODELS = _get_embedding_fallback_chain()
 
 # Initialize tiktoken encoder for token-aware chunking
 try:
@@ -240,13 +316,22 @@ def process_document(file_path: str, filename: str, user_id: str = "unknown"):
         estimated_tokens = count_tokens(total_content)
         logger.info(f"Total content: {total_chars:,} chars, ~{estimated_tokens:,} tokens")
         
-        # 2. Token-Aware Recursive Chunking
-        logger.info(f"Step 2: Token-Aware Recursive Chunking (chunk_size={TOKEN_CHUNK_SIZE}, overlap={TOKEN_CHUNK_OVERLAP})...")
+        # 2. Token-Aware Recursive Chunking with adaptive parameters
+        # Get adaptive chunking params based on model and document size
+        adaptive_params = get_adaptive_chunking_params(
+            model_name=EMBEDDING_MODELS[0].get('model') if EMBEDDING_MODELS else None,
+            document_tokens=estimated_tokens
+        )
+        
+        chunk_size = adaptive_params.get('token_chunk_size', TOKEN_CHUNK_SIZE)
+        chunk_overlap = adaptive_params.get('token_chunk_overlap', TOKEN_CHUNK_OVERLAP)
+        
+        logger.info(f"Step 2: Token-Aware Recursive Chunking (chunk_size={chunk_size}, overlap={chunk_overlap}, adaptive=true)...")
         
         # Use RecursiveCharacterTextSplitter with token counting
         text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=TOKEN_CHUNK_SIZE,
-            chunk_overlap=TOKEN_CHUNK_OVERLAP,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
             length_function=count_tokens,  # Use token-based counting
             add_start_index=True,
             separators=["\n\n", "\n", ". ", " ", ""]  # Prioritize semantic boundaries
@@ -277,10 +362,18 @@ def process_document(file_path: str, filename: str, user_id: str = "unknown"):
             chunk.metadata["embedding_model"] = provider_name
             
         # 4. Smart Batching dengan Token Limit Validation
-        # OpenAI embedding API limit: 64,000 tokens per request (not per minute)
-        MAX_TOKENS_PER_BATCH = 60000  # Safe limit below 64K
+        # Get batching config from chunking_summarization.yaml
+        batching_config = get_embedding_batching_config()
+        aggressive_config = batching_config.get('aggressive', {})
+        
+        # Override with config values if available
+        configured_batch_size = aggressive_config.get('batch_size', AGGRESSIVE_BATCH_SIZE)
+        configured_max_tokens = aggressive_config.get('max_tokens_per_batch', 60000)
+        configured_delay = aggressive_config.get('batch_delay_seconds', BATCH_DELAY_SECONDS)
+        
+        MAX_TOKENS_PER_BATCH = configured_max_tokens  # Safe limit below 64K
         logger.info(f"Step 4: Smart Batching & Embedding Generation...")
-        logger.info(f"Max batch size: {AGGRESSIVE_BATCH_SIZE} chunks OR {MAX_TOKENS_PER_BATCH:,} tokens (whichever is smaller)")
+        logger.info(f"Max batch size: {configured_batch_size} chunks OR {MAX_TOKENS_PER_BATCH:,} tokens (config-driven)")
         logger.info(f"Total capacity: 2M TPM across 4 models (4 x 500K TPM)")
         
         vectorstore = Chroma(
@@ -302,7 +395,7 @@ def process_document(file_path: str, filename: str, user_id: str = "unknown"):
             
             # Check if adding this chunk would exceed limits
             would_exceed_tokens = (current_batch_tokens + chunk_tokens) > MAX_TOKENS_PER_BATCH
-            would_exceed_count = len(current_batch) >= AGGRESSIVE_BATCH_SIZE
+            would_exceed_count = len(current_batch) >= configured_batch_size
             
             if (would_exceed_tokens or would_exceed_count) and current_batch:
                 # Save current batch and start new one
@@ -322,9 +415,9 @@ def process_document(file_path: str, filename: str, user_id: str = "unknown"):
         
         for batch_index, (batch, batch_tokens) in enumerate(smart_batches, 1):
             try:
-                # Add minimal delay between batches (aggressive mode)
+                # Add minimal delay between batches (config-driven)
                 if batch_index > 1:
-                    time.sleep(BATCH_DELAY_SECONDS)
+                    time.sleep(configured_delay)
                 
                 logger.info(f"Processing batch {batch_index}/{total_batches}: {len(batch)} chunks, {batch_tokens:,} tokens...")
                 vectorstore.add_documents(batch)

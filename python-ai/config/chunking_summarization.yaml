@@ -1,0 +1,251 @@
+# ============================================
+# Chunking & Summarization Configuration
+# ============================================
+# Dedicated configuration for document chunking,
+# embedding batching, and summarization settings.
+# 
+# Precedence: ENV override (limited) -> this file -> internal defaults
+# Non-secret configs go here, secrets/API keys stay in env variables
+# ============================================
+
+# ============================================
+# CHUNKING PROFILES - Model-aware adaptive profiles
+# ============================================
+chunking_profiles:
+  # Large model: 3072 dimensions - larger chunks for better context
+  large_model:
+    token_chunk_size: 1500
+    token_chunk_overlap: 150
+    description: "Optimal for text-embedding-3-large (3072 dim)"
+  
+  # Small model: 1536 dimensions - smaller chunks for efficiency  
+  small_model:
+    token_chunk_size: 1024
+    token_chunk_overlap: 100
+    description: "Optimal for text-embedding-3-small (1536 dim)"
+  
+  # Document size-based profiles
+  short_document:
+    max_tokens: 4000
+    use_profile: "large_model"
+    description: "Short docs <4K tokens: use large chunks"
+  
+  medium_document:
+    max_tokens: 15000
+    use_profile: "large_model"
+    description: "Medium docs 4K-15K: standard processing"
+  
+  long_document:
+    max_tokens: 50000
+    use_profile: "large_model"
+    description: "Long docs 15K-50K: standard with more batches"
+  
+  very_long_document:
+    max_tokens: 999999
+    use_profile: "small_model"
+    description: "Very long docs >50K: use smaller chunks to avoid token limits"
+
+# ============================================
+# EMBEDDING BATCHING CONFIGURATION
+# ============================================
+embedding_batching:
+  # Aggressive batching for high throughput
+  aggressive:
+    batch_size: 200
+    max_tokens_per_batch: 60000
+    batch_delay_seconds: 0.5
+    description: "High throughput mode - 200 chunks per batch"
+  
+  # Conservative batching for reliability
+  conservative:
+    batch_size: 50
+    max_tokens_per_batch: 30000
+    batch_delay_seconds: 1.0
+    description: "Reliable mode - 50 chunks per batch"
+  
+  # Default batching strategy
+  default: "aggressive"
+
+# ============================================
+# EMBEDDING MODEL FALLBACK CHAIN
+# ============================================
+# Primary -> Backup -> Fallback -> Fallback Backup
+# Total capacity: 2M TPM (4 x 500K TPM)
+# ============================================
+embedding_fallback:
+  chain:
+    - name: "text-embedding-3-large (Primary)"
+      provider: "github"
+      model: "text-embedding-3-large"
+      api_key_env: "GITHUB_TOKEN"
+      base_url: "https://models.inference.ai.azure.com"
+      tpm_limit: 500000
+      dimensions: 3072
+      priority: 1
+      
+    - name: "text-embedding-3-large (Backup)"
+      provider: "github"
+      model: "text-embedding-3-large"
+      api_key_env: "GITHUB_TOKEN_2"
+      base_url: "https://models.inference.ai.azure.com"
+      tpm_limit: 500000
+      dimensions: 3072
+      priority: 2
+      
+    - name: "text-embedding-3-small (Fallback 1)"
+      provider: "github"
+      model: "text-embedding-3-small"
+      api_key_env: "GITHUB_TOKEN"
+      base_url: "https://models.inference.ai.azure.com"
+      tpm_limit: 500000
+      dimensions: 1536
+      priority: 3
+      
+    - name: "text-embedding-3-small (Fallback 2)"
+      provider: "github"
+      model: "text-embedding-3-small"
+      api_key_env: "GITHUB_TOKEN_2"
+      base_url: "https://models.inference.ai.azure.com"
+      tpm_limit: 500000
+      dimensions: 1536
+      priority: 4
+
+# ============================================
+# SUMMARIZATION MODEL FALLBACK CHAIN
+# ============================================
+# Primary -> Backup -> Fallback -> Fallback Backup
+# Used for hierarchical document summarization
+# ============================================
+summarization_fallback:
+  chain:
+    - name: "gpt-4.1 (Primary)"
+      provider: "litellm"
+      model_name: "openai/gpt-4.1"
+      api_key_env: "GITHUB_TOKEN"
+      base_url: "https://models.inference.ai.azure.com"
+      priority: 1
+      max_tokens: 8000
+      
+    - name: "gpt-4.1 (Backup)"
+      provider: "litellm"
+      model_name: "openai/gpt-4.1"
+      api_key_env: "GITHUB_TOKEN_2"
+      base_url: "https://models.inference.ai.azure.com"
+      priority: 2
+      max_tokens: 8000
+      
+    - name: "gpt-4o (Fallback 1)"
+      provider: "litellm"
+      model_name: "openai/gpt-4o"
+      api_key_env: "GITHUB_TOKEN"
+      base_url: "https://models.inference.ai.azure.com"
+      priority: 3
+      max_tokens: 8000
+      
+    - name: "gpt-4o (Fallback 2)"
+      provider: "litellm"
+      model_name: "openai/gpt-4o"
+      api_key_env: "GITHUB_TOKEN_2"
+      base_url: "https://models.inference.ai.azure.com"
+      priority: 4
+      max_tokens: 8000
+
+# ============================================
+# SUMMARIZATION THRESHOLDS
+# ============================================
+summarization_thresholds:
+  # Single-pass summarization (no chunking needed)
+  single_pass:
+    max_tokens: 8000
+    description: "Documents under 8K tokens - single pass summarization"
+  
+  # Multi-pass hierarchical summarization
+  multi_pass:
+    batch_max_tokens: 8000
+    max_batches: 20
+    final_summary_max_tokens: 2000
+    description: "Documents over 8K tokens - chunk into batches, then combine"
+  
+  # Word count boundaries (approximate)
+  word_boundaries:
+    short: 1500
+    medium: 5000
+    long: 15000
+    very_long: 40000
+
+# ============================================
+# SEMANTIC RERANK CONFIGURATION
+# ============================================
+semantic_rerank:
+  enabled: true
+  api_url: "https://api.langsearch.com/v1/rerank"
+  model: "langsearch-reranker-v1"
+  timeout: 8
+  
+  # Primary and backup endpoints
+  chain:
+    - name: "langsearch-reranker-v1 (Primary)"
+      api_url: "https://api.langsearch.com/v1/rerank"
+      model: "langsearch-reranker-v1"
+      
+    - name: "langsearch-reranker-v1 (Backup)"
+      # Backup uses same API but can be configured differently if needed
+      api_url: "https://api.langsearch.com/v1/rerank"
+      model: "langsearch-reranker-v1"
+
+# ============================================
+# RERANK CONFIGURATION (for web search and document retrieval)
+# ============================================
+rerank:
+  # Document reranking settings
+  document:
+    candidates: 20
+    top_n: 5
+    enabled: true
+  
+  # Web search reranking settings  
+  web:
+    candidates: 10
+    top_n: 5
+    enabled: true
+
+# ============================================
+# FALLBACK POLICY
+# ============================================
+fallback_policy:
+  # Enable cascading fallback on rate limit
+  cascade_on_rate_limit: true
+  
+  # Enable cascading fallback on error
+  cascade_on_error: true
+  
+  # Maximum retries per model before cascading
+  max_retries_per_model: 3
+  
+  # Exponential backoff multiplier
+  backoff_multiplier: 2.0
+  
+  # Circuit breaker: consecutive failures before switch
+  circuit_breaker_threshold: 3
+
+# ============================================
+# EMBEDDING TIMEOUTS
+# ============================================
+timeouts:
+  embedding_timeout: 30
+  connection_timeout: 10
+  read_timeout: 120
+
+# ============================================
+# DEFAULT CHUNKING SETTINGS (used when no profile matches)
+# ============================================
+defaults:
+  token_chunk_size: 1500
+  token_chunk_overlap: 150
+  aggressive_batch_size: 200
+  batch_delay_seconds: 0.5
+  embedding_timeout: 30
+
+# ============================================
+# END OF CONFIGURATION
+# ============================================
