@@ -38,6 +38,15 @@ class LoginForm extends Form
             ]);
         }
 
+        if (is_null(Auth::user()?->email_verified_at)) {
+            Auth::logout();
+            RateLimiter::hit($this->throttleKey());
+
+            throw ValidationException::withMessages([
+                'form.email' => 'Login gagal. Akun belum terverifikasi, silakan daftar ulang dan selesaikan verifikasi OTP.',
+            ]);
+        }
+
         RateLimiter::clear($this->throttleKey());
     }
 

@@ -54,6 +54,23 @@ class AuthenticationTest extends TestCase
         $this->assertGuest();
     }
 
+    public function test_unverified_users_cannot_authenticate_using_login_screen(): void
+    {
+        $user = User::factory()->unverified()->create();
+
+        $component = Volt::test('pages.auth.login')
+            ->set('form.email', $user->email)
+            ->set('form.password', 'password');
+
+        $component->call('login');
+
+        $component
+            ->assertHasErrors(['form.email'])
+            ->assertNoRedirect();
+
+        $this->assertGuest();
+    }
+
     public function test_chat_page_can_be_rendered_for_authenticated_user(): void
     {
         $user = User::factory()->create();

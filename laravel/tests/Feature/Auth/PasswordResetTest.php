@@ -3,7 +3,7 @@
 namespace Tests\Feature\Auth;
 
 use App\Models\User;
-use Illuminate\Auth\Notifications\ResetPassword;
+use App\Notifications\CustomResetPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Livewire\Volt\Volt;
@@ -32,7 +32,7 @@ class PasswordResetTest extends TestCase
             ->set('email', $user->email)
             ->call('sendPasswordResetLink');
 
-        Notification::assertSentTo($user, ResetPassword::class);
+        Notification::assertSentTo($user, CustomResetPassword::class);
     }
 
     public function test_reset_password_screen_can_be_rendered(): void
@@ -45,7 +45,7 @@ class PasswordResetTest extends TestCase
             ->set('email', $user->email)
             ->call('sendPasswordResetLink');
 
-        Notification::assertSentTo($user, ResetPassword::class, function ($notification) {
+        Notification::assertSentTo($user, CustomResetPassword::class, function ($notification) {
             $response = $this->get('/reset-password/'.$notification->token);
 
             $response
@@ -66,7 +66,7 @@ class PasswordResetTest extends TestCase
             ->set('email', $user->email)
             ->call('sendPasswordResetLink');
 
-        Notification::assertSentTo($user, ResetPassword::class, function ($notification) use ($user) {
+        Notification::assertSentTo($user, CustomResetPassword::class, function ($notification) use ($user) {
             $component = Volt::test('pages.auth.reset-password', ['token' => $notification->token])
                 ->set('email', $user->email)
                 ->set('password', 'password')
@@ -80,5 +80,19 @@ class PasswordResetTest extends TestCase
 
             return true;
         });
+    }
+
+    public function test_unverified_user_cannot_request_password_reset_link(): void
+    {
+        Notification::fake();
+
+        $user = User::factory()->unverified()->create();
+
+        Volt::test('pages.auth.forgot-password')
+            ->set('email', $user->email)
+            ->call('sendPasswordResetLink')
+            ->assertHasErrors(['email']);
+
+        Notification::assertNothingSent();
     }
 }

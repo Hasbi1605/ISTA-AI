@@ -45,22 +45,29 @@
     </div>
 
     <div class="animate-enter-4 group space-y-2">
-        <label for="password_confirmation" class="ml-1 cursor-text text-[13px] font-bold text-stone-600 transition-all duration-300 group-focus-within:translate-x-1 group-focus-within:text-rose-900">Konfirmasi Kata sandi</label>
+        <label for="register_password_confirmation" class="ml-1 cursor-text text-[13px] font-bold text-stone-600 transition-all duration-300 group-focus-within:translate-x-1 group-focus-within:text-rose-900">Konfirmasi Kata sandi</label>
         <div class="relative transform transition-transform duration-300 group-focus-within:scale-[1.01]">
             <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-5">
                 <svg class="h-5 w-5 text-stone-500 transition-colors duration-300 group-focus-within:text-rose-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 00-2 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                 </svg>
             </div>
-            <input wire:model="password_confirmation" id="password_confirmation" class="ista-input" type="password" name="password_confirmation" placeholder="••••••••" required autocomplete="new-password" />
+            <input wire:model="register_password_confirmation" id="register_password_confirmation" class="ista-input" type="password" name="register_password_confirmation" placeholder="••••••••" required autocomplete="new-password" />
         </div>
     </div>
 
     <div class="animate-enter-4 pt-2">
-        <button type="submit" class="ista-login-button group">
+        <button type="submit" class="ista-login-button group" wire:loading.attr="disabled" wire:target="register">
             <span class="relative z-10 flex items-center justify-center gap-2 text-[15px] font-semibold text-white transition-all duration-500 ease-out">
-                Daftar Sekarang
-                <svg class="-ml-4 h-4 w-4 opacity-0 transition-all duration-500 group-hover:ml-0 group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <span wire:loading.remove wire:target="register">Daftar Sekarang</span>
+                <span wire:loading.flex wire:target="register" class="items-center justify-center gap-2">
+                    <svg class="h-4 w-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Memproses...
+                </span>
+                <svg wire:loading.remove wire:target="register" class="-ml-4 h-4 w-4 opacity-0 transition-all duration-500 group-hover:ml-0 group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                 </svg>
             </span>
