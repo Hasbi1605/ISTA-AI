@@ -124,15 +124,6 @@ new #[Layout('layouts.auth-canvas')] class extends Component
                     </div>
                 </form>
 
-                <div class="animate-enter-4 mt-6 text-center">
-                    <a href="{{ url('/') }}" class="group inline-flex items-center gap-2 text-xs font-bold text-rose-900 transition-colors hover:text-amber-600">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 cursor-pointer transition-transform duration-300 group-hover:-translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                        </svg>
-                        <span>Kembali ke Beranda</span>
-                    </a>
-                </div>
-
                 <div class="animate-enter-4 mt-8 border-t border-rose-900/10 pt-4 text-center">
                     <p class="inline-block cursor-pointer text-[12px] font-semibold text-rose-950/60 transition-colors hover:scale-105 hover:text-rose-900">
                         Copyright © 2026 Istana Kepresidenan Yogyakarta, All rights reserved.
