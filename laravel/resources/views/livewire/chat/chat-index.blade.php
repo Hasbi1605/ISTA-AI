@@ -1,7 +1,8 @@
 <div x-data="{ 
         darkMode: localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches),
-        showLeftSidebar: true,
-        showRightSidebar: true,
+        isMobile: window.matchMedia('(max-width: 1023px)').matches,
+        showLeftSidebar: !window.matchMedia('(max-width: 1023px)').matches,
+        showRightSidebar: !window.matchMedia('(max-width: 1023px)').matches,
         isDraggingFile: false,
         dragDepth: 0,
         dropError: '',
@@ -79,7 +80,24 @@
                 this.optimisticUserMessage = '';
                 this.$nextTick(() => this.scrollToBottom());
             });
+
+            // Use matchMedia for reliable responsive detection
+            const mql = window.matchMedia('(max-width: 1023px)');
+            const handleMqlChange = (e) => {
+                const wasMobile = this.isMobile;
+                this.isMobile = e.matches;
+                if (wasMobile && !this.isMobile) {
+                    this.showLeftSidebar = true;
+                    this.showRightSidebar = true;
+                } else if (!wasMobile && this.isMobile) {
+                    this.showLeftSidebar = false;
+                    this.showRightSidebar = false;
+                }
+            };
+            mql.addEventListener('change', handleMqlChange);
+            window.addEventListener('beforeunload', () => mql.removeEventListener('change', handleMqlChange), { once: true });
         },
+
         setDropError(message) {
             this.dropError = message;
             setTimeout(() => {
@@ -184,22 +202,32 @@
 
     <!-- LEFT SIDEBAR: Chat History -->
     <aside 
-        :class="showLeftSidebar ? 'w-[288px] opacity-100 translate-x-0 border-r border-stone-200/60 dark:border-[#1E293B]' : 'w-0 opacity-0 -translate-x-3 border-r border-transparent pointer-events-none'"
-        class="h-full flex-shrink-0 overflow-hidden bg-white/60 dark:bg-gray-900/90 backdrop-blur-[10px] flex flex-col z-10 transform-gpu will-change-[width,transform,opacity] transition-[width,transform,opacity,border-color] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]">
+        :class="[
+            showLeftSidebar ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-full pointer-events-none',
+            isMobile ? 'fixed left-0 top-0 h-full w-[288px] shadow-2xl border-r border-stone-200/60 dark:border-[#1E293B]' : (showLeftSidebar ? 'relative w-[288px] border-r border-stone-200/60 dark:border-[#1E293B]' : 'relative w-0 border-r border-transparent')
+        ]"
+        @click.stop
+        class="z-50 flex-shrink-0 overflow-hidden bg-white dark:bg-gray-900 flex flex-col transform-gpu will-change-[width,transform,opacity] transition-[width,transform,opacity,border-color] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]">
         
-        <!-- Kembali ke Beranda Button -->
-        <div class="px-4 pb-2 pt-3">
-            <a href="{{ route('dashboard') }}" class="inline-flex items-center px-4 py-2.5 font-medium text-[13px] text-gray-700 dark:text-gray-200 hover:text-amber-800 dark:hover:text-amber-300 transition-colors duration-200">
+        <!-- Left Sidebar Header with Close on Mobile -->
+        <div class="flex items-center justify-between px-4 pb-2 pt-3">
+            <a href="{{ route('dashboard') }}" @click="showLeftSidebar = false" class="inline-flex items-center px-1 py-2.5 font-medium text-[13px] text-gray-700 dark:text-gray-200 hover:text-amber-800 dark:hover:text-amber-300 transition-colors duration-200">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                 </svg>
                 Kembali ke Beranda
             </a>
+            <!-- Close button, only visible on mobile -->
+            <button type="button" x-show="isMobile" @click="showLeftSidebar = false" class="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 transition-colors" aria-label="Tutup sidebar">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
         </div>
 
         <!-- New Chat Button -->
         <div class="p-4 pt-2 pb-5">
-            <button wire:click="startNewChat" class="w-full flex items-center justify-start px-4 py-2.5 rounded-lg border border-stone-200/60 dark:border-[#334155] dark:bg-transparent bg-white hover:bg-gray-50 dark:hover:bg-white/5 font-medium text-[13px] text-gray-700 dark:text-gray-200 transition-all duration-200 shadow-sm">
+            <button type="button" @click="$wire.startNewChat().then(() => { if(isMobile) showLeftSidebar = false; })" class="w-full flex items-center justify-start px-4 py-2.5 rounded-lg border border-stone-200/60 dark:border-[#334155] dark:bg-transparent bg-white hover:bg-gray-50 dark:hover:bg-white/5 font-medium text-[13px] text-gray-700 dark:text-gray-200 transition-all duration-200 shadow-sm">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-[#64748B] dark:text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 5v14m-7-7h14" />
                 </svg>
@@ -219,14 +247,14 @@
                     
                     @foreach($visibleChats as $conversation)
                         <li class="group relative">
-                            <button wire:click="loadConversation({{ $conversation->id }})" 
+                            <button type="button" @click="$wire.loadConversation({{ $conversation->id }}).then(() => { if(isMobile) showLeftSidebar = false; })"
                                class="w-full text-left px-3 py-2 rounded-md flex items-center transition-colors duration-200 {{ $currentConversationId == $conversation->id ? 'bg-white/80 shadow-sm border border-stone-200 text-stone-800 dark:bg-[#1E293B] dark:border-[#334155] dark:text-white font-medium' : 'hover:bg-black/5 dark:hover:bg-white/5 text-stone-700 dark:text-gray-300' }}">
                                <!-- Chat icon -->
                                          <img src="{{ $uiIcons['historyLight'] }}" alt="" class="h-4 w-4 mr-2.5 flex-shrink-0 dark:hidden" />
                                          <img src="{{ $uiIcons['historyDark'] }}" alt="" class="h-4 w-4 mr-2.5 flex-shrink-0 hidden dark:block" />
                                <span class="truncate text-[13.2px]" title="{{ $conversation->title }}">{{ $conversation->title }}</span>
                             </button>
-                            <button wire:click="deleteConversation({{ $conversation->id }})"
+                            <button type="button" wire:click="deleteConversation({{ $conversation->id }})"
                                     wire:confirm="Delete this chat?"
                                     class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-500/20 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-all duration-200"
                                     title="Delete chat">
@@ -241,7 +269,7 @@
             
             @if($olderChats->count() > 0)
             <div class="mb-6">
-                <button wire:click="toggleOlderChats" class="flex items-center justify-between w-full text-left">
+                <button type="button" wire:click="toggleOlderChats" class="flex items-center justify-between w-full text-left">
                     <h3 class="text-[11.3px] font-bold text-[#64748B] dark:text-[#94A3B8] uppercase tracking-wider mb-2">Previous 7 Days</h3>
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-[#64748B] dark:text-[#94A3B8] transition-transform duration-200 {{ $showOlderChats ? 'rotate-180' : '' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
@@ -251,14 +279,14 @@
                     <ul class="mt-1 space-y-1">
                         @foreach($olderChats as $conversation)
                             <li class="group relative">
-                                <button wire:click="loadConversation({{ $conversation->id }})" 
+                                <button type="button" @click="$wire.loadConversation({{ $conversation->id }}).then(() => { if(isMobile) showLeftSidebar = false; })"
                                    class="w-full text-left px-3 py-2 rounded-md flex items-center transition-colors duration-200 {{ $currentConversationId == $conversation->id ? 'bg-white/80 shadow-sm border border-stone-200 text-stone-800 dark:bg-[#1E293B] dark:border-[#334155] dark:text-white font-medium' : 'hover:bg-black/5 dark:hover:bg-white/5 text-stone-700 dark:text-gray-300' }}">
                                     <!-- Chat icon -->
                                     <img src="{{ $uiIcons['historyLight'] }}" alt="" class="h-4 w-4 mr-2.5 flex-shrink-0 dark:hidden" />
                                     <img src="{{ $uiIcons['historyDark'] }}" alt="" class="h-4 w-4 mr-2.5 flex-shrink-0 hidden dark:block" />
                                     <span class="truncate text-[13.2px]" title="{{ $conversation->title }}">{{ $conversation->title }}</span>
                                 </button>
-                                <button wire:click="deleteConversation({{ $conversation->id }})"
+                                <button type="button" wire:click="deleteConversation({{ $conversation->id }})"
                                         wire:confirm="Delete this chat?"
                                         class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-500/20 text-gray-400 hover:text-red-600 transition-all duration-200">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -292,23 +320,23 @@
     </aside>
 
     <!-- CENTER MAIN: Chat Area -->
-    <main class="flex-1 flex flex-col relative w-full h-full bg-transparent z-0 overflow-hidden">
+    <main class="flex-1 flex flex-col relative w-full h-full bg-transparent z-0 overflow-hidden min-w-0">
         
         <!-- Header for Chat Space -->
-        <div class="h-[61px] flex-shrink-0 flex items-center justify-between px-6 z-20 border-b border-stone-200/60/70 dark:border-[#1E293B]/70 backdrop-blur-sm">
+        <div class="h-[61px] flex-shrink-0 flex items-center justify-between px-3 sm:px-6 z-20 border-b border-stone-200/60/70 dark:border-[#1E293B]/70 backdrop-blur-sm">
             <!-- Left toggler and title -->
-            <div class="flex items-center gap-4">
-                <button @click="showLeftSidebar = !showLeftSidebar" class="p-2 rounded-[10px] hover:bg-[#F1F5F9] dark:hover:bg-gray-800 transition-colors">
+            <div class="flex items-center gap-2 sm:gap-4">
+                <button type="button" @click="showLeftSidebar = !showLeftSidebar" class="p-2 rounded-[10px] hover:bg-[#F1F5F9] dark:hover:bg-gray-800 transition-colors flex-shrink-0">
                     <img src="{{ $uiIcons['collapseLeftLight'] }}" alt="" class="h-5 w-5 dark:hidden transition-transform duration-300 ease-in-out" :class="showLeftSidebar ? 'rotate-0' : 'rotate-180'" />
                     <img src="{{ $uiIcons['collapseLeftDark'] }}" alt="" class="h-5 w-5 hidden dark:block transition-transform duration-300 ease-in-out" :class="showLeftSidebar ? 'rotate-0' : 'rotate-180'" />
                 </button>
-                <a href="{{ route('dashboard') }}" class="group flex items-center gap-2"><div class="ista-brand-title text-xl text-ista-primary not-italic transition-transform duration-300 group-hover:scale-105">ISTA <span class="font-light italic text-ista-gold">AI</span></div></a>
+                <button type="button" wire:click="startNewChat" class="group flex items-center gap-2"><div class="ista-brand-title text-xl text-ista-primary not-italic transition-transform duration-300 group-hover:scale-105">ISTA <span class="font-light italic text-ista-gold">AI</span></div></button>
             </div>
 
             <!-- Right toggles -->
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-1 sm:gap-3">
                 <!-- Theme Toggle Button -->
-                <button @click="darkMode = !darkMode" class="p-2 rounded-[10px] hover:bg-[#F1F5F9] dark:hover:bg-gray-800 transition-colors">
+                <button type="button" @click="darkMode = !darkMode" class="p-2 rounded-[10px] hover:bg-[#F1F5F9] dark:hover:bg-gray-800 transition-colors">
                     <svg x-show="darkMode === false" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#64748B]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 3v2.5M12 18.5V21M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M3 12h2.5M18.5 12H21M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8M12 16a4 4 0 100-8 4 4 0 000 8z" />
                     </svg>
@@ -317,7 +345,7 @@
                     </svg>
                 </button>
 
-                <button @click="showRightSidebar = !showRightSidebar" class="p-2 rounded-[10px] hover:bg-[#F1F5F9] dark:hover:bg-gray-800 transition-colors">
+                <button type="button" @click="showRightSidebar = !showRightSidebar" class="p-2 rounded-[10px] hover:bg-[#F1F5F9] dark:hover:bg-gray-800 transition-colors flex-shrink-0">
                     <img src="{{ $uiIcons['collapseRightLight'] }}" alt="" class="h-5 w-5 dark:hidden transition-transform duration-300 ease-in-out" :class="showRightSidebar ? 'rotate-0' : 'rotate-180'" />
                     <img src="{{ $uiIcons['collapseRightDark'] }}" alt="" class="h-5 w-5 hidden dark:block transition-transform duration-300 ease-in-out" :class="showRightSidebar ? 'rotate-0' : 'rotate-180'" />
                 </button>
@@ -338,7 +366,7 @@
         </div>
         
         <!-- Messages List -->
-        <div class="flex-1 overflow-y-auto px-6 py-8 space-y-8" x-ref="chatBox" x-on:message-streamed.window="$refs.chatBox.scrollTop = $refs.chatBox.scrollHeight">
+        <div class="flex-1 overflow-y-auto px-3 sm:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8" x-ref="chatBox" x-on:message-streamed.window="$refs.chatBox.scrollTop = $refs.chatBox.scrollHeight">
             @if(empty($messages))
                 <div class="h-full flex flex-col items-center justify-center text-center">
                     <div class="h-16 w-16 mb-6">
@@ -356,7 +384,7 @@
                     $isUserMessage = $message['role'] == 'user';
                 @endphp
                 <div class="flex {{ $isUserMessage ? 'justify-end' : 'justify-start' }}">
-                    <div class="w-full sm:max-w-3xl flex items-start gap-4 px-2 sm:px-8 {{ $isUserMessage ? 'flex-row-reverse' : '' }}">
+                    <div class="w-full sm:max-w-3xl flex items-start gap-2 sm:gap-4 px-0 sm:px-8 {{ $isUserMessage ? 'flex-row-reverse' : '' }}">
                         <div class="shrink-0 h-8 w-8 rounded-full flex items-center justify-center {{ $message['role'] == 'user' ? 'bg-[#E2E8F0] dark:bg-white text-[#62748E] dark:text-black' : 'bg-white border border-stone-200 shadow-sm p-1' }}">
                             @if($message['role'] == 'user')
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -503,7 +531,7 @@
         </div>
 
         <!-- Input Area container -->
-        <div class="px-6 pb-6 pt-2 bg-transparent w-full">
+        <div class="px-3 sm:px-6 pb-4 sm:pb-6 pt-2 bg-transparent w-full">
             @php
                 $chatDocuments = $availableDocuments->whereIn('id', $conversationDocuments)->values();
             @endphp
@@ -621,14 +649,24 @@
 
     <!-- RIGHT SIDEBAR: Documents -->
     <aside 
-        :class="showRightSidebar ? 'w-[288px] opacity-100 translate-x-0 border-l border-stone-200/60 dark:border-[#1E293B]' : 'w-0 opacity-0 translate-x-3 border-l border-transparent pointer-events-none'"
-        class="h-full flex-shrink-0 overflow-hidden bg-white/60 dark:bg-gray-900/90 backdrop-blur-[10px] flex flex-col z-10 transform-gpu will-change-[width,transform,opacity] transition-[width,transform,opacity,border-color] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]">
+        :class="[
+            showRightSidebar ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-full pointer-events-none',
+            isMobile ? 'fixed right-0 top-0 h-full w-[288px] shadow-2xl border-l border-stone-200/60 dark:border-[#1E293B]' : (showRightSidebar ? 'relative w-[288px] border-l border-stone-200/60 dark:border-[#1E293B]' : 'relative w-0 border-l border-transparent')
+        ]"
+        @click.stop
+        class="z-50 flex-shrink-0 overflow-hidden bg-white dark:bg-gray-900 flex flex-col transform-gpu will-change-[width,transform,opacity] transition-[width,transform,opacity,border-color] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]">
         
-        <div class="px-4 pt-5 pb-0">
+        <div class="px-4 pt-5 pb-0 flex items-center justify-between">
             <span class="inline-flex items-center font-medium text-[13px] text-gray-700 dark:text-gray-200">
                 <svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z"/></svg>
                 Semua Dokumen Saya
             </span>
+            <!-- Close button, only visible on mobile -->
+            <button type="button" x-show="isMobile" @click="showRightSidebar = false" class="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 transition-colors" aria-label="Tutup sidebar dokumen">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
         </div>
         
 <div class="flex-1 overflow-y-auto px-4 pt-4" @if($hasDocumentsInProgress) wire:poll.3s="loadAvailableDocuments" @else wire:poll.20s="loadAvailableDocuments" @endif>
@@ -661,7 +699,7 @@
                              </svg>
                              Delete
                          </button>
-                         <button type="button" wire:click="addSelectedDocumentsToChat" class="ml-2 inline-flex shrink-0 items-center gap-1 text-white text-[10.5px] font-semibold px-1.5 py-1 rounded-md bg-ista-primary hover:bg-stone-800 transition-all whitespace-nowrap">
+                         <button type="button" @click="$wire.addSelectedDocumentsToChat().then(() => { if (isMobile) showRightSidebar = false; })" class="ml-2 inline-flex shrink-0 items-center gap-1 text-white text-[10.5px] font-semibold px-1.5 py-1 rounded-md bg-ista-primary hover:bg-stone-800 transition-all whitespace-nowrap">
                              <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                              </svg>
@@ -729,5 +767,19 @@
              </div>
         </div>
     </aside>
+
+    <!-- Unified Mobile Backdrop: closes whichever sidebar is open -->
+    <div 
+        x-show="isMobile && (showLeftSidebar || showRightSidebar)" 
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-200"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        @click="showLeftSidebar = false; showRightSidebar = false;"
+        class="fixed inset-0 bg-black/50 z-40"
+        style="display:none;"
+    ></div>
 
 </div>
