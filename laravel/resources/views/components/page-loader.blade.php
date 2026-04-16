@@ -82,18 +82,16 @@
 </div>
 
 <script>
-    // Execute immediately to prevent flash
-    const loader = document.getElementById('global-page-loader');
-    
     const showLoader = () => {
-        if(loader) loader.classList.remove('loader-hidden');
+        const loaderEl = document.getElementById('global-page-loader');
+        if(loaderEl) loaderEl.classList.remove('loader-hidden');
     };
     
     const hideLoader = () => {
-        if(loader) {
-            // Adds a micro-delay so the browser has time to paint the new DOM before fading out
+        const loaderEl = document.getElementById('global-page-loader');
+        if(loaderEl) {
             setTimeout(() => {
-                loader.classList.add('loader-hidden');
+                loaderEl.classList.add('loader-hidden');
             }, 150);
         }
     };
@@ -107,10 +105,10 @@
         if (e.persisted) hideLoader();
     });
 
-    // Livewire SPA mode support (if wire:navigate is used)
+    // Livewire SPA mode support (wire:navigate)
     document.addEventListener('livewire:navigating', showLoader);
     document.addEventListener('livewire:navigated', hideLoader);
     
-    // Safety fallback (force hide after 8 seconds to prevent users getting stuck on very slow requests or errors)
+    // Safety fallback (force hide after 8 seconds)
     setTimeout(hideLoader, 8000);
 </script>
