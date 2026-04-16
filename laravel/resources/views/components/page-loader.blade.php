@@ -9,9 +9,10 @@
         align-items: center;
         justify-content: center;
         background-color: #ffffff;
-        transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.5s cubic-bezier(0.4, 0, 0.2, 1);
         backdrop-filter: blur(8px);
         -webkit-backdrop-filter: blur(8px);
+        /* Muncull sekejap mata untuk memblocking blank screen (Snap IN) */
+        transition: opacity 0.05s ease-out, visibility 0.05s ease-out;
     }
     
     /* Adapt to Dark Mode natively if the `.dark` class is on html/body */
@@ -23,6 +24,8 @@
         opacity: 0;
         visibility: hidden;
         pointer-events: none;
+        /* Menghilang secara elegan memudar pelan pelan (Fade OUT) */
+        transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.6s cubic-bezier(0.4, 0, 0.2, 1);
     }
     
     /* Smooth Pulse Animation */
