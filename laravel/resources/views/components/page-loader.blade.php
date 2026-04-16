@@ -30,11 +30,12 @@
     
     /* Smooth Pulse Animation */
     @keyframes subtlePulse {
-        0%, 100% { transform: scale(1); opacity: 1; }
-        50% { transform: scale(1.05); opacity: 0.8; }
+        0%, 100% { transform: scale(1) translateZ(0); opacity: 1; }
+        50% { transform: scale(1.05) translateZ(0); opacity: 0.8; }
     }
     .loader-brand {
         animation: subtlePulse 2s ease-in-out infinite;
+        will-change: transform, opacity;
     }
     
     /* Gradient Spinner */
@@ -47,6 +48,7 @@
         border-right-color: #4f46e5;
         opacity: 0.8;
         animation: spin 1s linear infinite;
+        will-change: transform;
     }
     html.dark .loader-spinner, .dark .loader-spinner {
         border-top-color: #818cf8;
@@ -54,8 +56,8 @@
     }
 
     @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
+        0% { transform: rotate(0deg) translateZ(0); }
+        100% { transform: rotate(360deg) translateZ(0); }
     }
 </style>
 
