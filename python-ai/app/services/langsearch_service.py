@@ -2,12 +2,10 @@ import os
 import logging
 import requests
 import time
-import hashlib
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime
-from functools import lru_cache
 
-from app.config_loader import get_web_search_context_prompt, get_assertive_instruction
+from app.config_loader import get_web_search_context_prompt
 
 logger = logging.getLogger(__name__)
 

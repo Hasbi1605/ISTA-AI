@@ -2,16 +2,13 @@ from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Header,
 import os
 import shutil
 import uuid
-from typing import Dict, List, Optional
 from pydantic import BaseModel
-from app.services.rag_service import process_document, delete_document_vectors, summarize_document, get_document_chunks_for_summarization
+from app.services.rag_service import process_document, delete_document_vectors, get_document_chunks_for_summarization
 
 try:
-    from app.llm_manager import get_llm_stream
     from app.config_loader import get_summarize_single_prompt, get_summarize_partial_prompt, get_summarize_final_prompt
     CONFIG_AVAILABLE = True
 except ImportError:
-    from app.llm_manager import get_llm_stream
     CONFIG_AVAILABLE = False
 
 router = APIRouter(prefix="/api/documents", tags=["Documents"])
@@ -23,10 +20,6 @@ def verify_token(authorization: str = Header(None)):
     """Simple token-based security for internal service communication."""
     if not authorization or authorization != f"Bearer {AI_SERVICE_TOKEN}":
         raise HTTPException(status_code=401, detail="Unauthorized access to AI Service.")
-
-class ProcessDocumentRequest(BaseModel):
-    user_id: str
-
 
 @router.post("/process", dependencies=[Depends(verify_token)])
 async def upload_document(

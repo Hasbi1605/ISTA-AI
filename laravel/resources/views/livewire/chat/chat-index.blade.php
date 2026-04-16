@@ -220,7 +220,7 @@
                     @foreach($visibleChats as $conversation)
                         <li class="group relative">
                             <button wire:click="loadConversation({{ $conversation->id }})" 
-                               class="w-full text-left px-3 py-2 rounded-md flex items-center transition-colors duration-200 {{ $currentConversationId == $conversation->id ? 'bg-white/80 shadow-sm border border-stone-200 text-stone-800 dark:text-gray-100 font-medium' : 'hover:bg-black/5 dark:hover:bg-white/5 text-stone-700 dark:text-gray-300' }}">
+                               class="w-full text-left px-3 py-2 rounded-md flex items-center transition-colors duration-200 {{ $currentConversationId == $conversation->id ? 'bg-white/80 shadow-sm border border-stone-200 text-stone-800 dark:bg-[#1E293B] dark:border-[#334155] dark:text-white font-medium' : 'hover:bg-black/5 dark:hover:bg-white/5 text-stone-700 dark:text-gray-300' }}">
                                <!-- Chat icon -->
                                          <img src="{{ $uiIcons['historyLight'] }}" alt="" class="h-4 w-4 mr-2.5 flex-shrink-0 dark:hidden" />
                                          <img src="{{ $uiIcons['historyDark'] }}" alt="" class="h-4 w-4 mr-2.5 flex-shrink-0 hidden dark:block" />
@@ -252,7 +252,7 @@
                         @foreach($olderChats as $conversation)
                             <li class="group relative">
                                 <button wire:click="loadConversation({{ $conversation->id }})" 
-                                   class="w-full text-left px-3 py-2 rounded-md flex items-center transition-colors duration-200 {{ $currentConversationId == $conversation->id ? 'bg-white/80 shadow-sm border border-stone-200 text-stone-800 dark:text-gray-100 font-medium' : 'hover:bg-black/5 dark:hover:bg-white/5 text-stone-700 dark:text-gray-300' }}">
+                                   class="w-full text-left px-3 py-2 rounded-md flex items-center transition-colors duration-200 {{ $currentConversationId == $conversation->id ? 'bg-white/80 shadow-sm border border-stone-200 text-stone-800 dark:bg-[#1E293B] dark:border-[#334155] dark:text-white font-medium' : 'hover:bg-black/5 dark:hover:bg-white/5 text-stone-700 dark:text-gray-300' }}">
                                     <!-- Chat icon -->
                                     <img src="{{ $uiIcons['historyLight'] }}" alt="" class="h-4 w-4 mr-2.5 flex-shrink-0 dark:hidden" />
                                     <img src="{{ $uiIcons['historyDark'] }}" alt="" class="h-4 w-4 mr-2.5 flex-shrink-0 hidden dark:block" />
@@ -357,7 +357,7 @@
                 @endphp
                 <div class="flex {{ $isUserMessage ? 'justify-end' : 'justify-start' }}">
                     <div class="w-full sm:max-w-3xl flex items-start gap-4 px-2 sm:px-8 {{ $isUserMessage ? 'flex-row-reverse' : '' }}">
-                        <div class="shrink-0 h-8 w-8 rounded-full flex items-center justify-center {{ $message['role'] == 'user' ? 'bg-[#E2E8F0] dark:bg-gray-200 text-[#62748E] dark:text-gray-100' : 'bg-white border border-stone-200 shadow-sm p-1' }}">
+                        <div class="shrink-0 h-8 w-8 rounded-full flex items-center justify-center {{ $message['role'] == 'user' ? 'bg-[#E2E8F0] dark:bg-white text-[#62748E] dark:text-black' : 'bg-white border border-stone-200 shadow-sm p-1' }}">
                             @if($message['role'] == 'user')
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2m12-10a4 4 0 11-8 0 4 4 0 018 0z" />
@@ -391,7 +391,7 @@
                                     <div 
                                         wire:ignore
                                         wire:key="msg-typing-{{ $message['id'] }}"
-                                        class="rounded-xl bg-white/80 backdrop-blur-sm dark:bg-gray-800 border border-stone-200/60 dark:border-gray-800 px-4 py-3 text-[14.5px] leading-relaxed text-stone-700 dark:text-gray-100 max-w-[656px] prose prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-li:my-0 prose-li:marker:text-stone-800 dark:prose-li:marker:text-gray-100 pb-1"
+                                        class="rounded-xl bg-white/80 backdrop-blur-sm dark:bg-gray-800 border border-stone-200/60 dark:border-gray-800 px-4 py-3 text-[14.5px] leading-relaxed text-stone-700 dark:text-gray-100 max-w-[656px] prose prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-li:my-0 prose-li:marker:text-stone-800 dark:prose-headings:text-white dark:prose-p:text-gray-100 dark:prose-strong:text-white dark:prose-ul:text-gray-100 dark:prose-ol:text-gray-100 dark:prose-li:text-gray-100 dark:prose-li:marker:text-white pb-1"
                                         x-data="{ 
                                             content: @js((string) $assistantHtml), 
                                             displayedContent: '', 
@@ -432,7 +432,7 @@
                                 @else
                                     <div 
                                         wire:key="msg-static-{{ $message['id'] }}"
-                                        class="rounded-xl bg-white/80 backdrop-blur-sm dark:bg-gray-800 border border-stone-200/60 dark:border-gray-800 px-4 py-3 text-[14.5px] leading-relaxed text-stone-700 dark:text-gray-100 max-w-[656px] prose prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-li:my-0 prose-li:marker:text-stone-800 dark:prose-li:marker:text-gray-100 pb-1"
+                                        class="rounded-xl bg-white/80 backdrop-blur-sm dark:bg-gray-800 border border-stone-200/60 dark:border-gray-800 px-4 py-3 text-[14.5px] leading-relaxed text-stone-700 dark:text-gray-100 max-w-[656px] prose prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-li:my-0 prose-li:marker:text-stone-800 dark:prose-headings:text-white dark:prose-p:text-gray-100 dark:prose-strong:text-white dark:prose-ul:text-gray-100 dark:prose-ol:text-gray-100 dark:prose-li:text-gray-100 dark:prose-li:marker:text-white pb-1"
                                         x-html="@js((string) $assistantHtml)"
                                     >
                                     </div>
@@ -450,7 +450,7 @@
             <template x-if="optimisticUserMessage">
                 <div class="flex justify-end">
                     <div class="w-full sm:max-w-3xl flex items-start gap-4 px-2 sm:px-8 flex-row-reverse">
-                        <div class="shrink-0 h-8 w-8 rounded-full flex items-center justify-center bg-[#E2E8F0] dark:bg-gray-200 text-[#62748E] dark:text-gray-100">
+                        <div class="shrink-0 h-8 w-8 rounded-full flex items-center justify-center bg-[#E2E8F0] dark:bg-white text-[#62748E] dark:text-black">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2m12-10a4 4 0 11-8 0 4 4 0 018 0z" />
                             </svg>
@@ -531,7 +531,7 @@
                                 @php
                                     $fileExt = $doc->extension ?? strtolower(pathinfo($doc->original_name, PATHINFO_EXTENSION));
                                 @endphp
-                                <span class="inline-flex items-center gap-2 bg-[#E2E8F0] dark:bg-gray-800 text-[#314158] dark:text-gray-100 rounded-2xl px-4 py-2 text-[14px]">
+                                <span class="inline-flex items-center gap-2 bg-[#E2E8F0] dark:bg-gray-700 dark:border dark:border-gray-600 text-[#314158] dark:text-gray-100 rounded-2xl px-4 py-2 text-[14px]">
                                     @if($fileExt === 'pdf')
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#FF2056]" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"></path></svg>
                                     @elseif($fileExt === 'xlsx')

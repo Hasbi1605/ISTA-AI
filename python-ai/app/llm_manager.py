@@ -7,11 +7,8 @@ from app.services.rag_service import get_rag_context_for_prompt
 
 try:
     from app.config_loader import (
-        get_config,
         get_chat_models,
-        get_reasoning_model,
         get_system_prompt,
-        get_global_config,
         get_assertive_instruction,
     )
     CONFIG_AVAILABLE = True
@@ -30,13 +27,6 @@ def _get_chat_models_fallback():
             return models
     
     return []
-
-
-def _get_reasoning_model_fallback():
-    """Get reasoning model - tries config first, falls back to env."""
-    if CONFIG_AVAILABLE:
-        return get_reasoning_model()
-    return None
 
 
 def _get_default_system_prompt_fallback():

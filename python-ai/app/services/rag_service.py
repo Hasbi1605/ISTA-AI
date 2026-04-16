@@ -1,16 +1,12 @@
 import os
-import json
 import hashlib
 import logging
 import time
-import requests
 from typing import List, Tuple, Optional, Dict
 import re
 import unicodedata
 from dotenv import load_dotenv
 import tiktoken
-import asyncio
-from concurrent.futures import ThreadPoolExecutor
 
 # Ensure .env is loaded (for standalone imports)
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), '.env'))
@@ -20,7 +16,6 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 from langchain_core.embeddings import Embeddings
 from langchain_openai import OpenAIEmbeddings
-from langchain_core.documents import Document
 from app.services.langsearch_service import LangSearchService
 from app.config_loader import get_rag_prompt
 
@@ -610,7 +605,7 @@ def build_rag_prompt(
     context_parts = []
     sources = []
     
-    for i, chunk in enumerate(chunks):
+    for chunk in chunks:
         filename = chunk.get("filename", "Dokumen Tidak Diketahui")
         context_parts.append(f"--- Referensi dari Dokumen: {filename} ---")
         context_parts.append(chunk.get("content", ""))
@@ -641,60 +636,6 @@ Informasi web terbaru (digunakan jika relevan):
     return rag_prompt, sources
 
 
-def summarize_document(filename: str, user_id: str = None) -> Tuple[bool, str]:
-    """
-    Summarize a document by retrieving all chunks and sending to LLM.
-    
-    Args:
-        filename: The filename of the document to summarize
-        user_id: User ID for authorization filtering (required for security)
-    
-    Returns:
-        Tuple of (success: bool, result: str)
-    """
-    try:
-        logger.info(f"=== Summarizing document: {filename} ===")
-        
-        # Security: require user_id
-        if user_id is None:
-            return False, "User ID diperlukan untuk mengakses dokumen."
-        
-        # Get all chunks from ChromaDB for this filename
-        embeddings, provider_name, _ = get_embeddings_with_fallback()
-        
-        if embeddings is None:
-            return False, "Tidak dapat menginisialisasi embedding model."
-        
-        vectorstore = Chroma(
-            collection_name="documents_collection",
-            embedding_function=embeddings,
-            persist_directory=CHROMA_PATH
-        )
-        
-        # Get all chunks for this filename with user_id filter for security
-        docs = vectorstore.get(where={"$and": [{"filename": filename}, {"user_id": str(user_id)}]})
-        
-        if not docs or not docs.get("documents"):
-            return False, f"Dokumen '{filename}' tidak ditemukan atau Anda tidak memiliki akses."
-        
-        chunks_content = docs["documents"]
-        logger.info(f"Found {len(chunks_content)} chunks for summarization")
-        
-        # Build context from chunks
-        context_parts = []
-        for i, chunk in enumerate(chunks_content):
-            context_parts.append(f"--- Bagian {i+1} ---\n{chunk}")
-        
-        context_str = "\n\n".join(context_parts)
-        
-        # Return the context for LLM processing (actual summarization happens in the API endpoint)
-        return True, context_str
-        
-    except Exception as e:
-        logger.error(f"❌ Error summarizing document: {str(e)}")
-        return False, str(e)
-
-
 def get_document_chunks_for_summarization(filename: str, user_id: str = None, max_tokens: int = 8000) -> Tuple[bool, List[str], int]:
     """
     Get document chunks for summarization, with chunking for large documents.
@@ -717,7 +658,7 @@ def get_document_chunks_for_summarization(filename: str, user_id: str = None, ma
         if user_id is None:
             return False, [], 0
         
-        embeddings, provider_name, _ = get_embeddings_with_fallback()
+        embeddings, _, _ = get_embeddings_with_fallback()
         
         if embeddings is None:
             return False, [], 0

@@ -127,12 +127,6 @@ def reload_config() -> Dict[str, Any]:
     return load_config()
 
 
-def get_global_config() -> Dict[str, Any]:
-    """Get global settings."""
-    config = load_config()
-    return config.get('global', {})
-
-
 def get_chat_models() -> List[Dict[str, Any]]:
     """Get chat lane models."""
     config = load_config()
@@ -158,89 +152,85 @@ def get_search_config() -> Dict[str, Any]:
     return config.get('retrieval', {}).get('search', {})
 
 
-def get_rerank_config() -> Dict[str, Any]:
-    """Get semantic rerank configuration."""
-    config = load_config()
-    return config.get('retrieval', {}).get('semantic_rerank', {})
+def _get_prompt_with_fallback(config_path: List[str], fallback_path: List[str], warning_message: str) -> str:
+    """Resolve prompt from config with DEFAULT_PROMPTS fallback."""
+    value: Any = load_config()
+    for key in config_path:
+        if not isinstance(value, dict):
+            value = None
+            break
+        value = value.get(key)
 
+    if value:
+        return value
 
-def get_chunking_config() -> Dict[str, Any]:
-    """Get chunking configuration."""
-    config = load_config()
-    return config.get('chunking', {})
-
-
-def get_smtp_config() -> Dict[str, Any]:
-    """Get SMTP Gmail configuration."""
-    config = load_config()
-    return config.get('integrations', {}).get('smtp_gmail', {})
+    logger.warning(warning_message)
+    fallback: Any = DEFAULT_PROMPTS
+    for key in fallback_path:
+        if not isinstance(fallback, dict):
+            return ""
+        fallback = fallback.get(key)
+    return fallback or ""
 
 
 def get_system_prompt() -> str:
     """Get default system prompt."""
-    config = load_config()
-    prompt = config.get('prompts', {}).get('system', {}).get('default', '')
-    if not prompt:
-        logger.warning("System prompt empty, using default fallback")
-        prompt = DEFAULT_PROMPTS.get('system', {}).get('default', '')
-    return prompt
+    return _get_prompt_with_fallback(
+        ['prompts', 'system', 'default'],
+        ['system', 'default'],
+        "System prompt empty, using default fallback",
+    )
 
 
 def get_rag_prompt() -> str:
     """Get RAG document prompt."""
-    config = load_config()
-    prompt = config.get('prompts', {}).get('rag', {}).get('document', '')
-    if not prompt:
-        logger.warning("RAG prompt empty, using default fallback")
-        prompt = DEFAULT_PROMPTS.get('rag', {}).get('document', '')
-    return prompt
+    return _get_prompt_with_fallback(
+        ['prompts', 'rag', 'document'],
+        ['rag', 'document'],
+        "RAG prompt empty, using default fallback",
+    )
 
 
 def get_web_search_context_prompt() -> str:
     """Get web search context prompt template."""
-    config = load_config()
-    prompt = config.get('prompts', {}).get('web_search', {}).get('context', '')
-    if not prompt:
-        logger.warning("Web search context prompt empty, using default fallback")
-        prompt = DEFAULT_PROMPTS.get('web_search', {}).get('context', '')
-    return prompt
+    return _get_prompt_with_fallback(
+        ['prompts', 'web_search', 'context'],
+        ['web_search', 'context'],
+        "Web search context prompt empty, using default fallback",
+    )
 
 
 def get_assertive_instruction() -> str:
     """Get assertive instruction for web search."""
-    config = load_config()
-    prompt = config.get('prompts', {}).get('web_search', {}).get('assertive_instruction', '')
-    if not prompt:
-        logger.warning("Assertive instruction prompt empty, using default fallback")
-        prompt = DEFAULT_PROMPTS.get('web_search', {}).get('assertive_instruction', '')
-    return prompt
+    return _get_prompt_with_fallback(
+        ['prompts', 'web_search', 'assertive_instruction'],
+        ['web_search', 'assertive_instruction'],
+        "Assertive instruction prompt empty, using default fallback",
+    )
 
 
 def get_summarize_single_prompt() -> str:
     """Get single document summarization prompt."""
-    config = load_config()
-    prompt = config.get('prompts', {}).get('summarization', {}).get('single', '')
-    if not prompt:
-        logger.warning("Summarize single prompt empty, using default fallback")
-        prompt = DEFAULT_PROMPTS.get('summarization', {}).get('single', '')
-    return prompt
+    return _get_prompt_with_fallback(
+        ['prompts', 'summarization', 'single'],
+        ['summarization', 'single'],
+        "Summarize single prompt empty, using default fallback",
+    )
 
 
 def get_summarize_partial_prompt() -> str:
     """Get partial (multi-batch) summarization prompt."""
-    config = load_config()
-    prompt = config.get('prompts', {}).get('summarization', {}).get('partial', '')
-    if not prompt:
-        logger.warning("Summarize partial prompt empty, using default fallback")
-        prompt = DEFAULT_PROMPTS.get('summarization', {}).get('partial', '')
-    return prompt
+    return _get_prompt_with_fallback(
+        ['prompts', 'summarization', 'partial'],
+        ['summarization', 'partial'],
+        "Summarize partial prompt empty, using default fallback",
+    )
 
 
 def get_summarize_final_prompt() -> str:
     """Get final combined summarization prompt."""
-    config = load_config()
-    prompt = config.get('prompts', {}).get('summarization', {}).get('final', '')
-    if not prompt:
-        logger.warning("Summarize final prompt empty, using default fallback")
-        prompt = DEFAULT_PROMPTS.get('summarization', {}).get('final', '')
-    return prompt
+    return _get_prompt_with_fallback(
+        ['prompts', 'summarization', 'final'],
+        ['summarization', 'final'],
+        "Summarize final prompt empty, using default fallback",
+    )
