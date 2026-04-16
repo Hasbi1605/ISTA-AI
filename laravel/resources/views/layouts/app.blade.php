@@ -34,6 +34,7 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
     <body class="font-sans antialiased h-screen overflow-hidden text-gray-900 bg-[#ffffff] dark:bg-[#020618] dark:text-gray-100 transition-colors duration-200">
+        <x-page-loader />
         <script>
             // Inline script to prevent flash of unstyled content (FOUC)
             if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {

@@ -15,6 +15,7 @@
         @vite(['resources/css/app.css', 'resources/css/auth.css', 'resources/js/app.js'])
     </head>
     <body class="antialiased text-stone-900">
+        <x-page-loader />
         {{ $slot }}
     </body>
 </html>

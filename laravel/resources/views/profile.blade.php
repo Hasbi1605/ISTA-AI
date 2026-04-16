@@ -15,6 +15,7 @@
         @vite(['resources/css/app.css', 'resources/css/auth.css', 'resources/js/app.js'])
     </head>
     <body class="ista-shell ista-display-sans text-stone-800">
+        <x-page-loader />
         <div class="relative min-h-screen overflow-hidden bg-[#fafaf9]">
             <div class="absolute inset-0 z-0">
                 <div class="h-full w-full animate-breathe bg-cover bg-center opacity-100" style="background-image: url('/images/ista/login-bg.png');"></div>
