@@ -13,24 +13,12 @@
         <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
         @vite(['resources/css/app.css', 'resources/js/app.js'])
-        <script>
-            if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                document.documentElement.classList.add('dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-            }
-        </script>
     </head>
-    <body class="ista-shell ista-display-sans text-stone-800 dark:text-gray-100 dark:bg-[#020618] transition-colors duration-300">
+    <body class="ista-shell ista-display-sans text-stone-800">
         <x-page-loader />
-        <div class="relative min-h-screen overflow-hidden">
-            <!-- Light Mode Background -->
-            <div class="absolute inset-0 dark:hidden" style="background-image: radial-gradient(circle at 0 0, rgba(245, 158, 11, 0.08) 0%, rgba(245, 158, 11, 0) 30%), radial-gradient(circle at 100% 100%, rgba(76, 5, 25, 0.08) 0%, rgba(76, 5, 25, 0) 35%), url('{{ asset('images/ista/dashboard-grid.png') }}'); background-size: auto, auto, 8px 8px;"></div>
-            <!-- Dark Mode Background -->
-            <div class="absolute inset-0 hidden dark:block" style="background-image: radial-gradient(circle at 0 0, rgba(129, 140, 248, 0.08) 0%, transparent 30%), radial-gradient(circle at 100% 100%, rgba(79, 70, 229, 0.08) 0%, transparent 35%), url('{{ asset('images/ista/dashboard-grid.png') }}'); background-size: auto, auto, 8px 8px; opacity: 0.4;"></div>
-
-            <div class="pointer-events-none absolute -left-20 -top-20 h-[28rem] w-[28rem] rounded-full bg-amber-100/50 dark:bg-indigo-900/40 blur-3xl transition-colors duration-500"></div>
-            <div class="pointer-events-none absolute -right-24 top-32 h-[24rem] w-[24rem] rounded-full bg-rose-100/60 dark:bg-purple-900/30 blur-3xl transition-colors duration-500"></div>
+        <div class="relative min-h-screen overflow-hidden" style="background-image: radial-gradient(circle at 0 0, rgba(245, 158, 11, 0.08) 0%, rgba(245, 158, 11, 0) 30%), radial-gradient(circle at 100% 100%, rgba(76, 5, 25, 0.08) 0%, rgba(76, 5, 25, 0) 35%), url('{{ asset('images/ista/dashboard-grid.png') }}'); background-size: auto, auto, 8px 8px;">
+            <div class="pointer-events-none absolute -left-20 -top-20 h-[28rem] w-[28rem] rounded-full bg-amber-100/50 blur-3xl"></div>
+            <div class="pointer-events-none absolute -right-24 top-32 h-[24rem] w-[24rem] rounded-full bg-rose-100/60 blur-3xl"></div>
 
             <header class="ista-navbar">
                 <div class="mx-auto flex w-full max-w-7xl items-center justify-between px-5 py-4 sm:px-10">
@@ -61,34 +49,34 @@
 
             <main class="relative z-10 mx-auto flex min-h-[calc(100vh-136px)] w-full max-w-7xl items-center px-5 pb-20 pt-16 sm:px-10">
                 <section class="w-full text-center">
-                    <div class="mx-auto w-fit ista-pill bg-white/80 dark:bg-gray-800/80 border-stone-200 dark:border-gray-700 text-stone-700 dark:text-gray-300 backdrop-blur">Asisten Istana Pintar</div>
-                    <h1 class="ista-hero-title mt-8 text-stone-900 dark:text-white">Tanya <strong><span class="text-ista-primary dark:text-indigo-400">ISTA</span> <span class="font-light italic text-ista-gold dark:text-amber-300">AI</span></strong></h1>
+                    <div class="mx-auto w-fit ista-pill">Asisten Istana Pintar</div>
+                    <h1 class="ista-hero-title mt-8 text-stone-900">Tanya <strong><span class="text-ista-primary">ISTA</span> <span class="font-light italic text-ista-gold">AI</span></strong></h1>
 
                     @auth
-                    <form action="{{ route('chat') }}" method="GET" class="ista-search-shell bg-white/60 dark:bg-gray-800/60 border-stone-200/60 dark:border-gray-700/60 focus-within:bg-white dark:focus-within:bg-gray-800 backdrop-blur">
-                        <input name="q" class="ista-search-input text-stone-800 dark:text-gray-100 placeholder-stone-400 dark:placeholder-gray-500 bg-transparent" type="text" placeholder="Tanya apapun..." required>
+                    <form action="{{ route('chat') }}" method="GET" class="ista-search-shell">
+                        <input name="q" class="ista-search-input" type="text" placeholder="Tanya apapun..." required>
                         <button type="submit" class="ista-primary-cta">Mulai bertanya</button>
                     </form>
                     @else
-                    <form action="{{ route('guest-chat') }}" method="GET" class="ista-search-shell bg-white/60 dark:bg-gray-800/60 border-stone-200/60 dark:border-gray-700/60 focus-within:bg-white dark:focus-within:bg-gray-800 backdrop-blur">
-                        <input name="q" class="ista-search-input text-stone-800 dark:text-gray-100 placeholder-stone-400 dark:placeholder-gray-500 bg-transparent" type="text" placeholder="Tanya apapun..." required>
+                    <form action="{{ route('guest-chat') }}" method="GET" class="ista-search-shell">
+                        <input name="q" class="ista-search-input" type="text" placeholder="Tanya apapun..." required>
                         <button type="submit" class="ista-primary-cta">Mulai bertanya</button>
                     </form>
                     @endauth
 
                     <div class="mx-auto mt-10 grid max-w-sm gap-3">
                         @auth
-                        <a href="{{ route('chat') }}" class="rounded-2xl border border-stone-200 dark:border-gray-700 bg-white/80 dark:bg-gray-800/80 px-4 py-3 text-sm font-semibold text-stone-700 dark:text-gray-300 transition hover:border-ista-primary/30 dark:hover:border-indigo-500/50 hover:text-ista-primary dark:hover:text-indigo-400 backdrop-blur">Buka Chat</a>
+                        <a href="{{ route('chat') }}" class="rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-sm font-semibold text-stone-700 transition hover:border-ista-primary/30 hover:text-ista-primary">Buka Chat</a>
                         @else
-                        <a href="{{ route('guest-chat') }}" class="rounded-2xl border border-stone-200 dark:border-gray-700 bg-white/80 dark:bg-gray-800/80 px-4 py-3 text-sm font-semibold text-stone-700 dark:text-gray-300 transition hover:border-ista-primary/30 dark:hover:border-indigo-500/50 hover:text-ista-primary dark:hover:text-indigo-400 backdrop-blur">Buka Chat</a>
+                        <a href="{{ route('guest-chat') }}" class="rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-sm font-semibold text-stone-700 transition hover:border-ista-primary/30 hover:text-ista-primary">Buka Chat</a>
                         @endauth
                     </div>
                 </section>
             </main>
 
-            <footer class="relative z-20 flex h-[72px] flex-col items-center justify-center border-t border-stone-200/80 dark:border-gray-800 bg-white/80 dark:bg-[#020618]/80 backdrop-blur transition-colors duration-300">
-                <p class="text-[11px] font-bold uppercase tracking-widest text-[#78716c] dark:text-gray-500">Copyright &copy; 2026 Istana Kepresidenan Yogyakarta</p>
-                <p class="mt-1 text-[9px] font-medium uppercase tracking-[0.3em] text-[#a8a29e] dark:text-gray-600">All Rights Reserved.</p>
+            <footer class="relative z-20 flex h-[72px] flex-col items-center justify-center border-t border-stone-200/80 bg-white/80 backdrop-blur">
+                <p class="text-[11px] font-bold uppercase tracking-widest text-[#78716c]">Copyright &copy; 2026 Istana Kepresidenan Yogyakarta</p>
+                <p class="mt-1 text-[9px] font-medium uppercase tracking-[0.3em] text-[#a8a29e]">All Rights Reserved.</p>
             </footer>
         </div>
     </body>

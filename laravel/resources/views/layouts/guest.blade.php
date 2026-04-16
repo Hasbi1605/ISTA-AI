@@ -14,15 +14,8 @@
 
         <!-- Scripts -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])
-        <script>
-            if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                document.documentElement.classList.add('dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-            }
-        </script>
     </head>
-    <body class="font-sans text-gray-900 dark:text-gray-100 antialiased bg-gray-100 dark:bg-[#020618] transition-colors duration-300">
+    <body class="font-sans text-gray-900 antialiased">
         <x-page-loader />
         <div class="min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0 bg-gray-100 dark:bg-gray-900">
             <div>

@@ -13,15 +13,8 @@
         <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600;9..144,700&family=Instrument+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
         @vite(['resources/css/app.css', 'resources/css/auth.css', 'resources/js/app.js'])
-        <script>
-            if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                document.documentElement.classList.add('dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-            }
-        </script>
     </head>
-    <body class="antialiased text-stone-900 dark:text-gray-100 bg-[#fafaf9] dark:bg-[#020618] transition-colors duration-300">
+    <body class="antialiased text-stone-900">
         <x-page-loader />
         {{ $slot }}
     </body>

@@ -412,39 +412,39 @@ new #[Layout('layouts.auth-canvas')] class extends Component
     }
 }; ?>
 
-<div class="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-[#fafaf9] dark:bg-[#020618] transition-colors duration-300">
+<div class="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-[#fafaf9]">
     <div class="absolute inset-0 z-0">
-        <div class="h-full w-full animate-breathe bg-cover bg-center opacity-100 dark:opacity-20 transition-opacity duration-300" style="background-image: url('/images/ista/login-bg.png');"></div>
-        <div class="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(212,175,55,0.15)_0%,rgba(250,250,249,0.4)_80%)] dark:bg-[radial-gradient(circle_at_center,rgba(79,70,229,0.15)_0%,rgba(2,6,24,0.85)_80%)] transition-colors duration-300"></div>
-        <div class="absolute inset-0 bg-gradient-to-t from-ista-gold/20 via-white/5 to-transparent dark:from-indigo-900/30 dark:via-[#020618]/60 transition-colors duration-300"></div>
+        <div class="h-full w-full animate-breathe bg-cover bg-center opacity-100" style="background-image: url('/images/ista/login-bg.png');"></div>
+        <div class="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(212,175,55,0.15)_0%,rgba(250,250,249,0.4)_80%)]"></div>
+        <div class="absolute inset-0 bg-gradient-to-t from-ista-gold/20 via-white/5 to-transparent"></div>
     </div>
 
-    <div class="pointer-events-none absolute inset-0 z-0 overflow-hidden mix-blend-screen dark:mix-blend-color-dodge">
-        <div class="animate-float-slow absolute left-1/4 top-1/4 h-64 w-64 cursor-pointer rounded-full bg-yellow-400/20 dark:bg-indigo-500/10 blur-3xl transition-colors duration-500"></div>
-        <div class="animate-float-reverse absolute bottom-1/4 right-1/4 h-80 w-80 cursor-pointer rounded-full bg-rose-500/10 dark:bg-purple-600/10 blur-3xl transition-colors duration-500"></div>
+    <div class="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+        <div class="animate-float-slow absolute left-1/4 top-1/4 h-64 w-64 cursor-pointer rounded-full bg-yellow-400/20 mix-blend-overlay blur-3xl"></div>
+        <div class="animate-float-reverse absolute bottom-1/4 right-1/4 h-80 w-80 cursor-pointer rounded-full bg-rose-500/10 mix-blend-multiply blur-3xl"></div>
 
         <div class="animate-twinkle absolute left-20 top-10 h-2 w-2 cursor-pointer rounded-full bg-yellow-500 blur-[1px]" style="animation-delay: 0s"></div>
-        <div class="animate-twinkle absolute bottom-20 right-10 h-3 w-3 cursor-pointer rounded-full bg-rose-400 dark:bg-purple-400 blur-[2px]" style="animation-delay: 1s"></div>
+        <div class="animate-twinkle absolute bottom-20 right-10 h-3 w-3 cursor-pointer rounded-full bg-rose-400 blur-[2px]" style="animation-delay: 1s"></div>
         <div class="animate-twinkle absolute left-10 top-1/2 h-1.5 w-1.5 cursor-pointer rounded-full bg-white blur-[1px]" style="animation-delay: 2s"></div>
-        <div class="animate-twinkle absolute right-1/3 top-20 h-2 w-2 cursor-pointer rounded-full bg-yellow-600/60 dark:bg-indigo-400/60 blur-[1px]" style="animation-delay: 1.5s"></div>
+        <div class="animate-twinkle absolute right-1/3 top-20 h-2 w-2 cursor-pointer rounded-full bg-yellow-600/60 blur-[1px]" style="animation-delay: 1.5s"></div>
     </div>
 
     <div @class([
         'relative w-full max-w-[640px] p-6 font-sans transition-all duration-500',
         'opacity-30 blur-sm pointer-events-none' => $showVerificationModal,
     ]) style="{{ $showVerificationModal ? 'z-index: 0; filter: brightness(0.28) saturate(0.45);' : 'z-index: 10;' }}">
-        <div class="group/card ista-glass-card cursor-pointer bg-white/80 dark:bg-gray-900/60 border-white/60 dark:border-gray-700/60 shadow-[0_4px_30px_rgba(0,0,0,0.05)] dark:shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
-            <div class="absolute inset-0 z-0 -translate-x-[200%] bg-gradient-to-tr from-white/0 via-white/40 dark:via-white/10 to-white/0 group-hover/card:animate-[shimmer_1s_ease-out]"></div>
+        <div class="group/card ista-glass-card cursor-pointer">
+            <div class="absolute inset-0 z-0 -translate-x-[200%] bg-gradient-to-tr from-white/0 via-white/40 to-white/0 group-hover/card:animate-[shimmer_1s_ease-out]"></div>
 
             <div class="animate-enter-1 relative z-20 px-10 pb-6 pt-8 text-center">
-                <div class="group/logo mb-4 inline-flex h-16 w-16 cursor-pointer items-center justify-center rounded-2xl border border-white/40 dark:border-gray-700/50 bg-white/80 dark:bg-gray-800/80 shadow-sm transition-transform duration-500 hover:scale-110 hover:rotate-6 backdrop-blur">
+                <div class="group/logo mb-4 inline-flex h-16 w-16 cursor-pointer items-center justify-center rounded-2xl border border-white/40 bg-white/80 shadow-sm transition-transform duration-500 hover:scale-110 hover:rotate-6">
                     <img src="{{ asset('images/ista/logo.png') }}" class="h-9 w-9 object-contain group-hover/logo:brightness-110" alt="Logo">
                 </div>
 
                 <h1 class="ista-brand-title mb-1 flex items-center justify-center gap-2 cursor-default text-4xl tracking-tight drop-shadow-sm transition-all duration-300 not-italic">
-                    <span class="text-stone-900 dark:text-white not-italic">Login</span> <span class="text-ista-primary dark:text-indigo-400 not-italic">ISTA <span class="font-light italic text-ista-gold dark:text-amber-300">AI</span></span>
+                    <span class="text-stone-900 not-italic">Login</span> <span class="text-ista-primary not-italic">ISTA <span class="font-light italic text-ista-gold">AI</span></span>
                 </h1>
-                <p class="cursor-default text-[13px] font-medium text-stone-600 dark:text-gray-400 opacity-90">Asisten Istana Pintar</p>
+                <p class="cursor-default text-[13px] font-medium text-stone-600 opacity-90">Asisten Istana Pintar</p>
             </div>
 
             <div class="relative z-20 px-12 pb-10">
@@ -467,8 +467,8 @@ new #[Layout('layouts.auth-canvas')] class extends Component
                     @include('livewire.pages.auth.partials.forgot-password-form')
                 @endif
 
-                <div class="animate-enter-4 mt-8 border-t border-rose-900/10 dark:border-indigo-900/40 pt-4 text-center">
-                    <p class="inline-block cursor-pointer text-[12px] font-semibold text-rose-950/60 dark:text-gray-500 transition-colors hover:scale-105 hover:text-rose-900 dark:hover:text-indigo-400">
+                <div class="animate-enter-4 mt-8 border-t border-rose-900/10 pt-4 text-center">
+                    <p class="inline-block cursor-pointer text-[12px] font-semibold text-rose-950/60 transition-colors hover:scale-105 hover:text-rose-900">
                         Copyright © 2026 Istana Kepresidenan Yogyakarta, All rights reserved.
                     </p>
                 </div>
