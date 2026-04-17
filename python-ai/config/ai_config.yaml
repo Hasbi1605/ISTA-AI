@@ -200,6 +200,25 @@ chunking:
   # bisa underhitung 10-20% vs tokenizer API sebenarnya. Safety margin 37.5% → 40K.
   max_tokens_per_batch: 50000
 
+  # ============================================
+  # PDR (Parent Document Retrieval)
+  # ============================================
+  # Teknik untuk meningkatkan akurasi RAG pada dokumen panjang & terstruktur.
+  # Cara kerja:
+  #   - Child chunks (kecil) di-embed ke ChromaDB → digunakan untuk similarity search
+  #   - Parent chunks (besar) disimpan tanpa embed → dikirim ke LLM sebagai konteks
+  #   - Hasil: presisi retrieval TINGGI (child 256 token) + konteks LLM LENGKAP (parent 1500 token)
+  #
+  # Trade-off: storage ~2.5x lebih banyak, upload dokumen sedikit lebih lambat
+  # ⚠️  Butuh re-upload dokumen agar PDR aktif (dokumen lama tetap pakai mode lama)
+  pdr:
+    enabled: true
+    child_chunk_size: 256     # token — unit embedding untuk retrieval presisi
+    child_chunk_overlap: 32   # ~12.5% overlap antar child chunk
+    parent_chunk_size: 1500   # token — konteks penuh yang dikirim ke LLM
+    parent_chunk_overlap: 150 # overlap antar parent chunk
+
+
 # ============================================
 # INTEGRATIONS
 # ============================================

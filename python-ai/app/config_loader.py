@@ -192,6 +192,16 @@ def get_hyde_config() -> Dict[str, Any]:
     return config.get('retrieval', {}).get('hyde', {})
 
 
+def get_pdr_config() -> Dict[str, Any]:
+    """
+    Konfigurasi PDR (Parent Document Retrieval).
+    PDR menyimpan child chunks kecil (untuk retrieval presisi)
+    dan parent chunks besar (untuk konteks LLM yang lengkap).
+    """
+    config = load_config()
+    return config.get('chunking', {}).get('pdr', {})
+
+
 def _get_prompt_with_fallback(config_path: List[str], fallback_path: List[str], warning_message: str) -> str:
     """Resolve prompt from config with DEFAULT_PROMPTS fallback."""
     value: Any = load_config()

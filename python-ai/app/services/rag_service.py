@@ -302,57 +302,153 @@ def process_document(file_path: str, filename: str, user_id: str = "unknown"):
         total_chars = len(total_content)
         estimated_tokens = count_tokens(total_content)
         logger.info(f"Total content: {total_chars:,} chars, ~{estimated_tokens:,} tokens")
-        
-        # 2. Token-Aware Recursive Chunking
-        logger.info(f"Step 2: Token-Aware Recursive Chunking (chunk_size={TOKEN_CHUNK_SIZE}, overlap={TOKEN_CHUNK_OVERLAP})...")
-        
-        # Use RecursiveCharacterTextSplitter with token counting
-        text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=TOKEN_CHUNK_SIZE,
-            chunk_overlap=TOKEN_CHUNK_OVERLAP,
-            length_function=count_tokens,  # Use token-based counting
-            add_start_index=True,
-            separators=["\n\n", "\n", ". ", " ", ""]  # Prioritize semantic boundaries
-        )
-        chunks = text_splitter.split_documents(docs)
-        logger.info(f"Created {len(chunks)} token-aware chunks")
-        
+
+        # ── Load PDR config ──────────────────────────────────────────────────────
+        try:
+            from app.config_loader import get_pdr_config
+            pdr_cfg = get_pdr_config()
+        except Exception:
+            pdr_cfg = {}
+        pdr_enabled       = pdr_cfg.get('enabled', False)
+        pdr_child_size    = int(pdr_cfg.get('child_chunk_size', 256))
+        pdr_child_overlap = int(pdr_cfg.get('child_chunk_overlap', 32))
+        pdr_parent_size   = int(pdr_cfg.get('parent_chunk_size', TOKEN_CHUNK_SIZE))
+        pdr_parent_overlap= int(pdr_cfg.get('parent_chunk_overlap', TOKEN_CHUNK_OVERLAP))
+
+        # ── Step 2: Chunking (PDR atau standard) ────────────────────────────────
+        if pdr_enabled:
+            logger.info(
+                "Step 2: PDR Chunking (parent=%d token, child=%d token)...",
+                pdr_parent_size, pdr_child_size,
+            )
+            # 2a. Buat Parent chunks (besar, untuk konteks LLM)
+            parent_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=pdr_parent_size,
+                chunk_overlap=pdr_parent_overlap,
+                length_function=count_tokens,
+                add_start_index=True,
+                separators=["\n\n", "\n", ". ", " ", ""],
+            )
+            parent_chunks = parent_splitter.split_documents(docs)
+
+            # 2b. Buat Child chunks (kecil, untuk embedding & retrieval)
+            child_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=pdr_child_size,
+                chunk_overlap=pdr_child_overlap,
+                length_function=count_tokens,
+                add_start_index=True,
+                separators=["\n\n", "\n", ". ", " ", ""],
+            )
+
+            # Assign parent_id ke setiap parent, lalu buat child dari parent
+            child_chunks = []
+            pdr_parent_docs = []  # (parent_id, content, metadata) untuk disimpan tanpa embed
+
+            for p_idx, parent in enumerate(parent_chunks):
+                # Buat unique parent_id: hash dari filename + index + konten awal
+                raw_key = f"{filename}:{user_id}:{p_idx}:{parent.page_content[:50]}"
+                parent_id = hashlib.md5(raw_key.encode()).hexdigest()
+
+                parent_meta = {
+                    "filename": filename,
+                    "user_id": str(user_id),
+                    "chunk_type": "parent",
+                    "parent_id": parent_id,
+                    "parent_index": p_idx,
+                }
+                pdr_parent_docs.append((parent_id, parent.page_content, parent_meta))
+
+                # Buat child dari parent ini
+                children = child_splitter.split_documents([parent])
+                for c_idx, child in enumerate(children):
+                    child.metadata["chunk_type"] = "child"
+                    child.metadata["parent_id"]  = parent_id
+                    child.metadata["child_index"] = c_idx
+                    child_chunks.append(child)
+
+            chunks = child_chunks  # child yang akan di-embed
+            logger.info(
+                "✅ PDR: %d parent chunks + %d child chunks (ratio %.1f:1)",
+                len(parent_chunks), len(child_chunks),
+                len(child_chunks) / max(len(parent_chunks), 1),
+            )
+
+        else:
+            # Mode standard (non-PDR) — backward compatible
+            logger.info(
+                "Step 2: Token-Aware Recursive Chunking (chunk_size=%d, overlap=%d)...",
+                TOKEN_CHUNK_SIZE, TOKEN_CHUNK_OVERLAP,
+            )
+            text_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=TOKEN_CHUNK_SIZE,
+                chunk_overlap=TOKEN_CHUNK_OVERLAP,
+                length_function=count_tokens,
+                add_start_index=True,
+                separators=["\n\n", "\n", ". ", " ", ""],
+            )
+            chunks = text_splitter.split_documents(docs)
+            pdr_parent_docs = []  # tidak ada parent di mode standard
+            logger.info(f"Created {len(chunks)} token-aware chunks")
+
         # Log chunk statistics
         if chunks:
             chunk_tokens = [count_tokens(chunk.page_content) for chunk in chunks]
             avg_tokens = sum(chunk_tokens) / len(chunk_tokens)
-            max_tokens = max(chunk_tokens)
-            min_tokens = min(chunk_tokens)
-            logger.info(f"Chunk stats: avg={avg_tokens:.0f} tokens, min={min_tokens}, max={max_tokens}")
-        
-        # 3. Get embedding model dengan cascading fallback
+            max_tokens_val = max(chunk_tokens)
+            min_tokens_val = min(chunk_tokens)
+            logger.info(
+                "Chunk stats: avg=%d tokens, min=%d, max=%d",
+                avg_tokens, min_tokens_val, max_tokens_val,
+            )
+
+        # Step 3. Get embedding model dengan cascading fallback
         logger.info("Step 3: Initializing embedding model dengan cascading fallback...")
         current_model_index = 0
         embeddings, provider_name, current_model_index = get_embeddings_with_fallback(current_model_index)
-        
+
         if embeddings is None:
             raise Exception("Semua embedding provider gagal. Tidak dapat memproses dokumen.")
-        
-        # Add metadata untuk tracking (including user_id for authorization)
+
+        # Add metadata untuk tracking (termasuk user_id untuk authorization)
         for chunk in chunks:
             chunk.metadata["filename"] = filename
-            chunk.metadata["user_id"] = str(user_id)
+            chunk.metadata["user_id"]  = str(user_id)
             chunk.metadata["embedding_model"] = provider_name
-            
-        # 4. Smart Batching dengan Token Limit Validation
-        # OpenAI embedding API limit: 64,000 tokens per request (not per minute)
-        # CATATAN: tiktoken cl100k_base bisa underhitung vs tokenizer API sebenarnya.
-        # Nilai dibaca dari ai_config.yaml (max_tokens_per_batch) atau env MAX_TOKENS_PER_BATCH.
+
+        # Step 4. Smart Batching & Embedding Generation
         logger.info(f"Step 4: Smart Batching & Embedding Generation...")
-        logger.info(f"Max batch size: {AGGRESSIVE_BATCH_SIZE} chunks OR {MAX_TOKENS_PER_BATCH:,} tokens (whichever is smaller)")
-        logger.info(f"Total capacity: 2M TPM across 4 models (4 x 500K TPM)")
-        
+        logger.info(
+            "Max batch size: %d chunks OR %d tokens (whichever is smaller)",
+            AGGRESSIVE_BATCH_SIZE, MAX_TOKENS_PER_BATCH,
+        )
+        logger.info("Total capacity: 2M TPM across 4 models (4 x 500K TPM)")
+
         vectorstore = Chroma(
             collection_name="documents_collection",
             embedding_function=embeddings,
             persist_directory=CHROMA_PATH
         )
-        
+
+        # ── PDR Step 4a: Simpan Parent chunks (tanpa embedding) ───────────────
+        # Parent disimpan menggunakan raw ChromaDB client agar tidak di-embed
+        if pdr_enabled and pdr_parent_docs:
+            try:
+                raw_col = vectorstore._collection  # akses raw ChromaDB collection
+                p_ids   = [pid for pid, _, _ in pdr_parent_docs]
+                p_texts = [txt for _, txt, _ in pdr_parent_docs]
+                p_metas = [meta for _, _, meta in pdr_parent_docs]
+                # Upsert tanpa embeddings agar tidak di-index untuk similarity search
+                raw_col.upsert(
+                    ids=p_ids,
+                    documents=p_texts,
+                    metadatas=p_metas,
+                    embeddings=[[0.0] * 3072] * len(p_ids),  # dummy embedding (tidak dipakai)
+                )
+                logger.info("✅ PDR: %d parent chunks disimpan ke ChromaDB", len(pdr_parent_docs))
+            except Exception as pe:
+                logger.warning("⚠️  Gagal menyimpan parent PDR: %s", pe)
+
+
         successful_chunks = 0
         failed_chunks = 0
         
@@ -535,23 +631,32 @@ def process_document(file_path: str, filename: str, user_id: str = "unknown"):
 def delete_document_vectors(filename: str):
     """
     Removes all vector embeddings associated with a specific filename from ChromaDB.
+    Mencakup child chunks (embedded) dan parent chunks (PDR, tidak di-embed).
     """
     try:
-        # Gunakan embedding model dengan fallback
         embeddings, provider_name, _ = get_embeddings_with_fallback()
-        
+
         if embeddings is None:
             return False, "Tidak dapat menginisialisasi embedding model untuk delete operation."
-        
+
         vectorstore = Chroma(
             collection_name="documents_collection",
             embedding_function=embeddings,
             persist_directory=CHROMA_PATH
         )
-        
-        # In Chroma, we can filter by metadata to delete
+
+        # Hapus child chunks (embedded) — gunakan LangChain wrapper
         vectorstore.delete(where={"filename": filename})
-        logger.info(f"✅ Vectors for {filename} deleted successfully using {provider_name}")
+
+        # Hapus parent chunks (PDR, tidak di-embed) — gunakan raw collection
+        try:
+            raw_col = vectorstore._collection
+            raw_col.delete(where={"$and": [{"filename": filename}, {"chunk_type": "parent"}]})
+            logger.info("✅ PDR parent chunks for %s deleted", filename)
+        except Exception as pe:
+            logger.debug("PDR parent delete skipped (mungkin non-PDR dokumen): %s", pe)
+
+        logger.info("✅ Vectors for %s deleted successfully using %s", filename, provider_name)
         return True, f"Vectors for {filename} deleted successfully."
     except Exception as e:
         logger.error(f"❌ Error deleting vectors for {filename}: {str(e)}")
@@ -811,6 +916,107 @@ def _rrf_merge_docs(
     return merged
 
 
+def _resolve_pdr_parents(
+    child_chunks: List[Dict],
+    vectorstore,
+    user_id: str,
+) -> List[Dict]:
+    """
+    PDR: Tukar child chunks → parent chunks.
+
+    Setelah retrieval+reranking menemukan child chunks (256 token),
+    fungsi ini fetch parent chunks (1500 token) yang lebih lengkap
+    untuk dikirim ke LLM sebagai konteks.
+
+    - Deduplicate: jika 2 child dari parent yang sama, parent hanya ada 1×
+    - Preserve order: urutan relevansi dari reranker dipertahankan
+    - Fallback: jika parent tidak ditemukan, gunakan child asli
+    """
+    if not child_chunks:
+        return child_chunks
+
+    # Kumpulkan parent_ids yang unik, pertahankan urutan kemunculan pertama
+    seen_parent_ids: set = set()
+    ordered_parent_ids: List[str] = []
+    child_by_parent: Dict[str, Dict] = {}  # parent_id → child chunk (untuk fallback metadata)
+
+    for chunk in child_chunks:
+        pid = chunk.get("metadata", {}).get("parent_id") or chunk.get("parent_id")
+        ctype = chunk.get("metadata", {}).get("chunk_type") or chunk.get("chunk_type")
+
+        if pid and ctype == "child" and pid not in seen_parent_ids:
+            seen_parent_ids.add(pid)
+            ordered_parent_ids.append(pid)
+            child_by_parent[pid] = chunk
+        elif not pid or ctype != "child":
+            # Chunk lama (non-PDR) — lewatkan tanpa modifikasi
+            if "NON_PDR" not in seen_parent_ids:
+                seen_parent_ids.add("NON_PDR")
+
+    if not ordered_parent_ids:
+        return child_chunks  # semua chunk non-PDR, kembalikan apa adanya
+
+    # Fetch parent chunks dari ChromaDB (filter by parent_id)
+    try:
+        raw_col = vectorstore._collection
+        result = raw_col.get(
+            where={
+                "$and": [
+                    {"user_id": str(user_id)},
+                    {"chunk_type": "parent"},
+                    {"parent_id": {"$in": ordered_parent_ids}},
+                ]
+            },
+            include=["documents", "metadatas"],
+        )
+
+        # Buat mapping parent_id → content
+        parent_map: Dict[str, Dict] = {}
+        for doc, meta in zip(result.get("documents", []), result.get("metadatas", [])):
+            pid = meta.get("parent_id")
+            if pid:
+                parent_map[pid] = {"content": doc, "metadata": meta}
+
+        # Susun hasil akhir dalam urutan relevansi anak
+        resolved: List[Dict] = []
+        non_pdr: List[Dict] = []  # chunk lama tetap dipertahankan
+
+        for chunk in child_chunks:
+            pid = chunk.get("metadata", {}).get("parent_id") or chunk.get("parent_id")
+            ctype = chunk.get("metadata", {}).get("chunk_type") or chunk.get("chunk_type")
+
+            if pid and ctype == "child":
+                if pid in parent_map and pid not in {r.get("parent_id") for r in resolved}:
+                    p = parent_map[pid]
+                    resolved.append({
+                        "content":         p["content"],
+                        "score":           chunk.get("score", 1.0),
+                        "rerank_score":    chunk.get("rerank_score", 0.0),
+                        "filename":        p["metadata"].get("filename", chunk.get("filename", "unknown")),
+                        "chunk_index":     p["metadata"].get("parent_index", 0),
+                        "embedding_model": chunk.get("embedding_model", ""),
+                        "parent_id":       pid,
+                        "pdr":             True,
+                    })
+                elif pid not in {r.get("parent_id") for r in resolved}:
+                    # Parent tidak ditemukan — fallback ke child
+                    resolved.append(chunk)
+            else:
+                non_pdr.append(chunk)
+
+        final = resolved + non_pdr
+        pdr_count = sum(1 for r in final if r.get("pdr"))
+        logger.info(
+            "🔍 PDR: %d child → %d parent chunks (+ %d non-PDR chunks)",
+            len(ordered_parent_ids), pdr_count, len(non_pdr),
+        )
+        return final
+
+    except Exception as e:
+        logger.warning("⚠️  PDR parent lookup gagal: %s — fallback ke child chunks", e)
+        return child_chunks
+
+
 def search_relevant_chunks(query: str, filenames: List[str] = None, top_k: int = 5, user_id: str = None) -> Tuple[List[Dict], bool]:
     """
     Search for relevant document chunks based on query with optional reranking.
@@ -1065,6 +1271,20 @@ def search_relevant_chunks(query: str, filenames: List[str] = None, top_k: int =
                     ", ".join(f"{k}: {v}" for k, v in dist.items()),
                     f" ({n_forced} forced)" if n_forced else "",
                 )
+
+                # ── PDR: Tukar child chunks → parent chunks sebelum ke LLM ──────
+                try:
+                    from app.config_loader import get_pdr_config as _get_pdr
+                    _pdr = _get_pdr()
+                    _pdr_enabled = _pdr.get('enabled', False)
+                except Exception:
+                    _pdr_enabled = False
+
+                if _pdr_enabled:
+                    final_chunks = _resolve_pdr_parents(
+                        final_chunks, vectorstore, str(user_id)
+                    )
+
                 return final_chunks, True
             else:
                 logger.warning("⚠️ RAG: Rerank gagal, fallback ke vector search")
