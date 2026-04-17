@@ -111,15 +111,16 @@ def _chunking_float(env_key: str, yaml_key: str, default: float) -> float:
         return float(env_val)
     return float(_chunking_cfg.get(yaml_key, default))
 
-EMBEDDING_TIMEOUT    = _chunking_int("EMBEDDING_TIMEOUT",    "embedding_timeout",    30)
-TOKEN_CHUNK_SIZE     = _chunking_int("TOKEN_CHUNK_SIZE",     "token_chunk_size",     1500)
-TOKEN_CHUNK_OVERLAP  = _chunking_int("TOKEN_CHUNK_OVERLAP",  "token_chunk_overlap",  150)
-AGGRESSIVE_BATCH_SIZE = _chunking_int("AGGRESSIVE_BATCH_SIZE", "aggressive_batch_size", 100)   # sama dengan ai_config.yaml
-BATCH_DELAY_SECONDS  = _chunking_float("BATCH_DELAY_SECONDS", "batch_delay_seconds",  0.8)    # sama dengan ai_config.yaml
+EMBEDDING_TIMEOUT     = _chunking_int("EMBEDDING_TIMEOUT",       "embedding_timeout",      30)
+TOKEN_CHUNK_SIZE      = _chunking_int("TOKEN_CHUNK_SIZE",        "token_chunk_size",        1500)
+TOKEN_CHUNK_OVERLAP   = _chunking_int("TOKEN_CHUNK_OVERLAP",     "token_chunk_overlap",     150)
+AGGRESSIVE_BATCH_SIZE = _chunking_int("AGGRESSIVE_BATCH_SIZE",   "aggressive_batch_size",   100)
+BATCH_DELAY_SECONDS   = _chunking_float("BATCH_DELAY_SECONDS",   "batch_delay_seconds",     0.8)
+MAX_TOKENS_PER_BATCH  = _chunking_int("MAX_TOKENS_PER_BATCH",    "max_tokens_per_batch",    40000)
 
 logger.info(
-    "⚙️  Chunking config (YAML+env): chunk_size=%d overlap=%d batch=%d delay=%.1fs",
-    TOKEN_CHUNK_SIZE, TOKEN_CHUNK_OVERLAP, AGGRESSIVE_BATCH_SIZE, BATCH_DELAY_SECONDS
+    "⚙️  Chunking config (YAML+env): chunk_size=%d overlap=%d batch=%d delay=%.1fs max_tokens=%d",
+    TOKEN_CHUNK_SIZE, TOKEN_CHUNK_OVERLAP, AGGRESSIVE_BATCH_SIZE, BATCH_DELAY_SECONDS, MAX_TOKENS_PER_BATCH
 )
 
 # Embedding model list untuk cascading fallback (4-tier system)
@@ -341,8 +342,7 @@ def process_document(file_path: str, filename: str, user_id: str = "unknown"):
         # 4. Smart Batching dengan Token Limit Validation
         # OpenAI embedding API limit: 64,000 tokens per request (not per minute)
         # CATATAN: tiktoken cl100k_base bisa underhitung vs tokenizer API sebenarnya.
-        # Safety margin 37.5%: 64K * 0.625 = 40K → aman untuk dokumen apapun.
-        MAX_TOKENS_PER_BATCH = 40000  # Conservative limit (API=64K, tiktoken undercount ~10-20%)
+        # Nilai dibaca dari ai_config.yaml (max_tokens_per_batch) atau env MAX_TOKENS_PER_BATCH.
         logger.info(f"Step 4: Smart Batching & Embedding Generation...")
         logger.info(f"Max batch size: {AGGRESSIVE_BATCH_SIZE} chunks OR {MAX_TOKENS_PER_BATCH:,} tokens (whichever is smaller)")
         logger.info(f"Total capacity: 2M TPM across 4 models (4 x 500K TPM)")

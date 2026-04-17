@@ -149,12 +149,12 @@ system:
 chunking:
   token_chunk_size: 1500      # Max tokens per chunk (optimal untuk text-embedding-3-large)
   token_chunk_overlap: 150    # Token overlap antar chunk (10% dari chunk_size)
-  aggressive_batch_size: 100  # Max chunks per batch — naik ke 200 jika RAM server >= 8 GB
+  aggressive_batch_size: 120  # Max chunks per batch — naik ke 200 jika RAM server >= 8 GB
   batch_delay_seconds: 0.8    # Delay antar batch (detik) — turunkan ke 0.5 jika ingin lebih cepat
   embedding_timeout: 30       # Timeout embedding request (detik)
   # Batas token per batch (bukan per chunk). API limit = 64K, tapi tiktoken cl100k_base
   # bisa underhitung 10-20% vs tokenizer API sebenarnya. Safety margin 37.5% → 40K.
-  max_tokens_per_batch: 40000
+  max_tokens_per_batch: 50000
 
 # ============================================
 # INTEGRATIONS
