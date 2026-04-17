@@ -253,13 +253,47 @@ def process_document(file_path: str, filename: str, user_id: str = "unknown"):
             file_size = os.path.getsize(file_path)
             logger.info(f"File size: {file_size:,} bytes ({file_size / 1024 / 1024:.2f} MB)")
         
-        # 1. Load document
-        # Lazy import: library berat (PyTorch, ONNX, spaCy, OpenCV) dimuat hanya di sini,
-        # bukan saat server startup — menghemat ~1.5–2 GB RAM saat server idle.
-        logger.info("Step 1: Loading document (lazy-loading heavy ML libraries)...")
-        from langchain_community.document_loaders import UnstructuredFileLoader
-        loader = UnstructuredFileLoader(file_path)
-        docs = loader.load()
+        # 1. Load document — Tiered Loader Strategy
+        # Tier 1: PyPDFLoader (cepat, 5-20 detik untuk PDF besar, tidak butuh ML libs)
+        # Tier 2: UnstructuredFileLoader (lambat, 2-5 menit, tapi support semua format)
+        # Lazy import UnstructuredFileLoader hanya jika tier 1 gagal/hasilnya kosong.
+        import time as _time
+        _load_start = _time.time()
+        logger.info("Step 1: Loading document (tiered loader: PyPDF → Unstructured fallback)...")
+
+        docs = None
+        file_ext = os.path.splitext(filename)[1].lower()
+        is_pdf = file_ext == ".pdf"
+
+        # ── Tier 1: PyPDFLoader (khusus PDF, sangat cepat) ──────────────────
+        if is_pdf:
+            try:
+                from langchain_community.document_loaders import PyPDFLoader
+                logger.info("   [Tier 1] Mencoba PyPDFLoader (fast)...")
+                pdf_loader = PyPDFLoader(file_path)
+                docs = pdf_loader.load()
+
+                total_text = "".join(d.page_content for d in docs).strip()
+                if not total_text:
+                    logger.warning("   [Tier 1] PyPDFLoader menghasilkan teks kosong (PDF mungkin ter-scan/gambar) → fallback Unstructured")
+                    docs = None
+                else:
+                    elapsed = _time.time() - _load_start
+                    logger.info(f"   [Tier 1] ✅ PyPDFLoader berhasil: {len(docs)} halaman dalam {elapsed:.1f}s")
+            except Exception as pdf_err:
+                logger.warning(f"   [Tier 1] PyPDFLoader gagal: {pdf_err} → fallback Unstructured")
+                docs = None
+
+        # ── Tier 2: UnstructuredFileLoader (fallback untuk non-PDF atau PDF gagal) ──
+        if docs is None:
+            logger.info("   [Tier 2] Menggunakan UnstructuredFileLoader (lambat tapi universal)...")
+            logger.info("   ⏳ Proses ini bisa 1-5 menit untuk dokumen besar — harap tunggu...")
+            from langchain_community.document_loaders import UnstructuredFileLoader
+            loader = UnstructuredFileLoader(file_path)
+            docs = loader.load()
+            elapsed = _time.time() - _load_start
+            logger.info(f"   [Tier 2] ✅ UnstructuredFileLoader selesai dalam {elapsed:.1f}s")
+
         logger.info(f"Loaded {len(docs)} document(s)")
         
         # Calculate total content size
