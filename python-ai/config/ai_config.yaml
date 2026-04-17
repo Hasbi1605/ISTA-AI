@@ -56,15 +56,18 @@ lanes:
         api_key_env: "GITHUB_TOKEN_2"
         base_url: "https://models.inference.ai.azure.com"
         
-      - label: "Gemini 3 Flash"
-        provider: "gemini_native"
-        model_name: "gemini-3-flash-preview"
-        api_key_env: "GEMINI_API_KEY"
-        
+      # Fallback utama saat GPT-4.1/4o kena 413: Groq punya 128K context window,
+      # production-ready, dan konsisten mengikuti instruksi RAG.
       - label: "Llama 3.3 70B (Groq)"
         provider: "litellm"
         model_name: "groq/llama-3.3-70b-versatile"
         api_key_env: "GROQ_API_KEY"
+
+      # Last resort: Gemini Flash (1M context, tapi preview = kurang stabil)
+      - label: "Gemini 3 Flash"
+        provider: "gemini_native"
+        model_name: "gemini-3-flash-preview"
+        api_key_env: "GEMINI_API_KEY"
 
   # ============================================
   # LANE: REASONING (Model untuk reasoning complex)
