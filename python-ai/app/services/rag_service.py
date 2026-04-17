@@ -561,6 +561,62 @@ def delete_document_vectors(filename: str):
 
 # ─── Hybrid Search Helpers ────────────────────────────────────────────────────
 
+# Pola query yang TIDAK memerlukan HyDE (summary/retrieval sederhana)
+_HYDE_SKIP_PATTERNS = [
+    r'^(rangkum|buat ringkasan|ringkaskan)',
+    r'^(baca|baca isi|baca dan)',
+    r'^(apa isi|apa saja isi)',
+    r'^(jelaskan isi|jelaskan dokumen)',
+    r'^(tampilkan|tunjukkan|sebutkan)',
+    r'^(bandingkan isi|buat perbandingan)',
+    r'^(rangkumkan|buat tabel)',
+    r'^halo|^hi |^hai ',
+]
+
+# Pola query yang SANGAT mendapat manfaat dari HyDE (konseptual/analitis)
+_HYDE_USE_PATTERNS = [
+    r'\bmengapa\b', r'\bkenapa\b',
+    r'\bbagaimana (cara|bisa|pengaruh|hubungan|dampak|peran)\b',
+    r'\bapa (hubungan|perbedaan|persamaan|keterkaitan|pengaruh|dampak|peran)\b',
+    r'\bapa yang dimaksud\b', r'\bjelaskan konsep\b', r'\bjelaskan teori\b',
+    r'\bbuktikan\b', r'\bargumentasikan\b', r'\bankur\b', r'\bimplikasi\b',
+    r'\bkritik\b', r'\bevaluasi\b', r'\banalisis\b', r'\binterpretasi\b',
+]
+
+
+def _should_use_hyde(query: str) -> Tuple[bool, str]:
+    """
+    Smart HyDE detection: putuskan apakah query butuh HyDE atau tidak.
+
+    Returns:
+        (should_use, reason) — reason digunakan untuk logging
+    """
+    import re
+    q = query.strip().lower()
+    words = q.split()
+
+    # Terlalu pendek → skip
+    if len(words) < 5:
+        return False, f"query terlalu pendek ({len(words)} kata)"
+
+    # Deteksi pola SKIP terlebih dahulu (prioritas)
+    for pattern in _HYDE_SKIP_PATTERNS:
+        if re.search(pattern, q):
+            return False, f"pattern skip: '{pattern}'"
+
+    # Deteksi pola AKTIF
+    for pattern in _HYDE_USE_PATTERNS:
+        if re.search(pattern, q):
+            return True, f"pola konseptual: '{pattern}'"
+
+    # Query panjang & mengandung tanda tanya → kemungkinan perlu HyDE
+    if len(words) >= 8 and '?' in query:
+        return True, f"query panjang ({len(words)} kata) dengan tanda tanya"
+
+    # Default: skip
+    return False, "tidak ada pola konseptual terdeteksi"
+
+
 def _generate_hyde_query(original_query: str, timeout: int = 5, max_tokens: int = 100) -> str:
     """
     HyDE (Hypothetical Document Embeddings):
@@ -777,14 +833,26 @@ def search_relevant_chunks(query: str, filenames: List[str] = None, top_k: int =
         bm25_weight     = float(hybrid_cfg.get('bm25_weight', 0.3))
         bm25_cands      = int(hybrid_cfg.get('bm25_candidates', doc_candidates))
         hyde_enabled    = hyde_cfg.get('enabled', False)
+        hyde_mode       = str(hyde_cfg.get('mode', 'smart')).lower()
         hyde_timeout    = int(hyde_cfg.get('timeout', 5))
         hyde_max_tokens = int(hyde_cfg.get('max_tokens', 100))
 
-        # ── Step 0: HyDE — enhance query sebelum embedding ───────────────────
+        # ── Step 0: Smart HyDE — enhance query sebelum embedding ────────────
+        # mode = 'smart'  : aktif otomatis hanya untuk query konseptual/analitis
+        # mode = 'always' : selalu aktif (semua query)
+        # lainnya          : mati (off)
+        search_query = query
         if hyde_enabled:
-            search_query = _generate_hyde_query(query, timeout=hyde_timeout, max_tokens=hyde_max_tokens)
-        else:
-            search_query = query
+            if hyde_mode == 'always':
+                search_query = _generate_hyde_query(query, timeout=hyde_timeout, max_tokens=hyde_max_tokens)
+                logger.info("🔮 HyDE: mode=always — query dienhance")
+            elif hyde_mode == 'smart':
+                use_hyde, hyde_reason = _should_use_hyde(query)
+                if use_hyde:
+                    search_query = _generate_hyde_query(query, timeout=hyde_timeout, max_tokens=hyde_max_tokens)
+                    logger.info("🔮 HyDE: mode=smart — AKTIF (%s)", hyde_reason)
+                else:
+                    logger.debug("🔮 HyDE: mode=smart — skip (%s)", hyde_reason)
 
         # ── Step 1: Per-document hybrid search ───────────────────────────────
         # Untuk setiap dokumen:

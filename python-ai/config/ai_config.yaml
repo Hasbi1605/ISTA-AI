@@ -158,12 +158,17 @@ retrieval:
   # ============================================
   # Sebelum vector search, LLM membuat jawaban hipotetis singkat dari query.
   # Jawaban hipotetis + query asli diembed bersama untuk retrieval yang lebih kaya.
-  # Pro: +10-20% akurasi semantik untuk pertanyaan konseptual
-  # Kontra: +0.5-2 detik latency per query (butuh 1 LLM call)
+  #
+  # mode: smart  → DIREKOMENDASIKAN — aktif otomatis hanya untuk query konseptual
+  #               (mengapa, bagaimana, apa hubungan, analisis, evaluasi, dst)
+  #               Skip otomatis untuk: rangkumkan, baca isi, apa isi, dst
+  # mode: always → Selalu aktif untuk semua query (+1-2 detik setiap query)
+  # mode: off    → Matikan sepenuhnya
   hyde:
-    enabled: false   # set true untuk aktifkan (perlu GROQ_API_KEY atau GITHUB_TOKEN)
+    enabled: true    # aktif — mode smart akan filter sendiri kapan dijalankan
+    mode: smart      # 'smart' | 'always' | 'off'
     max_tokens: 100  # panjang jawaban hipotetis (singkat = cepat)
-    timeout: 5       # detik — jika LLM timeout, skip HyDE dan pakai query asli
+    timeout: 5       # detik — jika LLM timeout, skip HyDE tanpa error
 
 
 # ============================================
