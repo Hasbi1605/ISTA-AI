@@ -114,8 +114,8 @@ def _chunking_float(env_key: str, yaml_key: str, default: float) -> float:
 EMBEDDING_TIMEOUT    = _chunking_int("EMBEDDING_TIMEOUT",    "embedding_timeout",    30)
 TOKEN_CHUNK_SIZE     = _chunking_int("TOKEN_CHUNK_SIZE",     "token_chunk_size",     1500)
 TOKEN_CHUNK_OVERLAP  = _chunking_int("TOKEN_CHUNK_OVERLAP",  "token_chunk_overlap",  150)
-AGGRESSIVE_BATCH_SIZE = _chunking_int("AGGRESSIVE_BATCH_SIZE", "aggressive_batch_size", 200)
-BATCH_DELAY_SECONDS  = _chunking_float("BATCH_DELAY_SECONDS", "batch_delay_seconds",  0.5)
+AGGRESSIVE_BATCH_SIZE = _chunking_int("AGGRESSIVE_BATCH_SIZE", "aggressive_batch_size", 100)   # sama dengan ai_config.yaml
+BATCH_DELAY_SECONDS  = _chunking_float("BATCH_DELAY_SECONDS", "batch_delay_seconds",  0.8)    # sama dengan ai_config.yaml
 
 logger.info(
     "⚙️  Chunking config (YAML+env): chunk_size=%d overlap=%d batch=%d delay=%.1fs",
