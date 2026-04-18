@@ -133,10 +133,16 @@ retrieval:
     api_url: "https://api.langsearch.com/v1/rerank"
     model: "langsearch-reranker-v1"
     timeout: 8
-    top_k: 8
-    top_n: 8
-    # ⚠️ WAJIB: doc_candidates >= top_n
+    # ── RAG document reranking ─────────────────────────────────────────────────
+    top_k: 8          # Chunk yang dikembalikan ke LLM setelah reranking
+    top_n: 8          # Alias top_k untuk kompatibilitas
+    # ⚠️ WAJIB: doc_candidates >= top_n (makin besar = makin akurat tapi lebih lambat)
     doc_candidates: 25
+    # ── Web search result reranking ────────────────────────────────────────────
+    # Skala lebih kecil dari RAG karena hasil web sudah cukup relevan dari LangSearch
+    web_candidates: 10  # Max hasil web yang dikirim ke reranker
+    web_top_n: 5        # Hasil web terbaik setelah reranking (dikirim ke LLM)
+
 
   # ============================================
   # HYBRID SEARCH (Vector + BM25 keyword)

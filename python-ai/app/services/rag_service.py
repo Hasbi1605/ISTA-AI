@@ -1762,12 +1762,17 @@ def get_context_for_query(
             search_results = _merge_search_results(search_results, focused_results)
             
         # Apply rerank to web search results if enabled
-        rerank_enabled = os.getenv("LANGSEARCH_RERANK_ENABLED", "true").lower() == "true"
-        
-        if rerank_enabled and len(search_results) >= 2:
-            # Check if we should apply rerank based on intent or force
-            web_candidates = int(os.getenv("LANGSEARCH_RERANK_WEB_CANDIDATES", "10"))
-            web_top_n = int(os.getenv("LANGSEARCH_RERANK_WEB_TOP_N", "5"))
+        try:
+            from app.config_loader import get_rerank_config as _get_rc
+            _rc = _get_rc()
+            rerank_enabled = _rc.get('enabled', True)
+            web_candidates  = int(_rc.get('web_candidates', 10))
+            web_top_n       = int(_rc.get('web_top_n', 5))
+        except Exception:
+            rerank_enabled = os.getenv("LANGSEARCH_RERANK_ENABLED", "true").lower() == "true"
+            web_candidates  = int(os.getenv("LANGSEARCH_RERANK_WEB_CANDIDATES", "10"))
+            web_top_n       = int(os.getenv("LANGSEARCH_RERANK_WEB_TOP_N", "5"))
+
             
             # Limit candidates for reranking
             candidates = search_results[:web_candidates] if len(search_results) > web_candidates else search_results
