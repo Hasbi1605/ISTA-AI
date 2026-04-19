@@ -491,11 +491,29 @@ class ChatIndex extends Component
             }
         }
 
-        // 5. Finalize: Save AI Message to DB (remove sources metadata completely)
-        // Clean up any remaining source markers
+        // 5. Finalize: Save AI Message to DB 
         $cleanContent = preg_replace('/\[SOURCES:\[.+?\]\]/s', '', $fullResponse);
         $cleanContent = $this->sanitizeAssistantOutput((string) $cleanContent);
         $cleanContent = trim($cleanContent);
+
+        // Append sources to the final markdown if exist
+        if (!empty($this->sources)) {
+            $markdownSources = "\n\n---\n**Sumber Referensi:**\n";
+            $hasValidSource = false;
+            foreach ($this->sources as $source) {
+                if (!empty($source['url'])) {
+                    $title = !empty($source['title']) ? $source['title'] : parse_url($source['url'], PHP_URL_HOST);
+                    $markdownSources .= "- [🌐 {$title}]({$source['url']})\n";
+                    $hasValidSource = true;
+                } elseif (!empty($source['filename'])) {
+                    $markdownSources .= "- 📄 {$source['filename']}\n";
+                    $hasValidSource = true;
+                }
+            }
+            if ($hasValidSource) {
+                $cleanContent .= $markdownSources;
+            }
+        }
 
         $assistantMsg = Message::create([
             'conversation_id' => $this->currentConversationId,

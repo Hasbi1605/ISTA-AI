@@ -4,7 +4,7 @@ import logging
 import requests
 import litellm
 from typing import List, Dict, Generator
-from app.services.rag_service import get_rag_context_for_prompt
+from app.services.rag_service import get_rag_context_for_prompt, get_context_for_query
 
 logger = logging.getLogger(__name__)
 
@@ -260,15 +260,32 @@ def get_llm_stream(
 
     # Cari konteks dari web search (jika diaktifkan)
     search_context = ""
+    web_sources: list = []
     if query:
         try:
-            search_context = get_rag_context_for_prompt(
+            context_data = get_context_for_query(
                 query,
                 force_web_search=force_web_search,
                 allow_auto_realtime_web=allow_auto_realtime_web,
                 documents_active=documents_active,
                 explicit_web_request=explicit_web_request,
             )
+            search_context = context_data.get("search_context", "")
+
+            # Ekstrak web search results sebagai sources (untuk ditampilkan sebagai link)
+            raw_results = context_data.get("search_results", [])
+            if raw_results:
+                for r in raw_results:
+                    url   = (r.get("url") or "").strip()
+                    title = (r.get("title") or "").strip()
+                    snippet = (r.get("snippet") or r.get("description") or "").strip()
+                    if url:  # hanya sertakan jika ada URL valid
+                        web_sources.append({
+                            "type":     "web",
+                            "title":    title or url,
+                            "url":      url,
+                            "snippet":  snippet[:160] if snippet else "",
+                        })
         except Exception as e:
             logger.warning("⚠️  Web search/RAG context gagal: %s", e)
 
@@ -304,7 +321,7 @@ def get_llm_stream(
         else:
             enhanced_messages.append(msg)
 
-    yield from _stream_with_cascade(enhanced_messages)
+    yield from _stream_with_cascade(enhanced_messages, sources=web_sources or None)
 
 
 def get_llm_stream_with_sources(
