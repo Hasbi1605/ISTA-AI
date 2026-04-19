@@ -373,3 +373,43 @@ class TestCountTokens:
         short = rag.count_tokens("Hello")
         long  = rag.count_tokens("Hello world this is a longer sentence with more tokens")
         assert long > short
+
+
+class TestEmbeddingDimensionStrategy:
+    def test_max_embedding_dim_constant_defined(self, rag):
+        assert hasattr(rag, 'MAX_EMBEDDING_DIM')
+        assert rag.MAX_EMBEDDING_DIM == 3072
+
+    def test_embedding_models_include_dimensions(self, rag):
+        for model in rag.EMBEDDING_MODELS:
+            assert 'dimensions' in model
+            assert model['dimensions'] in [3072, 1536]
+
+    def test_all_models_use_fixed_chroma_dimension(self, rag):
+        max_dim = rag.MAX_EMBEDDING_DIM
+        assert max_dim == 3072
+        for model in rag.EMBEDDING_MODELS:
+            model_dim = model["dimensions"]
+            assert model_dim <= max_dim, f"Model {model['name']} exceeds Chroma capacity"
+
+    def test_embedding_model_initialized_with_dimensions_parameter(self, rag):
+        import inspect
+        from app.services import rag_service
+
+        source = inspect.getsource(rag_service.get_embeddings_with_fallback)
+        assert "dimensions" in source, "dimensions param should be passed to OpenAIEmbeddings"
+
+    def test_fallback_tier_uses_correct_dimension(self, rag):
+        large_model = rag.EMBEDDING_MODELS[0]
+        small_model = rag.EMBEDDING_MODELS[2]
+
+        assert large_model["dimensions"] == 3072, "Primary tier should use 3072 dimensions"
+        assert small_model["dimensions"] == 1536, "Fallback tier should use 1536 dimensions"
+
+    def test_all_fallback_models_use_max_embedding_dim(self, rag):
+        import inspect
+        from app.services import rag_service
+
+        source = inspect.getsource(rag_service.get_embeddings_with_fallback)
+        assert "MAX_EMBEDDING_DIM" in source, "All fallback models should use MAX_EMBEDDING_DIM"
+        assert "model_config['dimensions']" not in source, "Should NOT use model native dimensions"

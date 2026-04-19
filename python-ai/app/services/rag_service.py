@@ -153,6 +153,9 @@ logger.info(
     TOKEN_CHUNK_SIZE, TOKEN_CHUNK_OVERLAP, AGGRESSIVE_BATCH_SIZE, BATCH_DELAY_SECONDS, MAX_TOKENS_PER_BATCH
 )
 
+# Fixed dimension untuk Chroma collection (3072 untuk compatibility max)
+MAX_EMBEDDING_DIM = 3072
+
 # Embedding model list untuk cascading fallback (4-tier system)
 EMBEDDING_MODELS = [
     {
@@ -245,11 +248,11 @@ def get_embeddings_with_fallback(model_index: int = 0) -> Tuple[Optional[Embeddi
                 embeddings = OpenAIEmbeddings(
                     model=model_config["model"],
                     openai_api_base="https://models.inference.ai.azure.com",
-                    openai_api_key=api_key
+                    openai_api_key=api_key,
+                    dimensions=MAX_EMBEDDING_DIM
                 )
-                # Test dengan embedding sederhana
                 _ = embeddings.embed_query("test")
-                logger.info(f"✅ Menggunakan {model_config['name']} (TPM: {model_config['tpm_limit']:,}, Dim: {model_config['dimensions']})")
+                logger.info(f"✅ Menggunakan {model_config['name']} (TPM: {model_config['tpm_limit']:,}, Dim: {MAX_EMBEDDING_DIM})")
                 return embeddings, model_config["name"], idx
                 
         except Exception as e:
@@ -439,7 +442,8 @@ def process_document(file_path: str, filename: str, user_id: str = "unknown"):
         if embeddings is None:
             raise Exception("Semua embedding provider gagal. Tidak dapat memproses dokumen.")
 
-        # Simpan dimensi untuk PDR parent embedding (bukan hardcoded)
+        # Track dimensi model aktif untuk logging/metadata saja
+        # Note: Chroma collection menggunakan MAX_EMBEDDING_DIM=3072 fixed untuk compatibility
         current_embedding_dim = EMBEDDING_MODELS[current_model_index]["dimensions"]
 
         # Add metadata untuk tracking (termasuk user_id untuk authorization)
@@ -475,7 +479,7 @@ def process_document(file_path: str, filename: str, user_id: str = "unknown"):
                     ids=p_ids,
                     documents=p_texts,
                     metadatas=p_metas,
-                    embeddings=[[0.0] * current_embedding_dim] * len(p_ids),  # dummy embedding mengikuti dimensi aktif
+                    embeddings=[[0.0] * MAX_EMBEDDING_DIM] * len(p_ids),  # fixed dimension untuk Chroma compatibility
                 )
                 logger.info("✅ PDR: %d parent chunks disimpan ke ChromaDB", len(pdr_parent_docs))
             except Exception as pe:
