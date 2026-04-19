@@ -56,15 +56,18 @@ lanes:
         api_key_env: "GITHUB_TOKEN_2"
         base_url: "https://models.inference.ai.azure.com"
         
-      - label: "Gemini 3 Flash"
-        provider: "gemini_native"
-        model_name: "gemini-3-flash-preview"
-        api_key_env: "GEMINI_API_KEY"
-        
+      # Fallback utama saat GPT-4.1/4o kena 413: Groq punya 128K context window,
+      # production-ready, dan konsisten mengikuti instruksi RAG.
       - label: "Llama 3.3 70B (Groq)"
         provider: "litellm"
         model_name: "groq/llama-3.3-70b-versatile"
         api_key_env: "GROQ_API_KEY"
+
+      # Last resort: Gemini Flash (1M context, tapi preview = kurang stabil)
+      - label: "Gemini 3 Flash"
+        provider: "gemini_native"
+        model_name: "gemini-3-flash-preview"
+        api_key_env: "GEMINI_API_KEY"
 
   # ============================================
   # LANE: REASONING (Model untuk reasoning complex)
@@ -130,6 +133,53 @@ retrieval:
     api_url: "https://api.langsearch.com/v1/rerank"
     model: "langsearch-reranker-v1"
     timeout: 8
+    # ── RAG document reranking ─────────────────────────────────────────────────
+    top_k: 8          # Chunk yang dikembalikan ke LLM setelah reranking
+    top_n: 8          # Alias top_k untuk kompatibilitas
+    # ⚠️ WAJIB: doc_candidates >= top_n (makin besar = makin akurat tapi lebih lambat)
+    doc_candidates: 25
+    # ── Web search result reranking ────────────────────────────────────────────
+    # Skala lebih kecil dari RAG karena hasil web sudah cukup relevan dari LangSearch
+    web_candidates: 10  # Max hasil web yang dikirim ke reranker
+    web_top_n: 5        # Hasil web terbaik setelah reranking (dikirim ke LLM)
+
+
+  # ============================================
+  # HYBRID SEARCH (Vector + BM25 keyword)
+  # ============================================
+  # Menggabungkan dense vector search dengan sparse keyword search (BM25)
+  # menggunakan Reciprocal Rank Fusion (RRF). Membantu untuk:
+  # - Istilah teknis dan nama spesifik (contoh: 'Habermas', 'inokulasi')
+  # - Query yang berbeda wording dengan dokumen
+  hybrid_search:
+    enabled: true
+    # Bobot BM25 vs vector (total = 1.0).
+    # 0.3 = 30% BM25 + 70% vector — cocok untuk dokumen akademik
+    bm25_weight: 0.3
+    # Jumlah kandidat BM25 per dokumen (harus >= doc_candidates)
+    bm25_candidates: 25
+
+  # ============================================
+  # HyDE (Hypothetical Document Embeddings)
+  # ============================================
+  # Sebelum vector search, LLM membuat jawaban hipotetis singkat dari query.
+  # Jawaban hipotetis + query asli diembed bersama untuk retrieval yang lebih kaya.
+  #
+  # Untuk dokumen kantor/akademik: gunakan mode 'always' karena:
+  #   - Keakuratan > kecepatan untuk analisis dokumen
+  #   - User punya pola query beragam, tidak bisa diprediksi dengan keyword
+  #   - Timeout 3s: jika LLM lambat → fallback ke query asli (tanpa error)
+  #   - Actual overhead: ~300-600ms (bukan 2 detik, karena max_tokens=100)
+  #
+  # mode: always → DIREKOMENDASIKAN untuk dokumen kantor (+300-600ms, lebih akurat)
+  # mode: smart  → aktif hanya untuk pola konseptual tertentu (fragile)
+  # mode: off    → matikan sepenuhnya (tercepat, akurasi standar)
+  hyde:
+    enabled: true
+    mode: always     # 'always' | 'smart' | 'off'
+    max_tokens: 100  # jawaban hipotetis singkat (100 token = ~2-3 kalimat)
+    timeout: 3       # detik — timeout ketat: jika lambat, skip gracefully
+
 
 # ============================================
 # SYSTEM
@@ -140,12 +190,40 @@ system:
 # ============================================
 # CHUNKING
 # ============================================
+# Single source of truth untuk konfigurasi chunking.
+# rag_service.py membaca dari sini via config_loader.
+# Override per-environment: set env variable di .env (lebih prioritas dari YAML)
+#
+# Konfigurasi saat ini: dioptimasi untuk 50 user/hari, dokumen besar, tidak concurrent
+# Jika ingin lebih cepat (server RAM >= 8 GB): naikkan aggressive_batch_size ke 150-200
 chunking:
-  token_chunk_size: 1500
-  token_chunk_overlap: 150
-  aggressive_batch_size: 200
-  batch_delay_seconds: 0.5
-  embedding_timeout: 30
+  token_chunk_size: 1500      # Max tokens per chunk (optimal untuk text-embedding-3-large)
+  token_chunk_overlap: 150    # Token overlap antar chunk (10% dari chunk_size)
+  aggressive_batch_size: 120  # Max chunks per batch — naik ke 200 jika RAM server >= 8 GB
+  batch_delay_seconds: 0.8    # Delay antar batch (detik) — turunkan ke 0.5 jika ingin lebih cepat
+  embedding_timeout: 30       # Timeout embedding request (detik)
+  # Batas token per batch (bukan per chunk). API limit = 64K, tapi tiktoken cl100k_base
+  # bisa underhitung 10-20% vs tokenizer API sebenarnya. Safety margin 37.5% → 40K.
+  max_tokens_per_batch: 50000
+
+  # ============================================
+  # PDR (Parent Document Retrieval)
+  # ============================================
+  # Teknik untuk meningkatkan akurasi RAG pada dokumen panjang & terstruktur.
+  # Cara kerja:
+  #   - Child chunks (kecil) di-embed ke ChromaDB → digunakan untuk similarity search
+  #   - Parent chunks (besar) disimpan tanpa embed → dikirim ke LLM sebagai konteks
+  #   - Hasil: presisi retrieval TINGGI (child 256 token) + konteks LLM LENGKAP (parent 1500 token)
+  #
+  # Trade-off: storage ~2.5x lebih banyak, upload dokumen sedikit lebih lambat
+  # ⚠️  Butuh re-upload dokumen agar PDR aktif (dokumen lama tetap pakai mode lama)
+  pdr:
+    enabled: true
+    child_chunk_size: 256     # token — unit embedding untuk retrieval presisi
+    child_chunk_overlap: 32   # ~12.5% overlap antar child chunk
+    parent_chunk_size: 1500   # token — konteks penuh yang dikirim ke LLM
+    parent_chunk_overlap: 150 # overlap antar parent chunk
+
 
 # ============================================
 # INTEGRATIONS

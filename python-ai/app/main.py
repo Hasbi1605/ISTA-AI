@@ -19,6 +19,10 @@ from app.services.rag_service import (
     should_use_web_search,
     get_context_for_query,
 )
+try:
+    from app.config_loader import get_rag_top_k as _get_rag_top_k
+except Exception:
+    _get_rag_top_k = lambda: 5  # fallback jika config tidak tersedia
 
 app = FastAPI(title="ISTA AI Microservice", version="1.1.5")
 logger = logging.getLogger(__name__)
@@ -134,7 +138,7 @@ async def chat_stream(request: ChatRequest):
         chunks, success = search_relevant_chunks(
             query,
             request.document_filenames,
-            top_k=5,
+            top_k=_get_rag_top_k(),
             user_id=request.user_id,
         )
 

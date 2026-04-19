@@ -436,6 +436,7 @@ class ChatIndex extends Component
         // 4. Handle Streaming Response
         $fullResponse = "";
         $modelName = "AI";
+        $streamBuffer = '';
 
         // Push a placeholder assistant message for streaming
         $this->stream('assistant-output', "", true);
@@ -461,26 +462,21 @@ class ChatIndex extends Component
                 $this->webSearchMode,
                 $sourcePolicy,
                 $allowAutoRealtimeWeb
-            ) as $chunk
+        ) as $chunk
         ) {
-            // Parse model indicator from the first chunk
-            if (preg_match('/\[MODEL:(.+?)\]\n?/', $chunk, $matches)) {
-                $modelName = $matches[1];
-                $chunk = preg_replace('/\[MODEL:.+?\]\n?/', '', $chunk);
+            [$chunk, $streamBuffer, $parsedModelName, $parsedSources] = $this->extractStreamMetadata(
+                (string) $chunk,
+                $streamBuffer
+            );
+
+            if ($parsedModelName !== null) {
+                $modelName = $parsedModelName;
                 $this->stream('model-name', $modelName);
             }
 
-            // Parse sources if present (match multiline JSON, use /s modifier for multiline)
-            if (preg_match('/\[SOURCES:(\[.+?\])\]/s', $chunk, $matches)) {
-                $sourcesJson = $matches[1];
-                $parsedSources = json_decode($sourcesJson, true);
-                if ($parsedSources) {
-                    $this->sources = $parsedSources;
-                    // Emit to Alpine.js for real-time display
-                    $this->dispatch('assistant-sources', $this->sources);
-                }
-                // Remove sources from chunk
-                $chunk = preg_replace('/\[SOURCES:\[.+?\]\]/s', '', $chunk);
+            if (!empty($parsedSources)) {
+                $this->sources = $parsedSources;
+                $this->dispatch('assistant-sources', $this->sources);
             }
 
             $chunk = $this->sanitizeAssistantOutput((string) $chunk);
@@ -491,11 +487,29 @@ class ChatIndex extends Component
             }
         }
 
-        // 5. Finalize: Save AI Message to DB (remove sources metadata completely)
-        // Clean up any remaining source markers
+        // 5. Finalize: Save AI Message to DB 
         $cleanContent = preg_replace('/\[SOURCES:\[.+?\]\]/s', '', $fullResponse);
         $cleanContent = $this->sanitizeAssistantOutput((string) $cleanContent);
         $cleanContent = trim($cleanContent);
+
+        // Append sources to the final markdown if exist
+        if (!empty($this->sources)) {
+            $markdownSources = "\n\n---\n**Sumber Referensi:**\n";
+            $hasValidSource = false;
+            foreach ($this->sources as $source) {
+                if (!empty($source['url'])) {
+                    $title = !empty($source['title']) ? $source['title'] : parse_url($source['url'], PHP_URL_HOST);
+                    $markdownSources .= "- [🌐 {$title}]({$source['url']})\n  `{$source['url']}`\n";
+                    $hasValidSource = true;
+                } elseif (!empty($source['filename'])) {
+                    $markdownSources .= "- 📄 {$source['filename']}\n";
+                    $hasValidSource = true;
+                }
+            }
+            if ($hasValidSource) {
+                $cleanContent .= $markdownSources;
+            }
+        }
 
         $assistantMsg = Message::create([
             'conversation_id' => $this->currentConversationId,
@@ -533,6 +547,47 @@ class ChatIndex extends Component
         }
 
         return (string) $sanitized;
+    }
+
+    private function extractStreamMetadata(string $chunk, string $buffer = ''): array
+    {
+        $combined = $buffer . $chunk;
+        $modelName = null;
+        $sources = null;
+
+        if (preg_match('/\[MODEL:(.+?)\]\n?/', $combined, $matches)) {
+            $modelName = trim((string) $matches[1]);
+            $combined = preg_replace('/\[MODEL:.+?\]\n?/', '', $combined, 1) ?? $combined;
+        }
+
+        if (preg_match('/\[SOURCES:(\[.+?\])\]/s', $combined, $matches)) {
+            $parsedSources = json_decode($matches[1], true);
+            if (is_array($parsedSources)) {
+                $sources = $parsedSources;
+            }
+            $combined = preg_replace('/\[SOURCES:\[.+?\]\]/s', '', $combined, 1) ?? $combined;
+        }
+
+        $nextBuffer = '';
+        foreach (['[SOURCES:', '[MODEL:'] as $marker) {
+            $markerPos = strrpos($combined, $marker);
+            if ($markerPos === false) {
+                continue;
+            }
+
+            $tail = substr($combined, $markerPos);
+            $isComplete = $marker === '[SOURCES:'
+                ? preg_match('/^\[SOURCES:(\[.+?\])\]/s', $tail) === 1
+                : preg_match('/^\[MODEL:(.+?)\]\n?/s', $tail) === 1;
+
+            if (!$isComplete) {
+                $nextBuffer = $tail;
+                $combined = substr($combined, 0, $markerPos);
+                break;
+            }
+        }
+
+        return [$combined, $nextBuffer, $modelName, $sources];
     }
 
     public function render()

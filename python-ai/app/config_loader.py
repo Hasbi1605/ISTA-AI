@@ -14,7 +14,7 @@ DEFAULT_PROMPTS = {
         "default": "Anda adalah ISTA AI, asisten virtual istana pintar. Jawablah dengan sopan dan membantu."
     },
     "rag": {
-        "document": """Anda adalah asisten AI cerdas. Jawab pertanyaan user berdasarkan referensi berikut.
+        "document": """Anda adalah asisten AI yang bertugas membaca dan menjawab pertanyaan HANYA berdasarkan isi dokumen yang diberikan.
 
 SUMBER DOKUMEN REFERENSI:
 {context_str}
@@ -23,7 +23,14 @@ SUMBER DOKUMEN REFERENSI:
 
 Pertanyaan: {question}
 
-INSTRUKSI PENTING UNTUK FORMAT JAWABAN:
+ATURAN KEAKURATAN — WAJIB DIPATUHI:
+A. HANYA gunakan informasi yang secara eksplisit tertulis dalam SUMBER DOKUMEN REFERENSI di atas.
+B. DILARANG menambahkan, melengkapi, atau menyimpulkan informasi yang tidak tertulis dalam dokumen — meskipun Anda merasa mengetahui jawabannya dari pengetahuan umum.
+C. Jika suatu detail spesifik (angka, nama, tanggal, istilah teknis, daftar poin) tidak tertera dalam kutipan dokumen di atas, jangan ditebak atau diisi — nyatakan: "Detail ini tidak tersedia dalam bagian dokumen yang dapat saya baca saat ini."
+D. Untuk pertanyaan yang meminta penjelasan rinci atau daftar lengkap: kutip isi dokumen SECARA VERBATIM (kata per kata), jangan diparafrasekan atau diringkas kecuali diminta.
+E. Jika jawaban hanya tersedia sebagian dalam konteks, berikan bagian yang ada lalu nyatakan secara eksplisit bahwa sisanya tidak tercakup.
+
+INSTRUKSI FORMAT JAWABAN:
 1. JANGAN PERNAH menyebut istilah internal seperti "Kutipan 1", "Kutipan Dokumen 2", dsb. Gantikan secara natural dengan menyebut nama file atau merujuk ke isi dokumen tersebut.
 2. Jika di dalam teks/isi dokumen rujukan terdapat Judul Dokumen yang spesifik, sebutkan dan cetak TEBAL (BOLD).
 3. WAJIB cetak TEBAL (BOLD) setiap kali Anda menyebutkan nama file rujukan (contoh: "Berdasarkan dokumen **nama_dokumen.pdf**, ...").
@@ -150,6 +157,49 @@ def get_search_config() -> Dict[str, Any]:
     """Get search configuration."""
     config = load_config()
     return config.get('retrieval', {}).get('search', {})
+
+
+def get_rerank_config() -> Dict[str, Any]:
+    """Get semantic rerank configuration (top_k, top_n, doc_candidates, dll)."""
+    config = load_config()
+    return config.get('retrieval', {}).get('semantic_rerank', {})
+
+
+def get_rag_top_k() -> int:
+    """Jumlah chunk final yang dikirim ke LLM sebagai konteks."""
+    return int(get_rerank_config().get('top_k', 5))
+
+
+def get_rag_top_n() -> int:
+    """Jumlah chunk yang dipilih reranker dari kandidat."""
+    return int(get_rerank_config().get('top_n', 5))
+
+
+def get_rag_doc_candidates() -> int:
+    """Jumlah chunk kandidat yang diambil dari ChromaDB sebelum reranking."""
+    return int(get_rerank_config().get('doc_candidates', 25))
+
+
+def get_hybrid_search_config() -> Dict[str, Any]:
+    """Konfigurasi hybrid search (BM25 + vector + RRF)."""
+    config = load_config()
+    return config.get('retrieval', {}).get('hybrid_search', {})
+
+
+def get_hyde_config() -> Dict[str, Any]:
+    """Konfigurasi HyDE (Hypothetical Document Embeddings)."""
+    config = load_config()
+    return config.get('retrieval', {}).get('hyde', {})
+
+
+def get_pdr_config() -> Dict[str, Any]:
+    """
+    Konfigurasi PDR (Parent Document Retrieval).
+    PDR menyimpan child chunks kecil (untuk retrieval presisi)
+    dan parent chunks besar (untuk konteks LLM yang lengkap).
+    """
+    config = load_config()
+    return config.get('chunking', {}).get('pdr', {})
 
 
 def _get_prompt_with_fallback(config_path: List[str], fallback_path: List[str], warning_message: str) -> str:

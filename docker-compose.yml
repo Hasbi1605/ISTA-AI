@@ -13,6 +13,25 @@ services:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+    # Tuning MySQL agar hemat RAM (default MySQL bisa makan 500+ MB)
+    command: >
+      --innodb-buffer-pool-size=128M
+      --max-connections=50
+      --key-buffer-size=16M
+      --tmp-table-size=32M
+      --max-heap-table-size=32M
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 128M
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
   # Redis for Queue & Cache
   redis:
@@ -21,6 +40,20 @@ services:
     restart: always
     ports:
       - "6379:6379"
+    # Batasi max memory Redis agar tidak membengkak tak terbatas
+    command: redis-server --maxmemory 100mb --maxmemory-policy allkeys-lru
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.25'
+        reservations:
+          memory: 32M
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
 
   # Python AI Microservice
   python-ai:
@@ -34,13 +67,41 @@ services:
     environment:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_TOKEN_2=${GITHUB_TOKEN_2}
       - GROQ_API_KEY=${GROQ_API_KEY}
+      - AI_SERVICE_TOKEN=${AI_SERVICE_TOKEN}
+      # Chunking settings — tuned untuk dokumen besar, tidak concurrent
+      - TOKEN_CHUNK_SIZE=${TOKEN_CHUNK_SIZE:-1500}
+      - TOKEN_CHUNK_OVERLAP=${TOKEN_CHUNK_OVERLAP:-150}
+      - AGGRESSIVE_BATCH_SIZE=${AGGRESSIVE_BATCH_SIZE:-100}
+      - BATCH_DELAY_SECONDS=${BATCH_DELAY_SECONDS:-0.8}
+      - EMBEDDING_TIMEOUT=${EMBEDDING_TIMEOUT:-30}
+      # LangSearch
+      - LANGSEARCH_API_KEY=${LANGSEARCH_API_KEY}
+      - LANGSEARCH_API_KEY_BACKUP=${LANGSEARCH_API_KEY_BACKUP}
     volumes:
       - ./python-ai:/app
       - chroma_data:/app/chroma_data
     depends_on:
-      - mysql
-      - redis
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # 4 GB RAM untuk Python AI — perlu ruang lebih untuk dokumen besar
+    # Dengan lazy import, idle ~800 MB — spike saat proses dokumen besar ~2.5–3.5 GB
+    deploy:
+      resources:
+        limits:
+          memory: 4096M
+          cpus: '2.0'
+        reservations:
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
   # Laravel Web App
   laravel:
@@ -58,13 +119,35 @@ services:
       - DB_DATABASE=istanaai
       - DB_USERNAME=root
       - DB_PASSWORD=${DB_PASSWORD:-secret}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - AI_SERVICE_URL=${AI_SERVICE_URL:-http://python-ai:8001}
+      - AI_SERVICE_TOKEN=${AI_SERVICE_TOKEN}
     volumes:
       - ./laravel:/var/www/html
+      - laravel_storage:/var/www/html/storage
     depends_on:
-      - mysql
-      - redis
-      - python-ai
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      python-ai:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+          cpus: '1.0'
+        reservations:
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
 
 volumes:
   mysql_data:
   chroma_data:
+  laravel_storage:

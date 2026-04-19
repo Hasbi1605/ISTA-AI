@@ -525,6 +525,55 @@
                              </div>
                              <p x-show="text !== ''" class="whitespace-pre-wrap" x-text="text"></p>
                          </div>
+
+                          {{-- Sources: muncul di bawah bubble saat streaming (menampilkan real-time data context/web) --}}
+                          <template x-if="sources && Array.isArray(sources) && sources.length > 0">
+                              <div class="mt-2.5 w-full text-left"
+                                   x-transition:enter="transition ease-out duration-300 transform"
+                                   x-transition:enter-start="opacity-0 translate-y-2"
+                                   x-transition:enter-end="opacity-100 translate-y-0">
+                                  <p class="text-[10px] font-bold text-[#64748B] dark:text-[#94A3B8] uppercase tracking-wider mb-2 flex items-center gap-1.5 pl-0.5">
+                                      <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                      </svg>
+                                      Sumber Referensi:
+                                  </p>
+                                  <div class="flex flex-wrap gap-2">
+                                      <template x-for="(source, idx) in sources" :key="idx">
+                                          <div>
+                                              {{-- WEB SOURCE: Clickable Link --}}
+                                              <template x-if="source.type === 'web' && source.url">
+                                                  <a :href="source.url" target="_blank" rel="noopener noreferrer"
+                                                     :title="source.snippet || source.title"
+                                                     class="group inline-flex items-start gap-2 px-3 py-2 rounded-lg text-[11px] font-medium bg-white dark:bg-[#1E293B] border border-sky-100 dark:border-sky-900/50 shadow-sm text-sky-700 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30 hover:border-sky-300 dark:hover:border-sky-700 transition-all duration-200 hover:-translate-y-0.5 max-w-[300px]">
+                                                      <svg class="w-3.5 h-3.5 shrink-0 text-sky-500 transition-transform group-hover:scale-110 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/>
+                                                      </svg>
+                                                      <div class="flex flex-col min-w-0 pr-1">
+                                                          <span class="truncate block w-full font-bold leading-tight mb-0.5" x-text="source.title || (new URL(source.url)).hostname"></span>
+                                                          <span class="truncate block w-full text-[9.5px] opacity-80 font-mono tracking-tight" x-text="source.url"></span>
+                                                      </div>
+                                                      <svg class="w-3 h-3 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity mt-0.5 ml-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                                                      </svg>
+                                                  </a>
+                                              </template>
+
+                                              {{-- DOCUMENT SOURCE: Non-clickable Chip --}}
+                                              <template x-if="source.type !== 'web' || !source.url">
+                                                  <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium bg-stone-50 dark:bg-gray-800/80 border border-stone-200 dark:border-gray-700 text-stone-600 dark:text-gray-300 max-w-[260px] shadow-sm">
+                                                      <svg class="w-3.5 h-3.5 shrink-0 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                      </svg>
+                                                      <span class="truncate block max-w-[200px]" x-text="source.filename || 'Dokumen Office'"></span>
+                                                  </div>
+                                              </template>
+                                          </div>
+                                      </template>
+                                  </div>
+                              </div>
+                          </template>
+
                      </div>
                   </div>
             </div>
