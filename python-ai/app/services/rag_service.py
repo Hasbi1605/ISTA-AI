@@ -431,13 +431,16 @@ def process_document(file_path: str, filename: str, user_id: str = "unknown"):
                 avg_tokens, min_tokens_val, max_tokens_val,
             )
 
-        # Step 3. Get embedding model dengan cascading fallback
+        # Step 3. Get embedding model dengan cascadingFallback
         logger.info("Step 3: Initializing embedding model dengan cascading fallback...")
         current_model_index = 0
         embeddings, provider_name, current_model_index = get_embeddings_with_fallback(current_model_index)
 
         if embeddings is None:
             raise Exception("Semua embedding provider gagal. Tidak dapat memproses dokumen.")
+
+        # Simpan dimensi untuk PDR parent embedding (bukan hardcoded)
+        current_embedding_dim = EMBEDDING_MODELS[current_model_index]["dimensions"]
 
         # Add metadata untuk tracking (termasuk user_id untuk authorization)
         for chunk in chunks:
@@ -472,7 +475,7 @@ def process_document(file_path: str, filename: str, user_id: str = "unknown"):
                     ids=p_ids,
                     documents=p_texts,
                     metadatas=p_metas,
-                    embeddings=[[0.0] * 3072] * len(p_ids),  # dummy embedding (tidak dipakai)
+                    embeddings=[[0.0] * current_embedding_dim] * len(p_ids),  # dummy embedding mengikuti dimensi aktif
                 )
                 logger.info("✅ PDR: %d parent chunks disimpan ke ChromaDB", len(pdr_parent_docs))
             except Exception as pe:

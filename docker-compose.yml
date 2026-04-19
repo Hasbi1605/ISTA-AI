@@ -20,7 +20,6 @@ services:
       --key-buffer-size=16M
       --tmp-table-size=32M
       --max-heap-table-size=32M
-      --query-cache-type=0
     deploy:
       resources:
         limits:
