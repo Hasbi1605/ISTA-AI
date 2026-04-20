@@ -1,4 +1,8 @@
-<div x-data="chatMessages" class="flex-1 overflow-y-auto px-3 sm:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8" x-ref="chatBox" x-on:message-streamed.window="scrollToBottom()">
+<div x-data="chatMessages"
+     class="flex-1 overflow-y-auto px-3 sm:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8"
+     x-ref="chatBox"
+     x-on:message-streamed.window="scrollToBottom()"
+     x-on:message-send.window="optimisticUserMessage = $event.detail.text; scrollToBottom(true)">
     @if(empty($messages))
         <div class="h-full flex flex-col items-center justify-center text-center">
             <div class="h-16 w-16 mb-6">
@@ -98,8 +102,8 @@
                             </div>
                         @endif
                     @else
-                        <div class="text-[14.5px] leading-relaxed text-stone-700 dark:text-gray-100 max-w-[656px]">
-                            <p class="whitespace-pre-wrap">{{ $message['content'] }}</p>
+                        <div class="text-[14.5px] leading-relaxed text-stone-700 dark:text-gray-100 w-full max-w-[656px] min-w-0">
+                            <p class="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{{ $message['content'] }}</p>
                         </div>
                     @endif
                 </div>
@@ -120,8 +124,8 @@
                     <div class="flex items-center gap-2 mb-1 justify-end">
                         <span class="text-[13px] font-bold text-stone-800 dark:text-[#F8FAFC]">You</span>
                     </div>
-                    <div class="text-[14.5px] leading-relaxed text-stone-700 dark:text-gray-100 max-w-[656px]">
-                        <p class="whitespace-pre-wrap" x-text="optimisticUserMessage"></p>
+                    <div class="text-[14.5px] leading-relaxed text-stone-700 dark:text-gray-100 w-full max-w-[656px] min-w-0">
+                        <p class="whitespace-pre-wrap break-words [overflow-wrap:anywhere]" x-text="optimisticUserMessage"></p>
                     </div>
                 </div>
             </div>
@@ -155,7 +159,7 @@
                         <div class="h-2 w-2 bg-gray-400 dark:bg-[#64748B] rounded-full animate-bounce [animation-delay:-0.15s]"></div>
                         <div class="h-2 w-2 bg-gray-400 dark:bg-[#64748B] rounded-full animate-bounce [animation-delay:-0.3s]"></div>
                      </div>
-                     <p x-show="text !== ''" class="whitespace-pre-wrap" x-text="text"></p>
+                    <p x-show="text !== ''" class="whitespace-pre-wrap break-words [overflow-wrap:anywhere]" x-text="text"></p>
                  </div>
 
                  <template x-if="sources && Array.isArray(sources) && sources.length > 0">

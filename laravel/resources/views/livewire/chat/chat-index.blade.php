@@ -1,36 +1,33 @@
-<div x-data="chatLayout" 
+<div x-data="chatLayout"
+     x-on:dragenter.window.prevent="onDragEnter($event)"
+     x-on:dragover.window.prevent="onDragOver($event)"
+     x-on:dragleave.window.prevent="onDragLeave($event)"
+     x-on:drop.window.prevent="onDropFile($event)"
+     x-on:open-sidebar-right.window="showRightSidebar = true"
      class="flex h-screen w-full overflow-hidden text-stone-800 dark:text-gray-100 font-sans transition-colors duration-300 relative ista-display-sans bg-stone-50/50 dark:bg-gray-900" style="background-image: url('{{ asset('images/ista/dashboard-grid.png') }}'); background-size: 8px 8px;"
 >
-    <!-- Overlay for Global File Drag & Drop -->
-    <div x-data="chatFileHandler"
-         x-on:dragenter.window.prevent="onDragEnter($event)"
-         x-on:dragover.window.prevent="onDragOver($event)"
-         x-on:dragleave.window.prevent="onDragLeave($event)"
-         x-on:drop.window.prevent="onDropFile($event)"
-         class="contents"
-    >
-        @php
-            $uiIcons = [
-                'historyLight' => asset('images/icons/history-light.svg'),
-                'historyDark' => asset('images/icons/history-dark.svg'),
-                'collapseLeftLight' => asset('images/icons/collapse-left-light.svg'),
-                'collapseLeftDark' => asset('images/icons/collapse-left-dark.svg'),
-                'collapseRightLight' => asset('images/icons/collapse-right-light.svg'),
-                'collapseRightDark' => asset('images/icons/collapse-right-dark.svg'),
-                'searchLight' => asset('images/icons/search-light.svg'),
-                'searchDark' => asset('images/icons/search-dark.svg'),
-                'uploadLight' => asset('images/icons/upload-light.svg'),
-                'uploadDark' => asset('images/icons/upload-dark.svg'),
-                'sendLight' => asset('images/icons/send-light.svg'),
-                'sendDark' => asset('images/icons/send-dark.svg'),
-            ];
-        @endphp
+    @php
+        $uiIcons = [
+            'historyLight' => asset('images/icons/history-light.svg'),
+            'historyDark' => asset('images/icons/history-dark.svg'),
+            'collapseLeftLight' => asset('images/icons/collapse-left-light.svg'),
+            'collapseLeftDark' => asset('images/icons/collapse-left-dark.svg'),
+            'collapseRightLight' => asset('images/icons/collapse-right-light.svg'),
+            'collapseRightDark' => asset('images/icons/collapse-right-dark.svg'),
+            'searchLight' => asset('images/icons/search-light.svg'),
+            'searchDark' => asset('images/icons/search-dark.svg'),
+            'uploadLight' => asset('images/icons/upload-light.svg'),
+            'uploadDark' => asset('images/icons/upload-dark.svg'),
+            'sendLight' => asset('images/icons/send-light.svg'),
+            'sendDark' => asset('images/icons/send-dark.svg'),
+        ];
+    @endphp
 
-        <!-- LEFT SIDEBAR: Chat History -->
-        @include('livewire.chat.partials.chat-left-sidebar')
+    <!-- LEFT SIDEBAR: Chat History -->
+    @include('livewire.chat.partials.chat-left-sidebar')
 
-        <!-- CENTER MAIN: Chat Area -->
-        <main class="flex-1 flex flex-col relative w-full h-full bg-transparent z-0 overflow-hidden min-w-0">
+    <!-- CENTER MAIN: Chat Area -->
+    <main class="flex-1 flex flex-col relative w-full h-full bg-transparent z-0 overflow-hidden min-w-0">
 
             <!-- Header for Chat Space -->
             <div class="h-[61px] flex-shrink-0 flex items-center justify-between px-3 sm:px-6 z-20 border-b border-stone-200/60/70 dark:border-[#1E293B]/70 backdrop-blur-sm">
@@ -68,30 +65,29 @@
             <!-- Input Area (Composer) -->
             @include('livewire.chat.partials.chat-composer', ['prompt' => $prompt])
 
-        </main>
+    </main>
 
-        <!-- RIGHT SIDEBAR: Documents -->
-        @include('livewire.chat.partials.chat-right-sidebar')
+    <!-- RIGHT SIDEBAR: Documents -->
+    @include('livewire.chat.partials.chat-right-sidebar')
 
-        <!-- Drag & Drop Overlay Visual -->
-        <div x-show="isDraggingFile" x-transition.opacity class="fixed inset-0 z-[60] bg-ista-primary/10 backdrop-blur-[2px] flex items-center justify-center pointer-events-none">
-            <div class="h-[120px] w-[320px] rounded-2xl border-2 border-dashed border-ista-primary bg-white/90 dark:bg-gray-900/90 shadow-2xl flex flex-col items-center justify-center gap-3 scale-110 transition-transform">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-ista-primary animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
-                <span class="text-[15px] font-bold text-ista-primary">Drop file di mana saja untuk upload</span>
-            </div>
+    <!-- Drag & Drop Overlay Visual -->
+    <div x-show="isDraggingFile" x-transition.opacity class="fixed inset-0 z-[60] bg-ista-primary/10 backdrop-blur-[2px] flex items-center justify-center pointer-events-none">
+        <div class="h-[120px] w-[320px] rounded-2xl border-2 border-dashed border-ista-primary bg-white/90 dark:bg-gray-900/90 shadow-2xl flex flex-col items-center justify-center gap-3 scale-110 transition-transform">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-ista-primary animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            <span class="text-[15px] font-bold text-ista-primary">Drop file di mana saja untuk upload</span>
         </div>
-
-        <!-- Unified Mobile Backdrop -->
-        <div
-            x-show="isMobile && (showLeftSidebar || showRightSidebar)"
-            x-transition.opacity
-            @click="showLeftSidebar = false; showRightSidebar = false;"
-            class="fixed inset-0 bg-black/50 z-40"
-            style="display:none;"
-        ></div>
     </div>
+
+    <!-- Unified Mobile Backdrop -->
+    <div
+        x-show="isMobile && (showLeftSidebar || showRightSidebar)"
+        x-transition.opacity
+        @click="showLeftSidebar = false; showRightSidebar = false;"
+        class="fixed inset-0 bg-black/50 z-40"
+        style="display:none;"
+    ></div>
 
     <!-- Alpine Data Definitions -->
     <script>
@@ -102,6 +98,9 @@
                 isMobile: window.matchMedia('(max-width: 1023px)').matches,
                 showLeftSidebar: !window.matchMedia('(max-width: 1023px)').matches,
                 showRightSidebar: !window.matchMedia('(max-width: 1023px)').matches,
+                isDraggingFile: false,
+                dragDepth: 0,
+                dropError: '',
 
                 init() {
                     this.$watch('darkMode', val => {
@@ -125,9 +124,55 @@
                     mql.addEventListener('change', handleMqlChange);
                 },
 
-                // Event Listeners for cross-component sidebar control
-                ['x-on:open-sidebar-right.window']() {
+                onDragEnter(event) {
+                    if (!this.hasFiles(event)) return;
+                    this.dragDepth++;
+                    this.isDraggingFile = true;
+                },
+
+                onDragOver(event) {
+                    if (!this.hasFiles(event)) return;
+                    this.isDraggingFile = true;
+                },
+
+                onDragLeave(event) {
+                    if (!this.hasFiles(event)) return;
+                    this.dragDepth = Math.max(this.dragDepth - 1, 0);
+                    if (this.dragDepth === 0) this.isDraggingFile = false;
+                },
+
+                onDropFile(event) {
+                    this.dragDepth = 0;
+                    this.isDraggingFile = false;
+
+                    const files = event.dataTransfer?.files;
+                    if (!files || files.length === 0) return;
+
+                    if (files.length > 1) {
+                        this.showDropError('Hanya bisa upload 1 file sekaligus.');
+                        return;
+                    }
+
+                    const input = document.querySelector('[x-ref="chatAttachmentInput"]');
+                    if (!input) return;
+
+                    input.files = files;
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
                     this.showRightSidebar = true;
+                },
+
+                hasFiles(event) {
+                    return event.dataTransfer?.types?.includes('Files');
+                },
+
+                showDropError(message) {
+                    this.dropError = message;
+                    this.$dispatch('show-drop-error', { message });
+                    setTimeout(() => {
+                        if (this.dropError === message) {
+                            this.dropError = '';
+                        }
+                    }, 3500);
                 }
             }));
 
@@ -162,11 +207,6 @@
                     });
                 },
 
-                // Event Listeners for cross-component communication
-                ['x-on:message-send.window']() {
-                    this.optimisticUserMessage = event.detail.text;
-                    this.scrollToBottom();
-                }
             }));
 
             // 3. Composer & Input Management
@@ -236,54 +276,6 @@
                 }
             }));
 
-            // 4. File Handler Logic
-            Alpine.data('chatFileHandler', () => ({
-                isDraggingFile: false,
-                dragDepth: 0,
-                dropError: '',
-
-                onDragEnter(event) {
-                    if (!this.hasFiles(event)) return;
-                    this.dragDepth++;
-                    this.isDraggingFile = true;
-                },
-                onDragOver(event) {
-                    if (!this.hasFiles(event)) return;
-                    this.isDraggingFile = true;
-                },
-                onDragLeave(event) {
-                    if (!this.hasFiles(event)) return;
-                    this.dragDepth = Math.max(this.dragDepth - 1, 0);
-                    if (this.dragDepth === 0) this.isDraggingFile = false;
-                },
-                onDropFile(event) {
-                    this.dragDepth = 0;
-                    this.isDraggingFile = false;
-                    const files = event.dataTransfer?.files;
-                    if (!files || files.length === 0) return;
-                    
-                    if (files.length > 1) {
-                        this.showError('Hanya bisa upload 1 file sekaligus.');
-                        return;
-                    }
-
-                    // Dispatch directly to the hidden input in composer
-                    const input = document.querySelector('[x-ref="chatAttachmentInput"]');
-                    if (input) {
-                        input.files = files;
-                        input.dispatchEvent(new Event('change', { bubbles: true }));
-                        this.$dispatch('open-sidebar-right');
-                    }
-                },
-                hasFiles(event) {
-                    return event.dataTransfer?.types?.includes('Files');
-                },
-                showError(msg) {
-                    this.dropError = msg;
-                    this.$dispatch('show-drop-error', { message: msg });
-                    setTimeout(() => this.dropError = '', 3500);
-                }
-            }));
         });
     </script>
 </div>
