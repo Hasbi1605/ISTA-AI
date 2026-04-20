@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import warnings
 import requests
 import litellm
 from typing import List, Dict, Generator
@@ -20,6 +21,19 @@ except ImportError:
 
 # Suppress verbose litellm output
 litellm.set_verbose = False
+litellm.suppress_debug_info = True
+
+# litellm menggunakan httpx.AsyncClient secara internal untuk streaming.
+# Ketika kita mengkonsumsi stream dalam sync generator, aclose() tidak bisa
+# di-await dengan benar → warning asyncio "Task was destroyed but pending".
+# Ini hanya cosmetic warning, tidak mempengaruhi fungsionalitas.
+warnings.filterwarnings(
+    "ignore",
+    message="coroutine 'AsyncClient.aclose' was never awaited",
+    category=RuntimeWarning,
+)
+# Suppress asyncio logger noise dari masalah yang sama
+logging.getLogger("asyncio").setLevel(logging.CRITICAL)
 
 
 # ─── Error Classification Helpers ─────────────────────────────────────────────
