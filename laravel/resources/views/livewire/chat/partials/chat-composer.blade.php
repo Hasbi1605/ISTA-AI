@@ -1,4 +1,7 @@
-<div class="px-3 sm:px-6 pb-4 sm:pb-6 pt-2 bg-transparent w-full">
+<div x-data="chatComposer({ prompt: @js($prompt ?? '') })" 
+     x-on:show-drop-error.window="sendError = $event.detail.message"
+     class="px-3 sm:px-6 pb-4 sm:pb-6 pt-2 bg-transparent w-full"
+>
     @php
         $chatDocuments = $availableDocuments->whereIn('id', $conversationDocuments)->values();
     @endphp
@@ -11,6 +14,16 @@
     >
     <form x-on:submit.prevent="submitPrompt($event)" class="chat-form max-w-3xl mx-auto relative rounded-xl shadow-sm bg-white dark:bg-gray-800 border border-stone-200/60 dark:border-gray-700 transition-colors">
         <div class="flex flex-col w-full">
+            <!-- Error Notification -->
+            <div x-show="sendError" x-transition class="absolute -top-14 left-0 right-0 z-30">
+                <div class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[12px] text-rose-800 shadow-sm flex items-center justify-between gap-2">
+                    <span x-text="sendError"></span>
+                    <button type="button" @click="sendError = ''" class="text-rose-400 hover:text-rose-600">
+                        <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+            </div>
+
             <div wire:loading.flex wire:target="chatAttachment" class="px-5 pt-4 items-center gap-2 text-[12px] text-ista-primary dark:text-[#8E81FF]">
                 <span class="h-2 w-2 rounded-full bg-current animate-ping"></span>
             </div>

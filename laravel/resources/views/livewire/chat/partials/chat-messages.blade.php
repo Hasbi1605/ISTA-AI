@@ -1,4 +1,4 @@
-<div class="flex-1 overflow-y-auto px-3 sm:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8" x-ref="chatBox" x-on:message-streamed.window="$refs.chatBox.scrollTop = $refs.chatBox.scrollHeight">
+<div x-data="chatMessages" class="flex-1 overflow-y-auto px-3 sm:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8" x-ref="chatBox" x-on:message-streamed.window="scrollToBottom()">
     @if(empty($messages))
         <div class="h-full flex flex-col items-center justify-center text-center">
             <div class="h-16 w-16 mb-6">
