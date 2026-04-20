@@ -15,6 +15,7 @@ from app.services.rag_config import (
     BATCH_DELAY_SECONDS,
     MAX_TOKENS_PER_BATCH,
     MAX_EMBEDDING_DIM,
+    EMBEDDING_MODELS,
 )
 from app.services.rag_embeddings import count_tokens, get_embeddings_with_fallback
 
@@ -269,8 +270,7 @@ def process_document(file_path: str, filename: str, user_id: str = "unknown"):
                             logger.error(f"   ❌ Sub-batch {si}/2 gagal: {sub_err}")
                             failed_chunks += len(sub)
 
-                elif is_rate_limit and current_model_index < len(pdr_cfg.get('embedding_models', [])) - 1:
-                    from app.services.rag_config import EMBEDDING_MODELS
+                elif is_rate_limit and current_model_index < len(EMBEDDING_MODELS) - 1:
                     if current_model_index < len(EMBEDDING_MODELS) - 1:
                         logger.warning(f"🚫 Rate limit detected! Cascading to next model tier...")
 

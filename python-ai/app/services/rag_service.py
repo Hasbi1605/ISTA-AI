@@ -24,6 +24,7 @@ from app.services.rag_config import (
 from app.services.rag_embeddings import (
     count_tokens,
     get_embeddings_with_fallback,
+    TIKTOKEN_ENCODER,
 )
 
 from app.services.rag_ingest import (
