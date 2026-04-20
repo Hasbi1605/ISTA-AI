@@ -413,3 +413,64 @@ class TestEmbeddingDimensionStrategy:
         source = inspect.getsource(rag_service.get_embeddings_with_fallback)
         assert "MAX_EMBEDDING_DIM" in source, "All fallback models should use MAX_EMBEDDING_DIM"
         assert "model_config['dimensions']" not in source, "Should NOT use model native dimensions"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 5. REGRESSION TEST: Upload -> Retrieval Flow
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestDocumentIdentifierConsistency:
+    """
+    Regression test untuk issue: filename mismatch antara ingest dan retrieval.
+    
+    Flow yang diuji:
+    1. Ingest dokumen dengan filename="test_doc.pdf", user_id="user_1"
+    2. Retrieve dengan filename="test_doc.pdf", user_id="user_1"  
+    3. Pastikan chunk ditemukan (tidak ada mismatch identifier)
+    """
+
+    def test_ingest_retrieval_filename_consistency(self, rag):
+        from app.services import rag_ingest, rag_retrieval
+        from langchain_chroma import Chroma
+        from app.services.rag_config import CHROMA_PATH
+
+        test_filename = "regression_test_doc.pdf"
+        test_user_id = "regression_user_123"
+        test_content = "Ini adalah dokumen regresi untuk menguji konsistensi identifier."
+
+        embeddings, _, _ = rag.get_embeddings_with_fallback()
+        if embeddings is None:
+            pytest.skip("Embeddings tidak tersedia")
+
+        vectorstore = Chroma(
+            collection_name="documents_collection",
+            embedding_function=embeddings,
+            persist_directory=CHROMA_PATH
+        )
+
+        vectorstore.delete(where={"filename": test_filename, "user_id": test_user_id})
+
+        from langchain.schema import Document
+        test_doc = Document(
+            page_content=test_content,
+            metadata={
+                "filename": test_filename,
+                "user_id": test_user_id,
+                "chunk_index": 0,
+            }
+        )
+        vectorstore.add_documents([test_doc])
+
+        chunks, success = rag_retrieval.search_relevant_chunks(
+            query="dokumen regresi",
+            filenames=[test_filename],
+            top_k=5,
+            user_id=test_user_id,
+        )
+
+        assert success is True, "Retrieval harus berhasil"
+        assert len(chunks) > 0, f"Harus menemukan chunk untuk filename='{test_filename}', user_id='{test_user_id}'"
+        assert chunks[0]["filename"] == test_filename, "Filename di result harus sama dengan yang di-request"
+        assert chunks[0]["metadata"]["user_id"] == test_user_id, "User_id di metadata harus sama"
+
+        vectorstore.delete(where={"filename": test_filename, "user_id": test_user_id})

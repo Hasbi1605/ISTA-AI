@@ -125,6 +125,7 @@ def search_relevant_chunks(query: str, filenames: List[str] = None, top_k: int =
             docs = all_docs
 
         elif filenames and len(filenames) == 1:
+            logger.info("🔍 RETRIEVAL: Filtering by filename='%s', user_id='%s'", filenames[0], user_id)
             f_filter = {"$and": [user_filter, {"filename": filenames[0]}]}
             f_vec = vectorstore.similarity_search_with_score(
                 search_query, k=doc_candidates, filter=f_filter
@@ -165,7 +166,13 @@ def search_relevant_chunks(query: str, filenames: List[str] = None, top_k: int =
             docs = _exclude_parent_search_results(docs)
 
         if not docs:
-            logger.info("📚 RAG: Tidak ada chunk ditemukan")
+            logger.info("📚 RAG: Tidak ada chunk ditemukan - filename='%s', user_id='%s'", filenames[0] if filenames else None, user_id)
+            try:
+                all_data = vectorstore.get(where={"user_id": str(user_id)}, include=['metadatas'], limit=100)
+                stored_filenames = set(m.get('filename') for m in (all_data.get('metadatas') or []) if m.get('filename'))
+                logger.info("🔍 DEBUG: Available filenames in Chroma for user_id=%s: %s", user_id, list(stored_filenames))
+            except Exception as de:
+                logger.debug("DEBUG: Could not query Chroma: %s", de)
             return [], True
 
         langsearch_service = get_langsearch_service()

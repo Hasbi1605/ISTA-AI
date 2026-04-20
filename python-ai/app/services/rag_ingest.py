@@ -171,10 +171,12 @@ def process_document(file_path: str, filename: str, user_id: str = "unknown"):
 
         current_embedding_dim = pdr_cfg.get('embedding_dim', MAX_EMBEDDING_DIM)
 
-        for chunk in chunks:
+        for idx, chunk in enumerate(chunks):
             chunk.metadata["filename"] = filename
             chunk.metadata["user_id"]  = str(user_id)
             chunk.metadata["embedding_model"] = provider_name
+            if idx == 0:
+                logger.info("🔍 INGEST: Storing chunk metadata - filename='%s', user_id='%s'", filename, str(user_id))
 
         logger.info(f"Step 4: Smart Batching & Embedding Generation...")
         logger.info(
