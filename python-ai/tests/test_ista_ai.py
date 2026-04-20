@@ -413,3 +413,237 @@ class TestEmbeddingDimensionStrategy:
         source = inspect.getsource(rag_service.get_embeddings_with_fallback)
         assert "MAX_EMBEDDING_DIM" in source, "All fallback models should use MAX_EMBEDDING_DIM"
         assert "model_config['dimensions']" not in source, "Should NOT use model native dimensions"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 5. REGRESSION TEST: Upload -> Retrieval Flow
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestDocumentIdentifierConsistency:
+    """
+    Regression test untuk issue: filename mismatch antara ingest dan retrieval.
+    
+    Flow yang diuji:
+    1. Ingest dokumen dengan filename="test_doc.pdf", user_id="user_1"
+    2. Retrieve dengan filename="test_doc.pdf", user_id="user_1"  
+    3. Pastikan chunk ditemukan (tidak ada mismatch identifier)
+    """
+
+    def test_ingest_retrieval_filename_consistency(self, rag):
+        from app.services import rag_ingest, rag_retrieval
+        from langchain_chroma import Chroma
+        from app.services.rag_config import CHROMA_PATH
+
+        test_filename = "regression_test_doc.pdf"
+        test_user_id = "regression_user_123"
+        test_content = "Ini adalah dokumen regresi untuk menguji konsistensi identifier."
+
+        embeddings, _, _ = rag.get_embeddings_with_fallback()
+        if embeddings is None:
+            pytest.skip("Embeddings tidak tersedia")
+
+        vectorstore = Chroma(
+            collection_name="documents_collection",
+            embedding_function=embeddings,
+            persist_directory=CHROMA_PATH
+        )
+
+        vectorstore.delete(where={"filename": test_filename, "user_id": test_user_id})
+
+        from langchain.schema import Document
+        test_doc = Document(
+            page_content=test_content,
+            metadata={
+                "filename": test_filename,
+                "user_id": test_user_id,
+                "chunk_index": 0,
+            }
+        )
+        vectorstore.add_documents([test_doc])
+
+        chunks, success = rag_retrieval.search_relevant_chunks(
+            query="dokumen regresi",
+            filenames=[test_filename],
+            top_k=5,
+            user_id=test_user_id,
+        )
+
+        assert success is True, "Retrieval harus berhasil"
+        assert len(chunks) > 0, f"Harus menemukan chunk untuk filename='{test_filename}', user_id='{test_user_id}'"
+        assert chunks[0]["filename"] == test_filename, "Filename di result harus sama dengan yang di-request"
+        assert chunks[0]["metadata"]["user_id"] == test_user_id, "User_id di metadata harus sama"
+
+        vectorstore.delete(where={"filename": test_filename, "user_id": test_user_id})
+
+
+class TestPDRParentIsolation:
+    @staticmethod
+    def _disable_networked_retrieval_paths(monkeypatch):
+        from app import config_loader
+
+        monkeypatch.setattr(config_loader, "get_hyde_config", lambda: {"enabled": False})
+        monkeypatch.setattr(config_loader, "get_hybrid_search_config", lambda: {"enabled": False})
+        monkeypatch.setattr(config_loader, "get_rag_doc_candidates", lambda: 25)
+        monkeypatch.setattr(config_loader, "get_rag_top_n", lambda: 5)
+
+    def test_parent_chunks_do_not_block_child_retrieval(self, monkeypatch):
+        from app.services import rag_retrieval, rag_hybrid
+        from app.services.rag_config import PARENT_COLLECTION_NAME
+        from langchain_core.documents import Document
+
+        class FakeCollection:
+            def get(self, where=None, include=None, limit=None):
+                return {
+                    "documents": ["Isi lengkap parent software project"],
+                    "metadatas": [{
+                        "filename": "software-project.docx",
+                        "user_id": "47",
+                        "chunk_type": "parent",
+                        "parent_id": "parent-1",
+                        "parent_index": 0,
+                    }],
+                }
+
+        class FakeVectorStore:
+            def __init__(self):
+                self._collection = FakeCollection()
+
+            def similarity_search_with_score(self, query, k=4, filter=None):
+                return [(
+                    Document(
+                        page_content="Isi penting software project",
+                        metadata={
+                            "filename": "software-project.docx",
+                            "user_id": "47",
+                            "chunk_type": "child",
+                            "parent_id": "parent-1",
+                            "chunk_index": 0,
+                        },
+                    ),
+                    0.1,
+                )]
+
+            def get(self, where=None, include=None, limit=None):
+                return {
+                    "documents": ["Isi penting software project"],
+                    "metadatas": [{
+                        "filename": "software-project.docx",
+                        "user_id": "47",
+                        "chunk_type": "child",
+                        "parent_id": "parent-1",
+                        "chunk_index": 0,
+                    }],
+                }
+
+        class FakeChroma:
+            def __init__(self, collection_name=None, embedding_function=None, persist_directory=None):
+                self._collection = FakeCollection()
+
+        self._disable_networked_retrieval_paths(monkeypatch)
+        monkeypatch.setattr(
+            rag_retrieval,
+            "get_embeddings_with_fallback",
+            lambda *args, **kwargs: (object(), "fake", 0),
+        )
+        monkeypatch.setattr(rag_retrieval, "Chroma", lambda *args, **kwargs: FakeVectorStore())
+        monkeypatch.setattr(rag_hybrid, "Chroma", FakeChroma)
+        monkeypatch.setattr(rag_hybrid, "PARENT_COLLECTION_NAME", PARENT_COLLECTION_NAME)
+
+        chunks, success = rag_retrieval.search_relevant_chunks(
+            query="isi software project",
+            filenames=["software-project.docx"],
+            top_k=5,
+            user_id="47",
+        )
+
+        assert success is True
+        assert len(chunks) == 1
+        assert chunks[0]["filename"] == "software-project.docx"
+        assert chunks[0].get("pdr") is True
+        assert "Isi lengkap parent" in chunks[0]["content"]
+
+    def test_legacy_parent_chunks_in_vector_collection_fall_back_to_child_corpus(self, monkeypatch):
+        from app.services import rag_retrieval, rag_hybrid
+        from langchain_core.documents import Document
+
+        class LegacyCollection:
+            def get(self, where=None, include=None, limit=None):
+                return {
+                    "documents": ["Parent legacy content"],
+                    "metadatas": [{
+                        "filename": "legacy.docx",
+                        "user_id": "47",
+                        "chunk_type": "parent",
+                        "parent_id": "legacy-parent-1",
+                        "parent_index": 0,
+                    }],
+                }
+
+        class LegacyVectorStore:
+            def __init__(self):
+                self._collection = LegacyCollection()
+
+            def similarity_search_with_score(self, query, k=4, filter=None):
+                return [(
+                    Document(
+                        page_content="Parent legacy content",
+                        metadata={
+                            "filename": "legacy.docx",
+                            "user_id": "47",
+                            "chunk_type": "parent",
+                            "parent_id": "legacy-parent-1",
+                            "parent_index": 0,
+                        },
+                    ),
+                    0.0,
+                )]
+
+            def get(self, where=None, include=None, limit=None):
+                return {
+                    "documents": [
+                        "Parent legacy content",
+                        "Child content yang harus tetap bisa diretrieve",
+                    ],
+                    "metadatas": [
+                        {
+                            "filename": "legacy.docx",
+                            "user_id": "47",
+                            "chunk_type": "parent",
+                            "parent_id": "legacy-parent-1",
+                            "parent_index": 0,
+                        },
+                        {
+                            "filename": "legacy.docx",
+                            "user_id": "47",
+                            "chunk_type": "child",
+                            "parent_id": "legacy-parent-1",
+                            "chunk_index": 0,
+                        },
+                    ],
+                }
+
+        class MissingParentCollection:
+            def __init__(self, *args, **kwargs):
+                raise RuntimeError("no parent collection")
+
+        self._disable_networked_retrieval_paths(monkeypatch)
+        monkeypatch.setattr(
+            rag_retrieval,
+            "get_embeddings_with_fallback",
+            lambda *args, **kwargs: (object(), "fake", 0),
+        )
+        monkeypatch.setattr(rag_retrieval, "Chroma", lambda *args, **kwargs: LegacyVectorStore())
+        monkeypatch.setattr(rag_hybrid, "Chroma", MissingParentCollection)
+
+        chunks, success = rag_retrieval.search_relevant_chunks(
+            query="child content retrieve",
+            filenames=["legacy.docx"],
+            top_k=5,
+            user_id="47",
+        )
+
+        assert success is True
+        assert len(chunks) == 1
+        assert chunks[0]["filename"] == "legacy.docx"
+        assert chunks[0].get("pdr") is True
+        assert "Parent legacy content" in chunks[0]["content"]
