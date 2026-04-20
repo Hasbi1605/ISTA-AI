@@ -5,6 +5,7 @@ namespace App\Livewire\Documents;
 use App\Jobs\ProcessDocument;
 use App\Models\Document;
 use App\Services\AIService;
+use App\Services\DocumentLifecycleService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -62,60 +63,21 @@ class DocumentIndex extends Component
         }
     }
 
-    public function saveDocument()
+    public function saveDocument(DocumentLifecycleService $documentLifecycleService)
     {
         $this->validate();
-
-        // 1. Check Document Limit (Max 10)
-        $count = Document::where('user_id', Auth::id())->count();
-        if ($count >= 10) {
-            session()->flash('error', 'Limit kuota dokumen tercapai (Maksimal 10 dokumen).');
-            return;
-        }
 
         $this->isUploading = true;
 
         try {
-            // 2. Store file securely
-            $originalName = $this->file->getClientOriginalName();
-            $detectedMimeType = (string) $this->file->getMimeType();
-
-            if (!in_array($detectedMimeType, self::ALLOWED_ATTACHMENT_MIME_TYPES, true)) {
-                throw ValidationException::withMessages([
-                    'file' => 'Tipe MIME file tidak valid. Gunakan PDF, DOCX, atau XLSX.',
-                ]);
-            }
-
-            $duplicateExists = Document::where('user_id', Auth::id())
-                ->where('original_name', $originalName)
-                ->exists();
-
-            if ($duplicateExists) {
-                $this->addError('file', 'File dengan nama yang sama sudah pernah diunggah.');
-                return;
-            }
-
-            $filename = time() . '_' . $this->file->hashName();
-            $filePath = $this->file->storeAs('documents/' . Auth::id(), $filename);
-
-            // 3. Create Database Record
-            $document = Document::create([
-                'user_id' => Auth::id(),
-                'filename' => $filename,
-                'original_name' => $originalName,
-                'file_path' => $filePath,
-                'mime_type' => $detectedMimeType,
-                'file_size_bytes' => $this->file->getSize(),
-                'status' => 'pending',
-            ]);
-
-            // 4. Dispatch Background Job
-            ProcessDocument::dispatch($document);
+            $documentLifecycleService->uploadDocument($this->file, Auth::id());
 
             $this->reset('file');
             session()->flash('message', 'Dokumen berhasil diunggah dan sedang diproses.');
         } catch (ValidationException $e) {
-            throw $e;
+            $errors = $e->validator->errors();
+            $message = $errors->first('file') ?: 'Upload gagal. Periksa format file dan coba lagi.';
+            $this->addError('file', $message);
         } catch (\Exception $e) {
             session()->flash('error', 'Gagal mengunggah dokumen: ' . $e->getMessage());
         } finally {
@@ -123,48 +85,26 @@ class DocumentIndex extends Component
         }
     }
 
-    public function delete($id)
+    public function delete($id, DocumentLifecycleService $documentLifecycleService)
     {
         $document = Document::where('user_id', Auth::id())->findOrFail($id);
 
         try {
-            // 1. Notify Python Microservice to delete vectors
-            $pythonUrl = config('services.ai_service.url', 'http://127.0.0.1:8001') . '/api/documents/' . urlencode($document->original_name);
-            $token = config('services.ai_service.token');
-
-            $response = Http::withHeaders([
-                'Authorization' => "Bearer {$token}",
-            ])->delete($pythonUrl);
-
-            if (!$response->successful()) {
-                logger()->warning("Vector deletion failed for {$document->original_name}, proceeding anyway: " . $response->body());
-            }
-
-            // 2. Delete file from storage
-            Storage::delete($document->file_path);
-
-            // 3. Delete database record (Soft Delete)
-            $document->delete();
-
+            $documentLifecycleService->deleteDocument($document);
             session()->flash('message', 'Dokumen berhasil dihapus.');
         } catch (\Exception $e) {
             session()->flash('error', 'Gagal menghapus dokumen: ' . $e->getMessage());
         }
     }
 
-    public function summarize($id, AIService $aiService)
+    public function summarize($id, AIService $aiService, DocumentLifecycleService $documentLifecycleService)
     {
         $document = Document::where('user_id', Auth::id())->findOrFail($id);
-
-        if ($document->status !== 'ready') {
-            session()->flash('error', 'Dokumen belum selesai diproses. Tunggu hingga status menjadi "ready".');
-            return;
-        }
 
         $this->summarizingDocumentId = $id;
 
         try {
-            $result = $aiService->summarizeDocument($document->original_name, (string) Auth::id());
+            $result = $documentLifecycleService->summarizeDocument($document, $aiService);
 
             if ($result['status'] === 'success') {
                 $this->summaryResult = $result['summary'];
@@ -172,6 +112,8 @@ class DocumentIndex extends Component
             } else {
                 session()->flash('error', 'Gagal merangkum dokumen: ' . ($result['message'] ?? 'Unknown error'));
             }
+        } catch (\InvalidArgumentException $e) {
+            session()->flash('error', $e->getMessage());
         } catch (\Exception $e) {
             session()->flash('error', 'Gagal merangkum dokumen: ' . $e->getMessage());
         } finally {

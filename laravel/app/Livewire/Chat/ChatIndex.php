@@ -7,6 +7,7 @@ use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\Document;
 use App\Services\AIService;
+use App\Services\DocumentLifecycleService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -197,7 +198,7 @@ class ChatIndex extends Component
         $this->conversationDocuments = [];
     }
 
-    public function deleteDocument($documentId)
+    public function deleteDocument($documentId, DocumentLifecycleService $documentLifecycleService)
     {
         $document = Document::where('id', $documentId)
             ->where('user_id', Auth::id())
@@ -207,11 +208,7 @@ class ChatIndex extends Component
             return;
         }
 
-        if ($document->file_path && Storage::exists($document->file_path)) {
-            Storage::delete($document->file_path);
-        }
-
-        $document->delete();
+        $documentLifecycleService->deleteDocument($document);
 
         $this->selectedDocuments = array_values(array_filter($this->selectedDocuments, function ($id) use ($documentId) {
             return (int) $id !== (int) $documentId;
@@ -224,7 +221,7 @@ class ChatIndex extends Component
         $this->loadAvailableDocuments();
     }
 
-    public function deleteSelectedDocuments()
+    public function deleteSelectedDocuments(DocumentLifecycleService $documentLifecycleService)
     {
         $documentIds = array_map('intval', $this->selectedDocuments);
 
@@ -236,12 +233,7 @@ class ChatIndex extends Component
             ->whereIn('id', $documentIds)
             ->get();
 
-        foreach ($documents as $document) {
-            if ($document->file_path && Storage::exists($document->file_path)) {
-                Storage::delete($document->file_path);
-            }
-            $document->delete();
-        }
+        $documentLifecycleService->deleteDocuments($documents);
 
         $this->selectedDocuments = [];
         $this->conversationDocuments = array_values(array_filter($this->conversationDocuments, function ($id) use ($documentIds) {
@@ -280,10 +272,10 @@ class ChatIndex extends Component
 
         $this->attachmentUploadStatus = null;
         $this->attachmentUploadMessage = '';
-        $this->uploadChatAttachment();
+        $this->uploadChatAttachment(app(DocumentLifecycleService::class));
     }
 
-    public function uploadChatAttachment()
+    public function uploadChatAttachment(DocumentLifecycleService $documentLifecycleService)
     {
         try {
             $this->validate([
@@ -296,60 +288,18 @@ class ChatIndex extends Component
                 ],
             ]);
 
-            $originalName = $this->chatAttachment->getClientOriginalName();
-            $detectedMimeType = (string) $this->chatAttachment->getMimeType();
-
-            if (!in_array($detectedMimeType, self::ALLOWED_ATTACHMENT_MIME_TYPES, true)) {
-                throw ValidationException::withMessages([
-                    'chatAttachment' => 'Tipe MIME file tidak valid. Gunakan PDF, DOCX, atau XLSX.',
-                ]);
-            }
-
-            $duplicateExists = Document::where('user_id', Auth::id())
-                ->where('original_name', $originalName)
-                ->exists();
-
-            if ($duplicateExists) {
-                $this->attachmentUploadStatus = 'error';
-                $this->attachmentUploadMessage = 'File dengan nama yang sama sudah pernah diunggah.';
-                session()->flash('error', $this->attachmentUploadMessage);
-                $this->reset('chatAttachment');
-                return;
-            }
-
-            $documentCount = Document::where('user_id', Auth::id())->count();
-            if ($documentCount >= 10) {
-                session()->flash('error', 'Limit kuota dokumen tercapai (Maksimal 10 dokumen).');
-                $this->attachmentUploadStatus = 'error';
-                $this->attachmentUploadMessage = 'Limit kuota dokumen tercapai (Maksimal 10 dokumen).';
-                $this->reset('chatAttachment');
-                return;
-            }
-
             $this->isUploadingAttachment = true;
+            $this->uploadingAttachmentName = $this->chatAttachment->getClientOriginalName();
 
-            $this->uploadingAttachmentName = $originalName;
-            $filename = time() . '_' . $this->chatAttachment->hashName();
-            $filePath = $this->chatAttachment->storeAs('documents/' . Auth::id(), $filename);
-
-            $document = Document::create([
-                'user_id' => Auth::id(),
-                'filename' => $filename,
-                'original_name' => $originalName,
-                'file_path' => $filePath,
-                'mime_type' => $detectedMimeType,
-                'file_size_bytes' => $this->chatAttachment->getSize(),
-                'status' => 'pending',
-            ]);
-
-            ProcessDocument::dispatch($document);
+            $documentLifecycleService->uploadDocument($this->chatAttachment, Auth::id());
 
             session()->flash('message', 'Dokumen berhasil diunggah dan sedang diproses.');
             $this->attachmentUploadStatus = 'success';
             $this->attachmentUploadMessage = 'Upload berhasil. Dokumen sedang diproses.';
             $this->loadAvailableDocuments();
         } catch (ValidationException $e) {
-            $message = $e->validator->errors()->first('chatAttachment') ?: 'Upload gagal. Periksa format file dan coba lagi.';
+            $errors = $e->validator->errors();
+            $message = $errors->first('file') ?: ($errors->first('chatAttachment') ?: 'Upload gagal. Periksa format file dan coba lagi.');
             session()->flash('error', $message);
             $this->attachmentUploadStatus = 'error';
             $this->attachmentUploadMessage = $message;
