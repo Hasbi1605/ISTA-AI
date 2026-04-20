@@ -25,7 +25,7 @@ class ReprocessDocuments extends Command
     /**
      * Execute the console command.
      */
-    public function handle()
+    public function handle(\App\Services\DocumentLifecycleService $lifecycleService)
     {
         if ($this->option('id')) {
             $document = Document::find($this->option('id'));
@@ -34,7 +34,7 @@ class ReprocessDocuments extends Command
                 return 1;
             }
             
-            $this->reprocessDocument($document);
+            $this->reprocessDocument($document, $lifecycleService);
             return 0;
         }
         
@@ -53,14 +53,14 @@ class ReprocessDocuments extends Command
         $this->info("Found {$documents->count()} documents to reprocess.");
         
         foreach ($documents as $document) {
-            $this->reprocessDocument($document);
+            $this->reprocessDocument($document, $lifecycleService);
         }
         
         $this->info('All documents queued for reprocessing.');
         return 0;
     }
     
-    private function reprocessDocument(Document $document): void
+    private function reprocessDocument(Document $document, \App\Services\DocumentLifecycleService $lifecycleService): void
     {
         $this->line("Queueing: [{$document->id}] {$document->original_name}");
         
@@ -68,6 +68,6 @@ class ReprocessDocuments extends Command
         $document->update(['status' => 'pending']);
         
         // Dispatch the job
-        ProcessDocument::dispatch($document);
+        $lifecycleService->dispatchProcessing($document);
     }
 }

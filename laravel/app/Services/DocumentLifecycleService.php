@@ -80,9 +80,20 @@ class DocumentLifecycleService
         ]);
 
         // 6. Dispatch Processing Job
-        ProcessDocument::dispatch($document);
+        $this->dispatchProcessing($document);
 
         return $document;
+    }
+
+    /**
+     * Dispatch the job to process a document
+     *
+     * @param Document $document
+     * @return void
+     */
+    public function dispatchProcessing(Document $document): void
+    {
+        ProcessDocument::dispatch($document);
     }
 
     /**
