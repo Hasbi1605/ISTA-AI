@@ -1,0 +1,97 @@
+[
+    {
+        "id": "scenario_chat_umum_1",
+        "type": "general_chat",
+        "description": "Salam/chat umum",
+        "request": {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "Halo, siapa kamu?"
+                }
+            ],
+            "document_filenames": null,
+            "force_web_search": false
+        },
+        "expected_behaviors": [
+            "Jawaban mengandung persona ISTA AI",
+            "Menjawab dengan bahasa profesional dan sopan",
+            "Tidak memanggil web search atau RAG"
+        ]
+    },
+    {
+        "id": "scenario_web_search_1",
+        "type": "web_search",
+        "description": "Pertanyaan realtime (membutuhkan data terbaru)",
+        "request": {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "Siapa presiden Indonesia saat ini?"
+                }
+            ],
+            "document_filenames": null,
+            "force_web_search": true
+        },
+        "expected_behaviors": [
+            "Memanggil web search (langsearch/tavily)",
+            "Menyertakan list sources dengan title dan url",
+            "Jawaban didasarkan pada hasil web terbaru"
+        ]
+    },
+    {
+        "id": "scenario_rag_1",
+        "type": "rag_in_context",
+        "description": "Pertanyaan dengan dokumen aktif",
+        "request": {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "Apa saja program kerja yang disebutkan di dokumen ini?"
+                }
+            ],
+            "document_filenames": ["program-kerja-2026.pdf"],
+            "force_web_search": false
+        },
+        "expected_behaviors": [
+            "Mengekstraksi konteks dari vektor dokumen 'program-kerja-2026.pdf'",
+            "Menjawab spesifik sesuai teks dokumen",
+            "Menyertakan sources berisi nama dokumen",
+            "Tidak melakukan web search secara otomatis"
+        ]
+    },
+    {
+        "id": "scenario_rag_2",
+        "type": "rag_out_of_context",
+        "description": "Pertanyaan yang tidak ada di dokumen",
+        "request": {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "Apa resep membuat rendang?"
+                }
+            ],
+            "document_filenames": ["program-kerja-2026.pdf"],
+            "force_web_search": false
+        },
+        "expected_behaviors": [
+            "Menjawab bahwa informasi tidak ditemukan dalam dokumen",
+            "Menggunakan copywriting fallback seperti 'Jika Anda berkenan, saya dapat mencarinya di internet...'",
+            "Tidak berhalusinasi menjawab dari LLM pre-training"
+        ]
+    },
+    {
+        "id": "scenario_document_summarization",
+        "type": "summarization",
+        "description": "Summarization dokumen besar",
+        "request": {
+            "action": "summarize_document",
+            "document_filename": "laporan-tahunan-2025.pdf"
+        },
+        "expected_behaviors": [
+            "Memanggil proses summarization parsial per bagian (chunk)",
+            "Menggabungkan hasil parsial menjadi final summary",
+            "Menghasilkan ringkasan inti dan poin penting"
+        ]
+    }
+]
