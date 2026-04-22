@@ -28,15 +28,23 @@ class DocumentDeletionTest extends TestCase
         $defaultRuntime = config('ai_runtime.document_delete');
         $this->assertEquals('laravel', $defaultRuntime);
 
-        // Verify LaravelAIGateway is ready when document_delete_enabled=true
-        // and api_key is present
+        // Set config so LaravelAIGateway::isReady() returns true
+        // Both api_key and at least one feature flag must be set
         Config::set('ai.laravel_ai.api_key', 'test-key-123');
         Config::set('ai.laravel_ai.document_delete_enabled', true);
         Config::set('ai.laravel_ai.document_process_enabled', false);
         Config::set('ai.laravel_ai.document_summarize_enabled', false);
 
+        // Verify LaravelAIGateway::isReady() returns true
         $gateway = new \App\Services\Runtime\LaravelAIGateway();
         $this->assertTrue($gateway->isReady());
+
+        // CRITICAL: Verify AIRuntimeResolver actually returns LaravelAIGateway
+        // (not Python fallback), since the resolver has fallback logic
+        // that falls back to Python if the selected runtime is not ready
+        $resolver = new \App\Services\AIRuntimeResolver('document_delete', false);
+        $runtime = $resolver->getRuntime();
+        $this->assertInstanceOf(\App\Services\Runtime\LaravelAIGateway::class, $runtime);
     }
 
     public function test_delete_document_passes_user_id_to_runtime(): void
