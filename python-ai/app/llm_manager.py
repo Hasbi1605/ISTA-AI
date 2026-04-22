@@ -19,6 +19,8 @@ try:
     CONFIG_AVAILABLE = True
 except ImportError:
     CONFIG_AVAILABLE = False
+    # Keep this inline fallback text synchronized with
+    # app.config_loader.DEFAULT_PROMPTS["system"]["default"].
     DEFAULT_PROMPTS = {
         "system": {
             "default": (

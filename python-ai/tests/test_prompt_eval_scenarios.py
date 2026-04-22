@@ -211,4 +211,26 @@ async def test_eval_summarize_endpoint_returns_http_exception_when_rendered_prom
         )
 
     assert exc.value.status_code == 500
+    assert "Gagal merender prompt" in exc.value.detail
     assert "Prompt summarization kosong setelah dirender" in exc.value.detail
+
+
+@pytest.mark.anyio
+async def test_eval_summarize_endpoint_returns_http_exception_when_prompt_placeholder_is_missing(monkeypatch):
+    import app.routers.documents as documents
+
+    monkeypatch.setattr(
+        documents,
+        "get_document_chunks_for_summarization",
+        lambda *args, **kwargs: (True, ["isi ringkasan"], 1),
+    )
+    monkeypatch.setattr(documents, "get_summarize_single_prompt", lambda: "{missing_placeholder}")
+
+    with pytest.raises(HTTPException) as exc:
+        await documents.summarize_document_endpoint(
+            documents.SummarizeRequest(filename="memo.pdf", user_id="user-1")
+        )
+
+    assert exc.value.status_code == 500
+    assert "Gagal merender prompt" in exc.value.detail
+    assert "missing_placeholder" in exc.value.detail

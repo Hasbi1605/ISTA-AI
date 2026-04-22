@@ -86,8 +86,8 @@ def _render_prompt(template: str, **kwargs) -> str:
 def _render_prompt_or_http_exception(template: str, **kwargs) -> str:
     try:
         return _render_prompt(template, **kwargs)
-    except RuntimeError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except (RuntimeError, KeyError, IndexError) as exc:
+        raise HTTPException(status_code=500, detail=f"Gagal merender prompt: {exc}") from exc
 
 
 @router.post("/summarize", dependencies=[Depends(verify_token)])
