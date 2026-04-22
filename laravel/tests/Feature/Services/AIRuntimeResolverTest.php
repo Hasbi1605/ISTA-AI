@@ -3,6 +3,7 @@
 namespace Tests\Feature\Services;
 
 use App\Services\AIRuntimeResolver;
+use App\Services\AIService;
 use App\Services\Runtime\LaravelAIGateway;
 use App\Services\Runtime\PythonLegacyAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -268,5 +269,29 @@ class AIRuntimeResolverTest extends TestCase
         $this->assertArrayHasKey('status', $parity['primary']);
         $this->assertEquals('python', $parity['primary']['source']);
         $this->assertEquals('laravel', $parity['secondary']['source']);
+    }
+
+    public function test_aiservice_chat_delegates_to_runtime_resolver(): void
+    {
+        Config::set('ai_runtime.chat', 'python');
+        Config::set('ai_runtime.shadow.enabled', false);
+
+        $aiService = new AIService();
+
+        $generator = $aiService->sendChat([['role' => 'user', 'content' => 'test']]);
+
+        $this->assertInstanceOf(\Generator::class, $generator);
+    }
+
+    public function test_aiservice_summarize_delegates_to_runtime_resolver(): void
+    {
+        Config::set('ai_runtime.document_summarize', 'python');
+        Config::set('ai_runtime.shadow.enabled', false);
+
+        $aiService = new AIService();
+
+        $result = $aiService->summarizeDocument('test.pdf', 'user1');
+
+        $this->assertIsArray($result);
     }
 }
