@@ -27,4 +27,13 @@ return [
         ],
     ],
 
+    'laravel_ai' => [
+        'model' => env('AI_MODEL', 'gpt-4o-mini'),
+        'api_key' => env('OPENAI_API_KEY'),
+        'web_search' => [
+            'enabled' => env('AI_WEB_SEARCH_ENABLED', true),
+            'provider' => env('AI_WEB_SEARCH_PROVIDER', 'ddg'),
+        ],
+    ],
+
 ];

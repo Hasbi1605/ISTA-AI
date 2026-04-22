@@ -3,6 +3,7 @@
 namespace App\Services\Runtime;
 
 use App\Contracts\AIRuntimeInterface;
+use App\Services\Chat\LaravelChatService;
 use Illuminate\Support\Facades\Log;
 
 class LaravelAIGateway implements AIRuntimeInterface
@@ -15,9 +16,16 @@ class LaravelAIGateway implements AIRuntimeInterface
         ?string $source_policy = null,
         bool $allow_auto_realtime_web = true
     ): \Generator {
-        Log::info('LaravelAIGateway: chat not implemented - falling back to Python');
+        $service = app(LaravelChatService::class);
 
-        yield "⚠️ Chat via Laravel AI SDK belum tersedia. Menggunakan fallback.";
+        yield from $service->chat(
+            $messages,
+            $document_filenames,
+            $user_id,
+            $force_web_search,
+            $source_policy,
+            $allow_auto_realtime_web
+        );
     }
 
     public function documentProcess(string $filePath, string $originalName, int $userId): array
@@ -49,6 +57,6 @@ class LaravelAIGateway implements AIRuntimeInterface
 
     public function isReady(): bool
     {
-        return false;
+        return config('ai.laravel_ai.api_key') !== null;
     }
 }

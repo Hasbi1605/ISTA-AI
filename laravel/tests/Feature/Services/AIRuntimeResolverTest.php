@@ -36,8 +36,10 @@ class AIRuntimeResolverTest extends TestCase
 
     public function test_laravel_runtime_resolved_when_ready(): void
     {
+        Config::set('ai.laravel_ai.api_key', 'test-key');
+
         $runtime = new LaravelAIGateway();
-        $this->assertFalse($runtime->isReady());
+        $this->assertTrue($runtime->isReady());
     }
 
     public function test_python_runtime_is_ready(): void
