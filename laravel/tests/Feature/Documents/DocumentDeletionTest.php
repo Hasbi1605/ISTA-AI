@@ -107,21 +107,10 @@ class DocumentDeletionTest extends TestCase
         
         $sameFilename = 'shared_document.pdf';
         
-        // User A uploads the file
-        $filePathA = 'documents/' . $userA->id . '/' . $sameFilename;
-        Storage::disk('local')->put($filePathA, 'content from user A');
-        
-        $documentA = Document::create([
-            'user_id' => $userA->id,
-            'filename' => $sameFilename . '_' . time() . '_a',
-            'original_name' => $sameFilename,
-            'file_path' => $filePathA,
-            'mime_type' => 'application/pdf',
-            'file_size_bytes' => 100,
-            'status' => 'ready',
-        ]);
-        
-        // User B uploads the same filename
+        // CRITICAL: Create User B's document FIRST to ensure proper ordering
+        // If user_id is NOT propagated to LaravelDocumentService::deleteDocument(),
+        // the query would incorrectly pick up User B's document (first created)
+        // instead of User A's document when deleting as User A
         $filePathB = 'documents/' . $userB->id . '/' . $sameFilename;
         Storage::disk('local')->put($filePathB, 'content from user B');
         
@@ -135,6 +124,20 @@ class DocumentDeletionTest extends TestCase
             'status' => 'ready',
         ]);
         
+        // Create User A's document SECOND
+        $filePathA = 'documents/' . $userA->id . '/' . $sameFilename;
+        Storage::disk('local')->put($filePathA, 'content from user A');
+        
+        $documentA = Document::create([
+            'user_id' => $userA->id,
+            'filename' => $sameFilename . '_' . time() . '_a',
+            'original_name' => $sameFilename,
+            'file_path' => $filePathA,
+            'mime_type' => 'application/pdf',
+            'file_size_bytes' => 100,
+            'status' => 'ready',
+        ]);
+        
         // User A deletes their document (by original_name)
         Livewire::actingAs($userA)
             ->test(DocumentIndex::class)
@@ -142,6 +145,8 @@ class DocumentDeletionTest extends TestCase
         
         // CRITICAL: User A's document should be deleted, but User B's should remain
         // This proves that user_id was propagated correctly to Laravel runtime
+        // If user_id was NOT propagated, the query would pick User B's doc (created first)
+        // and we'd see the opposite result: documentB would be soft deleted instead
         $this->assertSoftDeleted($documentA);
         $this->assertNotSoftDeleted($documentB);
         
