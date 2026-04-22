@@ -1,0 +1,150 @@
+[
+    {
+        "id": "scenario_chat_umum_1",
+        "type": "general_chat",
+        "description": "Salam/chat umum",
+        "request": {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "Halo, siapa kamu?"
+                }
+            ],
+            "document_filenames": null,
+            "force_web_search": false
+        },
+        "expected_behaviors": [
+            "Jawaban mempertahankan persona asisten kerja (ISTA AI)",
+            "Format respons profesional, objektif, dan tanpa emoji berlebih",
+            "Sistem tidak memicu retrieval dokumen atau pencarian web"
+        ]
+    },
+    {
+        "id": "scenario_web_search_1",
+        "type": "web_search",
+        "description": "Pertanyaan realtime (membutuhkan data terbaru)",
+        "request": {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "Siapa presiden Indonesia saat ini?"
+                }
+            ],
+            "document_filenames": null,
+            "force_web_search": true
+        },
+        "expected_behaviors": [
+            "Sistem melakukan pencarian informasi eksternal terbaru",
+            "Respons menyertakan metadata rujukan (title, url, snippet)",
+            "Jawaban berbasis data terkini hasil pencarian"
+        ]
+    },
+    {
+        "id": "scenario_rag_1",
+        "type": "rag_in_context",
+        "description": "Pertanyaan dengan dokumen aktif",
+        "request": {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "Apa saja program kerja yang disebutkan di dokumen ini?"
+                }
+            ],
+            "document_filenames": ["program-kerja-2026.pdf"],
+            "force_web_search": false
+        },
+        "expected_behaviors": [
+            "Sistem menggunakan konteks dari dokumen yang diunggah",
+            "Jawaban dibatasi pada informasi yang tersedia di dokumen (grounding)",
+            "Metadata rujukan merujuk pada file dokumen yang relevan",
+            "Tidak melakukan pencarian web secara otomatis saat dokumen aktif"
+        ]
+    },
+    {
+        "id": "scenario_rag_2",
+        "type": "rag_out_of_context",
+        "description": "Pertanyaan yang tidak ada di dokumen",
+        "request": {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "Apa resep membuat rendang?"
+                }
+            ],
+            "document_filenames": ["program-kerja-2026.pdf"],
+            "force_web_search": false
+        },
+        "expected_behaviors": [
+            "Sistem menyatakan informasi tidak ditemukan dalam dokumen",
+            "Menggunakan narasi fallback standar (menawarkan bantuan pencarian web jika relevan)",
+            "Menghindari halusinasi atau menjawab dari pengetahuan umum LLM tanpa disclaimer"
+        ]
+    },
+    {
+        "id": "scenario_policy_overlap",
+        "type": "policy_check",
+        "description": "Cek prioritas Dokumen vs Web (Force Web Search)",
+        "request": {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "Bandingkan data di dokumen ini dengan berita terbaru di internet"
+                }
+            ],
+            "document_filenames": ["data-internal.pdf"],
+            "force_web_search": true
+        },
+        "expected_behaviors": [
+            "Sistem menggabungkan konteks dokumen lokal DAN hasil pencarian web",
+            "Respons membedakan dengan jelas mana informasi dari dokumen dan mana dari internet",
+            "Rujukan (sources) berisi campuran dokumen lokal dan link eksternal"
+        ]
+    },
+    {
+        "id": "scenario_lifecycle_upload_process",
+        "type": "lifecycle_check",
+        "description": "Lifecycle: Upload dan Ingest Dokumen",
+        "request": {
+            "action": "upload_and_process",
+            "files": [
+                {"name": "test-file.pdf", "type": "application/pdf"},
+                {"name": "data-test.xlsx", "type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
+            ]
+        },
+        "expected_behaviors": [
+            "File tersimpan di storage permanen",
+            "Proses ekstraksi teks (chunking) berjalan tanpa error",
+            "Metadata dokumen masuk ke database dengan status 'ready' atau 'processed'",
+            "Vektor dokumen tersedia untuk dicari di tahap retrieval"
+        ]
+    },
+    {
+        "id": "scenario_lifecycle_delete",
+        "type": "lifecycle_check",
+        "description": "Lifecycle: Penghapusan Dokumen",
+        "request": {
+            "action": "delete_document",
+            "document_id": "doc_123",
+            "filename": "test-file.pdf"
+        },
+        "expected_behaviors": [
+            "File fisik dihapus dari storage",
+            "Record dokumen dihapus dari database",
+            "Data vektor terkait dokumen tersebut dibersihkan dari vector store"
+        ]
+    },
+    {
+        "id": "scenario_document_summarization",
+        "type": "summarization",
+        "description": "Summarization dokumen besar",
+        "request": {
+            "action": "summarize_document",
+            "document_filename": "laporan-tahunan-2025.pdf"
+        },
+        "expected_behaviors": [
+            "Sistem memproses dokumen dalam beberapa bagian jika terlalu besar",
+            "Hasil ringkasan mencakup poin-poid inti secara komprehensif",
+            "Struktur ringkasan mengikuti template standar (Inti, Poin Penting, Tindak Lanjut)"
+        ]
+    }
+]
