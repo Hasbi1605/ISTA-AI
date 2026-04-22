@@ -6,7 +6,7 @@ use App\Livewire\Chat\ChatIndex;
 use App\Livewire\Documents\DocumentIndex;
 use App\Models\Document;
 use App\Models\User;
-use App\Services\AIRuntimeService;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
@@ -19,14 +19,7 @@ class DocumentDeletionTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->mock(AIRuntimeService::class, function ($mock) {
-            $mock->shouldReceive('documentDelete')
-                ->withArgs(function ($filename, $userId) {
-                    return is_string($filename) && ($userId === null || is_string($userId));
-                })
-                ->andReturn(true)
-                ->byDefault();
-        });
+        Config::set('ai_runtime.document_delete', 'python');
     }
 
     public function test_delete_document_passes_user_id_to_runtime(): void
