@@ -5,10 +5,11 @@ namespace Tests\Feature\Jobs;
 use App\Jobs\ProcessDocument;
 use App\Models\Document;
 use App\Models\User;
+use App\Services\AIRuntimeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
+use Mockery;
 use Exception;
 
 class ProcessDocumentTest extends TestCase
@@ -20,7 +21,6 @@ class ProcessDocumentTest extends TestCase
         Storage::fake('local');
         $user = User::factory()->create();
 
-        // Create dummy file
         $filePath = 'documents/' . $user->id . '/dummy.pdf';
         Storage::disk('local')->put($filePath, 'dummy content');
 
@@ -34,12 +34,13 @@ class ProcessDocumentTest extends TestCase
             'status' => 'pending',
         ]);
 
-        Http::fake([
-            '*' => Http::response(['message' => 'success'], 200),
-        ]);
+        $mockRuntime = Mockery::mock(AIRuntimeService::class);
+        $mockRuntime->shouldReceive('documentProcess')
+            ->once()
+            ->andReturn(['status' => 'success', 'message' => 'ok']);
 
         $job = new ProcessDocument($document);
-        $job->handle();
+        $job->handle($mockRuntime);
 
         $this->assertEquals('ready', $document->fresh()->status);
     }
@@ -62,12 +63,13 @@ class ProcessDocumentTest extends TestCase
             'status' => 'pending',
         ]);
 
-        Http::fake([
-            '*' => Http::response(['message' => 'error'], 500),
-        ]);
+        $mockRuntime = Mockery::mock(AIRuntimeService::class);
+        $mockRuntime->shouldReceive('documentProcess')
+            ->once()
+            ->andReturn(['status' => 'error', 'message' => 'failed']);
 
         $job = new ProcessDocument($document);
-        $job->handle();
+        $job->handle($mockRuntime);
 
         $this->assertEquals('error', $document->fresh()->status);
     }
@@ -86,10 +88,10 @@ class ProcessDocumentTest extends TestCase
             'status' => 'pending',
         ]);
 
-        // Do not put file in storage
+        $mockRuntime = Mockery::mock(AIRuntimeService::class);
 
         $job = new ProcessDocument($document);
-        $job->handle();
+        $job->handle($mockRuntime);
 
         $this->assertEquals('error', $document->fresh()->status);
     }

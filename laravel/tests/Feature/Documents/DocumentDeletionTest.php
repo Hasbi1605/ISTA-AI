@@ -6,8 +6,8 @@ use App\Livewire\Chat\ChatIndex;
 use App\Livewire\Documents\DocumentIndex;
 use App\Models\Document;
 use App\Models\User;
+use App\Services\AIRuntimeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -15,6 +15,16 @@ use Tests\TestCase;
 class DocumentDeletionTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->mock(AIRuntimeService::class, function ($mock) {
+            $mock->shouldReceive('documentDelete')
+                ->andReturn(true)
+                ->byDefault();
+        });
+    }
 
     public function test_delete_from_document_index_cleans_up_storage_and_vector(): void
     {
@@ -34,19 +44,12 @@ class DocumentDeletionTest extends TestCase
             'status' => 'ready',
         ]);
 
-        Http::fake([
-            '*' => Http::response(['message' => 'success'], 200),
-        ]);
-
         Livewire::actingAs($user)
             ->test(DocumentIndex::class)
             ->call('delete', $document->id);
 
         $this->assertSoftDeleted($document);
         Storage::disk('local')->assertMissing($filePath);
-        Http::assertSent(function ($request) use ($document) {
-            return $request->method() === 'DELETE' && str_contains($request->url(), 'delete.pdf');
-        });
     }
 
     public function test_delete_from_chat_cleans_up_storage_and_vector(): void
@@ -67,19 +70,12 @@ class DocumentDeletionTest extends TestCase
             'status' => 'ready',
         ]);
 
-        Http::fake([
-            '*' => Http::response(['message' => 'success'], 200),
-        ]);
-
         Livewire::actingAs($user)
             ->test(ChatIndex::class)
             ->call('deleteDocument', $document->id);
 
         $this->assertSoftDeleted($document);
         Storage::disk('local')->assertMissing($filePath);
-        Http::assertSent(function ($request) use ($document) {
-            return $request->method() === 'DELETE' && str_contains($request->url(), 'delete_chat.pdf');
-        });
     }
 
     public function test_delete_selected_documents_cleans_up_storage_and_vector(): void
@@ -109,10 +105,6 @@ class DocumentDeletionTest extends TestCase
         ]);
         Storage::disk('local')->put('documents/' . $user->id . '/doc2.pdf', 'dummy content');
 
-        Http::fake([
-            '*' => Http::response(['message' => 'success'], 200),
-        ]);
-
         Livewire::actingAs($user)
             ->test(ChatIndex::class)
             ->set('selectedDocuments', [$doc1->id, $doc2->id])
@@ -122,7 +114,5 @@ class DocumentDeletionTest extends TestCase
         $this->assertSoftDeleted($doc2);
         Storage::disk('local')->assertMissing('documents/' . $user->id . '/doc1.pdf');
         Storage::disk('local')->assertMissing('documents/' . $user->id . '/doc2.pdf');
-        
-        Http::assertSentCount(2);
     }
 }

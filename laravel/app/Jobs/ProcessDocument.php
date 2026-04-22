@@ -3,12 +3,12 @@
 namespace App\Jobs;
 
 use App\Models\Document;
+use App\Services\AIRuntimeService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Exception;
 
@@ -37,16 +37,12 @@ class ProcessDocument implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(): void
+    public function handle(AIRuntimeService $AIRuntimeService): void
     {
         try {
-            // 1. Update status to processing
             $this->document->update(['status' => 'processing']);
 
-            // 2. Prepare file - Try both private and public paths
             $filePath = Storage::disk('local')->path($this->document->file_path);
-            
-            // Laravel 11+ stores in private/ by default
             if (!file_exists($filePath)) {
                 $filePath = Storage::disk('local')->path('private/' . $this->document->file_path);
             }
@@ -55,33 +51,20 @@ class ProcessDocument implements ShouldQueue
                 throw new Exception("File not found. Tried: {$this->document->file_path} and private/{$this->document->file_path}");
             }
 
-            // 3. Send to Python Microservice (with extended timeout for embedding)
-            $pythonUrl = config('services.ai_service.url', 'http://127.0.0.1:8001') . '/api/documents/process';
-            $token = config('services.ai_service.token');
+            $result = $AIRuntimeService->documentProcess(
+                $filePath,
+                $this->document->original_name,
+                $this->document->user_id
+            );
 
-            $response = Http::timeout(900) // 15 minutes timeout for large documents
-                ->withHeaders([
-                    'Authorization' => "Bearer {$token}",
-                ])
-                ->attach(
-                    'file',
-                    file_get_contents($filePath),
-                    $this->document->original_name
-                )
-                ->post($pythonUrl, [
-                    'user_id' => (string) $this->document->user_id,
-                ]);
-
-            if ($response->successful()) {
-                // 4. Update status to ready
+            if (($result['status'] ?? 'error') === 'success') {
                 $this->document->update(['status' => 'ready']);
             } else {
-                throw new Exception("Microservice error: " . $response->body());
+                throw new Exception("Process failed: " . ($result['message'] ?? 'Unknown error'));
             }
 
         } catch (Exception $e) {
             $this->document->update(['status' => 'error']);
-            // Log the error
             logger()->error("Document processing failed for ID {$this->document->id}: " . $e->getMessage());
         }
     }

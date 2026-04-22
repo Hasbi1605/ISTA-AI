@@ -4,8 +4,8 @@ namespace App\Services;
 
 use App\Jobs\ProcessDocument;
 use App\Models\Document;
+use App\Services\AIRuntimeService;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
@@ -105,28 +105,16 @@ class DocumentLifecycleService
      */
     public function deleteDocument(Document $document): bool
     {
-        // 1. Notify Python Microservice to delete vectors
-        $pythonUrl = config('services.ai_service.url', 'http://127.0.0.1:8001') . '/api/documents/' . urlencode($document->original_name);
-        $token = config('services.ai_service.token');
-
-        try {
-            $response = Http::withHeaders([
-                'Authorization' => "Bearer {$token}",
-            ])->delete($pythonUrl);
-
-            if (!$response->successful() && $response->status() !== 404) {
-                logger()->warning("Vector deletion failed for {$document->original_name}, proceeding anyway: " . $response->body());
-            }
-        } catch (\Exception $e) {
-            logger()->warning("Vector deletion HTTP request failed for {$document->original_name}, proceeding anyway: " . $e->getMessage());
+        $deleted = AIRuntimeService::documentDelete($document->original_name);
+        
+        if (!$deleted) {
+            logger()->warning("Vector deletion returned false for {$document->original_name}, proceeding anyway");
         }
 
-        // 2. Delete file from storage
         if ($document->file_path && Storage::exists($document->file_path)) {
             Storage::delete($document->file_path);
         }
 
-        // 3. Delete database record (Soft Delete)
         return $document->delete();
     }
     
