@@ -83,6 +83,13 @@ def _render_prompt(template: str, **kwargs) -> str:
     return rendered
 
 
+def _render_prompt_or_http_exception(template: str, **kwargs) -> str:
+    try:
+        return _render_prompt(template, **kwargs)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
 @router.post("/summarize", dependencies=[Depends(verify_token)])
 async def summarize_document_endpoint(request: SummarizeRequest):
     """
@@ -113,7 +120,7 @@ async def summarize_document_endpoint(request: SummarizeRequest):
         raise HTTPException(status_code=403, detail="Dokumen tidak ditemukan atau Anda tidak memiliki akses.")
     
     if len(batches) == 1:
-        summarize_prompt = _render_prompt(
+        summarize_prompt = _render_prompt_or_http_exception(
             get_summarize_single_prompt(),
             document=batches[0] or "",
         )
@@ -137,7 +144,7 @@ async def summarize_document_endpoint(request: SummarizeRequest):
     
     partial_summaries = []
     for i, batch in enumerate(batches):
-        partial_prompt = _render_prompt(
+        partial_prompt = _render_prompt_or_http_exception(
             get_summarize_partial_prompt(),
             batch=batch or "",
             part_number=i + 1,
@@ -160,7 +167,7 @@ async def summarize_document_endpoint(request: SummarizeRequest):
     # Step 2: Combine partial summaries into final summary
     combined_summaries = "\n\n".join([f"Ringkasan Bagian {i+1}:\n{s}" for i, s in enumerate(partial_summaries)])
     
-    final_prompt = _render_prompt(
+    final_prompt = _render_prompt_or_http_exception(
         get_summarize_final_prompt(),
         combined_summaries=combined_summaries,
     )

@@ -20,9 +20,15 @@ from app.services.rag_service import (
     get_context_for_query,
 )
 try:
-    from app.config_loader import get_rag_top_k as _get_rag_top_k
+    from app.config_loader import (
+        get_rag_top_k as _get_rag_top_k,
+        get_rag_no_answer_prompt as _get_rag_no_answer_prompt,
+        get_document_error_prompt as _get_document_error_prompt,
+    )
 except Exception:
     _get_rag_top_k = lambda: 5  # fallback jika config tidak tersedia
+    _get_rag_no_answer_prompt = lambda: ""
+    _get_document_error_prompt = lambda: ""
 
 app = FastAPI(title="ISTA AI Microservice", version="1.1.5")
 logger = logging.getLogger(__name__)
@@ -82,9 +88,7 @@ def _get_latest_user_query(messages: List[Dict[str, str]]) -> str:
 
 def _document_permission_message() -> str:
     try:
-        from app.config_loader import get_rag_no_answer_prompt
-
-        prompt = get_rag_no_answer_prompt()
+        prompt = _get_rag_no_answer_prompt()
         if prompt:
             return prompt
     except Exception:
@@ -98,9 +102,7 @@ def _document_permission_message() -> str:
 
 def _document_context_error_message() -> str:
     try:
-        from app.config_loader import get_document_error_prompt
-
-        prompt = get_document_error_prompt()
+        prompt = _get_document_error_prompt()
         if prompt:
             return prompt
     except Exception:

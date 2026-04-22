@@ -46,7 +46,7 @@ class ChatOrchestrationService
     public function buildHistory(array $messages): array
     {
         return array_map(
-            fn (array $msg) => ['role' => $msg['role'], 'content' => $msg['content']],
+            fn (array $msg) => ['role' => $msg['role'], 'content' => $msg['content']] + $msg,
             $messages
         );
     }

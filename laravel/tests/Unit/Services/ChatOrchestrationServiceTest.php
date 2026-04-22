@@ -24,6 +24,27 @@ class ChatOrchestrationServiceTest extends TestCase
         $this->assertSame('assistant', $history[1]['role']);
     }
 
+    public function test_build_history_preserves_additional_message_fields(): void
+    {
+        $service = new ChatOrchestrationService();
+
+        $messages = [
+            [
+                'role' => 'user',
+                'content' => 'Tolong siapkan ringkasan',
+                'metadata' => ['trace_id' => 'abc-123'],
+                'timestamp' => '2026-04-22T10:00:00+07:00',
+            ],
+        ];
+
+        $history = $service->buildHistory($messages);
+
+        $this->assertSame($messages[0]['metadata'], $history[0]['metadata']);
+        $this->assertSame($messages[0]['timestamp'], $history[0]['timestamp']);
+        $this->assertSame('user', $history[0]['role']);
+        $this->assertSame('Tolong siapkan ringkasan', $history[0]['content']);
+    }
+
     public function test_single_document_source_uses_compact_reference_footer(): void
     {
         $service = new ChatOrchestrationService();
