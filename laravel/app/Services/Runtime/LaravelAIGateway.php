@@ -46,4 +46,9 @@ class LaravelAIGateway implements AIRuntimeInterface
 
         return false;
     }
+
+    public function isReady(): bool
+    {
+        return false;
+    }
 }

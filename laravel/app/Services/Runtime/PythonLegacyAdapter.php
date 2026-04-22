@@ -197,4 +197,9 @@ class PythonLegacyAdapter implements AIRuntimeInterface
             return false;
         }
     }
+
+    public function isReady(): bool
+    {
+        return true;
+    }
 }

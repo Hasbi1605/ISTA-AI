@@ -35,7 +35,13 @@ class AIRuntimeResolver
             $runtimeType = 'python';
         }
 
-        $this->primaryRuntime = $this->resolveRuntime($runtimeType);
+        $runtime = $this->resolveRuntime($runtimeType);
+
+        if (!$this->shadowMode && !$runtime->isReady()) {
+            $runtime = $this->resolveRuntime('python');
+        }
+
+        $this->primaryRuntime = $runtime;
 
         if ($this->shadowMode && $runtimeType !== 'shadow') {
             $secondaryType = $runtimeType === 'python' ? 'laravel' : 'python';
