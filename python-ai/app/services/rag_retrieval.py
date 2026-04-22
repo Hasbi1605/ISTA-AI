@@ -389,7 +389,7 @@ def build_rag_prompt(
     web_section = ""
     if web_context.strip():
         web_section = f"""
-Informasi web terbaru (digunakan jika relevan):
+KONTEKS WEB TERBARU:
 {web_context}
 """
 

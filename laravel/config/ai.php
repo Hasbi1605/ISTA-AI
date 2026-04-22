@@ -27,8 +27,4 @@ return [
         ],
     ],
 
-    'system' => [
-        'default_prompt' => env('DEFAULT_SYSTEM_PROMPT', 'Anda adalah ISTA AI, asisten virtual istana pintar. Jawablah dengan sopan dan membantu.'),
-    ],
-
 ];

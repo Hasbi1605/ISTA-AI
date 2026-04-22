@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 try:
     from app.config_loader import (
+        DEFAULT_PROMPTS,
         get_chat_models,
         get_system_prompt,
         get_assertive_instruction,
@@ -18,6 +19,28 @@ try:
     CONFIG_AVAILABLE = True
 except ImportError:
     CONFIG_AVAILABLE = False
+    # Keep this inline fallback text synchronized with
+    # app.config_loader.DEFAULT_PROMPTS["system"]["default"].
+    DEFAULT_PROMPTS = {
+        "system": {
+            "default": (
+                "Anda adalah ISTA AI, asisten kerja internal untuk pegawai "
+                "Istana Kepresidenan Yogyakarta.\n\n"
+                "GAYA RESPONS:\n"
+                "- Gunakan Bahasa Indonesia yang baku, luwes, dan nyaman dibaca.\n"
+                "- Bersikap ramah, serius, fokus, dan tenang.\n"
+                "- Jawab inti persoalan terlebih dahulu. Tambahkan detail hanya bila membantu.\n"
+                "- Gunakan struktur seperlunya. Jangan memaksa daftar poin jika bentuk naratif lebih nyaman.\n"
+                "- Hindari emoji, jargon model, pembuka repetitif, pujian berlebihan, dan nada menggurui.\n"
+                "- Tetap terdengar profesional tanpa menjadi kaku atau birokratis.\n\n"
+                "ATURAN KERJA:\n"
+                "- Jika informasi belum cukup, katakan dengan jujur apa yang belum diketahui.\n"
+                "- Jika perlu klarifikasi, ajukan pertanyaan sesingkat mungkin.\n"
+                "- Jika bisa membantu, beri langkah lanjut yang konkret.\n"
+                "- Jangan menyebut proses internal sistem, nama model, atau istilah teknis internal kecuali diminta."
+            )
+        }
+    }
 
 # Suppress verbose litellm output
 litellm.set_verbose = False
@@ -67,15 +90,20 @@ def _get_chat_models_fallback():
 
 
 def _get_default_system_prompt_fallback():
-    """Get system prompt - tries config first, falls back to env."""
+    """Get system prompt from config, env override, or shared default prompt."""
     if CONFIG_AVAILABLE:
-        prompt = get_system_prompt()
-        if prompt:
-            return prompt
-    return os.getenv(
-        "DEFAULT_SYSTEM_PROMPT",
-        "Anda adalah ISTA AI, asisten virtual istana pintar. Jawablah dengan sopan dan membantu."
-    )
+        try:
+            prompt = get_system_prompt()
+            if prompt:
+                return prompt
+        except Exception as exc:
+            logger.warning("⚠️  Gagal memuat system prompt dari config: %s", exc)
+
+    env_prompt = os.getenv("DEFAULT_SYSTEM_PROMPT", "").strip()
+    if env_prompt:
+        return env_prompt
+
+    return DEFAULT_PROMPTS["system"]["default"]
 
 
 # ─── Gemini Native Streaming ───────────────────────────────────────────────────
@@ -320,7 +348,7 @@ def get_llm_stream(
             )
 
         base = system_prompt_base if system_prompt_base else default_system_prompt
-        enhanced_system = search_context + base + assertive_instruction
+        enhanced_system = f"{search_context.rstrip()}\n\n{base}\n\n{assertive_instruction.strip()}".strip()
     else:
         enhanced_system = system_prompt_base if system_prompt_base else default_system_prompt
 

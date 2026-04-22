@@ -9,9 +9,9 @@
             <div class="h-16 w-16 mb-6">
                 <img src="{{ asset('images/ista/logo.png') }}" alt="ISTA AI" class="h-full w-full object-contain" />
             </div>
-            <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-2">ISTA AI Assistant</h2>
+            <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-2">ISTA AI</h2>
             <p class="text-gray-500 dark:text-[#94A3B8] text-[14px]">
-                Start a new conversation to get started.
+                Mulai percakapan baru untuk meminta ringkasan, informasi, atau bantuan kerja.
             </p>
         </div>
     @else
@@ -39,7 +39,7 @@
                             : null;
                     @endphp
                     <div class="flex items-center gap-2 mb-1 {{ $isUserMessage ? 'justify-end' : 'justify-start' }}">
-                        <span class="text-[13px] font-bold text-stone-800 dark:text-[#F8FAFC]">{{ $message['role'] == 'user' ? 'You' : 'ISTA AI' }}</span>
+                        <span class="text-[13px] font-bold text-stone-800 dark:text-[#F8FAFC]">{{ $message['role'] == 'user' ? 'Anda' : 'ISTA AI' }}</span>
                         @if($messageTime)
                             <span class="text-[10px] text-gray-400 dark:text-[#64748B]">{{ $messageTime }}</span>
                         @endif
@@ -123,7 +123,7 @@
                 </div>
                 <div class="flex flex-col gap-1 w-full items-end text-right">
                     <div class="flex items-center gap-2 mb-1 justify-end">
-                        <span class="text-[13px] font-bold text-stone-800 dark:text-[#F8FAFC]">You</span>
+                        <span class="text-[13px] font-bold text-stone-800 dark:text-[#F8FAFC]">Anda</span>
                     </div>
                     <div class="text-[14.5px] leading-relaxed text-stone-700 dark:text-gray-100 w-full max-w-[656px] min-w-0">
                         <p class="whitespace-pre-wrap break-words [overflow-wrap:anywhere]" x-text="optimisticUserMessage"></p>
@@ -172,7 +172,7 @@
                              <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                              </svg>
-                             Sumber Referensi:
+                             Rujukan:
                          </p>
                          <div class="flex flex-wrap gap-2">
                              <template x-for="(source, idx) in sources" :key="idx">
@@ -199,7 +199,7 @@
                                              <svg class="w-3.5 h-3.5 shrink-0 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                              </svg>
-                                             <span class="truncate block max-w-[200px]" x-text="source.filename || 'Dokumen Office'"></span>
+                                             <span class="truncate block max-w-[200px]" x-text="source.filename || 'Dokumen rujukan'"></span>
                                          </div>
                                      </template>
                                  </div>

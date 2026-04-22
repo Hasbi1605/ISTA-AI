@@ -6,12 +6,9 @@ use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\Document;
 use Illuminate\Support\Facades\Auth;
-use Generator;
 
 class ChatOrchestrationService
 {
-    private const SYSTEM_PROMPT = "Anda adalah ISTA AI, asisten virtual istana pintar. Jawablah dengan sopan dan membantu.";
-
     private const SANITIZE_REPLACEMENTS = [
         '/\bchunks?\b/i' => 'bagian dokumen',
         '/\bchunk(?:ing|ed)?\b/i' => 'bagian dokumen',
@@ -48,15 +45,10 @@ class ChatOrchestrationService
 
     public function buildHistory(array $messages): array
     {
-        $history = [
-            ['role' => 'system', 'content' => self::SYSTEM_PROMPT]
-        ];
-
-        foreach ($messages as $msg) {
-            $history[] = ['role' => $msg['role'], 'content' => $msg['content']];
-        }
-
-        return $history;
+        return array_map(
+            fn (array $msg) => array_merge($msg, ['role' => $msg['role'], 'content' => $msg['content']]),
+            $messages
+        );
     }
 
     public function getDocumentFilenames(array $conversationDocuments): ?array
@@ -86,21 +78,68 @@ class ChatOrchestrationService
             return '';
         }
 
-        $markdownSources = "\n\n---\n**Sumber Referensi:**\n";
-        $hasValidSource = false;
+        $normalizedSources = $this->normalizeSources($sources);
+        if (empty($normalizedSources)) {
+            return '';
+        }
 
-        foreach ($sources as $source) {
+        $webSources = [];
+        $documentSources = [];
+
+        foreach ($normalizedSources as $source) {
             if (!empty($source['url'])) {
-                $title = !empty($source['title']) ? $source['title'] : parse_url($source['url'], PHP_URL_HOST);
-                $markdownSources .= "- [🌐 {$title}]({$source['url']})\n  `{$source['url']}`\n";
-                $hasValidSource = true;
-            } elseif (!empty($source['filename'])) {
-                $markdownSources .= "- 📄 {$source['filename']}\n";
-                $hasValidSource = true;
+                $webSources[] = $source;
+                continue;
+            }
+
+            if (!empty($source['filename'])) {
+                $documentSources[] = $source['filename'];
             }
         }
 
-        return $hasValidSource ? $markdownSources : '';
+        $documentSources = array_values(array_unique($documentSources));
+
+        if (count($webSources) === 0 && count($documentSources) === 1) {
+            return "\n\n---\nDokumen rujukan: **{$documentSources[0]}**";
+        }
+
+        $lines = ["", "", "---", "**Rujukan:**"];
+
+        foreach ($webSources as $source) {
+            $title = !empty($source['title']) ? $source['title'] : parse_url($source['url'], PHP_URL_HOST);
+            $lines[] = "- [{$title}]({$source['url']})";
+        }
+
+        foreach ($documentSources as $filename) {
+            $lines[] = "- Dokumen: {$filename}";
+        }
+
+        return implode("\n", $lines);
+    }
+
+    private function normalizeSources(array $sources): array
+    {
+        $normalized = [];
+        $seen = [];
+
+        foreach ($sources as $source) {
+            $url = trim((string) ($source['url'] ?? ''));
+            $filename = trim((string) ($source['filename'] ?? ''));
+
+            if ($url === '' && $filename === '') {
+                continue;
+            }
+
+            $key = $url !== '' ? "web:{$url}" : "doc:{$filename}";
+            if (isset($seen[$key])) {
+                continue;
+            }
+
+            $seen[$key] = true;
+            $normalized[] = $source;
+        }
+
+        return $normalized;
     }
 
     public function sanitizeAssistantOutput(string $text): string

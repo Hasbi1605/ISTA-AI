@@ -448,9 +448,14 @@ class TestDocumentIdentifierConsistency:
             persist_directory=CHROMA_PATH
         )
 
-        vectorstore.delete(where={"filename": test_filename, "user_id": test_user_id})
+        vectorstore.delete(where={
+            "$and": [
+                {"filename": test_filename},
+                {"user_id": test_user_id},
+            ]
+        })
 
-        from langchain.schema import Document
+        from langchain_core.documents import Document
         test_doc = Document(
             page_content=test_content,
             metadata={
@@ -473,7 +478,12 @@ class TestDocumentIdentifierConsistency:
         assert chunks[0]["filename"] == test_filename, "Filename di result harus sama dengan yang di-request"
         assert chunks[0]["metadata"]["user_id"] == test_user_id, "User_id di metadata harus sama"
 
-        vectorstore.delete(where={"filename": test_filename, "user_id": test_user_id})
+        vectorstore.delete(where={
+            "$and": [
+                {"filename": test_filename},
+                {"user_id": test_user_id},
+            ]
+        })
 
 
 class TestPDRParentIsolation:

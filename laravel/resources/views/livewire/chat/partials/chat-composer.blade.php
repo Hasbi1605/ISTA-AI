@@ -52,7 +52,7 @@
                                 </svg>
                             @endif
                             <span class="max-w-[180px] truncate">{{ $doc->original_name }}</span>
-                            <button type="button" wire:click="removeConversationDocument({{ $doc->id }})" class="text-[#7C8DA8] hover:text-[#314158] dark:text-gray-300 dark:hover:text-white" title="Remove">
+                            <button type="button" wire:click="removeConversationDocument({{ $doc->id }})" class="text-[#7C8DA8] hover:text-[#314158] dark:text-gray-300 dark:hover:text-white" title="Lepas dokumen">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                                 </svg>
@@ -75,7 +75,7 @@
                     x-model="promptDraft"
                     x-on:keydown.enter.prevent="if($event.shiftKey) return; submitPrompt($event)"
                     x-on:input="autoResizeTextarea($el)"
-                    placeholder="Message ISTA AI..."
+                    placeholder="Tulis pertanyaan atau arahan kerja Anda..."
                     class="chat-input w-full max-h-[200px] min-h-[44px] bg-transparent border-none focus:ring-0 focus:outline-none focus:border-transparent focus-visible:ring-0 focus-visible:outline-none resize-none text-[14.5px] text-stone-800 dark:text-[#F8FAFC] placeholder-[#94A3B8] dark:placeholder-[#64748B] px-2 py-[10px] hover:bg-transparent focus:bg-transparent"
                     rows="1"
                     style="outline: none !important; box-shadow: none !important;"
@@ -88,11 +88,11 @@
                             <path d="M7 1.16667C5.50214 2.73942 4.66667 4.8281 4.66667 7C4.66667 9.1719 5.50214 11.2606 7 12.8333C8.49786 11.2606 9.33333 9.1719 9.33333 7C9.33333 4.8281 8.49786 2.73942 7 1.16667Z" stroke="currentColor" stroke-width="1.16667" stroke-linecap="round" stroke-linejoin="round"/>
                             <path d="M1.16667 7H12.8333" stroke="currentColor" stroke-width="1.16667" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
-                        <span>Search</span>
+                        <span>Web</span>
                     </button>
 
                     <div class="flex items-center gap-2">
-                        <button type="button" @click="openAttachmentPicker()" wire:loading.attr="disabled" wire:target="chatAttachment" class="h-[34px] w-[34px] rounded-full transition-colors flex items-center justify-center bg-transparent hover:bg-[#F1F5F9] dark:hover:bg-gray-800 disabled:opacity-60" title="Attach file">
+                        <button type="button" @click="openAttachmentPicker()" wire:loading.attr="disabled" wire:target="chatAttachment" class="h-[34px] w-[34px] rounded-full transition-colors flex items-center justify-center bg-transparent hover:bg-[#F1F5F9] dark:hover:bg-gray-800 disabled:opacity-60" title="Lampirkan file">
                             <img src="{{ $uiIcons['uploadLight'] }}" alt="" class="h-[18px] w-[18px] dark:hidden" />
                             <img src="{{ $uiIcons['uploadDark'] }}" alt="" class="h-[18px] w-[18px] hidden dark:block" />
                         </button>
@@ -112,13 +112,13 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                     </svg>
-                    Drop file di sini untuk upload
+                    Seret file ke sini untuk mengunggah
                 </div>
             </div>
         </div>
     </form>
     <p x-show="dropError" x-transition.opacity class="max-w-3xl mx-auto mt-2 text-xs text-red-500 dark:text-red-400" x-text="dropError"></p>
     <div class="text-center mt-3 text-[11px] text-[#94A3B8] dark:text-[#64748B]">
-        ISTA AI can make mistakes. Consider verifying critical information.
+        ISTA AI dapat keliru. Mohon verifikasi kembali informasi yang penting.
     </div>
 </div>

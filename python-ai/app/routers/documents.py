@@ -3,13 +3,12 @@ import os
 import shutil
 import uuid
 from pydantic import BaseModel
+from app.config_loader import (
+    get_summarize_single_prompt,
+    get_summarize_partial_prompt,
+    get_summarize_final_prompt,
+)
 from app.services.rag_service import process_document, delete_document_vectors, get_document_chunks_for_summarization
-
-try:
-    from app.config_loader import get_summarize_single_prompt, get_summarize_partial_prompt, get_summarize_final_prompt
-    CONFIG_AVAILABLE = True
-except ImportError:
-    CONFIG_AVAILABLE = False
 
 router = APIRouter(prefix="/api/documents", tags=["Documents"])
 
@@ -77,6 +76,20 @@ class SummarizeRequest(BaseModel):
     user_id: str
 
 
+def _render_prompt(template: str, **kwargs) -> str:
+    rendered = template.format(**kwargs)
+    if not rendered.strip():
+        raise RuntimeError("Prompt summarization kosong setelah dirender")
+    return rendered
+
+
+def _render_prompt_or_http_exception(template: str, **kwargs) -> str:
+    try:
+        return _render_prompt(template, **kwargs)
+    except (RuntimeError, KeyError, IndexError) as exc:
+        raise HTTPException(status_code=500, detail=f"Gagal merender prompt: {exc}") from exc
+
+
 @router.post("/summarize", dependencies=[Depends(verify_token)])
 async def summarize_document_endpoint(request: SummarizeRequest):
     """
@@ -106,61 +119,11 @@ async def summarize_document_endpoint(request: SummarizeRequest):
     if not success:
         raise HTTPException(status_code=403, detail="Dokumen tidak ditemukan atau Anda tidak memiliki akses.")
     
-    def get_single_prompt(doc_content: str) -> str:
-        if CONFIG_AVAILABLE:
-            try:
-                template = get_summarize_single_prompt()
-                if template:
-                    return template.format(document=doc_content or "")
-            except Exception:
-                pass
-        return f"""Buatkan ringkasan yang jelas dan padat dari dokumen berikut. 
-Ringkasan harus mencakup poin-poin utama dan informasi penting.
-
-Dokumen:
-{doc_content}
-
----
-
-Buat ringkasan dalam Bahasa Indonesia (maksimal 500 kata):"""
-
-    def get_partial_prompt(batch: str, part_num: int, total: int) -> str:
-        if CONFIG_AVAILABLE:
-            try:
-                template = get_summarize_partial_prompt()
-                if template:
-                    return template.format(batch=batch or "", part_number=part_num, total_parts=total)
-            except Exception:
-                pass
-        return f"""Buatkan ringkasan singkat dari bagian dokumen berikut.
-Ini adalah bagian {part_num} dari {total} bagian dokumen.
-
-Dokumen:
-{batch}
-
----
-
-Berikan ringkasan singkat (maksimal 100 kata) dari bagian ini dalam Bahasa Indonesia:"""
-
-    def get_final_prompt(combined: str) -> str:
-        if CONFIG_AVAILABLE:
-            try:
-                template = get_summarize_final_prompt()
-                if template:
-                    return template.format(combined_summaries=combined or "")
-            except Exception:
-                pass
-        return f"""Berdasarkan ringkasan bagian-bagian berikut, buat ringkasan keseluruhan yang komprehensif.
-
-Ringkasan Bagian:
-{combined}
-
----
-
-Buat ringkasan keseluruhan yang jelas dan terstruktur dalam Bahasa Indonesia (maksimal 500 kata):"""
-
     if len(batches) == 1:
-        summarize_prompt = get_single_prompt(batches[0])
+        summarize_prompt = _render_prompt_or_http_exception(
+            get_summarize_single_prompt(),
+            document=batches[0] or "",
+        )
         
         messages = [{"role": "user", "content": summarize_prompt}]
         
@@ -181,7 +144,12 @@ Buat ringkasan keseluruhan yang jelas dan terstruktur dalam Bahasa Indonesia (ma
     
     partial_summaries = []
     for i, batch in enumerate(batches):
-        partial_prompt = get_partial_prompt(batch, i + 1, len(batches))
+        partial_prompt = _render_prompt_or_http_exception(
+            get_summarize_partial_prompt(),
+            batch=batch or "",
+            part_number=i + 1,
+            total_parts=len(batches),
+        )
         
         batch_messages = [{"role": "user", "content": partial_prompt}]
         partial_response = ""
@@ -199,7 +167,10 @@ Buat ringkasan keseluruhan yang jelas dan terstruktur dalam Bahasa Indonesia (ma
     # Step 2: Combine partial summaries into final summary
     combined_summaries = "\n\n".join([f"Ringkasan Bagian {i+1}:\n{s}" for i, s in enumerate(partial_summaries)])
     
-    final_prompt = get_final_prompt(combined_summaries)
+    final_prompt = _render_prompt_or_http_exception(
+        get_summarize_final_prompt(),
+        combined_summaries=combined_summaries,
+    )
     
     final_messages = [{"role": "user", "content": final_prompt}]
     

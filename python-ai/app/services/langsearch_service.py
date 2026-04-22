@@ -154,7 +154,6 @@ class LangSearchService:
             return ""
         
         current_date = datetime.now().strftime("%A, %d %B %Y")
-        current_year = datetime.now().year
         
         template = get_web_search_context_prompt()
         
@@ -165,20 +164,19 @@ class LangSearchService:
             url = result.get("url", "")
             date = result.get("datePublished", "")
             
-            result_str = f"""🔍 Hasil #{idx}:
-   📌 Judul: {title}
-   📝 Isi: {snippet}"""
+            result_str = f"""Hasil {idx}:
+Judul: {title}
+Ringkasan: {snippet}"""
             if url:
-                result_str += f"\n   🔗 Sumber: {url}"
+                result_str += f"\nSumber: {url}"
             if date:
-                result_str += f"\n   📅 Tanggal Publikasi: {date}"
+                result_str += f"\nTanggal publikasi: {date}"
             results_formatted.append(result_str)
         
         results_str = "\n\n".join(results_formatted)
         
         return template.format(
             current_date=current_date,
-            current_year=current_year,
             results=results_str
         )
 

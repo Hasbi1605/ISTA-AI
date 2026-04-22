@@ -12,6 +12,7 @@ File konfigurasi terpusat untuk menyederhanakan pergantian nilai operasional AI 
 
 ### Laravel Backend
 - **Lokasi**: `laravel/config/ai.php`
+- **Catatan**: File ini hanya untuk koneksi service AI dari Laravel ke Python. Persona dan prompt aktif dibaca dari `python-ai/config/ai_config.yaml -> prompts.*`.
 
 ## Struktur Konfigurasi
 
@@ -90,10 +91,12 @@ retrieval:
     timeout: 8
 ```
 
-### 7. System Prompt
+### 7. Prompt Aktif
 ```yaml
-system:
-  default_prompt: "Anda adalah ISTA AI, asisten virtual istana pintar..."
+prompts:
+  system:
+    default: |
+      Anda adalah ISTA AI, asisten kerja internal untuk pegawai Istana Kepresidenan Yogyakarta.
 ```
 
 ### 8. Chunking
@@ -264,6 +267,7 @@ Semua perubahan tidak perlu ubah logika kode!
 ### Lokasi File Prompt
 
 Semua prompt AI disimpan di file `python-ai/config/ai_config.yaml` di bagian `prompts:`.
+Key legacy `system.default_prompt` sudah deprecated dan tidak dipakai lagi.
 
 ### Struktur Prompt
 
@@ -275,6 +279,8 @@ prompts:
   rag:
     document: |
       Template prompt RAG...
+    no_answer: |
+      Prompt saat jawaban tidak ditemukan pada dokumen aktif
 
   web_search:
     context: |
@@ -290,6 +296,10 @@ prompts:
       Template partial...
     final: |
       Template final...
+
+  fallback:
+    document_not_found: "Prompt saat jawaban tidak ada di dokumen aktif"
+    document_error: "Prompt saat konteks dokumen gagal dibaca"
 ```
 
 ### Cara Mengganti Prompt
@@ -326,6 +336,16 @@ Template variables yang tersedia:
 - `{context_str}` - Isi dokumen dari RAG
 - `{web_section}` - Konteks hasil pencarian web (jika ada)
 - `{question}` - Pertanyaan user
+
+#### 2a. Ganti Prompt Saat Jawaban Tidak Ada di Dokumen
+
+```yaml
+prompts:
+  rag:
+    no_answer: |
+      Saya belum menemukan jawaban yang diminta pada dokumen yang sedang aktif.
+      Jika Anda berkenan, saya bisa membantu melanjutkan dengan web search atau pengetahuan umum.
+```
 
 #### 3. Ganti Web Search Context
 
@@ -398,14 +418,14 @@ Template variables:
 ```yaml
 prompts:
   system:
-    default: "Anda adalah ISTA AI, asisten virtual istana pintar. Jawablah dengan sopan dan membantu."
+    default: "Prompt lama persona ISTA AI"
 ```
 
 **Sesudah:**
 ```yaml
 prompts:
   system:
-    default: "Anda adalah asisten AI yang bersifat formal, profesional, dan membantu. Gunakan bahasa Indonesia yang baik dan benar."
+    default: "Anda adalah ISTA AI, asisten kerja internal untuk pegawai Istana Kepresidenan Yogyakarta."
 ```
 
 #### Contoh 2: Ubah Cara RAG Merespons
@@ -415,9 +435,7 @@ prompts:
 prompts:
   rag:
     document: |
-      Anda adalah asisten AI cerdas. Jawab pertanyaan user berdasarkan referensi berikut.
-      ...
-      WAJIB cetak TEBAL (BOLD) setiap kali Anda menyebutkan nama file rujukan.
+      Prompt RAG lama yang masih generik.
 ```
 
 **Sesudah:**
@@ -425,14 +443,10 @@ prompts:
 prompts:
   rag:
     document: |
-      Anda adalah asisten AI yang membantu menjawab dari dokumen.
-      Selalu sebutkan sumber dokumen di akhir jawaban.
-      Jika informasi tidak ditemukan, katakan dengan jujur bahwa tidak ada di dokumen.
-      
-      DOKUMEN: {context_str}
-      PERTANYAAN: {question}
-      
-      Jawaban:
+      Anda adalah ISTA AI, asisten kerja internal untuk pegawai Istana Kepresidenan Yogyakarta.
+      Utamakan informasi yang tertulis eksplisit pada dokumen aktif.
+      Jangan menebak detail yang tidak tertulis.
+      Jangan membuat daftar sumber di akhir jawaban.
 ```
 
 ### Fallback Mechanism
