@@ -96,7 +96,7 @@ class LaravelDocumentService
             );
 
             $result = $provider->prompt($prompt);
-            $content = $result->content ?? '';
+            $content = $result->text ?? '';
 
             Log::info('LaravelDocumentService: document summarized', [
                 'file' => $filename,

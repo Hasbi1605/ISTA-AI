@@ -53,9 +53,9 @@ class LaravelAIGateway implements AIRuntimeInterface
         return app(LaravelDocumentService::class)->summarizeDocument($filename, $user_id);
     }
 
-    public function documentDelete(string $filename): bool
+    public function documentDelete(string $filename, ?string $userId = null): bool
     {
-        return app(LaravelDocumentService::class)->deleteDocument($filename);
+        return app(LaravelDocumentService::class)->deleteDocument($filename, $userId);
     }
 
     public function isReady(): bool

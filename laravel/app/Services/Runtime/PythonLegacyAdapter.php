@@ -178,16 +178,27 @@ class PythonLegacyAdapter implements AIRuntimeInterface
         }
     }
 
-    public function documentDelete(string $filename): bool
+    public function documentDelete(string $filename, ?string $userId = null): bool
     {
         $pythonUrl = $this->baseUrl . '/api/documents/' . urlencode($filename);
 
         try {
-            $response = $this->client->delete($pythonUrl, [
+            $payload = [];
+            if ($userId !== null) {
+                $payload['user_id'] = $userId;
+            }
+
+            $options = [
                 'headers' => [
                     'Authorization' => 'Bearer ' . $this->token,
                 ],
-            ]);
+            ];
+
+            if (!empty($payload)) {
+                $options['json'] = $payload;
+            }
+
+            $response = $this->client->delete($pythonUrl, $options);
 
             return $response->getStatusCode() === 200 || $response->getStatusCode() === 404;
         } catch (\Throwable $e) {

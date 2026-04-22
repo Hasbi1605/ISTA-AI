@@ -17,7 +17,7 @@ interface AIRuntimeInterface
 
     public function documentSummarize(string $filename, ?string $user_id = null): array;
 
-    public function documentDelete(string $filename): bool;
+    public function documentDelete(string $filename, ?string $userId = null): bool;
 
     public function isReady(): bool;
 }

@@ -58,7 +58,10 @@ class ProcessDocument implements ShouldQueue
             );
 
             if (($result['status'] ?? 'error') === 'success') {
-                $this->document->update(['status' => 'ready']);
+                $this->document->update([
+                    'status' => 'ready',
+                    'provider_file_id' => $result['provider_file_id'] ?? null,
+                ]);
             } else {
                 throw new Exception("Process failed: " . ($result['message'] ?? 'Unknown error'));
             }
