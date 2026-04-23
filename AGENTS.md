@@ -21,15 +21,17 @@ Repo ini menggunakan workflow berbasis plan, implementasi bertahap, verifikasi w
 8. Setelah review, tindak lanjuti komentar lalu verifikasi ulang.
 9. Jika konteksnya adalah PR aktif dan verifikasi ulang memadai, commit lalu push ke branch PR yang sama.
 10. Jika review akhir menyatakan PR lolos, jalankan full test akhir.
-11. Jika full test akhir memadai, merge PR, tutup PR, dan hapus branch kerja.
-12. Setelah merge, pastikan branch lokal bersih, kembali ke `main`, dan sinkron dengan remote.
+11. Setelah full test akhir memadai, laporkan hasil ke user dan tunggu approval eksplisit dari user sebelum merge.
+12. Jika user sudah approve eksplisit untuk merge, baru merge PR, tutup PR, dan hapus branch kerja.
+13. Setelah merge, pastikan branch lokal bersih, kembali ke `main`, dan sinkron dengan remote.
 
 ## Aturan Review PR
 - Review PR dipost sebagai komentar biasa melalui GitHub CLI.
 - Jangan gunakan request changes.
 - Jangan gunakan approval formal GitHub.
 - Jika masih ada perbaikan yang dibutuhkan, tulis komentar review biasa yang menjelaskan blocker dan tindak lanjut.
-- Jika PR sudah sesuai scope, tidak ada blocker, dan verifikasi memadai, tulis komentar approval-style sebagai komentar biasa yang berisi tanda approval dan ringkasan hasil review.
+- Jika PR sudah sesuai scope, tidak ada blocker, dan verifikasi memadai, tulis ringkasan status siap-merge tanpa menyatakan approval final.
+- Jangan pernah memberi approval final atas nama user.
 
 ## Aturan Tindak Lanjut Review PR
 - Jika tugasnya adalah menindaklanjuti komentar review pada PR yang sudah ada, kerjakan perubahan pada branch PR yang aktif.
@@ -37,20 +39,21 @@ Repo ini menggunakan workflow berbasis plan, implementasi bertahap, verifikasi w
 - Jika verifikasi memadai, commit perubahan dan push ke branch PR yang sama.
 - Jangan berhenti pada perubahan lokal saja jika konteks tugasnya adalah follow-up review PR.
 - Setelah push, tulis ringkasan singkat tentang komentar review yang ditindaklanjuti, file yang berubah, dan test yang dijalankan.
+- Setelah itu, minta verifikasi/konfirmasi user; jangan merge tanpa instruksi merge eksplisit dari user.
 
 ## Aturan Pasca-Approve PR
-- Jika PR sudah dinyatakan lolos oleh review terakhir dan tidak ada blocker, lakukan verifikasi akhir penuh sebelum merge.
+- Jika PR sudah dinyatakan lolos oleh review terakhir dan tidak ada blocker, lakukan verifikasi akhir penuh sebelum meminta instruksi merge ke user.
 - Verifikasi akhir penuh harus mencakup seluruh test yang relevan untuk Laravel dan Python, bukan hanya subset yang sebelumnya dijalankan.
 - Untuk Python, gunakan environment lokal:
   `cd python-ai && source venv/bin/activate && pytest`
-- Setelah full test akhir memadai, lanjutkan merge PR.
+- Setelah full test akhir memadai, laporkan hasil ke user dan tunggu instruksi merge eksplisit.
 - Setelah merge selesai, tutup PR jika masih terbuka dan hapus branch kerja yang sudah tidak dibutuhkan.
 - Setelah itu, pastikan branch lokal kembali bersih dan menyisakan `main` sebagai branch aktif.
 - Pastikan `main` lokal sudah sinkron dengan `main` di remote.
 - Jangan melakukan merge jika full test akhir masih gagal atau ada error yang belum jelas.
 
 ## Aturan Merge PR
-- Merge hanya boleh dilakukan setelah review terakhir menyatakan PR lolos dan tidak ada blocker.
+- Merge hanya boleh dilakukan setelah review terakhir menyatakan PR lolos, tidak ada blocker, dan ada instruksi merge eksplisit dari user.
 - Sebelum merge, lakukan full test akhir untuk memastikan perubahan tidak menimbulkan error atau bug tambahan.
 - Jangan merge jika full test akhir gagal atau hasil verifikasi belum jelas.
 - Setelah merge, hapus branch kerja yang sudah selesai jika aman untuk dihapus.
@@ -113,7 +116,8 @@ Sebuah tugas dianggap selesai hanya jika:
 - jika tugasnya adalah follow-up review PR, perubahan sudah di-push ke branch PR yang benar setelah verifikasi memadai
 - jika tugasnya melalui PR, review akhir sudah menyatakan tidak ada blocker
 - full test akhir sudah dijalankan dan hasilnya memadai
-- PR sudah di-merge
+- jika user belum memberi instruksi merge eksplisit, tugas berhenti di push + laporan verifikasi
+- PR sudah di-merge hanya jika ada instruksi merge eksplisit dari user
 - branch kerja sudah dihapus bila tidak lagi dibutuhkan
 - branch lokal sudah kembali ke `main`
 - kondisi lokal dan remote sudah sinkron
