@@ -39,8 +39,8 @@ class AIRuntimeService
         );
     }
 
-    public static function documentDelete(string $filename): bool
+    public static function documentDelete(string $filename, ?string $userId = null): bool
     {
-        return AIRuntimeResolver::for('document_delete')->getRuntime()->documentDelete($filename);
+        return AIRuntimeResolver::for('document_delete')->getRuntime()->documentDelete($filename, $userId);
     }
 }

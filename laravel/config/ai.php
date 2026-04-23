@@ -34,6 +34,9 @@ return [
             'enabled' => env('AI_WEB_SEARCH_ENABLED', true),
             'provider' => env('AI_WEB_SEARCH_PROVIDER', 'ddg'),
         ],
+        'document_process_enabled' => env('AI_DOCUMENT_PROCESS_ENABLED', false),
+        'document_summarize_enabled' => env('AI_DOCUMENT_SUMMARIZE_ENABLED', false),
+        'document_delete_enabled' => env('AI_DOCUMENT_DELETE_ENABLED', true),
     ],
 
 ];

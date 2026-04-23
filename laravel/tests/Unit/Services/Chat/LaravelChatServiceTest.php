@@ -16,6 +16,8 @@ class LaravelChatServiceTest extends TestCase
         Config::set('ai.laravel_ai.api_key', 'test-key');
         Config::set('ai.laravel_ai.web_search.enabled', true);
         Config::set('ai.laravel_ai.web_search.provider', 'ddg');
+        Config::set('ai.laravel_ai.document_process_enabled', true);
+        Config::set('ai.laravel_ai.document_summarize_enabled', true);
     }
 
     public function test_chat_with_documents_returns_fallback_message(): void

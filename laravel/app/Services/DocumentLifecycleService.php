@@ -105,7 +105,7 @@ class DocumentLifecycleService
      */
     public function deleteDocument(Document $document): bool
     {
-        $deleted = AIRuntimeService::documentDelete($document->original_name);
+        $deleted = AIRuntimeService::documentDelete($document->original_name, (string) $document->user_id);
         
         if (!$deleted) {
             logger()->warning("Vector deletion returned false for {$document->original_name}, proceeding anyway");

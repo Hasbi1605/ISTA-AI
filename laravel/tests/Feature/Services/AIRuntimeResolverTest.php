@@ -37,6 +37,8 @@ class AIRuntimeResolverTest extends TestCase
     public function test_laravel_runtime_resolved_when_ready(): void
     {
         Config::set('ai.laravel_ai.api_key', 'test-key');
+        Config::set('ai.laravel_ai.document_process_enabled', true);
+        Config::set('ai.laravel_ai.document_summarize_enabled', true);
 
         $runtime = new LaravelAIGateway();
         $this->assertTrue($runtime->isReady());

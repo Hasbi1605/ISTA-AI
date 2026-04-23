@@ -4,6 +4,7 @@ namespace App\Services\Runtime;
 
 use App\Contracts\AIRuntimeInterface;
 use App\Services\Chat\LaravelChatService;
+use App\Services\Document\LaravelDocumentService;
 use Illuminate\Support\Facades\Log;
 
 class LaravelAIGateway implements AIRuntimeInterface
@@ -44,33 +45,29 @@ class LaravelAIGateway implements AIRuntimeInterface
 
     public function documentProcess(string $filePath, string $originalName, int $userId): array
     {
-        Log::info('LaravelAIGateway: documentProcess not implemented');
-
-        return [
-            'status' => 'error',
-            'message' => 'Document process via Laravel AI SDK belum tersedia.',
-        ];
+        return app(LaravelDocumentService::class)->processDocument($filePath, $originalName, $userId);
     }
 
     public function documentSummarize(string $filename, ?string $user_id = null): array
     {
-        Log::info('LaravelAIGateway: documentSummarize not implemented');
-
-        return [
-            'status' => 'error',
-            'message' => 'Document summarize via Laravel AI SDK belum tersedia.',
-        ];
+        return app(LaravelDocumentService::class)->summarizeDocument($filename, $user_id);
     }
 
-    public function documentDelete(string $filename): bool
+    public function documentDelete(string $filename, ?string $userId = null): bool
     {
-        Log::info('LaravelAIGateway: documentDelete not implemented');
-
-        return false;
+        return app(LaravelDocumentService::class)->deleteDocument($filename, $userId);
     }
 
     public function isReady(): bool
     {
-        return config('ai.laravel_ai.api_key') !== null;
+        $apiKey = config('ai.laravel_ai.api_key');
+
+        if (!$apiKey) {
+            return false;
+        }
+
+        return config('ai.laravel_ai.document_process_enabled', false)
+            || config('ai.laravel_ai.document_summarize_enabled', false)
+            || config('ai.laravel_ai.document_delete_enabled', true);
     }
 }
