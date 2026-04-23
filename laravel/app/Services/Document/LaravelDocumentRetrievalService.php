@@ -44,7 +44,7 @@ class LaravelDocumentRetrievalService implements DocumentRetrievalInterface
         $this->ai = app(AiManager::class);
         $this->model = config('ai.laravel_ai.model', 'gpt-4o-mini');
         $this->topK = config('ai.rag.top_k', 5);
-        $this->useProviderFileSearch = config('ai.rag.use_provider_file_search', false);
+        $this->useProviderFileSearch = config('ai.laravel_ai.use_provider_file_search', false);
     }
 
     public function searchRelevantChunks(
