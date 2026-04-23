@@ -4,6 +4,8 @@ return [
 
     'chat' => env('AI_RUNTIME_CHAT', 'python'),
 
+    'document_retrieval' => env('AI_RUNTIME_DOCUMENT_RETRIEVAL', 'python'),
+
     'document_process' => env('AI_RUNTIME_DOCUMENT_PROCESS', 'laravel'),
 
     'document_summarize' => env('AI_RUNTIME_DOCUMENT_SUMMARIZE', 'laravel'),
