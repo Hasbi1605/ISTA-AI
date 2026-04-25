@@ -90,13 +90,12 @@ class LaravelDocumentRetrievalServiceTest extends TestCase
         $user = User::factory()->create();
         $document = Document::factory()->for($user)->create([
             'status' => 'ready',
+            'original_name' => 'test.pdf',
             'provider_file_id' => null,
             'file_path' => 'documents/test.pdf',
         ]);
 
         Storage::put('documents/test.pdf', 'Test content about Laravel AI SDK');
-
-        $this->app->instance(AiManager::class, Mockery::mock(AiManager::class));
 
         $service = new LaravelDocumentRetrievalService();
 
@@ -118,13 +117,26 @@ class LaravelDocumentRetrievalServiceTest extends TestCase
         $user = User::factory()->create();
         $document = Document::factory()->for($user)->create([
             'status' => 'ready',
+            'original_name' => 'test.txt',
             'provider_file_id' => null,
             'file_path' => 'documents/test.txt',
         ]);
 
-        Storage::put('documents/test.txt', 'This is a test document content.');
+        Storage::put('documents/test.txt', 'This is a test document content about Laravel.');
 
-        $this->app->instance(AiManager::class, Mockery::mock(AiManager::class));
+        $mockProvider = new class {
+            public function embeddings(array $inputs, ?int $dimensions = null, ?string $model = null, int $timeout = 30): EmbeddingsResponse {
+                return new EmbeddingsResponse(
+                    embeddings: [[1.0, 0.0], [1.0, 0.0]],
+                    tokens: 2,
+                    meta: new Meta(provider: 'test', model: 'embedding-model')
+                );
+            }
+        };
+
+        $mockAiManager = Mockery::mock(AiManager::class);
+        $mockAiManager->shouldReceive('textProvider')->andReturn($mockProvider);
+        $this->app->instance(AiManager::class, $mockAiManager);
 
         $service = new LaravelDocumentRetrievalService();
 
