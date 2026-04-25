@@ -2,9 +2,14 @@
 
 namespace Tests\Unit\Services\Document;
 
+use App\Models\Document;
+use App\Models\User;
 use App\Services\Document\LaravelDocumentRetrievalService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Ai\AiManager;
+use Laravel\Ai\AnonymousAgent;
 use Laravel\Ai\Responses\Data\Meta;
 use Laravel\Ai\Responses\EmbeddingsResponse;
 use Mockery;
@@ -12,6 +17,14 @@ use Tests\TestCase;
 
 class LaravelDocumentRetrievalServiceTest extends TestCase
 {
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Storage::fake('local');
+    }
+
     public function test_calculate_similarity_uses_sdk_embeddings_api_shape(): void
     {
         Config::set('ai.rag.embedding_model', 'text-embedding-3-small');
@@ -67,6 +80,63 @@ class LaravelDocumentRetrievalServiceTest extends TestCase
 
         $this->assertGreaterThan(0.0, $score);
         $this->assertLessThan(1.0, $score);
+    }
+
+    public function test_search_uses_provider_file_search_when_enabled(): void
+    {
+        Config::set('ai.laravel_ai.use_provider_file_search', true);
+        Config::set('ai.laravel_ai.model', 'gpt-4o-mini');
+
+        $user = User::factory()->create();
+        $document = Document::factory()->for($user)->create([
+            'status' => 'ready',
+            'provider_file_id' => null,
+            'file_path' => 'documents/test.pdf',
+        ]);
+
+        Storage::put('documents/test.pdf', 'Test content about Laravel AI SDK');
+
+        $this->app->instance(AiManager::class, Mockery::mock(AiManager::class));
+
+        $service = new LaravelDocumentRetrievalService();
+
+        $result = $service->searchRelevantChunks(
+            'apa itu laravel?',
+            ['test.pdf'],
+            5,
+            (string) $user->id
+        );
+
+        $this->assertArrayHasKey('chunks', $result);
+        $this->assertArrayHasKey('success', $result);
+    }
+
+    public function test_search_uses_local_extraction_when_provider_file_search_disabled(): void
+    {
+        Config::set('ai.laravel_ai.use_provider_file_search', false);
+
+        $user = User::factory()->create();
+        $document = Document::factory()->for($user)->create([
+            'status' => 'ready',
+            'provider_file_id' => null,
+            'file_path' => 'documents/test.txt',
+        ]);
+
+        Storage::put('documents/test.txt', 'This is a test document content.');
+
+        $this->app->instance(AiManager::class, Mockery::mock(AiManager::class));
+
+        $service = new LaravelDocumentRetrievalService();
+
+        $result = $service->searchRelevantChunks(
+            'test',
+            ['test.txt'],
+            5,
+            (string) $user->id
+        );
+
+        $this->assertArrayHasKey('chunks', $result);
+        $this->assertArrayHasKey('success', $result);
     }
 
     private function invokeCalculateSimilarity(

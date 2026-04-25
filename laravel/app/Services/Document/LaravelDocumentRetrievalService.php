@@ -7,9 +7,7 @@ use App\Models\Document;
 use Illuminate\Support\Facades\Log;
 use Laravel\Ai\AiManager;
 use Laravel\Ai\AnonymousAgent;
-use Laravel\Ai\Files;
 use Laravel\Ai\Files\Document as AiDocument;
-use Laravel\Ai\Prompts\AgentPrompt;
 
 class LaravelDocumentRetrievalService implements DocumentRetrievalInterface
 {
@@ -518,17 +516,10 @@ class LaravelDocumentRetrievalService implements DocumentRetrievalInterface
                     . 'Jawab seringkas mungkin dan gunakan konteks dari dokumen.'
             );
 
-            $files = new Files(...$aiDocuments);
-
-            $prompt = new AgentPrompt(
-                agent: $agent,
-                prompt: "Berdasarkan pertanyaan berikut, carikan informasi yang relevan dari dokumen:\n\n{$query}",
-                files: $files,
-                provider: $this->ai->textProvider(),
-                model: $this->model,
+            $result = $agent->prompt(
+                "Berdasarkan pertanyaan berikut, carikan informasi yang relevan dari dokumen:\n\n{$query}",
+                attachments: $aiDocuments
             );
-
-            $result = $this->ai->textProvider()->prompt($prompt);
 
             $chunks = [
                 [
