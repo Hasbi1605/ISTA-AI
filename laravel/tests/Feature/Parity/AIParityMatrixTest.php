@@ -2,18 +2,23 @@
 
 namespace Tests\Feature\Parity;
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 /**
  * AI Parity Matrix Test
  * 
- * Fixture ini berfungsi sebagai acceptance matrix (kontrak parity) antara
+ * Fixture ini berfungsi sebagai checklist non-gating (acceptance matrix) antara
  * kapabilitas Python AI yang sudah ada dengan target implementasi Laravel-only.
  * Test yang ditandai incomplete (markTestIncomplete) merepresentasikan gap
- * yang harus diselesaikan pada child issue berikutnya sebelum cutover.
+ * yang harus diselesaikan pada child issue berikutnya. Sebelum cutover final,
+ * seluruh test di dalam file ini wajib berstatus passed.
  */
 class AIParityMatrixTest extends TestCase
 {
+    use RefreshDatabase;
+
     /**
      * @test
      * @group parity
@@ -171,9 +176,17 @@ class AIParityMatrixTest extends TestCase
      */
     public function it_enforces_document_vs_web_policy()
     {
-        // Fitur ini sebagian sudah diimplementasikan di DocumentPolicyService, 
-        // tapi kita pastikan test ini ada dalam matrix.
-        $this->assertTrue(true, 'Document policy dasar telah ada, namun butuh integrasi penuh dengan cascade.');
+        $service = app(\App\Services\Document\DocumentPolicyService::class);
+        $result = $service->shouldUseWebSearch(
+            query: 'kurs dollar sekarang',
+            forceWebSearch: false,
+            explicitWebRequest: false,
+            allowAutoRealtimeWeb: true,
+            documentsActive: true
+        );
+        
+        $this->assertFalse($result['should_search']);
+        $this->assertEquals('DOC_NO_WEB', $result['reason_code']);
     }
 
     /**
@@ -183,7 +196,25 @@ class AIParityMatrixTest extends TestCase
      */
     public function it_enforces_delete_cleanup_per_user()
     {
-        // Fitur ini baru diselesaikan di issue lifecycle sebelumnya
-        $this->assertTrue(true, 'Delete cleanup dengan user isolation sudah diimplementasikan.');
+        Storage::fake('local');
+        $user = \App\Models\User::factory()->create();
+        
+        $doc = \App\Models\Document::create([
+            'user_id' => $user->id,
+            'filename' => 'delete_matrix.pdf',
+            'original_name' => 'delete_matrix.pdf',
+            'file_path' => 'documents/' . $user->id . '/delete_matrix.pdf',
+            'mime_type' => 'application/pdf',
+            'file_size_bytes' => 123,
+            'status' => 'ready',
+        ]);
+        
+        Storage::disk('local')->put($doc->file_path, 'dummy');
+
+        $service = app(\App\Services\DocumentLifecycleService::class);
+        $service->deleteDocument($doc);
+        
+        $this->assertSoftDeleted($doc);
+        Storage::disk('local')->assertMissing($doc->file_path);
     }
 }
