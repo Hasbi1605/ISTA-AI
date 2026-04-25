@@ -84,7 +84,9 @@ class LaravelDocumentService
             $aiDoc = AiDocument::fromPath(storage_path('app/' . $document->file_path));
 
             $agent = AnonymousAgent::make(
-                instructions: 'Anda adalah asisten AI yang merangkum dokumen. Berikan ringkasan singkat dan akurat.'
+                instructions: 'Anda adalah asisten AI yang merangkum dokumen. Berikan ringkasan singkat dan akurat.',
+                messages: [],
+                tools: []
             );
 
             $prompt = new AgentPrompt(

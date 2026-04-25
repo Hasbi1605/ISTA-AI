@@ -513,7 +513,9 @@ class LaravelDocumentRetrievalService implements DocumentRetrievalInterface
 
             $agent = AnonymousAgent::make(
                 instructions: 'Anda adalah asisten AI yang menjawab berdasarkan dokumen yang diberikan. '
-                    . 'Jawab seringkas mungkin dan gunakan konteks dari dokumen.'
+                    . 'Jawab seringkas mungkin dan gunakan konteks dari dokumen.',
+                messages: [],
+                tools: []
             );
 
             $result = $agent->prompt(

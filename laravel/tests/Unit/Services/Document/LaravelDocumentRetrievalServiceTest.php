@@ -94,18 +94,16 @@ class LaravelDocumentRetrievalServiceTest extends TestCase
             'file_path' => 'documents/test.pdf',
         ]);
 
-        Storage::put('documents/test.pdf', 'Test content about Laravel AI SDK for document retrieval');
+        $realPath = storage_path('app/documents/test.pdf');
+        $dir = dirname($realPath);
+        if (!is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+        file_put_contents($realPath, 'Test content about Laravel AI SDK for document retrieval');
 
-        // Set up mock provider
-        $mockProvider = Mockery::mock(\Laravel\Ai\Contracts\Providers\TextProvider::class);
-        $mockProvider->shouldReceive('name')->andReturn('openai');
-
-        $mockAiManager = Mockery::mock(AiManager::class);
-        $mockAiManager->shouldReceive('textProvider')->andReturn($mockProvider);
-        $mockAiManager->shouldReceive('textProviderFor')->andReturnUsing(function ($agent, $name = null) use ($mockProvider) {
-            return $mockProvider;
-        });
-        $this->app->instance(AiManager::class, $mockAiManager);
+        \Laravel\Ai\AnonymousAgent::fake([
+            'Ini adalah mock response dari agent prompt',
+        ]);
 
         $service = new LaravelDocumentRetrievalService();
 
@@ -116,8 +114,17 @@ class LaravelDocumentRetrievalServiceTest extends TestCase
             (string) $user->id
         );
 
-        $this->assertArrayHasKey('chunks', $result);
         $this->assertArrayHasKey('success', $result);
+        if (!$result['success']) {
+            dump($result);
+        }
+        $this->assertTrue($result['success']);
+        $this->assertArrayHasKey('chunks', $result);
+        $this->assertNotEmpty($result['chunks']);
+        $this->assertEquals('Ini adalah mock response dari agent prompt', $result['chunks'][0]['content']);
+        $this->assertEquals('test.pdf', $result['chunks'][0]['filename']);
+
+        unlink($realPath);
     }
 
     public function test_search_uses_local_extraction_when_provider_file_search_disabled(): void
@@ -141,15 +148,14 @@ class LaravelDocumentRetrievalServiceTest extends TestCase
         file_put_contents($realPath, 'This is a test document content about Laravel.\nIt contains important information about the framework.');
 
         // Use mock embeddings that returns high similarity so search succeeds
-        $mockProvider = new class {
-            public function embeddings(array $inputs, ?int $dimensions = null, ?string $model = null, int $timeout = 30): EmbeddingsResponse {
-                return new EmbeddingsResponse(
-                    embeddings: [[1.0, 0.0], [1.0, 0.0]],
-                    tokens: 2,
-                    meta: new Meta(provider: 'test', model: 'embedding-model')
-                );
-            }
-        };
+        $mockProvider = Mockery::mock(\Laravel\Ai\Contracts\Providers\TextProvider::class);
+        $mockProvider->shouldReceive('embeddings')->andReturn(
+            new EmbeddingsResponse(
+                embeddings: [[1.0, 0.0], [1.0, 0.0]],
+                tokens: 2,
+                meta: new Meta(provider: 'test', model: 'embedding-model')
+            )
+        );
 
         $mockAiManager = Mockery::mock(AiManager::class);
         $mockAiManager->shouldReceive('textProvider')->andReturn($mockProvider);
@@ -164,9 +170,12 @@ class LaravelDocumentRetrievalServiceTest extends TestCase
             (string) $user->id
         );
 
-        // Verify response has expected shape
-        $this->assertArrayHasKey('chunks', $result);
         $this->assertArrayHasKey('success', $result);
+        $this->assertTrue($result['success']);
+        $this->assertArrayHasKey('chunks', $result);
+        $this->assertNotEmpty($result['chunks']);
+        $this->assertEquals('test.txt', $result['chunks'][0]['filename']);
+        $this->assertStringContainsString('This is a test document content about Laravel.', $result['chunks'][0]['content']);
 
         unlink($realPath);
     }
