@@ -29,22 +29,18 @@ class AIRuntimeResolver
             return $this->primaryRuntime;
         }
 
-        $runtimeType = config("ai_runtime.{$this->capability}", 'python');
+        $runtimeType = config("ai_runtime.{$this->capability}", 'laravel');
 
         if ($runtimeType === 'shadow' && !$this->shadowMode) {
-            $runtimeType = 'python';
+            $runtimeType = 'laravel';
         }
 
         $runtime = $this->resolveRuntime($runtimeType);
 
-        if (!$runtime->isReady()) {
-            $runtime = $this->resolveRuntime('python');
-        }
-
         $this->primaryRuntime = $runtime;
 
         if ($this->shadowMode && $runtimeType !== 'shadow') {
-            $secondaryType = $runtimeType === 'python' ? 'laravel' : 'python';
+            $secondaryType = $runtimeType === 'laravel' ? 'python' : 'laravel';
             $this->secondaryRuntime = $this->resolveRuntime($secondaryType);
         }
 

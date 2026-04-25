@@ -34,10 +34,10 @@ return [
             'enabled' => env('AI_WEB_SEARCH_ENABLED', true),
             'provider' => env('AI_WEB_SEARCH_PROVIDER', 'ddg'),
         ],
-        'document_process_enabled' => env('AI_DOCUMENT_PROCESS_ENABLED', false),
-        'document_summarize_enabled' => env('AI_DOCUMENT_SUMMARIZE_ENABLED', false),
+        'document_process_enabled' => env('AI_DOCUMENT_PROCESS_ENABLED', true),
+        'document_summarize_enabled' => env('AI_DOCUMENT_SUMMARIZE_ENABLED', true),
         'document_delete_enabled' => env('AI_DOCUMENT_DELETE_ENABLED', true),
-        'document_retrieval_enabled' => env('AI_DOCUMENT_RETRIEVAL_ENABLED', false),
+        'document_retrieval_enabled' => env('AI_DOCUMENT_RETRIEVAL_ENABLED', true),
         'use_provider_file_search' => env('AI_USE_PROVIDER_FILE_SEARCH', false),
     ],
 

@@ -199,21 +199,27 @@ class AIRuntimeResolverTest extends TestCase
     {
         $this->setUpRuntimeConfig('chat', 'laravel');
 
+        Config::set('ai.laravel_ai.api_key', null);
+        Config::set('ai.laravel_ai.document_process_enabled', false);
+
         $resolver = new AIRuntimeResolver('chat', false);
         $runtime = $resolver->getRuntime();
 
-        $this->assertInstanceOf(PythonLegacyAdapter::class, $runtime);
+        $this->assertInstanceOf(LaravelAIGateway::class, $runtime);
     }
 
     public function test_fallback_works_even_when_shadow_mode_enabled(): void
     {
         $this->setUpRuntimeConfig('chat', 'laravel', true);
 
+        Config::set('ai.laravel_ai.api_key', null);
+        Config::set('ai.laravel_ai.document_process_enabled', false);
+
         $resolver = new AIRuntimeResolver('chat', true);
 
         $runtime = $resolver->getRuntime();
 
-        $this->assertInstanceOf(PythonLegacyAdapter::class, $runtime);
+        $this->assertInstanceOf(LaravelAIGateway::class, $runtime);
 
         $this->assertTrue($resolver->isShadowMode());
         $secondary = $resolver->getSecondaryRuntime();

@@ -40,15 +40,20 @@ class LaravelAIGateway implements AIRuntimeInterface
         }
 
         if ($documentFilenamesValid) {
-            $python = new PythonLegacyAdapter();
-            return $python->chat(
+            Log::warning('LaravelAIGateway: Document retrieval requested but service not available', [
+                'document_filenames' => $document_filenames,
+            ]);
+
+            $service = app(LaravelChatService::class);
+            yield from $service->chat(
                 $messages,
-                $document_filenames,
+                null,
                 $user_id,
                 $force_web_search,
                 $source_policy,
                 $allow_auto_realtime_web
             );
+            return;
         }
 
         $service = app(LaravelChatService::class);

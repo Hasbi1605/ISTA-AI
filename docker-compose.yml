@@ -55,54 +55,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # Python AI Microservice
-  python-ai:
-    build:
-      context: ./python-ai
-      dockerfile: Dockerfile
-    container_name: ista_python_ai
-    restart: always
-    ports:
-      - "8001:8001"
-    environment:
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - GITHUB_TOKEN=${GITHUB_TOKEN}
-      - GITHUB_TOKEN_2=${GITHUB_TOKEN_2}
-      - GROQ_API_KEY=${GROQ_API_KEY}
-      - AI_SERVICE_TOKEN=${AI_SERVICE_TOKEN}
-      # Chunking settings — tuned untuk dokumen besar, tidak concurrent
-      - TOKEN_CHUNK_SIZE=${TOKEN_CHUNK_SIZE:-1500}
-      - TOKEN_CHUNK_OVERLAP=${TOKEN_CHUNK_OVERLAP:-150}
-      - AGGRESSIVE_BATCH_SIZE=${AGGRESSIVE_BATCH_SIZE:-100}
-      - BATCH_DELAY_SECONDS=${BATCH_DELAY_SECONDS:-0.8}
-      - EMBEDDING_TIMEOUT=${EMBEDDING_TIMEOUT:-30}
-      # LangSearch
-      - LANGSEARCH_API_KEY=${LANGSEARCH_API_KEY}
-      - LANGSEARCH_API_KEY_BACKUP=${LANGSEARCH_API_KEY_BACKUP}
-    volumes:
-      - ./python-ai:/app
-      - chroma_data:/app/chroma_data
-    depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    # 4 GB RAM untuk Python AI — perlu ruang lebih untuk dokumen besar
-    # Dengan lazy import, idle ~800 MB — spike saat proses dokumen besar ~2.5–3.5 GB
-    deploy:
-      resources:
-        limits:
-          memory: 4096M
-          cpus: '2.0'
-        reservations:
-          memory: 256M
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-
   # Laravel Web App
   laravel:
     build:
@@ -131,8 +83,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      python-ai:
-        condition: service_healthy
     deploy:
       resources:
         limits:
@@ -149,5 +99,4 @@ services:
 
 volumes:
   mysql_data:
-  chroma_data:
   laravel_storage:
