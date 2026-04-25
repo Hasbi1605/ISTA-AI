@@ -146,7 +146,7 @@ class AIParityMatrixTest extends TestCase
      */
     public function it_supports_ocr_for_scanned_pdf()
     {
-        $this->markTestIncomplete('Gap: Laravel belum mendukung parsing PDF hasil scan (via Gemini OCR/Tesseract).');
+        $this->markTestIncomplete('Gap: Laravel belum mendukung parsing PDF hasil scan (Target Utama: GitHub Models Vision; Fallback: Gemini/Tesseract).');
     }
 
     /**
@@ -197,24 +197,47 @@ class AIParityMatrixTest extends TestCase
     public function it_enforces_delete_cleanup_per_user()
     {
         Storage::fake('local');
-        $user = \App\Models\User::factory()->create();
         
-        $doc = \App\Models\Document::create([
-            'user_id' => $user->id,
-            'filename' => 'delete_matrix.pdf',
-            'original_name' => 'delete_matrix.pdf',
-            'file_path' => 'documents/' . $user->id . '/delete_matrix.pdf',
+        // Create two users with the same filename
+        $userA = \App\Models\User::factory()->create();
+        $userB = \App\Models\User::factory()->create();
+        $sameFilename = 'shared_document.pdf';
+        
+        // User B's document
+        $docB = \App\Models\Document::create([
+            'user_id' => $userB->id,
+            'filename' => $sameFilename . '_b',
+            'original_name' => $sameFilename,
+            'file_path' => 'documents/' . $userB->id . '/' . $sameFilename,
             'mime_type' => 'application/pdf',
-            'file_size_bytes' => 123,
+            'file_size_bytes' => 100,
             'status' => 'ready',
         ]);
+        Storage::disk('local')->put($docB->file_path, 'content B');
         
-        Storage::disk('local')->put($doc->file_path, 'dummy');
-
+        // User A's document
+        $docA = \App\Models\Document::create([
+            'user_id' => $userA->id,
+            'filename' => $sameFilename . '_a',
+            'original_name' => $sameFilename,
+            'file_path' => 'documents/' . $userA->id . '/' . $sameFilename,
+            'mime_type' => 'application/pdf',
+            'file_size_bytes' => 100,
+            'status' => 'ready',
+        ]);
+        Storage::disk('local')->put($docA->file_path, 'content A');
+        
         $service = app(\App\Services\DocumentLifecycleService::class);
-        $service->deleteDocument($doc);
         
-        $this->assertSoftDeleted($doc);
-        Storage::disk('local')->assertMissing($doc->file_path);
+        // User A deletes THEIR document
+        $service->deleteDocument($docA);
+        
+        // Assert User A's doc is deleted from DB and storage
+        $this->assertSoftDeleted($docA);
+        Storage::disk('local')->assertMissing($docA->file_path);
+        
+        // Assert User B's doc REMAINS in DB and storage (Isolation check)
+        $this->assertNotSoftDeleted($docB);
+        Storage::disk('local')->assertExists($docB->file_path);
     }
 }

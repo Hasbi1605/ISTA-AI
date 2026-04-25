@@ -1,9 +1,11 @@
-# Issue Plan: Parity Penuh Capability Python AI ke Laravel-only Multi-provider Sebelum Decommission
+# Issue Plan Lokal: Baseline Capability dan Acceptance Matrix Parity Python AI ke Laravel-only
+
+Dokumen ini disusun setelah issue GitHub `#84` dan `#85` sudah dibuat. Jika ada perbedaan isi, keputusan, atau wording, acuan utama tetap issue GitHub tersebut, sedangkan file ini berfungsi sebagai turunan lokal untuk membantu implementasi dan review di repo.
 
 ## Latar Belakang
 Migrasi menuju arsitektur `Laravel-only` sudah berjalan bertahap melalui boundary runtime, Laravel AI SDK, document lifecycle, chat/web search, dan RAG dokumen. Namun hasil analisis terbaru menunjukkan bahwa `python-ai` masih memiliki beberapa capability penting yang belum boleh hilang begitu saja saat full cutover.
 
-User sudah menegaskan bahwa kemampuan yang sebelumnya ada di Python terasa penting dan perlu dipertahankan. User juga tidak memiliki `OPENAI_API_KEY`, sehingga target parity tidak boleh bergantung pada OpenAI API sebagai syarat utama. Karena itu issue ini menjadi gate wajib sebelum issue cutover, re-ingest, dan decommission `python-ai` dijalankan.
+User sudah menegaskan bahwa kemampuan yang sebelumnya ada di Python terasa penting dan perlu dipertahankan. User juga tidak memiliki `OPENAI_API_KEY`, sehingga target parity tidak boleh bergantung pada OpenAI API sebagai syarat utama. Karena itu blueprint `#84` menjadi gate parity sebelum decommission final `python-ai`, sedangkan child issue `#85` difokuskan untuk inventaris baseline capability Python, acceptance matrix minimal, dan daftar gap yang akan menjadi input child issue berikutnya.
 
 Targetnya bukan sekadar mematikan Python, tetapi memastikan seluruh capability bernilai tinggi dari Python punya pengganti setara di Laravel-only dengan token/API yang sudah dipakai sebelumnya: `GITHUB_TOKEN`, `GITHUB_TOKEN_2`, `GROQ_API_KEY`, `GEMINI_API_KEY` jika tersedia/free-tier memadai, dan `LANGSEARCH_API_KEY`. Provider-managed path boleh dipakai hanya jika kompatibel dengan token yang tersedia dan kualitasnya setara atau hampir setara.
 
@@ -11,15 +13,20 @@ Issue ini melengkapi issue cutover yang sudah ada:
 
 - `issue/issue-cutover-reingest-decommission-python-ai.md`
 
-Cutover final harus menunggu issue parity ini selesai agar tidak ada regresi kualitas besar pada chat, RAG, retrieval, OCR/parsing, source rendering, model fallback, dan lifecycle dokumen.
+Cutover final tetap harus menunggu parity blueprint selesai agar tidak ada regresi kualitas besar pada chat, RAG, retrieval, OCR/parsing, source rendering, model fallback, dan lifecycle dokumen.
+
+## Acuan Utama GitHub
+- Blueprint utama: `#84 [Blueprint] Parity Python AI ke Laravel-only Multi-provider sebelum Decommission`
+- Child issue yang menjadi fokus dokumen lokal ini: `#85 [AI Parity] Inventaris baseline capability Python dan acceptance matrix`
+- Jika ada mismatch antara markdown lokal ini dengan issue GitHub, gunakan issue GitHub sebagai source of truth.
 
 ## Tujuan
 - Menginventaris seluruh capability penting yang saat ini hanya atau terutama tersedia di `python-ai`.
 - Menentukan target pengganti setiap capability di ekosistem Laravel-only multi-provider, bukan OpenAI-only.
-- Membuat parity gate yang wajib lolos sebelum `python-ai` boleh dinonaktifkan.
+- Membuat baseline contract parity dan acceptance matrix minimal yang menjadi input child issue lanjutan, bukan melakukan cutover/decommission pada issue ini.
 - Memastikan migrasi tidak menghilangkan kualitas yang sudah terasa penting bagi user.
 - Menentukan capability mana yang harus setara 1:1, mana yang boleh berubah implementasi tetapi wajib setara secara user-facing, dan mana yang butuh fallback tambahan.
-- Memastikan sistem tetap bisa berjalan tanpa `OPENAI_API_KEY`.
+- Memastikan sistem target tetap bisa berjalan tanpa `OPENAI_API_KEY`.
 
 ## Ruang Lingkup
 - Inventaris capability Python yang wajib dipertahankan:
@@ -52,7 +59,7 @@ Cutover final harus menunggu issue parity ini selesai agar tidak ada regresi kua
   - Laravel service custom
   - package PHP tambahan
   - fallback minimal yang tetap Laravel-only
-- Penyusunan test matrix parity sebelum cutover.
+- Penyusunan acceptance matrix/checklist parity baseline sebelum cutover.
 - Penyusunan keputusan token/API/model mana yang tetap dipakai, diganti, atau dipensiunkan setelah parity selesai.
 
 ## Di Luar Scope
@@ -83,7 +90,7 @@ Cutover final harus menunggu issue parity ini selesai agar tidak ada regresi kua
 | PDR | Presisi child chunk + konteks parent chunk | Provider file search atau Laravel parent/child index | Wajib untuk dokumen panjang |
 | Token-aware chunking | Mengontrol ukuran chunk dan biaya | Laravel chunker token-aware | Wajib |
 | Batch ingest throttling | Menghindari rate limit saat dokumen besar | Laravel queue batching/rate limiter | Wajib |
-| OCR/scanned PDF | Membaca PDF scan | Samakan dengan Python jika Gemini/free-tier memadai; jika tidak, pakai alternatif Laravel-compatible gratis seperti Tesseract/system OCR atau provider gratis yang lolos fixture | Wajib jika user memakai PDF scan |
+| OCR/scanned PDF | Membaca PDF scan | Target utama memakai GitHub Models vision (`openai/gpt-4.1` / `openai/gpt-4o`) via token GitHub yang sudah ada; Gemini/free-tier dan Tesseract/system OCR menjadi fallback | Wajib jika user memakai PDF scan |
 | Summarization chunk/batch | Ringkas dokumen besar | Laravel summarization pipeline berbasis chunk/provider file | Wajib |
 | Source metadata | Rujukan dokumen/web di UI | Kontrak `[SOURCES:...]` tetap dipertahankan | Wajib |
 | Document-vs-web policy | Dokumen-first, explicit web, realtime auto | `DocumentPolicyService` plus test parity | Wajib |
@@ -155,6 +162,8 @@ Urutan embedding yang ditargetkan tetap mengikuti Python:
 - Biaya provider bisa naik jika semua capability dipindahkan ke provider-managed tanpa quota/rate limit.
 
 ## Langkah Implementasi
+Catatan scope: untuk issue `#85`, keluaran utamanya berhenti pada inventaris baseline capability, acceptance matrix/checklist minimal, dan daftar gap untuk child issue lanjutan. Langkah 4-12 di bawah ini tetap dipertahankan sebagai roadmap turunan blueprint `#84`, bukan deliverable penuh dari PR baseline ini.
+
 1. Buat matrix baseline capability Python dari `python-ai/config/ai_config.yaml` dan service RAG terkait.
 2. Tandai setiap capability sebagai:
    - exact parity
@@ -182,6 +191,7 @@ Urutan embedding yang ditargetkan tetap mengikuti Python:
    - fallback Laravel-only lain yang lolos test parity.
 8. Implementasikan pipeline ingest/chunking Laravel yang token-aware dan aman terhadap rate limit.
 9. Implementasikan strategy OCR/scanned PDF:
+   - gunakan GitHub Models vision (`openai/gpt-4.1` atau `openai/gpt-4o`) sebagai target utama; atau
    - gunakan Gemini/free-tier jika tersedia dan kualitasnya memadai; atau
    - gunakan alternatif gratis Laravel-compatible seperti Tesseract/system OCR; atau
    - nyatakan tidak setara hanya dengan approval eksplisit user.
@@ -190,6 +200,8 @@ Urutan embedding yang ditargetkan tetap mengikuti Python:
 12. Baru setelah semua gate lolos, lanjutkan issue cutover/decommission.
 
 ## Rencana Test
+Untuk issue `#85`, verifikasi minimum mengikuti issue GitHub: review dokumen matrix, baseline Python bila masih dipakai sebagai referensi, dan test Laravel yang relevan bila ada fixture/test baru.
+
 - Full Laravel test:
   - `cd laravel && php artisan test`
 - Full Python baseline test selama Python masih menjadi referensi:
@@ -217,13 +229,15 @@ Urutan embedding yang ditargetkan tetap mengikuti Python:
   - upload, summarize, delete dokumen
 
 ## Kriteria Selesai
+Untuk issue `#85`, keluaran minimalnya adalah matrix capability Python vs target Laravel-only, fixture/test case minimal untuk capability penting, daftar gap untuk child issue berikutnya, dan keputusan bahwa runtime target tidak boleh bergantung pada `OPENAI_API_KEY`. Daftar di bawah tetap dipertahankan sebagai kriteria selesai blueprint parity secara keseluruhan.
+
 - Semua capability penting Python sudah dipetakan ke target Laravel-only multi-provider atau alternatif setara/hampir setara.
 - Tidak ada token/model Python yang dipensiunkan sebelum pengganti setara tersedia.
 - Sistem berjalan tanpa `OPENAI_API_KEY`.
 - Multi-model fallback/cascade punya padanan Laravel dengan urutan yang sama seperti Python atau keputusan eksplisit yang diuji.
 - GitHub Models, Groq, Gemini/free-tier jika tersedia, dan LangSearch dipanggil dari Laravel tanpa menjalankan service Python.
 - Retrieval dokumen Laravel lolos parity untuk vector, keyword, dokumen panjang, dan source rendering.
-- OCR/scanned PDF punya keputusan final: didukung setara via Gemini/free-tier, didukung via OCR gratis Laravel-compatible, atau dinyatakan tidak dipakai dengan approval eksplisit.
+- OCR/scanned PDF punya keputusan final: didukung setara via GitHub Models vision, didukung via Gemini/free-tier atau OCR gratis Laravel-compatible sebagai fallback, atau dinyatakan tidak dipakai dengan approval eksplisit.
 - Delete cleanup memakai isolasi user end-to-end dan dilindungi test caller-level.
 - Acceptance matrix parity hijau untuk skenario utama.
 - Issue cutover/decommission boleh dilanjutkan hanya setelah issue ini selesai.
@@ -236,7 +250,7 @@ Urutan embedding yang ditargetkan tetap mengikuti Python:
 - LangSearch tetap dipakai untuk web search dan rerank.
 
 ## Acceptance Matrix (Skenario Test Parity)
-Setiap capability telah dipetakan menjadi test case minimal di `laravel/tests/Feature/Parity/AIParityMatrixTest.php`. File tersebut berfungsi sebagai executable acceptance matrix. Saat ini, sebagian besar test di-mark sebagai `incomplete` karena merupakan gap yang harus diselesaikan.
+Setiap capability telah dipetakan menjadi test case minimal di `laravel/tests/Feature/Parity/AIParityMatrixTest.php`. Pada fase issue `#85`, file tersebut diperlakukan sebagai checklist parity non-gating yang mendokumentasikan baseline dan gap implementasi. Entri yang masih `incomplete` menandakan pekerjaan lanjutan di child issue berikutnya; seluruhnya baru wajib `passed` sebelum parity gate final / decommission dijalankan.
 
 ## Daftar Gap Parity (Input Child Issue)
 Berdasarkan inventaris di atas, berikut adalah gap utama yang belum ada di ekosistem Laravel-only dan harus dipecah menjadi child issue:
@@ -245,6 +259,6 @@ Berdasarkan inventaris di atas, berikut adalah gap utama yang belum ada di ekosi
 3. **Advanced RAG Engine (Vector Store, Hybrid, RRF, HyDE, PDR)**: Pengganti Chroma yang mendukung pencarian hybrid (Vector + BM25), Reciprocal Rank Fusion, query expansion (HyDE), dan Parent Document Retrieval.
 4. **Embedding Fallback**: Laravel harus mendukung fallback text-embedding-3 (primary -> backup -> small).
 5. **Ingest Pipeline & Chunking**: Laravel perlu mengimplementasikan pemotongan dokumen yang sadar-token (token-aware chunking) dan batch ingest throttling.
-6. **OCR / Scanned PDF**: Laravel perlu strategi OCR menggunakan Gemini Vision (free-tier) atau alternatif lain seperti Tesseract untuk file scan.
+6. **OCR / Scanned PDF**: Laravel perlu strategi OCR dengan GitHub Models vision sebagai target utama, lalu Gemini/free-tier atau Tesseract/system OCR sebagai fallback untuk file scan.
 7. **Summarization Pipeline**: Mekanisme map-reduce/batch untuk meringkas dokumen yang sangat panjang.
 8. **Stream Marker & Metadata**: Render metadata `[MODEL:...]` dan `[SOURCES:...]` ke UI Chat dari Laravel stream.
