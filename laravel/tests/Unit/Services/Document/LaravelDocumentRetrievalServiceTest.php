@@ -124,7 +124,52 @@ class LaravelDocumentRetrievalServiceTest extends TestCase
         $this->assertEquals('Ini adalah mock response dari agent prompt', $result['chunks'][0]['content']);
         $this->assertEquals('test.pdf', $result['chunks'][0]['filename']);
 
+        \Laravel\Ai\AnonymousAgent::assertPrompted(function ($prompt) {
+            return $prompt->model === 'gpt-4o-mini' &&
+                   $prompt->attachments->isNotEmpty() &&
+                   $prompt->attachments->first() instanceof \Laravel\Ai\Files\LocalDocument;
+        });
+
         unlink($realPath);
+    }
+
+    public function test_search_uses_provider_file_id_and_uses_config_model_when_enabled(): void
+    {
+        Config::set('ai.laravel_ai.use_provider_file_search', true);
+        Config::set('ai.laravel_ai.model', 'gpt-4o-mini');
+
+        $user = User::factory()->create();
+        $document = Document::factory()->for($user)->create([
+            'status' => 'ready',
+            'original_name' => 'test_provider.pdf',
+            'provider_file_id' => 'file-abcde12345',
+            'file_path' => 'documents/missing.pdf', // file lokal sengaja tidak ada
+        ]);
+
+        \Laravel\Ai\AnonymousAgent::fake([
+            'Ini adalah mock response dari agent prompt via provider id',
+        ]);
+
+        $service = new LaravelDocumentRetrievalService();
+
+        $result = $service->searchRelevantChunks(
+            'apa itu laravel?',
+            ['test_provider.pdf'],
+            5,
+            (string) $user->id
+        );
+
+        $this->assertArrayHasKey('success', $result);
+        $this->assertTrue($result['success']);
+        $this->assertArrayHasKey('chunks', $result);
+        $this->assertEquals('Ini adalah mock response dari agent prompt via provider id', $result['chunks'][0]['content']);
+
+        \Laravel\Ai\AnonymousAgent::assertPrompted(function ($prompt) {
+            return $prompt->model === 'gpt-4o-mini' &&
+                   $prompt->attachments->isNotEmpty() &&
+                   $prompt->attachments->first() instanceof \Laravel\Ai\Files\ProviderDocument &&
+                   $prompt->attachments->first()->id === 'file-abcde12345';
+        });
     }
 
     public function test_search_uses_local_extraction_when_provider_file_search_disabled(): void

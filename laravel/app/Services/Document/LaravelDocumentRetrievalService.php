@@ -501,9 +501,13 @@ class LaravelDocumentRetrievalService implements DocumentRetrievalInterface
 
             $aiDocuments = [];
             foreach ($documents as $doc) {
-                $filePath = storage_path('app/' . $doc['file_path']);
-                if (file_exists($filePath)) {
-                    $aiDocuments[] = AiDocument::fromPath($filePath);
+                if (!empty($doc['provider_file_id'])) {
+                    $aiDocuments[] = AiDocument::fromId($doc['provider_file_id']);
+                } else {
+                    $filePath = storage_path('app/' . $doc['file_path']);
+                    if (file_exists($filePath)) {
+                        $aiDocuments[] = AiDocument::fromPath($filePath);
+                    }
                 }
             }
 
@@ -520,7 +524,8 @@ class LaravelDocumentRetrievalService implements DocumentRetrievalInterface
 
             $result = $agent->prompt(
                 "Berdasarkan pertanyaan berikut, carikan informasi yang relevan dari dokumen:\n\n{$query}",
-                attachments: $aiDocuments
+                attachments: $aiDocuments,
+                model: $this->model
             );
 
             $chunks = [
