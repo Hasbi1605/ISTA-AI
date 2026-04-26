@@ -559,14 +559,14 @@ class HybridRetrievalService
         $vectorRanked = $this->rankDocsByScore($vectorResults, 'vector_score');
 
         foreach ($vectorRanked as $rank => $item) {
-            $key = $this->getDocKey($item['content']);
+            $key = $this->getDocKey($item);
             $rrfScores[$key] = $rrfScores[$key] ?? 0.0;
             $rrfScores[$key] += (1 - $this->bm25Weight) / ($this->rrfK + $rank + 1);
             $docPool[$key] = $item;
         }
 
         foreach ($bm25Ranked as $rank => $item) {
-            $key = $this->getDocKey($item['content']);
+            $key = $this->getDocKey($item);
             $rrfScores[$key] = $rrfScores[$key] ?? 0.0;
             $rrfScores[$key] += $this->bm25Weight / ($this->rrfK + $rank + 1);
             
@@ -597,9 +597,15 @@ class HybridRetrievalService
         return $docs;
     }
 
-    protected function getDocKey(string $content): string
+    protected function getDocKey(array $doc): string
     {
-        return substr($content, 0, 60);
+        $chunkId = $doc['chunk_id'] ?? null;
+        if ($chunkId) {
+            return 'chunk_' . $chunkId;
+        }
+        $docId = $doc['document_id'] ?? null;
+        $chunkIdx = $doc['chunk_index'] ?? 0;
+        return $docId ? "doc_{$docId}_idx_{$chunkIdx}" : substr($doc['content'] ?? '', 0, 60);
     }
 
     protected function resolvePdrParents(array $childChunks, string $userId): array
@@ -624,6 +630,7 @@ class HybridRetrievalService
 
         $parentChunks = DocumentChunk::whereIn('id', array_keys($parentIds))
             ->where('chunk_type', 'parent')
+            ->whereHas('document', fn($q) => $q->where('user_id', (int) $userId))
             ->get()
             ->keyBy('id');
 

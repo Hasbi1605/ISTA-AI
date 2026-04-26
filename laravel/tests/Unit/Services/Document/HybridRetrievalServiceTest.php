@@ -243,14 +243,137 @@ class HybridRetrievalServiceTest extends TestCase
         $reflection = new \ReflectionClass(HybridRetrievalService::class);
         $method = $reflection->getMethod('tokenize');
         $method->setAccessible(true);
-        
+
         $service = new HybridRetrievalService();
-        
+
         $tokens = $method->invoke($service, 'Machine Learning adalah AI');
-        
+
         $this->assertContains('machine', $tokens);
         $this->assertContains('learning', $tokens);
         $this->assertContains('adalah', $tokens);
         $this->assertContains('ai', $tokens);
+    }
+
+    #[Test]
+    public function it_does_not_leak_parent_chunks_from_other_users(): void
+    {
+        $reflection = new \ReflectionClass(HybridRetrievalService::class);
+        $method = $reflection->getMethod('resolvePdrParents');
+        $method->setAccessible(true);
+
+        $service = new HybridRetrievalService();
+
+        $otherUser = User::factory()->create();
+        $otherDoc = Document::create([
+            'user_id' => $otherUser->id,
+            'filename' => 'other_user_doc.pdf',
+            'original_name' => 'other_user_doc.pdf',
+            'file_path' => 'documents/' . $otherUser->id . '/other_user_doc.pdf',
+            'mime_type' => 'application/pdf',
+            'file_size_bytes' => 1000,
+            'status' => 'ready',
+        ]);
+
+        $otherParent = DocumentChunk::create([
+            'document_id' => $otherDoc->id,
+            'chunk_type' => 'parent',
+            'parent_index' => 0,
+            'text_content' => 'Parent chunk from other user - SECRET DATA',
+        ]);
+
+        $userParent = DocumentChunk::create([
+            'document_id' => $this->document->id,
+            'chunk_type' => 'parent',
+            'parent_index' => 0,
+            'text_content' => 'User parent chunk - allowed',
+        ]);
+
+        $childChunks = [
+            [
+                'content' => 'Child pointing to other user parent',
+                'score' => 0.9,
+                'filename' => 'test.pdf',
+                'chunk_index' => 0,
+                'chunk_id' => 999,
+                'parent_id' => $otherParent->id,
+                'chunk_type' => 'child',
+            ],
+            [
+                'content' => 'Child pointing to user parent',
+                'score' => 0.8,
+                'filename' => 'test.pdf',
+                'chunk_index' => 1,
+                'chunk_id' => 998,
+                'parent_id' => $userParent->id,
+                'chunk_type' => 'child',
+            ],
+        ];
+
+        $result = $method->invoke($service, $childChunks, (string) $this->user->id);
+
+        $this->assertNotEmpty($result);
+        $contents = array_column($result, 'content');
+        $this->assertContains('User parent chunk - allowed', $contents);
+        $this->assertNotContains('Parent chunk from other user - SECRET DATA', $contents);
+
+        $otherParent->delete();
+        $userParent->delete();
+        $otherDoc->delete();
+        $otherUser->delete();
+    }
+
+    #[Test]
+    public function it_does_not_collapse_chunks_with_same_prefix(): void
+    {
+        $reflection = new \ReflectionClass(HybridRetrievalService::class);
+        $method = $reflection->getMethod('performRrfMerge');
+        $method->setAccessible(true);
+
+        $service = new HybridRetrievalService();
+
+        $bm25Results = [
+            [
+                'content' => 'ini adalah teks yang sangat panjang dari dokumen pertama dengan detail berbeda',
+                'bm25_score' => 0.9,
+                'filename' => 'doc1.pdf',
+                'chunk_id' => 1,
+                'document_id' => 10,
+                'chunk_index' => 0,
+            ],
+            [
+                'content' => 'ini adalah teks yang sangat panjang dari dokumen kedua dengan detail berbeda',
+                'bm25_score' => 0.8,
+                'filename' => 'doc2.pdf',
+                'chunk_id' => 2,
+                'document_id' => 20,
+                'chunk_index' => 0,
+            ],
+        ];
+
+        $vectorResults = [
+            [
+                'content' => 'ini adalah teks yang sangat panjang dari dokumen pertama dengan detail berbeda',
+                'vector_score' => 0.7,
+                'filename' => 'doc1.pdf',
+                'chunk_id' => 1,
+                'document_id' => 10,
+                'chunk_index' => 0,
+            ],
+            [
+                'content' => 'ini adalah teks yang sangat panjang dari dokumen kedua dengan detail berbeda',
+                'vector_score' => 0.6,
+                'filename' => 'doc2.pdf',
+                'chunk_id' => 2,
+                'document_id' => 20,
+                'chunk_index' => 0,
+            ],
+        ];
+
+        $merged = $method->invoke($service, $bm25Results, $vectorResults, 5);
+
+        $this->assertCount(2, $merged);
+        $filenames = array_column($merged, 'filename');
+        $this->assertContains('doc1.pdf', $filenames);
+        $this->assertContains('doc2.pdf', $filenames);
     }
 }
