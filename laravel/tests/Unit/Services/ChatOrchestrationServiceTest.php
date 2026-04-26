@@ -24,12 +24,14 @@ class ChatOrchestrationServiceTest extends TestCase
         $this->assertSame('assistant', $history[1]['role']);
     }
 
-    public function test_build_history_preserves_additional_message_fields(): void
+    public function test_build_history_strips_database_fields_before_sending_to_ai(): void
     {
         $service = new ChatOrchestrationService();
 
         $messages = [
             [
+                'id' => 10,
+                'conversation_id' => 5,
                 'role' => 'user',
                 'content' => 'Tolong siapkan ringkasan',
                 'metadata' => ['trace_id' => 'abc-123'],
@@ -39,10 +41,12 @@ class ChatOrchestrationServiceTest extends TestCase
 
         $history = $service->buildHistory($messages);
 
-        $this->assertSame($messages[0]['metadata'], $history[0]['metadata']);
-        $this->assertSame($messages[0]['timestamp'], $history[0]['timestamp']);
-        $this->assertSame('user', $history[0]['role']);
-        $this->assertSame('Tolong siapkan ringkasan', $history[0]['content']);
+        $this->assertSame([
+            [
+                'role' => 'user',
+                'content' => 'Tolong siapkan ringkasan',
+            ],
+        ], $history);
     }
 
     public function test_single_document_source_uses_compact_reference_footer(): void
