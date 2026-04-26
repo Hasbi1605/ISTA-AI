@@ -96,84 +96,42 @@ class TextChunker
         return [$text];
     }
 
-    protected function merge(array $segments, string $separator = ''): array
+    protected function merge(array $segments, string $separator = ""): array
     {
-        if (empty($segments)) {
-            return [];
-        }
-
         $chunks = [];
         $currentChunk = "";
         
-        foreach ($segments as $i => $segment) {
-            if ($segment === "" && $i === count($segments) - 1) {
-                continue;
-            }
-            
-            $isLastSegment = ($i === count($segments) - 1);
-            
-            $segmentWithSep = $isLastSegment ? $segment : $segment . $separator;
-            
+        foreach ($segments as $index => $segment) {
             $testChunk = $currentChunk === "" 
-                ? $segmentWithSep 
-                : $currentChunk . $segmentWithSep;
+                ? $segment 
+                : $currentChunk . ($separator !== "" ? $separator : "") . $segment;
             
             $tokens = $this->tokenCounter->count($testChunk);
             
             if ($tokens > $this->chunkSize && $currentChunk !== "") {
                 $chunks[] = $currentChunk;
-                $currentChunk = $segment;
                 
-                if ($this->chunkOverlap > 0 && $i > 0) {
-                    $prevSegment = $segments[$i - 1];
-                    $overlapTokens = $this->tokenCounter->count($prevSegment . $separator);
-                    if ($overlapTokens <= $this->chunkOverlap) {
-                        $currentChunk = $prevSegment . $separator . $segment;
+                $overlapText = "";
+                if ($this->chunkOverlap > 0) {
+                    $currentTokens = $this->tokenCounter->count($currentChunk);
+                    if ($currentTokens <= $this->chunkOverlap) {
+                        $overlapText = $currentChunk;
+                    } else {
+                        $overlapText = $this->getTailText($currentChunk, $this->chunkOverlap);
                     }
                 }
+                
+                $currentChunk = $overlapText . ($separator !== "" ? $separator : "") . $segment;
             } else {
                 $currentChunk = $testChunk;
             }
         }
         
-        if (trim($currentChunk) !== "") {
+        if ($currentChunk !== "") {
             $chunks[] = $currentChunk;
         }
         
-        return array_values(array_filter($chunks, fn($c) => trim($c) !== ""));
-    }
-
-    protected function addOverlap(string $chunk, string $separator = ''): string
-    {
-        if ($this->chunkOverlap <= 0) {
-            return $chunk;
-        }
-
-        return $chunk;
-    }
-
-    public function addOverlapToEnd(string $chunk, array $nextSegments, string $separator = ''): string
-    {
-        if ($this->chunkOverlap <= 0 || empty($nextSegments)) {
-            return $chunk;
-        }
-
-        $overlapTokens = 0;
-        $overlapContent = "";
-        
-        foreach ($nextSegments as $seg) {
-            $segWithSep = ($separator !== "") ? $seg . $separator : $seg;
-            $segTokens = $this->tokenCounter->count($segWithSep);
-            
-            if ($overlapTokens + $segTokens <= $this->chunkOverlap) {
-                $overlapContent .= $segWithSep;
-                $overlapTokens += $segTokens;
-            } else {
-                break;
-            }
-        }
-        
-        return $chunk . trim($overlapContent);
+        return array_values(array_filter($chunks));
     }
 
     protected function hardSplit(string $text): array
@@ -184,5 +142,30 @@ class TextChunker
         $chunks = str_split($text, $charsPerChunk);
         
         return array_values(array_filter($chunks));
+    }
+
+    protected function getTailText(string $text, int $maxTokens): string
+    {
+        $textTokens = $this->tokenCounter->count($text);
+        
+        if ($textTokens <= $maxTokens) {
+            return $text;
+        }
+        
+        $charsPerToken = TokenCounter::CHARS_PER_TOKEN;
+        $targetChars = $maxTokens * $charsPerToken;
+        
+        if ($targetChars >= strlen($text)) {
+            return $text;
+        }
+        
+        $tail = substr($text, -$targetChars);
+        
+        $lastSpace = strrpos($tail, ' ');
+        if ($lastSpace !== false && $lastSpace > 0) {
+            $tail = substr($tail, $lastSpace + 1);
+        }
+        
+        return ltrim($tail) ?: $text;
     }
 }

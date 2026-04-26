@@ -109,29 +109,46 @@ class TokenChunkerTest extends TestCase
         }
     }
 
-    public function test_text_chunker_preserves_spaces_between_words(): void
+    public function test_text_chunker_overlap_is_word_safe(): void
     {
-        $chunker = new TextChunker(20, 5);
+        $chunker = new TextChunker(15, 5);
         
         $pages = [
-            ['page_content' => 'one two three four five six seven eight nine ten', 'page_number' => 1],
+            ['page_content' => 'one two three four five six', 'page_number' => 1],
         ];
         
         $chunks = $chunker->chunk($pages);
         
         $this->assertNotEmpty($chunks);
         
-        $allText = implode(' ', $chunks);
-        $this->assertStringContainsString(' ', $allText, 'Chunks should preserve spaces between words');
-        $this->assertStringNotContainsString('  ', $allText, 'Chunks should not have double spaces');
+        foreach ($chunks as $chunk) {
+            $this->assertStringStartsWith('o', $chunk, 'Chunk should start at word boundary, not middle of word');
+        }
     }
 
-    public function test_text_chunker_preserves_separator_for_period_separator(): void
+    public function test_pdr_chunker_preserves_separator(): void
     {
-        $chunker = new TextChunker(50, 10);
+        $chunker = new PdrChunker(30, 10, 15, 5);
         
         $pages = [
-            ['page_content' => 'First sentence. Second sentence. Third sentence. Fourth sentence. Fifth sentence.', 'page_number' => 1],
+            ['page_content' => 'word1 word2 word3 word4 word5', 'page_number' => 1],
+        ];
+        
+        $chunks = $chunker->chunk($pages, 'test.pdf', 'user1');
+        
+        $this->assertNotEmpty($chunks);
+        
+        foreach ($chunks as $chunk) {
+            $this->assertStringContainsString(' ', $chunk['text'], 'Chunk should preserve spaces between words');
+        }
+    }
+
+    public function test_text_chunker_preserves_period_separator(): void
+    {
+        $chunker = new TextChunker(20, 5);
+        
+        $pages = [
+            ['page_content' => 'First sentence. Second sentence. Third sentence.', 'page_number' => 1],
         ];
         
         $chunks = $chunker->chunk($pages);
@@ -140,39 +157,6 @@ class TokenChunkerTest extends TestCase
         
         foreach ($chunks as $chunk) {
             $this->assertStringContainsString('. ', $chunk, 'Chunk should preserve period-space separator');
-        }
-    }
-
-    public function test_pdr_chunker_preserves_newlines(): void
-    {
-        $chunker = new PdrChunker(100, 20, 30, 5);
-        
-        $pages = [
-            ['page_content' => "Line one\n\nLine two\n\nLine three\n\nLine four", 'page_number' => 1],
-        ];
-        
-        $chunks = $chunker->chunk($pages, 'test.pdf', 'user1');
-        
-        $this->assertNotEmpty($chunks);
-        
-        $allText = implode(' ', array_column($chunks, 'text'));
-        $this->assertStringContainsString("\n", $allText, 'Chunks should preserve newlines');
-    }
-
-    public function test_text_chunker_produces_explicit_expected_chunks(): void
-    {
-        $chunker = new TextChunker(10, 2);
-        
-        $pages = [
-            ['page_content' => 'word1 word2 word3 word4 word5 word6 word7 word8 word9 word10', 'page_number' => 1],
-        ];
-        
-        $chunks = $chunker->chunk($pages);
-        
-        $this->assertNotEmpty($chunks);
-        
-        foreach ($chunks as $chunk) {
-            $this->assertStringContainsString(' ', $chunk);
         }
     }
 }

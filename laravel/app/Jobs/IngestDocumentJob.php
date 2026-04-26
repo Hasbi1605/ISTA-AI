@@ -9,6 +9,7 @@ use App\Services\Document\Chunking\TextChunker;
 use App\Services\Document\Chunking\PdrChunker;
 use App\Services\Document\IngestThrottleService;
 use App\Services\Document\Parsing\DocumentParserFactory;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
@@ -30,8 +31,12 @@ class IngestDocumentJob implements ShouldQueue
     {
     }
 
-    public function handle(): void
+    protected IngestThrottleService $throttleService;
+
+    public function handle(IngestThrottleService $throttleService): void
     {
+        $this->throttleService = $throttleService;
+
         try {
             $this->document->update(['status' => 'processing']);
 
@@ -59,7 +64,7 @@ class IngestDocumentJob implements ShouldQueue
                 throw new Exception('Document chunking produced no chunks');
             }
 
-            $this->persistChunks($chunks);
+            $this->persistChunksWithThrottle($chunks);
 
             $this->document->update(['status' => 'ready']);
 
@@ -144,43 +149,52 @@ class IngestDocumentJob implements ShouldQueue
 
     protected function persistChunks(array $chunks): void
     {
+        $this->persistChunksWithThrottle($chunks);
+    }
+
+    protected function persistChunksWithThrottle(array $chunks): void
+    {
         $tokenCounter = new TokenCounter();
         $embeddingModel = config('ai.rag.embedding_model', 'text-embedding-3-small');
         $embeddingDimensions = config('ai.rag.embedding_dimensions', 1536);
 
         DocumentChunk::where('document_id', $this->document->id)->delete();
 
-        $batch = [];
-        
-        foreach ($chunks as $chunk) {
-            $tokens = $tokenCounter->count($chunk['text']);
-            
-            $batch[] = [
-                'document_id' => $this->document->id,
-                'parent_id' => $chunk['parent_id'],
-                'chunk_type' => $chunk['chunk_type'],
-                'parent_index' => $chunk['parent_index'],
-                'child_index' => $chunk['child_index'] ?? null,
-                'page_number' => 1,
-                'text_content' => $chunk['text'],
-                'embedding' => null,
-                'embedding_model' => $embeddingModel,
-                'embedding_dimensions' => $embeddingDimensions,
-            ];
+        $tokens = array_map(fn($chunk) => $tokenCounter->count($chunk['text']), $chunks);
+        $batches = $this->throttleService->createBatches($chunks, $tokens);
 
-            if (count($batch) >= 100) {
+        foreach ($batches as $batchData) {
+            $batch = [];
+            
+            foreach ($batchData['chunks'] as $chunk) {
+                $batch[] = [
+                    'document_id' => $this->document->id,
+                    'parent_id' => $chunk['parent_id'],
+                    'chunk_type' => $chunk['chunk_type'],
+                    'parent_index' => $chunk['parent_index'],
+                    'child_index' => $chunk['child_index'] ?? null,
+                    'page_number' => 1,
+                    'text_content' => $chunk['text'],
+                    'embedding' => null,
+                    'embedding_model' => $embeddingModel,
+                    'embedding_dimensions' => $embeddingDimensions,
+                ];
+            }
+
+            if (!empty($batch)) {
                 DocumentChunk::insert($batch);
-                $batch = [];
+            }
+
+            $delay = $this->throttleService->getBatchDelay();
+            if ($delay > 0) {
+                usleep((int)($delay * 1000000));
             }
         }
 
-        if (!empty($batch)) {
-            DocumentChunk::insert($batch);
-        }
-
-        Log::info('IngestDocumentJob: persisted chunks', [
+        Log::info('IngestDocumentJob: persisted chunks with throttling', [
             'document_id' => $this->document->id,
             'total_chunks' => count($chunks),
+            'total_batches' => count($batches),
         ]);
     }
 

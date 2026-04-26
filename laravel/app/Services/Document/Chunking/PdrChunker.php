@@ -34,7 +34,7 @@ class PdrChunker
         $this->tokenCounter = new TokenCounter();
     }
 
-    public function chunk(array $pages, string $filename, string $userId): array
+public function chunk(array $pages, string $filename, string $userId): array
     {
         $fullText = $this->mergePages($pages);
         
@@ -42,7 +42,7 @@ class PdrChunker
             Log::warning('PdrChunker: empty content, skipping chunking');
             return [];
         }
-
+        
         $parentChunks = $this->createParentChunks($fullText);
         
         $chunks = [];
@@ -55,6 +55,7 @@ class PdrChunker
                 'chunk_type' => 'parent',
                 'parent_id' => $parentId,
                 'parent_index' => $pIndex,
+                'page_number' => 1,
                 'metadata' => [
                     'filename' => $filename,
                     'user_id' => $userId,
@@ -73,6 +74,7 @@ class PdrChunker
                     'parent_id' => $parentId,
                     'parent_index' => $pIndex,
                     'child_index' => $cIndex,
+                    'page_number' => 1,
                     'metadata' => [
                         'filename' => $filename,
                         'user_id' => $userId,
@@ -164,39 +166,27 @@ class PdrChunker
         return str_split($parentText, $charsPerChunk);
     }
 
-    protected function mergeByTokens(array $segments, int $targetSize, int $overlap, string $separator = ''): array
+    protected function mergeByTokens(array $segments, int $targetSize, int $overlap, string $separator = ""): array
     {
-        if (empty($segments)) {
-            return [];
-        }
-
         $chunks = [];
         $currentChunk = "";
         
-        foreach ($segments as $i => $segment) {
-            if ($segment === "" && $i === count($segments) - 1) {
-                continue;
-            }
-            
-            $isLastSegment = ($i === count($segments) - 1);
-            
-            $segmentWithSep = $isLastSegment ? $segment : $segment . $separator;
-            
+foreach ($segments as $index => $segment) {
             $testChunk = $currentChunk === "" 
-                ? $segmentWithSep 
-                : $currentChunk . $segmentWithSep;
+                ? $segment 
+                : $currentChunk . ($separator !== "" ? $separator : "") . $segment;
             
             $tokens = $this->tokenCounter->count($testChunk);
             
             if ($tokens > $targetSize && $currentChunk !== "") {
                 $chunks[] = trim($currentChunk);
-                $currentChunk = $segment;
                 
-                if ($overlap > 0 && $i > 0) {
-                    $prevSegment = $segments[$i - 1];
-                    $prevWithSep = $prevSegment . $separator . $segment;
-                    $currentChunk = $prevWithSep;
+                $overlapText = "";
+                if ($overlap > 0) {
+                    $overlapText = $this->getTailText($currentChunk, $overlap);
                 }
+                
+                $currentChunk = $overlapText . ($separator !== "" ? $separator : "") . $segment;
             } else {
                 $currentChunk = $testChunk;
             }
@@ -206,7 +196,7 @@ class PdrChunker
             $chunks[] = trim($currentChunk);
         }
         
-        return array_values(array_filter($chunks, fn($c) => trim($c) !== ""));
+        return array_filter($chunks);
     }
 
     protected function generateParentId(string $filename, string $userId, int $index, string $text): string
@@ -214,5 +204,30 @@ class PdrChunker
         $raw = "{$filename}:{$userId}:{$index}:" . substr($text, 0, 50);
         
         return md5($raw);
+    }
+
+    protected function getTailText(string $text, int $maxTokens): string
+    {
+        $textTokens = $this->tokenCounter->count($text);
+        
+        if ($textTokens <= $maxTokens) {
+            return $text;
+        }
+        
+        $charsPerToken = TokenCounter::CHARS_PER_TOKEN;
+        $targetChars = $maxTokens * $charsPerToken;
+        
+        if ($targetChars >= strlen($text)) {
+            return $text;
+        }
+        
+        $tail = substr($text, -$targetChars);
+        
+        $lastSpace = strrpos($tail, ' ');
+        if ($lastSpace !== false && $lastSpace > 0) {
+            $tail = substr($tail, $lastSpace + 1);
+        }
+        
+        return ltrim($tail) ?: $text;
     }
 }

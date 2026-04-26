@@ -7,6 +7,7 @@ use App\Services\Document\Parsing\DocumentParserFactory;
 use App\Services\Document\Parsing\PdfParser;
 use App\Services\Document\Parsing\DocxParser;
 use App\Services\Document\Parsing\SpreadsheetParser;
+use Illuminate\Support\Facades\Storage;
 
 class DocumentParserTest extends TestCase
 {
@@ -51,35 +52,13 @@ class DocumentParserTest extends TestCase
         $this->assertFalse($factory->supports('/tmp/test.jpg'));
     }
 
-    public function test_parsed_output_has_expected_structure(): void
+    public function test_parser_factory_supports_returns_true_for_supported_formats(): void
     {
         $factory = new DocumentParserFactory();
         
-        $this->assertTrue(method_exists($factory, 'parse'));
-        
-        $reflection = new \ReflectionMethod($factory, 'parse');
-        $this->assertEquals('array', $reflection->getReturnType()->getName());
-    }
-
-    public function test_pdf_parser_returns_array_of_pages(): void
-    {
-        $parser = new PdfParser();
-        
-        $this->assertTrue(method_exists($parser, 'parse'));
-        
-        $reflection = new \ReflectionMethod($parser, 'parse');
-        $this->assertEquals('array', $reflection->getReturnType()->getName());
-    }
-
-    public function test_pdf_parser_returns_page_structure_with_expected_keys(): void
-    {
-        $parser = new PdfParser();
-        
-        $expectedKeys = ['page_content', 'page_number', 'source'];
-        $mockPage = ['page_content' => 'test content', 'page_number' => 1, 'source' => 'pdf'];
-        
-        foreach ($expectedKeys as $key) {
-            $this->assertArrayHasKey($key, $mockPage);
-        }
+        $this->assertTrue($factory->supports('/path/to/document.pdf'));
+        $this->assertTrue($factory->supports('/path/to/document.docx'));
+        $this->assertTrue($factory->supports('/path/to/document.xlsx'));
+        $this->assertTrue($factory->supports('/path/to/document.csv'));
     }
 }

@@ -5,11 +5,11 @@ namespace App\Jobs;
 use App\Models\Document;
 use App\Models\DocumentChunk;
 use App\Services\AIRuntimeService;
+use App\Services\Document\Chunking\PdrChunker;
+use App\Services\Document\Chunking\TextChunker;
+use App\Services\Document\Chunking\TokenCounter;
 use App\Services\Document\IngestThrottleService;
 use App\Services\Document\Parsing\DocumentParserFactory;
-use App\Services\Document\Chunking\TokenCounter;
-use App\Services\Document\Chunking\TextChunker;
-use App\Services\Document\Chunking\PdrChunker;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
@@ -129,14 +129,6 @@ class ProcessDocument implements ShouldQueue
             ]);
 
             $chunks = $this->chunkDocument($pages);
-            
-            if (empty($chunks)) {
-                return [
-                    'status' => 'error',
-                    'message' => 'Document chunking produced no chunks',
-                ];
-            }
-
             $this->persistChunks($chunks);
 
             return [
@@ -189,6 +181,12 @@ class ProcessDocument implements ShouldQueue
             }, $texts, array_keys($texts));
         }
 
+        Log::info('ProcessDocument: chunked document', [
+            'document_id' => $this->document->id,
+            'chunks' => count($chunks),
+            'mode' => $usePdr ? 'pdr' : 'standard',
+        ]);
+
         return $chunks;
     }
 
@@ -197,40 +195,73 @@ class ProcessDocument implements ShouldQueue
         $tokenCounter = new TokenCounter();
         $embeddingModel = config('ai.rag.embedding_model', 'text-embedding-3-small');
         $embeddingDimensions = config('ai.rag.embedding_dimensions', 1536);
+        $throttleService = new IngestThrottleService();
+        $usePdr = config('ai.rag.pdr.enabled', true);
 
         DocumentChunk::where('document_id', $this->document->id)->delete();
 
-        $batch = [];
+        $tokens = array_map(fn($chunk) => $tokenCounter->count($chunk['text']), $chunks);
+        $batches = $throttleService->createBatches($chunks, $tokens);
         
-        foreach ($chunks as $chunk) {
-            $tokens = $tokenCounter->count($chunk['text']);
+        $successCount = 0;
+        $documentId = $this->document->id;
+        
+        foreach ($batches as $batchIndex => $batch) {
+            $batchChunk = array_map(function ($chunk) use ($tokenCounter, $embeddingModel, $embeddingDimensions, $throttleService, $documentId) {
+                $tokens = $tokenCounter->count($chunk['text']);
+                return [
+                    'document_id' => $documentId,
+                    'text_content' => $chunk['text'],
+                    'chunk_type' => $chunk['chunk_type'],
+                    'parent_id' => $chunk['parent_id'] ?? null,
+                    'parent_index' => $chunk['parent_index'] ?? null,
+                    'child_index' => $chunk['child_index'] ?? null,
+                    'page_number' => $chunk['page_number'] ?? $chunk['metadata']['page_number'] ?? 1,
+                    'embedding' => null,
+                    'embedding_model' => $embeddingModel,
+                    'embedding_dimensions' => $embeddingDimensions,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            }, $batch['chunks']);
+
+            $attempt = 0;
+            $inserted = false;
             
-            $batch[] = [
-                'document_id' => $this->document->id,
-                'parent_id' => $chunk['parent_id'],
-                'chunk_type' => $chunk['chunk_type'],
-                'parent_index' => $chunk['parent_index'],
-                'child_index' => $chunk['child_index'] ?? null,
-                'page_number' => 1,
-                'text_content' => $chunk['text'],
-                'embedding' => null,
-                'embedding_model' => $embeddingModel,
-                'embedding_dimensions' => $embeddingDimensions,
-            ];
-
-            if (count($batch) >= 100) {
-                DocumentChunk::insert($batch);
-                $batch = [];
+            while (!$inserted && $attempt < $throttleService->getRetryAttempts()) {
+                try {
+                    DocumentChunk::insert($batchChunk);
+                    $inserted = true;
+                    $successCount += count($batchChunk);
+                } catch (\Throwable $e) {
+                    $attempt++;
+                    
+                    if (!$throttleService->shouldRetry($e, $attempt)) {
+                        throw $e;
+                    }
+                    
+                    $delay = $throttleService->getRetryDelay($attempt);
+                    Log::warning('ProcessDocument: batch insert retry', [
+                        'batch' => $batchIndex + 1,
+                        'attempt' => $attempt,
+                        'delay' => $delay,
+                        'error' => $e->getMessage(),
+                    ]);
+                    
+                    usleep((int)($delay * 1000000));
+                }
             }
-        }
-
-        if (!empty($batch)) {
-            DocumentChunk::insert($batch);
+            
+            if ($batchIndex < count($batches) - 1) {
+                usleep((int)($throttleService->getBatchDelay() * 1000000));
+            }
         }
 
         Log::info('ProcessDocument: persisted chunks', [
             'document_id' => $this->document->id,
-            'total_chunks' => count($chunks),
+            'chunks' => $successCount,
+            'batches' => count($batches),
+            'mode' => $usePdr ? 'pdr' : 'standard',
         ]);
     }
 
