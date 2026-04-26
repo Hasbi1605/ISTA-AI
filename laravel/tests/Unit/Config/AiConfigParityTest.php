@@ -73,4 +73,58 @@ class AiConfigParityTest extends TestCase
         $this->assertSame(587, (int) $gmail['port']);
         $this->assertSame('tls', $gmail['encryption']);
     }
+
+    public function test_rag_batching_keys_exist(): void
+    {
+        $this->assertNotNull(config('ai.rag.batching.batch_size'));
+        $this->assertNotNull(config('ai.rag.batching.max_tokens_per_batch'));
+        $this->assertNotNull(config('ai.rag.batching.delay_seconds'));
+        $this->assertNotNull(config('ai.rag.batching.retry_attempts'));
+        $this->assertNotNull(config('ai.rag.batching.retry_delay_base'));
+    }
+
+    public function test_ocr_keys_exist(): void
+    {
+        $this->assertTrue((bool) config('ai.ocr.enabled'));
+        $this->assertSame('tesseract', config('ai.ocr.tesseract_path'));
+        $this->assertTrue((bool) config('ai.ocr.fallback_to_tesseract'));
+    }
+
+    public function test_vision_cascade_has_nodes(): void
+    {
+        $nodes = config('ai.vision_cascade.nodes');
+
+        $this->assertIsArray($nodes);
+        $this->assertNotEmpty($nodes);
+        foreach ($nodes as $node) {
+            $this->assertArrayHasKey('label', $node);
+            $this->assertArrayHasKey('provider', $node);
+            $this->assertArrayHasKey('model', $node);
+            $this->assertArrayHasKey('base_url', $node);
+        }
+    }
+
+    public function test_chat_cascade_nodes_all_have_base_url(): void
+    {
+        $nodes = config('ai.cascade.nodes');
+
+        $this->assertIsArray($nodes);
+        $this->assertNotEmpty($nodes);
+        foreach ($nodes as $node) {
+            $this->assertArrayHasKey(
+                'base_url',
+                $node,
+                "Cascade node '{$node['label']}' must have base_url to avoid defaulting to OpenAI URL"
+            );
+            $this->assertNotEmpty($node['base_url']);
+        }
+    }
+
+    public function test_summarization_single_template_has_document_placeholder(): void
+    {
+        $single = config('ai.prompts.summarization.single');
+
+        $this->assertIsString($single);
+        $this->assertStringContainsString('{document}', $single);
+    }
 }

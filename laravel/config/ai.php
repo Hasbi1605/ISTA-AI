@@ -82,8 +82,9 @@ return [
             [
                 'label' => 'Gemini 3 Flash',
                 'provider' => 'gemini',
-                'model' => 'gemini-3-flash-preview',
+                'model' => env('AI_CASCADE_GEMINI_MODEL', 'gemini-1.5-flash'),
                 'api_key' => env('GEMINI_API_KEY'),
+                'base_url' => env('AI_CASCADE_GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta/openai'),
             ],
         ],
     ],
@@ -133,6 +134,15 @@ return [
         'embedding_model' => env('RAG_EMBEDDING_MODEL', 'text-embedding-3-small'),
         'embedding_dimensions' => env('RAG_EMBEDDING_DIMENSIONS', 1536),
 
+        'batching' => [
+            'enabled' => env('RAG_BATCHING_ENABLED', true),
+            'batch_size' => env('RAG_BATCH_SIZE', 100),
+            'max_tokens_per_batch' => env('RAG_MAX_TOKENS_PER_BATCH', 40000),
+            'delay_seconds' => env('RAG_BATCH_DELAY', 0.8),
+            'retry_attempts' => env('RAG_BATCH_RETRY', 3),
+            'retry_delay_base' => env('RAG_BATCH_RETRY_DELAY', 1.0),
+        ],
+
         'hybrid' => [
             'enabled' => env('RAG_HYBRID_ENABLED', true),
             'bm25_weight' => env('RAG_BM25_WEIGHT', 0.3),
@@ -152,6 +162,59 @@ return [
             'mode' => env('RAG_HYDE_MODE', 'smart'),
             'timeout' => env('RAG_HYDE_TIMEOUT', 5),
             'max_tokens' => env('RAG_HYDE_MAX_TOKENS', 100),
+        ],
+    ],
+
+    'ocr' => [
+        'enabled' => env('AI_OCR_ENABLED', true),
+        'min_text_length' => (int) env('AI_OCR_MIN_TEXT_LENGTH', 50),
+        'sample_pages' => (int) env('AI_OCR_SAMPLE_PAGES', 3),
+        'tesseract_path' => env('TESSERACT_PATH', 'tesseract'),
+        'fallback_to_tesseract' => env('AI_OCR_FALLBACK_TESSERACT', true),
+        'image_dpi' => (int) env('AI_OCR_IMAGE_DPI', 200),
+        'image_format' => env('AI_OCR_IMAGE_FORMAT', 'png'),
+        'max_pages' => (int) env('AI_OCR_MAX_PAGES', 20),
+    ],
+
+    'vision_cascade' => [
+        'enabled' => env('AI_VISION_CASCADE_ENABLED', true),
+        'max_pages' => (int) env('AI_VISION_MAX_PAGES', 20),
+        'nodes' => [
+            [
+                'label' => 'GPT-4.1 Vision (Primary)',
+                'provider' => 'openai',
+                'model' => env('AI_VISION_MODEL_PRIMARY', 'gpt-4.1'),
+                'api_key' => env('GITHUB_TOKEN'),
+                'base_url' => env('AI_VISION_BASE_URL_PRIMARY', 'https://models.inference.ai.azure.com'),
+            ],
+            [
+                'label' => 'GPT-4.1 Vision (Backup)',
+                'provider' => 'openai',
+                'model' => env('AI_VISION_MODEL_PRIMARY', 'gpt-4.1'),
+                'api_key' => env('GITHUB_TOKEN_2'),
+                'base_url' => env('AI_VISION_BASE_URL_PRIMARY', 'https://models.inference.ai.azure.com'),
+            ],
+            [
+                'label' => 'GPT-4o Vision (Primary)',
+                'provider' => 'openai',
+                'model' => env('AI_VISION_MODEL_BACKUP', 'gpt-4o'),
+                'api_key' => env('GITHUB_TOKEN'),
+                'base_url' => env('AI_VISION_BASE_URL_PRIMARY', 'https://models.inference.ai.azure.com'),
+            ],
+            [
+                'label' => 'GPT-4o Vision (Backup)',
+                'provider' => 'openai',
+                'model' => env('AI_VISION_MODEL_BACKUP', 'gpt-4o'),
+                'api_key' => env('GITHUB_TOKEN_2'),
+                'base_url' => env('AI_VISION_BASE_URL_PRIMARY', 'https://models.inference.ai.azure.com'),
+            ],
+            [
+                'label' => 'Gemini Vision (Fallback)',
+                'provider' => 'gemini',
+                'model' => env('AI_VISION_MODEL_GEMINI', 'gemini-1.5-flash'),
+                'api_key' => env('GEMINI_API_KEY'),
+                'base_url' => env('AI_VISION_BASE_URL_GEMINI', 'https://generativelanguage.googleapis.com/v1beta/openai'),
+            ],
         ],
     ],
 
@@ -279,6 +342,9 @@ PROMPT,
             'instructions' => 'Anda adalah asisten AI yang merangkum dokumen. Berikan ringkasan singkat dan akurat dalam Bahasa Indonesia.',
             'single' => <<<'PROMPT'
 Ringkas dokumen berikut untuk kebutuhan kerja internal.
+
+Dokumen:
+{document}
 
 Tulis dalam Bahasa Indonesia dengan format berikut:
 
