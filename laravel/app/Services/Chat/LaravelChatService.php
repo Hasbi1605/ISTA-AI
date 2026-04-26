@@ -340,6 +340,11 @@ class LaravelChatService
 
     protected function getSystemPrompt(): string
     {
+        $configured = config('ai.prompts.system.default');
+        if (is_string($configured) && trim($configured) !== '') {
+            return $configured;
+        }
+
         return <<<'PROMPT'
 Anda adalah asisten AI yang helpful dan informative. 
 Selalu berikan jawaban yang akurat, jelas, dan relevan.
@@ -349,6 +354,11 @@ PROMPT;
 
     protected function getWebSearchPrompt(): string
     {
+        $configured = config('ai.prompts.web_search.assertive_instruction');
+        if (is_string($configured) && trim($configured) !== '') {
+            return $configured;
+        }
+
         return <<<'PROMPT'
 Anda adalah asisten AI yang helpful dan informative. 
 Selalu berikan jawaban yang akurat, jelas, dan relevan berdasarkan hasil pencarian web terkini.

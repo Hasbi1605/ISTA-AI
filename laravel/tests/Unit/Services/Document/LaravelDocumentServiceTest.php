@@ -101,6 +101,26 @@ class LaravelDocumentServiceTest extends TestCase
         $this->assertIsBool($result);
     }
 
+    public function test_summarization_prompt_keys_exist_in_config(): void
+    {
+        // Pastikan kunci config yang dipakai LaravelDocumentService::summarizeDocument
+        // ada secara default setelah migrasi parity #99 (mencegah regresi diam-diam
+        // ketika prompt di-rename atau dihapus).
+        $instructions = config('ai.prompts.summarization.instructions');
+        $single = config('ai.prompts.summarization.single');
+        $partial = config('ai.prompts.summarization.partial');
+        $final = config('ai.prompts.summarization.final');
+
+        $this->assertIsString($instructions);
+        $this->assertNotEmpty($instructions);
+        $this->assertIsString($single);
+        $this->assertStringContainsString('Ringkasan inti', $single);
+        $this->assertIsString($partial);
+        $this->assertStringContainsString('{part_number}', $partial);
+        $this->assertIsString($final);
+        $this->assertStringContainsString('{combined_summaries}', $final);
+    }
+
     public function test_summarize_returns_sources_metadata(): void
     {
         Config::set('ai.laravel_ai.api_key', 'test-key');
