@@ -19,13 +19,22 @@ class EmbeddingCascadeService
      * Embed text inputs using cascade fallback.
      *
      * @param array $inputs
+     * @param string|null $targetModel
      * @return EmbeddingsResponse
      * @throws \Exception
      */
-    public function embed(array $inputs): EmbeddingsResponse
+    public function embed(array $inputs, ?string $targetModel = null): EmbeddingsResponse
     {
         $nodes = config('ai.embedding_cascade.nodes', []);
         $enabled = config('ai.embedding_cascade.enabled', true);
+
+        if ($targetModel) {
+            // Filter nodes to only those matching targetModel
+            $nodes = array_filter($nodes, fn($n) => $n['model'] === $targetModel);
+            if (empty($nodes)) {
+                Log::warning("EmbeddingCascade: Forced model {$targetModel} not found in cascade nodes.");
+            }
+        }
 
         if (!$enabled || empty($nodes)) {
             // Fallback to default provider
