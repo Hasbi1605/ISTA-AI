@@ -340,7 +340,7 @@ class LaravelDocumentService
 
         $prompt = new AgentPrompt(
             agent: $agent,
-            prompt: 'Rangkum bagian dokumen berikut dengan detail dan akurat: ' . $content,
+            prompt: $this->buildSummarizationPrompt($content),
             attachments: [],
             provider: $provider,
             model: $node['model'],
@@ -357,13 +357,27 @@ class LaravelDocumentService
 
         $result = $defaultProvider->prompt(new AgentPrompt(
             agent: $agent,
-            prompt: 'Rangkum bagian dokumen berikut dengan detail dan akurat: ' . $content,
+            prompt: $this->buildSummarizationPrompt($content),
             attachments: [],
             provider: $defaultProvider,
             model: $this->model,
         ));
 
         return $result->text ?? '';
+    }
+
+    protected function buildSummarizationPrompt(string $content): string
+    {
+        $template = config('ai.prompts.summarization.partial');
+        if (is_string($template) && trim($template) !== '') {
+            return str_replace(
+                ['{batch}', '{part_number}', '{total_parts}'],
+                [$content, '1', '1'],
+                $template
+            );
+        }
+
+        return 'Rangkum bagian dokumen berikut dengan detail dan akurat: ' . $content;
     }
 
     public function deleteDocument(string $filename, ?string $userId = null): bool
