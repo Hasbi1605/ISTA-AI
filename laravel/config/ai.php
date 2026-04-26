@@ -132,6 +132,20 @@ return [
         'chunk_overlap' => env('RAG_CHUNK_OVERLAP', 100),
         'embedding_model' => env('RAG_EMBEDDING_MODEL', 'text-embedding-3-small'),
         'embedding_dimensions' => env('RAG_EMBEDDING_DIMENSIONS', 1536),
+
+        'hybrid' => [
+            'enabled' => env('RAG_HYBRID_ENABLED', true),
+            'bm25_weight' => env('RAG_BM25_WEIGHT', 0.3),
+            'rrf_k' => env('RAG_RRF_K', 60),
+        ],
+
+        'pdr' => [
+            'enabled' => env('RAG_PDR_ENABLED', true),
+            'child_chunk_size' => env('RAG_PDR_CHILD_SIZE', 256),
+            'child_chunk_overlap' => env('RAG_PDR_CHILD_OVERLAP', 32),
+            'parent_chunk_size' => env('RAG_PDR_PARENT_SIZE', 1500),
+            'parent_chunk_overlap' => env('RAG_PDR_PARENT_OVERLAP', 200),
+        ],
     ],
 
     'prompts' => [
