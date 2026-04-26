@@ -2,7 +2,7 @@
 
 namespace Tests\Unit\Services\Document;
 
-use PHPUnit\Framework\TestCase;
+use Tests\TestCase;
 use App\Services\Document\IngestThrottleService;
 
 class IngestThrottleServiceTest extends TestCase
@@ -50,7 +50,7 @@ class IngestThrottleServiceTest extends TestCase
     {
         $service = new IngestThrottleService();
         
-        $error = new \Exception('Service unavailable: Resource exhausted');
+        $error = new \Exception('Service unavailable: resource_exhausted');
         
         $this->assertTrue($service->isRateLimitError($error));
     }

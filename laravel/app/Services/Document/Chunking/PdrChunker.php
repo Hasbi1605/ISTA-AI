@@ -130,7 +130,7 @@ class PdrChunker
             }
             
             $segments = explode($separator, $text);
-            $chunks = $this->mergeByTokens($segments, $this->parentChunkSize, $this->parentChunkOverlap);
+            $chunks = $this->mergeByTokens($segments, $this->parentChunkSize, $this->parentChunkOverlap, $separator);
             
             if (count($chunks) > 1) {
                 return $chunks;
@@ -152,7 +152,7 @@ class PdrChunker
             }
             
             $segments = explode($separator, $parentText);
-            $chunks = $this->mergeByTokens($segments, $this->childChunkSize, $this->childChunkOverlap);
+            $chunks = $this->mergeByTokens($segments, $this->childChunkSize, $this->childChunkOverlap, $separator);
             
             if (count($chunks) > 1) {
                 return $chunks;
@@ -164,21 +164,39 @@ class PdrChunker
         return str_split($parentText, $charsPerChunk);
     }
 
-    protected function mergeByTokens(array $segments, int $targetSize, int $overlap): array
+    protected function mergeByTokens(array $segments, int $targetSize, int $overlap, string $separator = ''): array
     {
+        if (empty($segments)) {
+            return [];
+        }
+
         $chunks = [];
         $currentChunk = "";
         
-        foreach ($segments as $segment) {
-            $testChunk = $currentChunk === "" ? $segment : $currentChunk . $segment;
+        foreach ($segments as $i => $segment) {
+            if ($segment === "" && $i === count($segments) - 1) {
+                continue;
+            }
+            
+            $isLastSegment = ($i === count($segments) - 1);
+            
+            $segmentWithSep = $isLastSegment ? $segment : $segment . $separator;
+            
+            $testChunk = $currentChunk === "" 
+                ? $segmentWithSep 
+                : $currentChunk . $segmentWithSep;
             
             $tokens = $this->tokenCounter->count($testChunk);
             
             if ($tokens > $targetSize && $currentChunk !== "") {
                 $chunks[] = trim($currentChunk);
+                $currentChunk = $segment;
                 
-                $prevKey = array_search($segment, $segments) - 1;
-                $currentChunk = $segments[$prevKey] ?? $segment;
+                if ($overlap > 0 && $i > 0) {
+                    $prevSegment = $segments[$i - 1];
+                    $prevWithSep = $prevSegment . $separator . $segment;
+                    $currentChunk = $prevWithSep;
+                }
             } else {
                 $currentChunk = $testChunk;
             }
@@ -188,7 +206,7 @@ class PdrChunker
             $chunks[] = trim($currentChunk);
         }
         
-        return array_filter($chunks);
+        return array_values(array_filter($chunks, fn($c) => trim($c) !== ""));
     }
 
     protected function generateParentId(string $filename, string $userId, int $index, string $text): string
