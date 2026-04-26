@@ -50,7 +50,7 @@ class IngestThrottleServiceTest extends TestCase
     {
         $service = new IngestThrottleService();
         
-        $error = new \Exception('Service unavailable: Resource exhausted');
+        $error = new \Exception('Service unavailable: resource_exhausted');
         
         $this->assertTrue($service->isRateLimitError($error));
     }
