@@ -9,14 +9,6 @@ use App\Services\LangSearchService;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
-use Laravel\Ai\AiManager;
-use Laravel\Ai\Contracts\Providers\TextProvider;
-use Laravel\Ai\Prompts\AgentPrompt;
-use Laravel\Ai\Responses\Data\Meta;
-use Laravel\Ai\Responses\Data\UrlCitation;
-use Laravel\Ai\Responses\StreamableAgentResponse;
-use Laravel\Ai\Streaming\Events\TextDelta;
-use Laravel\Ai\Streaming\Events\Citation;
 use Mockery;
 use Tests\TestCase;
 
@@ -173,38 +165,6 @@ class LaravelChatServiceTest extends TestCase
         $this->assertStringNotContainsString('dokumen aktif belum tersedia', $output);
     }
 
-    public function test_stream_parsing_handles_text_delta(): void
-    {
-        $event = new TextDelta(
-            id: '1',
-            messageId: 'msg1',
-            delta: 'Hello',
-            timestamp: time()
-        );
-
-        $this->assertInstanceOf(TextDelta::class, $event);
-        $this->assertEquals('Hello', $event->delta);
-    }
-
-    public function test_citation_emits_source_metadata(): void
-    {
-        $citationData = new UrlCitation(
-            title: 'Test Title',
-            url: 'https://example.com'
-        );
-
-        $event = new Citation(
-            id: '1',
-            messageId: 'msg1',
-            citation: $citationData,
-            timestamp: time()
-        );
-
-        $this->assertInstanceOf(Citation::class, $event);
-        $this->assertEquals('Test Title', $event->citation->title);
-        $this->assertEquals('https://example.com', $event->citation->url);
-    }
-
     public function test_chat_with_documents_success_uses_rag_prompt_and_document_sources(): void
     {
         $this->setUpLaravelAIConfig();
@@ -235,24 +195,15 @@ class LaravelChatServiceTest extends TestCase
             'reason_code' => 'DOC_NO_WEB',
         ]);
 
-        $provider = Mockery::mock(TextProvider::class);
-        $provider->shouldReceive('stream')
-            ->once()
-            ->with(Mockery::on(function ($prompt) {
-                return $prompt instanceof AgentPrompt
-                    && $prompt->prompt === 'RAG_CONTEXT_PROMPT';
-            }))
-            ->andReturn($this->streamableResponseFromEvents([
-                new TextDelta(id: '1', messageId: 'm1', delta: 'Jawaban grounded', timestamp: time()),
-            ]));
-
-        $ai = Mockery::mock(AiManager::class);
-        $ai->shouldReceive('textProviderFor')->andReturn($provider);
-        $ai->shouldReceive('textProvider')->zeroOrMoreTimes()->andReturn($provider);
+        Http::fake([
+            'api.openai.com/v1/chat/completions' => Http::response(
+                $this->sseBody(['Jawaban grounded']),
+                200
+            ),
+        ]);
 
         $this->app->instance(LaravelDocumentRetrievalService::class, $retrieval);
         $this->app->instance(DocumentPolicyService::class, $policy);
-        $this->app->instance(AiManager::class, $ai);
 
         $service = new LaravelChatService();
         $result = $service->chat(
@@ -261,11 +212,13 @@ class LaravelChatServiceTest extends TestCase
             '1'
         );
 
-        $output = implode('', iterator_to_array($result));
+        $output = $this->collectStream($result);
 
+        $this->assertStringContainsString('[MODEL:Default]', $output);
         $this->assertStringContainsString('Jawaban grounded', $output);
         $this->assertStringContainsString('[SOURCES:', $output);
         $this->assertStringContainsString('doc1.pdf', $output);
+        Http::assertSent(fn ($r) => str_contains($r->url(), '/chat/completions'));
     }
 
     public function test_chat_with_documents_web_fallback_normalizes_stream_and_citations(): void
@@ -286,6 +239,10 @@ class LaravelChatServiceTest extends TestCase
                     ]
                 ]
             ], 200),
+            'api.openai.com/v1/chat/completions' => Http::response(
+                $this->sseBody(['Jawaban dari web']),
+                200
+            ),
         ]);
 
         $retrieval = Mockery::mock(LaravelDocumentRetrievalService::class);
@@ -303,27 +260,8 @@ class LaravelChatServiceTest extends TestCase
             'reason_code' => 'DOC_WEB_EXPLICIT',
         ]);
 
-        $provider = Mockery::mock(TextProvider::class);
-        $provider->shouldReceive('stream')
-            ->once()
-            ->with(Mockery::type(AgentPrompt::class))
-            ->andReturn($this->streamableResponseFromEvents([
-                new TextDelta(id: '2', messageId: 'm2', delta: 'Jawaban dari web', timestamp: time()),
-                new Citation(
-                    id: '3',
-                    messageId: 'm2',
-                    citation: new UrlCitation(title: 'Web Ref', url: 'https://example.com/ref'),
-                    timestamp: time()
-                ),
-            ]));
-
-        $ai = Mockery::mock(AiManager::class);
-        $ai->shouldReceive('textProviderFor')->andReturn($provider);
-        $ai->shouldReceive('textProvider')->zeroOrMoreTimes()->andReturn($provider);
-
         $this->app->instance(LaravelDocumentRetrievalService::class, $retrieval);
         $this->app->instance(DocumentPolicyService::class, $policy);
-        $this->app->instance(AiManager::class, $ai);
 
         Cache::flush();
         
@@ -334,7 +272,7 @@ class LaravelChatServiceTest extends TestCase
             '1'
         );
 
-        $output = implode('', iterator_to_array($result));
+        $output = $this->collectStream($result);
 
         $this->assertStringContainsString('Jawaban dari web', $output);
         $this->assertStringContainsString('[SOURCES:', $output);
@@ -342,20 +280,100 @@ class LaravelChatServiceTest extends TestCase
         $this->assertStringContainsString('example.com\\/ref', $output);
     }
 
-    private function streamFromEvents(array $events): \Generator
+    public function test_chat_streams_from_chat_completions_endpoint_on_default_node(): void
     {
-        foreach ($events as $event) {
-            yield $event;
-        }
+        $this->setUpLaravelAIConfig();
+        Config::set('ai.cascade.enabled', false);
+        Config::set('ai.langsearch.api_key', null);
+        Config::set('ai.langsearch.api_key_backup', null);
+
+        Http::fake([
+            'api.openai.com/v1/chat/completions' => Http::response(
+                $this->sseBody(['Hello ', 'world']),
+                200
+            ),
+        ]);
+
+        $service = new LaravelChatService();
+        $generator = $service->chat([['role' => 'user', 'content' => 'hi']], null, '1');
+        $output = $this->collectStream($generator);
+
+        $this->assertStringContainsString('[MODEL:Default]', $output);
+        $this->assertStringContainsString('Hello world', $output);
+        Http::assertSent(fn ($r) => str_ends_with($r->url(), '/chat/completions'));
+        Http::assertNotSent(fn ($r) => str_contains($r->url(), '/responses'));
     }
 
-    private function streamableResponseFromEvents(array $events): StreamableAgentResponse
+    public function test_cascade_falls_back_to_backup_node_on_primary_failure(): void
     {
-        return new StreamableAgentResponse(
-            invocationId: 'test-invocation',
-            generator: fn () => $this->streamFromEvents($events),
-            meta: new Meta(provider: 'test', model: 'test-model')
-        );
+        $this->setUpLaravelAIConfig();
+        Config::set('ai.cascade.enabled', true);
+        Config::set('ai.cascade.nodes', [
+            [
+                'label' => 'Primary',
+                'provider' => 'openai',
+                'model' => 'gpt-4o-mini',
+                'api_key' => 'primary-key',
+                'base_url' => 'https://primary.example.com/v1',
+            ],
+            [
+                'label' => 'Backup',
+                'provider' => 'openai',
+                'model' => 'gpt-4o-mini',
+                'api_key' => 'backup-key',
+                'base_url' => 'https://backup.example.com/v1',
+            ],
+        ]);
+        Config::set('ai.langsearch.api_key', null);
+        Config::set('ai.langsearch.api_key_backup', null);
+
+        Http::fake([
+            'primary.example.com/v1/chat/completions' => Http::response('upstream error', 503),
+            'backup.example.com/v1/chat/completions' => Http::response(
+                $this->sseBody(['from backup']),
+                200
+            ),
+        ]);
+
+        $service = new LaravelChatService();
+        $generator = $service->chat([['role' => 'user', 'content' => 'hi']], null, '1');
+        $output = $this->collectStream($generator);
+
+        $this->assertStringContainsString('[MODEL:Primary]', $output);
+        $this->assertStringContainsString('[MODEL:Backup]', $output);
+        $this->assertStringContainsString('from backup', $output);
+    }
+
+    /**
+     * Collect all chunks from a chat stream into a single string.
+     * Uses foreach (not iterator_to_array) to avoid integer-key collisions
+     * between the outer generator and the nested `yield from` generators.
+     */
+    private function collectStream(\Generator $stream): string
+    {
+        $output = '';
+        foreach ($stream as $chunk) {
+            $output .= $chunk;
+        }
+        return $output;
+    }
+
+    /**
+     * Build a Server-Sent Events body containing OpenAI-style chat-completion deltas
+     * followed by the [DONE] terminator. Used by Http::fake() to simulate the
+     * /chat/completions streaming response.
+     */
+    private function sseBody(array $deltas): string
+    {
+        $body = '';
+        foreach ($deltas as $delta) {
+            $payload = json_encode([
+                'choices' => [['delta' => ['content' => $delta]]],
+            ]);
+            $body .= "data: {$payload}\n\n";
+        }
+        $body .= "data: [DONE]\n\n";
+        return $body;
     }
 
     public function test_perform_lang_search_returns_results_with_rerank(): void
@@ -427,6 +445,7 @@ class LaravelChatServiceTest extends TestCase
     public function test_perform_lang_search_returns_empty_when_not_configured(): void
     {
         Config::set('ai.langsearch.api_key', null);
+        Config::set('ai.langsearch.api_key_backup', null);
         
         $service = new LaravelChatService();
         $results = $service->performLangSearch('test query');

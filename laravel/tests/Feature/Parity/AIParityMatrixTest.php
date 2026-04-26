@@ -31,19 +31,16 @@ class AIParityMatrixTest extends TestCase
     {
         config(['ai.cascade.enabled' => true]);
         config(['ai.cascade.nodes' => [
-            ['label' => 'Primary', 'provider' => 'openai', 'model' => 'gpt-4', 'api_key' => 'key1'],
-            ['label' => 'Backup', 'provider' => 'openai', 'model' => 'gpt-4o', 'api_key' => 'key2'],
+            ['label' => 'Primary', 'provider' => 'openai', 'model' => 'gpt-4', 'api_key' => 'key1', 'base_url' => 'https://primary.test/v1'],
+            ['label' => 'Backup', 'provider' => 'openai', 'model' => 'gpt-4o', 'api_key' => 'key2', 'base_url' => 'https://backup.test/v1'],
         ]]);
+        Config::set('ai.langsearch.api_key', null);
+        Config::set('ai.langsearch.api_key_backup', null);
 
-        // Mock failure on first node, success on second
-        \Laravel\Ai\AnonymousAgent::fake(function ($prompt) {
-            static $calls = 0;
-            $calls++;
-            if ($calls === 1) {
-                throw new \Exception('429 Rate Limit');
-            }
-            return 'Hello from backup';
-        });
+        Http::fake([
+            'primary.test/v1/chat/completions' => Http::response('rate limited', 429),
+            'backup.test/v1/chat/completions' => Http::response($this->sseChatBody(['Hello from backup']), 200),
+        ]);
 
         $service = new \App\Services\Chat\LaravelChatService();
         $generator = $service->chat([['role' => 'user', 'content' => 'hi']]);
@@ -66,13 +63,16 @@ class AIParityMatrixTest extends TestCase
     {
         config(['ai.cascade.enabled' => true]);
         config(['ai.cascade.nodes' => [
-            ['label' => 'Node1', 'provider' => 'openai', 'model' => 'gpt-4', 'api_key' => 'key1'],
-            ['label' => 'Node2', 'provider' => 'openai', 'model' => 'gpt-4', 'api_key' => 'key2'],
+            ['label' => 'Node1', 'provider' => 'openai', 'model' => 'gpt-4', 'api_key' => 'key1', 'base_url' => 'https://n1.test/v1'],
+            ['label' => 'Node2', 'provider' => 'openai', 'model' => 'gpt-4', 'api_key' => 'key2', 'base_url' => 'https://n2.test/v1'],
         ]]);
+        Config::set('ai.langsearch.api_key', null);
+        Config::set('ai.langsearch.api_key_backup', null);
 
-        \Laravel\Ai\AnonymousAgent::fake(function ($prompt) {
-            throw new \Exception('500 Service Unavailable');
-        });
+        Http::fake([
+            'n1.test/v1/chat/completions' => Http::response('boom', 500),
+            'n2.test/v1/chat/completions' => Http::response('boom', 500),
+        ]);
 
         $service = new \App\Services\Chat\LaravelChatService();
         $output = '';
@@ -92,43 +92,38 @@ class AIParityMatrixTest extends TestCase
     {
         config(['ai.cascade.enabled' => true]);
         config(['ai.cascade.nodes' => [
-            ['label' => 'Node1', 'provider' => 'openai', 'model' => 'gpt-4', 'api_key' => 'key1'],
-            ['label' => 'Node2', 'provider' => 'openai', 'model' => 'gpt-4', 'api_key' => 'key2'],
+            ['label' => 'Node1', 'provider' => 'openai', 'model' => 'gpt-4', 'api_key' => 'key1', 'base_url' => 'https://n1.test/v1'],
+            ['label' => 'Node2', 'provider' => 'openai', 'model' => 'gpt-4', 'api_key' => 'key2', 'base_url' => 'https://n2.test/v1'],
         ]]);
-
-        // Test 413
-        \Laravel\Ai\AnonymousAgent::fake(function ($prompt) {
-            static $calls = 0;
-            $calls++;
-            if ($calls % 2 !== 0) {
-                throw new \Exception('413 Request Entity Too Large');
-            }
-            return 'Handled 413';
-        });
+        Config::set('ai.langsearch.api_key', null);
+        Config::set('ai.langsearch.api_key_backup', null);
 
         $service = new \App\Services\Chat\LaravelChatService();
-        
+        $sseBody = $this->sseChatBody(['Handled fallback']);
+
+        // Phase 1: Node1 returns 413 -> Node2 succeeds.
+        // Use callables so each invocation produces a fresh Response with a fresh
+        // body stream (Http::response() builds it once and reuses it).
+        Http::fake([
+            'n1.test/v1/chat/completions' => fn () => Http::response('too large', 413),
+            'n2.test/v1/chat/completions' => fn () => Http::response($sseBody, 200),
+        ]);
         $output = '';
         foreach ($service->chat([['role' => 'user', 'content' => 'long prompt']]) as $chunk) {
             $output .= $chunk;
         }
-        $this->assertStringContainsString('Handled 413', $output);
+        $this->assertStringContainsString('Handled fallback', $output);
 
-        // Test 429
-        \Laravel\Ai\AnonymousAgent::fake(function ($prompt) {
-            static $calls = 0;
-            $calls++;
-            if ($calls % 2 !== 0) {
-                throw new \Exception('429 Too Many Requests');
-            }
-            return 'Handled 429';
-        });
-
+        // Phase 2: Node1 returns 429 -> Node2 succeeds.
+        Http::fake([
+            'n1.test/v1/chat/completions' => fn () => Http::response('rate limit', 429),
+            'n2.test/v1/chat/completions' => fn () => Http::response($sseBody, 200),
+        ]);
         $output = '';
         foreach ($service->chat([['role' => 'user', 'content' => 'fast prompt']]) as $chunk) {
             $output .= $chunk;
         }
-        $this->assertStringContainsString('Handled 429', $output);
+        $this->assertStringContainsString('Handled fallback', $output);
     }
 
     #[Test]
@@ -136,9 +131,14 @@ class AIParityMatrixTest extends TestCase
     #[Group('chat')]
     public function it_injects_model_marker_in_stream()
     {
-        \Laravel\Ai\AnonymousAgent::fake(function ($prompt) {
-            return 'Response content';
-        });
+        config(['ai.cascade.enabled' => false]);
+        Config::set('ai.laravel_ai.api_key', 'test-key');
+        Config::set('ai.langsearch.api_key', null);
+        Config::set('ai.langsearch.api_key_backup', null);
+
+        Http::fake([
+            'api.openai.com/v1/chat/completions' => Http::response($this->sseChatBody(['Response content']), 200),
+        ]);
 
         $service = new \App\Services\Chat\LaravelChatService();
         $output = '';
@@ -176,23 +176,44 @@ class AIParityMatrixTest extends TestCase
     #[Group('web')]
     public function it_supports_langsearch_semantic_rerank()
     {
+        Config::set('ai.langsearch.rerank_url', 'https://api.langsearch.com/v1/rerank');
+
         Http::fake([
-            'api.langsearch.com/*' => Http::response([
-                'code' => 200,
+            'api.langsearch.com/v1/rerank' => Http::response([
                 'results' => [
-                    ['index' => 1, 'relevance_score' => 0.9],
-                    ['index' => 0, 'relevance_score' => 0.4],
+                    ['index' => 1, 'document' => ['url' => 'https://b.com'], 'relevance_score' => 0.9],
+                    ['index' => 0, 'document' => ['url' => 'https://a.com'], 'relevance_score' => 0.8],
                 ],
             ], 200),
         ]);
+        Cache::flush();
 
         $service = new \App\Services\LangSearchService();
+        $result = $service->rerank(
+            'test query',
+            [
+                ['title' => 'A', 'snippet' => 'Desc A', 'url' => 'https://a.com'],
+                ['title' => 'B', 'snippet' => 'Desc B', 'url' => 'https://b.com'],
+            ]
+        );
 
-        $result = $service->rerank('test query', ['doc1', 'doc2']);
+        $this->assertNotNull($result);
+        $this->assertCount(2, $result);
+        $this->assertSame(0.9, $result[0]['relevance_score']);
+    }
 
-        $this->assertIsArray($result);
-        $this->assertNotEmpty($result);
-        $this->assertArrayHasKey('relevance_score', $result[0]);
+    /**
+     * Build an OpenAI-style SSE chat-completion stream body terminated with [DONE].
+     */
+    private function sseChatBody(array $deltas): string
+    {
+        $body = '';
+        foreach ($deltas as $delta) {
+            $payload = json_encode(['choices' => [['delta' => ['content' => $delta]]]]);
+            $body .= "data: {$payload}\n\n";
+        }
+        $body .= "data: [DONE]\n\n";
+        return $body;
     }
 
     #[Test]
