@@ -200,10 +200,55 @@ class AIParityMatrixTest extends TestCase
     #[Group('rag')]
     public function it_supports_hyde_for_conceptual_queries()
     {
-        $this->markTestIncomplete('Gap: Laravel belum memiliki pre-query expansion (HyDE).');
+        $service = app(\App\Services\Document\HydeQueryExpansionService::class);
+
+        $this->assertTrue($service->isEnabled(), 'HyDE service harus enabled');
+
+        $conceptualQuery = 'mengapa inflation mempengaruhi interest rates secara signifikan dalam ekonomi modern?';
+        [$shouldUse, $reason] = $service->shouldUseHyde($conceptualQuery);
+        $this->assertTrue($shouldUse, "Query konseptual harus trigger HyDE: {$reason}");
+
+        $shortQuery = 'apa itu AI';
+        [$shouldUseShort, $reasonShort] = $service->shouldUseHyde($shortQuery);
+        $this->assertFalse($shouldUseShort, "Query pendek tidak boleh trigger HyDE: {$reasonShort}");
     }
 
-#[Test]
+    #[Test]
+    #[Group('parity')]
+    #[Group('rag')]
+    public function it_falls_back_to_original_query_on_hyde_failure()
+    {
+        config(['ai.cascade.enabled' => true]);
+        config(['ai.cascade.nodes' => [
+            ['label' => 'HydeNode', 'provider' => 'openai', 'model' => 'gpt-4', 'api_key' => 'fake_key'],
+        ]]);
+
+        \Laravel\Ai\AnonymousAgent::fake(function ($prompt) {
+            throw new \Exception('API Error');
+        });
+
+        $service = new \App\Services\Document\HydeQueryExpansionService([
+            'enabled' => true,
+            'cascade_nodes' => [
+                ['label' => 'HydeNode', 'provider' => 'openai', 'model' => 'gpt-4', 'api_key' => 'fake_key'],
+            ],
+        ]);
+
+        $longQuery = str_repeat('a', 600);
+        $result = $service->generateEnhancedQuery($longQuery);
+
+        $this->assertEquals($longQuery, $result, 'Fallback harus return originalQuery penuh, bukan query yang dipotong');
+    }
+
+    #[Test]
+    #[Group('parity')]
+    #[Group('rag')]
+    public function it_returns_full_query_on_hyde_success_with_long_input()
+    {
+        $this->markTestIncomplete('Gap: HyDE success path menggunakan AiManager::textProvider() yang tidak bisa di-mock dengan AnonymousAgent::fake(). Fix kode sudah diterapkan di HydeQueryExpansionService.php:183 - menggunakan $originalQuery bukan $queryForHyde. Verifikasi dilakukan via review kode dan test fallbback.');
+    }
+
+    #[Test]
     #[Group('parity')]
     #[Group('rag')]
     public function it_injects_source_metadata_in_stream()
