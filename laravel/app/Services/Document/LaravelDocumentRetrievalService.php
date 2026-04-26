@@ -4,6 +4,8 @@ namespace App\Services\Document;
 
 use App\Contracts\DocumentRetrievalInterface;
 use App\Models\Document;
+use App\Models\DocumentChunk;
+use App\Services\AI\EmbeddingCascadeService;
 use Illuminate\Support\Facades\Log;
 use Laravel\Ai\AiManager;
 use Laravel\Ai\AnonymousAgent;
@@ -12,6 +14,7 @@ use Laravel\Ai\Files\Document as AiDocument;
 class LaravelDocumentRetrievalService implements DocumentRetrievalInterface
 {
     protected AiManager $ai;
+    protected EmbeddingCascadeService $embeddingCascade;
     protected string $model;
     protected int $topK;
     protected bool $useProviderFileSearch;
@@ -40,6 +43,7 @@ class LaravelDocumentRetrievalService implements DocumentRetrievalInterface
     public function __construct()
     {
         $this->ai = app(AiManager::class);
+        $this->embeddingCascade = app(EmbeddingCascadeService::class);
         $this->model = config('ai.laravel_ai.model', 'gpt-4o-mini');
         $this->topK = config('ai.rag.top_k', 5);
         $this->useProviderFileSearch = config('ai.laravel_ai.use_provider_file_search', false);
@@ -257,30 +261,151 @@ class LaravelDocumentRetrievalService implements DocumentRetrievalInterface
             return [];
         }
 
-        $chunks = [];
-        $documentsDir = storage_path('app/documents');
+        $allChunks = [];
+        $targetModel = config('ai.rag.embedding_model', 'text-embedding-3-small');
+        $targetDimensions = (int) config('ai.rag.embedding_dimensions', 1536);
 
-        foreach ($documents as $doc) {
-            $filePath = storage_path('app/' . $doc['file_path']);
-
-            if (!file_exists($filePath)) {
-                Log::warning('LaravelDocumentRetrieval: file not found', [
-                    'path' => $filePath,
-                ]);
-                continue;
-            }
-
-            $docChunks = $this->extractChunksFromDocument($filePath, $doc);
-            $relevantChunks = $this->findRelevantChunks($query, $docChunks, $topK, $doc);
-
-            $chunks = array_merge($chunks, $relevantChunks);
+        // 1. Get query embedding
+        $actualModel = config('ai.rag.embedding_model', 'text-embedding-3-small');
+        try {
+            $queryResponse = $this->embeddingCascade->embed([$query]);
+            $queryEmbedding = $queryResponse->embeddings[0] ?? null;
+            
+            // Update target model from response to match what was actually used
+            $actualModel = $queryResponse->meta->model;
+        } catch (\Throwable $e) {
+            Log::warning('LaravelDocumentRetrieval: query embedding failed, falling back to lexical search', [
+                'error' => $e->getMessage()
+            ]);
+            $queryEmbedding = null;
         }
 
-        usort($chunks, function ($a, $b) {
+        foreach ($documents as $docData) {
+            $document = Document::find($docData['id']);
+            if (!$document) continue;
+
+            // 2. Ensure document is chunked and embedded in DB
+            $this->ensureDocumentIsIngested($document);
+
+            // 3. Fetch chunks from DB
+            $dbChunks = $document->chunks()
+                ->where('embedding_model', $actualModel)
+                ->get();
+
+            if ($dbChunks->isEmpty()) {
+                // If no embeddings for target model, try to compute them now
+                $this->computeEmbeddingsForDocument($document, $actualModel, $targetDimensions);
+                $dbChunks = $document->chunks()
+                    ->where('embedding_model', $actualModel)
+                    ->get();
+            }
+
+            foreach ($dbChunks as $chunk) {
+                $score = 0.0;
+                if ($queryEmbedding && !empty($chunk->embedding)) {
+                    $score = $this->cosineSimilarity($queryEmbedding, $chunk->embedding);
+                } else {
+                    // Lexical fallback per chunk
+                    $score = $this->calculateLexicalScore($query, $chunk->text_content);
+                }
+
+                $allChunks[] = [
+                    'content' => $chunk->text_content,
+                    'score' => $score,
+                    'filename' => $document->original_name,
+                    'chunk_index' => $chunk->id, // or another identifier
+                ];
+            }
+        }
+
+        usort($allChunks, function ($a, $b) {
             return ($b['score'] ?? 0) <=> ($a['score'] ?? 0);
         });
 
-        return array_slice($chunks, 0, $topK);
+        return array_slice($allChunks, 0, $topK);
+    }
+
+    protected function ensureDocumentIsIngested(Document $document): void
+    {
+        if ($document->chunks()->exists()) {
+            return;
+        }
+
+        $filePath = storage_path('app/' . $document->file_path);
+        if (!file_exists($filePath)) {
+            Log::warning('LaravelDocumentRetrieval: file not found for ingestion', ['path' => $filePath]);
+            return;
+        }
+
+        $docData = $document->toArray();
+        $chunksData = $this->extractChunksFromDocument($filePath, $docData);
+
+        foreach ($chunksData as $data) {
+            $document->chunks()->create([
+                'text_content' => $data['content'],
+                'page_number' => $data['page_number'] ?? null,
+            ]);
+        }
+        
+        Log::info('LaravelDocumentRetrieval: document chunked and stored', [
+            'document_id' => $document->id,
+            'chunks_count' => count($chunksData)
+        ]);
+    }
+
+    protected function computeEmbeddingsForDocument(Document $document, string $model, int $dimensions): void
+    {
+        $chunks = $document->chunks()->whereNull('embedding')->orWhere('embedding_model', '!=', $model)->get();
+        if ($chunks->isEmpty()) return;
+
+        try {
+            $texts = $chunks->pluck('text_content')->toArray();
+            
+            // GitHub Models/OpenAI usually have limits on number of inputs per request.
+            // We'll chunk the requests if needed.
+            $batchSize = 20;
+            $batches = array_chunk($texts, $batchSize);
+            $batchChunks = $chunks->chunk($batchSize);
+
+            $i = 0;
+            foreach ($batches as $index => $batch) {
+                $response = $this->embeddingCascade->embed($batch);
+                
+                $currentBatchChunks = $batchChunks->values()[$index];
+                foreach ($currentBatchChunks as $j => $chunk) {
+                    $chunk->update([
+                        'embedding' => $response->embeddings[$j],
+                        'embedding_model' => $response->meta->model, // Use actual model returned
+                        'embedding_dimensions' => $dimensions,
+                    ]);
+                }
+            }
+
+            Log::info('LaravelDocumentRetrieval: embeddings computed and stored', [
+                'document_id' => $document->id,
+                'model' => $model
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('LaravelDocumentRetrieval: failed to compute embeddings', [
+                'document_id' => $document->id,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    protected function calculateLexicalScore(string $query, string $content): float
+    {
+        $queryTerms = array_unique(preg_split('/\s+/', strtolower($query)));
+        $contentTerms = array_unique(preg_split('/\s+/', strtolower($content)));
+
+        $intersection = array_intersect($queryTerms, $contentTerms);
+        $union = array_unique(array_merge($queryTerms, $contentTerms));
+
+        if (count($union) === 0) {
+            return 0.0;
+        }
+
+        return count($intersection) / count($union);
     }
 
     protected function extractChunksFromDocument(string $filePath, array $document): array
@@ -391,72 +516,6 @@ class LaravelDocumentRetrievalService implements DocumentRetrievalInterface
         }
 
         return $chunks;
-    }
-
-    protected function findRelevantChunks(
-        string $query,
-        array $docChunks,
-        int $topK,
-        array $document
-    ): array {
-        if (empty($docChunks)) {
-            return [];
-        }
-
-        $provider = $this->ai->textProvider();
-
-        $relevantChunks = [];
-        foreach ($docChunks as $chunk) {
-            $score = $this->calculateSimilarity($query, $chunk['content'], $provider);
-
-            $relevantChunks[] = array_merge($chunk, [
-                'score' => $score,
-            ]);
-        }
-
-        usort($relevantChunks, function ($a, $b) {
-            return ($b['score'] ?? 0) <=> ($a['score'] ?? 0);
-        });
-
-        return array_slice($relevantChunks, 0, $topK);
-    }
-
-    protected function calculateSimilarity(string $query, string $content, $provider): float
-    {
-        try {
-            $model = config('ai.rag.embedding_model');
-            $dimensions = (int) config('ai.rag.embedding_dimensions', 1536);
-
-            $embeddingResponse = $provider->embeddings(
-                [
-                    $query,
-                    substr($content, 0, 500),
-                ],
-                $dimensions,
-                $model
-            );
-
-            $queryEmbedding = $embeddingResponse->embeddings[0] ?? [0];
-            $contentEmbedding = $embeddingResponse->embeddings[1] ?? [0];
-
-            return $this->cosineSimilarity($queryEmbedding, $contentEmbedding);
-        } catch (\Throwable $e) {
-            Log::debug('LaravelDocumentRetrieval: similarity calculation failed', [
-                'error' => $e->getMessage(),
-            ]);
-
-            $queryTerms = array_unique(preg_split('/\s+/', strtolower($query)));
-            $contentTerms = array_unique(preg_split('/\s+/', strtolower($content)));
-
-            $intersection = array_intersect($queryTerms, $contentTerms);
-            $union = array_unique(array_merge($queryTerms, $contentTerms));
-
-            if (count($union) === 0) {
-                return 0.0;
-            }
-
-            return count($intersection) / count($union);
-        }
     }
 
     protected function cosineSimilarity(array $a, array $b): float
