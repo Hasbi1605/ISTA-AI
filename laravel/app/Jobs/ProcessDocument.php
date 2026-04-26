@@ -46,10 +46,11 @@ class ProcessDocument implements ShouldQueue
             $laravelResult = $this->processWithLaravel($filePath);
             
             if ($laravelResult['status'] === 'success') {
-                $this->document->update([
-                    'status' => 'ready',
-                    'provider_file_id' => $laravelResult['provider_file_id'] ?? null,
-                ]);
+                $updates = ['status' => 'ready'];
+                if (isset($laravelResult['provider_file_id'])) {
+                    $updates['provider_file_id'] = $laravelResult['provider_file_id'];
+                }
+                $this->document->update($updates);
                 return;
             }
 
@@ -129,6 +130,14 @@ class ProcessDocument implements ShouldQueue
             ]);
 
             $chunks = $this->chunkDocument($pages);
+            
+            if (empty($chunks)) {
+                return [
+                    'status' => 'error',
+                    'message' => 'Document chunking produced no chunks',
+                ];
+            }
+
             $this->persistChunks($chunks);
 
             return [
@@ -149,6 +158,12 @@ class ProcessDocument implements ShouldQueue
                 'message' => $e->getMessage(),
             ];
         }
+    }
+
+    public function failed(\Throwable $exception): void
+    {
+        $this->document->update(['status' => 'error']);
+        logger()->error("Document processing permanently failed for ID {$this->document->id}: " . $exception->getMessage());
     }
 
     protected function chunkDocument(array $pages): array
@@ -263,11 +278,5 @@ class ProcessDocument implements ShouldQueue
             'batches' => count($batches),
             'mode' => $usePdr ? 'pdr' : 'standard',
         ]);
-    }
-
-    public function failed(\Throwable $exception): void
-    {
-        $this->document->update(['status' => 'error']);
-        logger()->error("Document processing permanently failed for ID {$this->document->id}: " . $exception->getMessage());
     }
 }

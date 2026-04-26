@@ -50,6 +50,21 @@ return [
             'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url(env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
         ],
 
+        // Gmail SMTP profile (parity dengan integrations.smtp_gmail di python-ai).
+        // Gunakan dengan MAIL_MAILER=gmail di .env, atau pakai sebagai fallback
+        // dari mailer lain. WAJIB pakai App Password Google (16 karakter), bukan
+        // password akun Gmail.
+        'gmail' => [
+            'transport' => 'smtp',
+            'host' => env('MAIL_GMAIL_HOST', 'smtp.gmail.com'),
+            'port' => env('MAIL_GMAIL_PORT', 587),
+            'encryption' => env('MAIL_GMAIL_ENCRYPTION', 'tls'),
+            'username' => env('MAIL_GMAIL_USERNAME', env('MAIL_USERNAME')),
+            'password' => env('MAIL_GMAIL_PASSWORD', env('MAIL_PASSWORD')),
+            'timeout' => null,
+            'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url(env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
+        ],
+
         'ses' => [
             'transport' => 'ses',
         ],

@@ -2,9 +2,7 @@
 
 namespace App\Services\Chat;
 
-use Laravel\Ai\Streaming\Events\TextDelta;
-use Laravel\Ai\Streaming\Events\Citation;
-use Laravel\Ai\Prompts\AgentPrompt;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use App\Services\Document\LaravelDocumentRetrievalService;
 use App\Services\Document\DocumentPolicyService;
@@ -117,18 +115,12 @@ class LaravelChatService
         $success = false;
         foreach ($nodes as $index => $node) {
             try {
-                $agent = new \Laravel\Ai\AnonymousAgent(
-                    instructions: $this->getSystemPrompt(),
-                    messages: [],
-                    tools: [], // tools will be added later if supported
-                );
+                $systemPrompt = $this->getSystemPrompt();
 
-                $provider = $this->getProviderForNode($node, $agent);
-                
-$webSearchResults = [];
+                $webSearchResults = [];
                 if ($useWebSearch && $this->useLangSearch) {
                     $webSearchResults = $this->performLangSearch($prompt);
-                    $agent->instructions = $this->getWebSearchPrompt();
+                    $systemPrompt = $this->getWebSearchPrompt();
                 }
 
                 yield "[MODEL:{$node['label']}]\n";
@@ -137,17 +129,12 @@ $webSearchResults = [];
                     ? $this->buildWebSearchContext($webSearchResults) . "\n\n" . $prompt
                     : $prompt;
 
-                $stream = $provider->stream(
-                    new AgentPrompt(
-                        agent: $agent,
-                        prompt: $promptToUse,
-                        attachments: [],
-                        provider: $provider,
-                        model: $node['model'],
-                    )
+                yield from $this->streamChatCompletion(
+                    $node,
+                    $systemPrompt,
+                    $promptToUse,
+                    $this->getWebSearchSources($webSearchResults)
                 );
-
-                yield from $this->streamResponseWithSources($stream, $this->getWebSearchSources($webSearchResults));
                 $success = true;
                 break;
             } catch (\Throwable $e) {
@@ -212,30 +199,13 @@ $webSearchResults = [];
                 : [['label' => 'Default', 'provider' => 'openai', 'model' => $this->model, 'api_key' => config('ai.laravel_ai.api_key')]];
 
             $chatSuccess = false;
+            $ragSystemPrompt = 'Anda adalah ISTA AI, asisten kerja internal untuk pegawai Istana Kepresidenan Yogyakarta. '
+                . 'Gunakan Bahasa Indonesia yang baku dan luwes. Jawab berdasarkan dokumen yang diberikan.';
             foreach ($nodes as $index => $node) {
                 try {
-                    $agent = new \Laravel\Ai\AnonymousAgent(
-                        instructions: 'Anda adalah ISTA AI, asisten kerja internal untuk pegawai Istana Kepresidenan Yogyakarta. '
-                            . 'Gunakan Bahasa Indonesia yang baku dan luwes. Jawab berdasarkan dokumen yang diberikan.',
-                        messages: [],
-                        tools: []
-                    );
-
-                    $provider = $this->getProviderForNode($node, $agent);
-
                     yield "[MODEL:{$node['label']}]\n";
 
-                    $promptObj = new AgentPrompt(
-                        agent: $agent,
-                        prompt: $prompt,
-                        attachments: [],
-                        provider: $provider,
-                        model: $node['model'],
-                    );
-
-                    $stream = $provider->stream($promptObj);
-
-                    yield from $this->streamResponseWithSources($stream, $sources);
+                    yield from $this->streamChatCompletion($node, $ragSystemPrompt, $prompt, $sources);
                     $chatSuccess = true;
                     break;
                 } catch (\Throwable $e) {
@@ -266,18 +236,12 @@ $webSearchResults = [];
                 $chatSuccess = false;
                 foreach ($nodes as $index => $node) {
                     try {
-                        $agent = new \Laravel\Ai\AnonymousAgent(
-                            instructions: $this->getSystemPrompt(),
-                            messages: [],
-                            tools: [],
-                        );
-
-                        $provider = $this->getProviderForNode($node, $agent);
+                        $systemPrompt = $this->getSystemPrompt();
 
                         $webSearchResults = [];
                         if ($this->useLangSearch) {
                             $webSearchResults = $this->performLangSearch($query);
-                            $agent->instructions = $this->getWebSearchPrompt();
+                            $systemPrompt = $this->getWebSearchPrompt();
                         }
 
                         yield "[MODEL:{$node['label']}]\n";
@@ -286,15 +250,12 @@ $webSearchResults = [];
                             ? $this->buildWebSearchContext($webSearchResults) . "\n\n" . $query
                             : $query;
 
-                        $promptObj = new AgentPrompt(
-                            agent: $agent,
-                            prompt: $promptToUse,
-                            attachments: [],
-                            provider: $provider,
-                            model: $node['model'],
+                        yield from $this->streamChatCompletion(
+                            $node,
+                            $systemPrompt,
+                            $promptToUse,
+                            $this->getWebSearchSources($webSearchResults)
                         );
-
-                        yield from $this->streamResponseWithSources($provider->stream($promptObj), $this->getWebSearchSources($webSearchResults));
                         $chatSuccess = true;
                         break;
                     } catch (\Throwable $e) {
@@ -322,18 +283,12 @@ $webSearchResults = [];
             $chatSuccess = false;
             foreach ($nodes as $index => $node) {
                 try {
-                    $agent = new \Laravel\Ai\AnonymousAgent(
-                        instructions: $this->getSystemPrompt(),
-                        messages: [],
-                        tools: [],
-                    );
-
-                    $provider = $this->getProviderForNode($node, $agent);
+                    $systemPrompt = $this->getSystemPrompt();
 
                     $webSearchResults = [];
                     if ($this->useLangSearch) {
                         $webSearchResults = $this->performLangSearch($query);
-                        $agent->instructions = $this->getWebSearchPrompt();
+                        $systemPrompt = $this->getWebSearchPrompt();
                     }
 
                     yield "[MODEL:{$node['label']}]\n";
@@ -342,15 +297,12 @@ $webSearchResults = [];
                         ? $this->buildWebSearchContext($webSearchResults) . "\n\n" . $query
                         : $query;
 
-                    $promptObj = new AgentPrompt(
-                        agent: $agent,
-                        prompt: $promptToUse,
-                        attachments: [],
-                        provider: $provider,
-                        model: $node['model'],
+                    yield from $this->streamChatCompletion(
+                        $node,
+                        $systemPrompt,
+                        $promptToUse,
+                        $this->getWebSearchSources($webSearchResults)
                     );
-
-                    yield from $this->streamResponseWithSources($provider->stream($promptObj), $this->getWebSearchSources($webSearchResults));
                     $chatSuccess = true;
                     break;
                 } catch (\Throwable $e) {
@@ -388,6 +340,11 @@ $webSearchResults = [];
 
     protected function getSystemPrompt(): string
     {
+        $configured = config('ai.prompts.system.default');
+        if (is_string($configured) && trim($configured) !== '') {
+            return $configured;
+        }
+
         return <<<'PROMPT'
 Anda adalah asisten AI yang helpful dan informative. 
 Selalu berikan jawaban yang akurat, jelas, dan relevan.
@@ -397,6 +354,11 @@ PROMPT;
 
     protected function getWebSearchPrompt(): string
     {
+        $configured = config('ai.prompts.web_search.assertive_instruction');
+        if (is_string($configured) && trim($configured) !== '') {
+            return $configured;
+        }
+
         return <<<'PROMPT'
 Anda adalah asisten AI yang helpful dan informative. 
 Selalu berikan jawaban yang akurat, jelas, dan relevan berdasarkan hasil pencarian web terkini.
@@ -429,46 +391,86 @@ PROMPT;
         return $sources;
     }
 
-    protected function streamResponseWithSources(iterable $stream, array $initialSources = []): \Generator
-    {
-        $sources = $initialSources;
+    /**
+     * Stream a chat completion directly via the provider's `/chat/completions` endpoint.
+     * Bypasses laravel/ai SDK because some endpoints (e.g. GitHub Models) do not
+     * implement the OpenAI Responses API used by the SDK.
+     */
+    protected function streamChatCompletion(
+        array $node,
+        string $systemPrompt,
+        string $userPrompt,
+        array $initialSources = []
+    ): \Generator {
+        $baseUrl = rtrim($node['base_url'] ?? 'https://api.openai.com/v1', '/');
+        $url = $baseUrl . '/chat/completions';
 
-        foreach ($stream as $event) {
-            if ($event instanceof TextDelta) {
-                yield $event->delta;
-            } elseif ($event instanceof Citation) {
-                $citation = $event->citation;
-                $sources[] = [
-                    'title' => $citation->title ?? '',
-                    'url' => $citation->url ?? '',
-                ];
+        $body = [
+            'model' => $node['model'],
+            'messages' => [
+                ['role' => 'system', 'content' => $systemPrompt],
+                ['role' => 'user', 'content' => $userPrompt],
+            ],
+            'stream' => true,
+        ];
+
+        $response = Http::withToken((string) ($node['api_key'] ?? ''))
+            ->withHeaders(['Accept' => 'text/event-stream'])
+            ->withOptions(['stream' => true])
+            ->timeout((int) config('ai.global.timeout', 120))
+            ->post($url, $body);
+
+        if ($response->status() >= 400) {
+            throw new \RuntimeException("HTTP request returned status code {$response->status()}");
+        }
+
+        $sources = $initialSources;
+        $stream = $response->toPsrResponse()->getBody();
+        $buffer = '';
+
+        while (!$stream->eof()) {
+            $chunk = $stream->read(2048);
+            if ($chunk === '' || $chunk === false) {
+                continue;
+            }
+            $buffer .= $chunk;
+
+            while (($pos = strpos($buffer, "\n")) !== false) {
+                $line = rtrim(substr($buffer, 0, $pos), "\r");
+                $buffer = substr($buffer, $pos + 1);
+
+                if ($line === '' || str_starts_with($line, ':')) {
+                    continue;
+                }
+                if (!str_starts_with($line, 'data:')) {
+                    continue;
+                }
+
+                $data = trim(substr($line, 5));
+                if ($data === '' || $data === '[DONE]') {
+                    if ($data === '[DONE]') {
+                        break 2;
+                    }
+                    continue;
+                }
+
+                $payload = json_decode($data, true);
+                if (!is_array($payload)) {
+                    continue;
+                }
+
+                $delta = $payload['choices'][0]['delta']['content']
+                    ?? $payload['choices'][0]['message']['content']
+                    ?? '';
+                if ($delta !== '' && $delta !== null) {
+                    yield $delta;
+                }
             }
         }
 
         if (!empty($sources)) {
             yield "\n[SOURCES:" . json_encode($sources) . "]\n";
         }
-    }
-
-    protected function getProviderForNode(array $node, $agent = null)
-    {
-        $configKey = 'ai.providers.temp_cascade';
-        config([$configKey => [
-            'driver' => $node['provider'],
-            'key' => $node['api_key'],
-            'url' => $node['base_url'] ?? null,
-            'models' => [
-                'text' => [
-                    'default' => $node['model'],
-                ],
-            ],
-        ]]);
-
-        if ($agent) {
-            return app(\Laravel\Ai\AiManager::class)->textProviderFor($agent, 'temp_cascade');
-        }
-
-        return app(\Laravel\Ai\AiManager::class)->textProvider('temp_cascade');
     }
 
     protected function shouldFallback(\Throwable $e): bool

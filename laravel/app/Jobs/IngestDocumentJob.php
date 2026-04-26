@@ -173,7 +173,7 @@ class IngestDocumentJob implements ShouldQueue
                     'chunk_type' => $chunk['chunk_type'],
                     'parent_index' => $chunk['parent_index'],
                     'child_index' => $chunk['child_index'] ?? null,
-                    'page_number' => 1,
+                    'page_number' => $chunk['page_number'] ?? $chunk['metadata']['page_number'] ?? 1,
                     'text_content' => $chunk['text'],
                     'embedding' => null,
                     'embedding_model' => $embeddingModel,

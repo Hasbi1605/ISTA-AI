@@ -39,6 +39,25 @@ class DocumentIndexTest extends TestCase
         Queue::assertPushed(ProcessDocument::class, 1);
     }
 
+    public function test_documents_route_is_accessible_for_verified_user(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+        ]);
+
+        $response = $this->actingAs($user)->get(route('documents.index'));
+
+        $response->assertOk();
+        $response->assertSeeLivewire(DocumentIndex::class);
+    }
+
+    public function test_documents_route_redirects_guest_to_login(): void
+    {
+        $response = $this->get(route('documents.index'));
+
+        $response->assertRedirect(route('login'));
+    }
+
     public function test_summarize_rejects_non_ready_document(): void
     {
         $user = User::factory()->create();
