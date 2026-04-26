@@ -108,6 +108,7 @@ class LaravelDocumentRetrievalServiceTest extends TestCase
     public function test_search_uses_local_vector_storage_and_cascade(): void
     {
         Config::set('ai.laravel_ai.use_provider_file_search', false);
+        Config::set('ai.rag.hybrid.enabled', false);
         Config::set('ai.rag.embedding_model', 'text-embedding-3-small');
         Config::set('ai.rag.embedding_dimensions', 1536);
 
@@ -241,6 +242,7 @@ class LaravelDocumentRetrievalServiceTest extends TestCase
     public function test_search_reembeds_when_existing_chunks_use_different_dimensions(): void
     {
         Config::set('ai.laravel_ai.use_provider_file_search', false);
+        Config::set('ai.rag.hybrid.enabled', false);
 
         $user = User::factory()->create();
         $document = Document::factory()->for($user)->create([
@@ -300,6 +302,7 @@ class LaravelDocumentRetrievalServiceTest extends TestCase
     public function test_search_reembeds_stale_chunks_when_document_has_mixed_embedding_states(): void
     {
         Config::set('ai.laravel_ai.use_provider_file_search', false);
+        Config::set('ai.rag.hybrid.enabled', false);
 
         $user = User::factory()->create();
         $document = Document::factory()->for($user)->create([
@@ -365,6 +368,7 @@ class LaravelDocumentRetrievalServiceTest extends TestCase
     public function test_search_uses_lexical_fallback_when_query_embedding_fails(): void
     {
         Config::set('ai.laravel_ai.use_provider_file_search', false);
+        Config::set('ai.rag.hybrid.enabled', false);
 
         $user = User::factory()->create();
         $document = Document::factory()->for($user)->create([
@@ -403,6 +407,7 @@ class LaravelDocumentRetrievalServiceTest extends TestCase
     public function test_search_uses_lexical_fallback_when_document_embedding_refresh_fails(): void
     {
         Config::set('ai.laravel_ai.use_provider_file_search', false);
+        Config::set('ai.rag.hybrid.enabled', false);
 
         $user = User::factory()->create();
         $document = Document::factory()->for($user)->create([

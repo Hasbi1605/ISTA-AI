@@ -6,6 +6,7 @@ use App\Contracts\DocumentRetrievalInterface;
 use App\Models\Document;
 use App\Models\DocumentChunk;
 use App\Services\AI\EmbeddingCascadeService;
+use App\Services\Document\HybridRetrievalService;
 use Illuminate\Support\Facades\Log;
 use Laravel\Ai\AiManager;
 use Laravel\Ai\AnonymousAgent;
@@ -18,6 +19,7 @@ class LaravelDocumentRetrievalService implements DocumentRetrievalInterface
     protected string $model;
     protected int $topK;
     protected bool $useProviderFileSearch;
+    protected ?HybridRetrievalService $hybridService = null;
 
     private const EXPLICIT_WEB_PATTERNS = [
         '/\bcari\s+di\s+web\b/i',
@@ -47,6 +49,11 @@ class LaravelDocumentRetrievalService implements DocumentRetrievalInterface
         $this->model = config('ai.laravel_ai.model', 'gpt-4o-mini');
         $this->topK = config('ai.rag.top_k', 5);
         $this->useProviderFileSearch = config('ai.laravel_ai.use_provider_file_search', false);
+        
+        $hybridEnabled = config('ai.rag.hybrid.enabled', false);
+        if ($hybridEnabled) {
+            $this->hybridService = app(HybridRetrievalService::class);
+        }
     }
 
     public function searchRelevantChunks(
@@ -63,6 +70,8 @@ class LaravelDocumentRetrievalService implements DocumentRetrievalInterface
                 $result = $this->searchViaProviderFileSearch($query, $filenames, $topK, $userId);
                 $chunks = $result['chunks'] ?? [];
                 $success = $result['success'] ?? false;
+            } elseif ($this->hybridService !== null) {
+                return $this->hybridService->search($query, $filenames, $topK, $userId);
             } else {
                 $documents = $this->getDocumentsForUser($filenames, $userId);
 
