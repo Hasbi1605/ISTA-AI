@@ -24,7 +24,14 @@ class PdfToImageRenderer
         $outputDir = $this->prepareOutputDirectory();
 
         if ($this->isImagickAvailable()) {
-            return $this->renderWithImagick($pdfPath, $outputDir);
+            try {
+                return $this->renderWithImagick($pdfPath, $outputDir);
+            } catch (\Throwable $e) {
+                Log::warning('PdfToImageRenderer: Imagick failed, falling back to pdftoppm', [
+                    'file' => $pdfPath,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         return $this->renderWithPdftoppm($pdfPath, $outputDir);

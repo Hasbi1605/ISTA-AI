@@ -100,26 +100,32 @@ class TextChunker
     {
         $chunks = [];
         $currentChunk = "";
+        $overlapText = "";
         
-        foreach ($segments as $segment) {
-            $segmentWithSeparator = $segment;
+        foreach ($segments as $index => $segment) {
             $testChunk = $currentChunk === "" 
-                ? $segmentWithSeparator 
-                : $currentChunk . $segmentWithSeparator;
+                ? $segment 
+                : $currentChunk . $segment;
             
             $tokens = $this->tokenCounter->count($testChunk);
             
             if ($tokens > $this->chunkSize && $currentChunk !== "") {
-                $chunks[] = $this->addOverlap($currentChunk);
-                $currentChunk = $segmentWithSeparator;
+                $chunks[] = $currentChunk;
                 
-                if ($this->chunkOverlap > 0 && isset($segments[array_search($segment, $segments) - 1])) {
-                    $prevSegment = $segments[array_search($segment, $segments) - 1];
-                    $overlapTokens = $this->tokenCounter->count($prevSegment);
-                    if ($overlapTokens <= $this->chunkOverlap) {
-                        $currentChunk = $prevSegment . $segment;
+                $overlapText = "";
+                if ($this->chunkOverlap > 0 && $index > 0) {
+                    $prevSegment = $segments[$index - 1];
+                    $prevTokens = $this->tokenCounter->count($prevSegment);
+                    if ($prevTokens <= $this->chunkOverlap) {
+                        $overlapText = $prevSegment;
+                    } else {
+                        $prevChars = substr($prevSegment, -min(100, strlen($prevSegment)));
+                        $overlapText = $prevChars;
                     }
                 }
+                
+                $currentChunk = $overlapText . $segment;
+                $overlapText = "";
             } else {
                 $currentChunk = $testChunk;
             }
@@ -130,11 +136,6 @@ class TextChunker
         }
         
         return array_values(array_filter($chunks));
-    }
-
-    protected function addOverlap(string $chunk): string
-    {
-        return $chunk;
     }
 
     protected function hardSplit(string $text): array

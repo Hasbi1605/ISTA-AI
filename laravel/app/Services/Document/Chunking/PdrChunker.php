@@ -36,7 +36,14 @@ class PdrChunker
 
     public function chunk(array $pages, string $filename, string $userId): array
     {
-        $fullText = $this->mergePages($pages);
+        $pagesWithMetadata = $this->mergePages($pages);
+        
+        if (empty($pagesWithMetadata)) {
+            Log::warning('PdrChunker: empty content, skipping chunking');
+            return [];
+        }
+
+        $fullText = $this->getFullText($pagesWithMetadata);
         
         if (empty(trim($fullText))) {
             Log::warning('PdrChunker: empty content, skipping chunking');
@@ -46,21 +53,25 @@ class PdrChunker
         $parentChunks = $this->createParentChunks($fullText);
         
         $chunks = [];
+        $totalParentChunks = count($parentChunks);
         
         foreach ($parentChunks as $pIndex => $parentText) {
             $parentId = $this->generateParentId($filename, $userId, $pIndex, $parentText);
+            $pageNumber = $this->getPageNumberForChunk($pagesWithMetadata, $pIndex, $totalParentChunks);
             
             $chunks[] = [
                 'text' => $parentText,
                 'chunk_type' => 'parent',
                 'parent_id' => $parentId,
                 'parent_index' => $pIndex,
+                'page_number' => $pageNumber,
                 'metadata' => [
                     'filename' => $filename,
                     'user_id' => $userId,
                     'chunk_type' => 'parent',
                     'parent_id' => $parentId,
                     'parent_index' => $pIndex,
+                    'page_number' => $pageNumber,
                 ],
             ];
             
@@ -73,6 +84,7 @@ class PdrChunker
                     'parent_id' => $parentId,
                     'parent_index' => $pIndex,
                     'child_index' => $cIndex,
+                    'page_number' => $pageNumber,
                     'metadata' => [
                         'filename' => $filename,
                         'user_id' => $userId,
@@ -80,6 +92,7 @@ class PdrChunker
                         'parent_id' => $parentId,
                         'parent_index' => $pIndex,
                         'child_index' => $cIndex,
+                        'page_number' => $pageNumber,
                     ],
                 ];
             }
@@ -106,18 +119,50 @@ class PdrChunker
         return $this->childChunkSize;
     }
 
-    protected function mergePages(array $pages): string
+    protected function mergePages(array $pages): array
     {
-        $texts = [];
+        $pagesWithMetadata = [];
         
         foreach ($pages as $page) {
             $content = $page['page_content'] ?? '';
             if (!empty(trim($content))) {
-                $texts[] = $content;
+                $pagesWithMetadata[] = [
+                    'content' => $content,
+                    'page_number' => $page['page_number'] ?? 1,
+                    'source' => $page['source'] ?? 'unknown',
+                ];
             }
         }
         
+        return $pagesWithMetadata;
+    }
+
+    protected function getFullText(array $pagesWithMetadata): string
+    {
+        $texts = [];
+        
+        foreach ($pagesWithMetadata as $page) {
+            $texts[] = $page['content'];
+        }
+        
         return implode("\n\n", $texts);
+    }
+
+    protected function getPageNumberForChunk(array $pagesWithMetadata, int $chunkIndex, int $totalChunks): int
+    {
+        if (empty($pagesWithMetadata)) {
+            return 1;
+        }
+
+        $totalPages = count($pagesWithMetadata);
+        
+        if ($totalPages === 1) {
+            return $pagesWithMetadata[0]['page_number'];
+        }
+
+        $pageIndex = min(floor($chunkIndex * $totalPages / $totalChunks), $totalPages - 1);
+        
+        return $pagesWithMetadata[$pageIndex]['page_number'] ?? 1;
     }
 
     protected function createParentChunks(string $text): array
@@ -169,7 +214,7 @@ class PdrChunker
         $chunks = [];
         $currentChunk = "";
         
-        foreach ($segments as $segment) {
+        foreach ($segments as $index => $segment) {
             $testChunk = $currentChunk === "" ? $segment : $currentChunk . $segment;
             
             $tokens = $this->tokenCounter->count($testChunk);
@@ -177,8 +222,19 @@ class PdrChunker
             if ($tokens > $targetSize && $currentChunk !== "") {
                 $chunks[] = trim($currentChunk);
                 
-                $prevKey = array_search($segment, $segments) - 1;
-                $currentChunk = $segments[$prevKey] ?? $segment;
+                $overlapText = "";
+                if ($overlap > 0 && $index > 0) {
+                    $prevSegment = $segments[$index - 1];
+                    $prevTokens = $this->tokenCounter->count($prevSegment);
+                    if ($prevTokens <= $overlap) {
+                        $overlapText = $prevSegment;
+                    } else {
+                        $prevChars = substr($prevSegment, -min(100, strlen($prevSegment)));
+                        $overlapText = $prevChars;
+                    }
+                }
+                
+                $currentChunk = $overlapText . $segment;
             } else {
                 $currentChunk = $testChunk;
             }

@@ -7,6 +7,7 @@ use App\Services\Document\Parsing\DocumentParserFactory;
 use App\Services\Document\Parsing\PdfParser;
 use App\Services\Document\Parsing\DocxParser;
 use App\Services\Document\Parsing\SpreadsheetParser;
+use Illuminate\Support\Facades\Storage;
 
 class DocumentParserTest extends TestCase
 {
@@ -49,5 +50,15 @@ class DocumentParserTest extends TestCase
         
         $this->assertFalse($factory->supports('/tmp/test.txt'));
         $this->assertFalse($factory->supports('/tmp/test.jpg'));
+    }
+
+    public function test_parser_factory_supports_returns_true_for_supported_formats(): void
+    {
+        $factory = new DocumentParserFactory();
+        
+        $this->assertTrue($factory->supports('/path/to/document.pdf'));
+        $this->assertTrue($factory->supports('/path/to/document.docx'));
+        $this->assertTrue($factory->supports('/path/to/document.xlsx'));
+        $this->assertTrue($factory->supports('/path/to/document.csv'));
     }
 }
