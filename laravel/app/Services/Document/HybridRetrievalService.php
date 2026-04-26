@@ -12,6 +12,7 @@ use Laravel\Ai\AiManager;
 class HybridRetrievalService
 {
     protected EmbeddingCascadeService $embeddingCascade;
+    protected ?HydeQueryExpansionService $hydeService;
     protected string $embeddingModel;
     protected int $embeddingDimensions;
     protected int $topK;
@@ -23,10 +24,13 @@ class HybridRetrievalService
     protected int $pdrChildOverlap;
     protected int $pdrParentSize;
     protected int $pdrParentOverlap;
+    protected bool $hydeEnabled;
+    protected string $hydeMode;
 
     public function __construct()
     {
         $this->embeddingCascade = app(EmbeddingCascadeService::class);
+        $this->hydeService = null;
         
         $ragConfig = config('ai.rag', []);
         $this->topK = $ragConfig['top_k'] ?? 5;
@@ -44,18 +48,56 @@ class HybridRetrievalService
         $this->pdrChildOverlap = (int) ($pdr['child_chunk_overlap'] ?? 32);
         $this->pdrParentSize = (int) ($pdr['parent_chunk_size'] ?? 1500);
         $this->pdrParentOverlap = (int) ($pdr['parent_chunk_overlap'] ?? 200);
+
+        $hyde = $ragConfig['hyde'] ?? [];
+        $this->hydeEnabled = $hyde['enabled'] ?? true;
+        $this->hydeMode = $hyde['mode'] ?? 'smart';
+
+        if ($this->hydeEnabled) {
+            try {
+                $this->hydeService = app(HydeQueryExpansionService::class);
+            } catch (\Throwable $e) {
+                Log::warning('HybridRetrievalService: HyDE service not available', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
     }
 
     public function search(string $query, array $filenames, int $topK, string $userId): array
     {
+        $searchQuery = $this->getEnhancedQuery($query);
+
         if ($this->hybridEnabled) {
-            return $this->performHybridSearch($query, $filenames, $topK, $userId);
+            return $this->performHybridSearch($searchQuery, $query, $filenames, $topK, $userId);
         }
         
-        return $this->performVectorSearchOnly($query, $filenames, $topK, $userId);
+        return $this->performVectorSearchOnly($searchQuery, $query, $filenames, $topK, $userId);
     }
 
-    protected function performVectorSearchOnly(string $query, array $filenames, int $topK, string $userId): array
+    protected function getEnhancedQuery(string $query): string
+    {
+        if ($this->hydeService === null || !$this->hydeEnabled) {
+            return $query;
+        }
+
+        if ($this->hydeMode === 'always') {
+            return $this->hydeService->generateEnhancedQuery($query);
+        }
+
+        if ($this->hydeMode === 'smart') {
+            list($shouldUse, $reason) = $this->hydeService->shouldUseHyde($query);
+            if ($shouldUse) {
+                Log::info('HyDE: mode=smart — AKTIF (' . $reason . ')');
+                return $this->hydeService->generateEnhancedQuery($query);
+            }
+            Log::debug('HyDE: mode=smart — skip (' . $reason . ')');
+        }
+
+        return $query;
+    }
+
+    protected function performVectorSearchOnly(string $searchQuery, string $originalQuery, array $filenames, int $topK, string $userId): array
     {
         $documents = $this->getDocumentsForUser($filenames, $userId);
         
@@ -63,7 +105,7 @@ class HybridRetrievalService
             return ['chunks' => [], 'success' => false, 'reason' => 'no_documents'];
         }
 
-        $queryEmbedding = $this->getQueryEmbedding($query);
+        $queryEmbedding = $this->getQueryEmbedding($searchQuery);
         $allChunks = [];
 
         foreach ($documents as $docData) {
@@ -75,7 +117,7 @@ class HybridRetrievalService
             $chunks = $this->getVectorScoredChunks(
                 $document, 
                 $queryEmbedding,
-                $query,
+                $searchQuery,
                 $topK * 2
             );
 
@@ -90,7 +132,7 @@ class HybridRetrievalService
         ];
     }
 
-    protected function performHybridSearch(string $query, array $filenames, int $topK, string $userId): array
+    protected function performHybridSearch(string $searchQuery, string $originalQuery, array $filenames, int $topK, string $userId): array
     {
         $documents = $this->getDocumentsForUser($filenames, $userId);
         
@@ -98,7 +140,7 @@ class HybridRetrievalService
             return ['chunks' => [], 'success' => false, 'reason' => 'no_documents'];
         }
 
-        $queryEmbedding = $this->getQueryEmbedding($query);
+        $queryEmbedding = $this->getQueryEmbedding($searchQuery);
         $bm25Results = [];
         $vectorResults = [];
 
@@ -108,10 +150,10 @@ class HybridRetrievalService
 
             $this->ensureDocumentIngested($document, $this->pdrEnabled);
 
-            $bm25Scored = $this->getBm25ScoredChunks($document, $query, $topK * 3);
+            $bm25Scored = $this->getBm25ScoredChunks($document, $originalQuery, $topK * 3);
             $bm25Results = array_merge($bm25Results, $bm25Scored);
 
-            $vectorScored = $this->getVectorScoredChunks($document, $queryEmbedding, $query, $topK * 3);
+            $vectorScored = $this->getVectorScoredChunks($document, $queryEmbedding, $searchQuery, $topK * 3);
             $vectorResults = array_merge($vectorResults, $vectorScored);
         }
 

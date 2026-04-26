@@ -146,6 +146,13 @@ return [
             'parent_chunk_size' => env('RAG_PDR_PARENT_SIZE', 1500),
             'parent_chunk_overlap' => env('RAG_PDR_PARENT_OVERLAP', 200),
         ],
+
+        'hyde' => [
+            'enabled' => env('RAG_HYDE_ENABLED', true),
+            'mode' => env('RAG_HYDE_MODE', 'smart'),
+            'timeout' => env('RAG_HYDE_TIMEOUT', 5),
+            'max_tokens' => env('RAG_HYDE_MAX_TOKENS', 100),
+        ],
     ],
 
     'prompts' => [
