@@ -33,6 +33,9 @@ new class extends Component
                     <x-nav-link :href="route('chat')" :active="request()->routeIs('chat')" wire:navigate>
                         {{ __('Chat') }}
                     </x-nav-link>
+                    <x-nav-link :href="route('documents.index')" :active="request()->routeIs('documents.*')" wire:navigate>
+                        {{ __('Dokumen') }}
+                    </x-nav-link>
                 </div>
             </div>
 
@@ -83,6 +86,9 @@ new class extends Component
         <div class="pt-2 pb-3 space-y-1">
             <x-responsive-nav-link :href="route('chat')" :active="request()->routeIs('chat')" wire:navigate>
                 {{ __('Chat') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('documents.index')" :active="request()->routeIs('documents.*')" wire:navigate>
+                {{ __('Dokumen') }}
             </x-responsive-nav-link>
         </div>
 
