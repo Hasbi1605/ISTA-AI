@@ -79,7 +79,7 @@ class IngestThrottleService
     {
         $errorMsg = strtolower($error->getMessage());
         
-        $indicators = ['429', 'rate limit', 'resource_exhausted', 'quota', '503', 'too many requests'];
+        $indicators = ['429', 'rate limit', 'resource_exhausted', 'resource exhausted', 'quota', '503', 'too many requests'];
         
         foreach ($indicators as $indicator) {
             if (str_contains($errorMsg, $indicator)) {

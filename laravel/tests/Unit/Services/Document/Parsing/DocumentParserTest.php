@@ -2,7 +2,7 @@
 
 namespace Tests\Unit\Services\Document\Parsing;
 
-use PHPUnit\Framework\TestCase;
+use Tests\TestCase;
 use App\Services\Document\Parsing\DocumentParserFactory;
 use App\Services\Document\Parsing\PdfParser;
 use App\Services\Document\Parsing\DocxParser;

@@ -2,7 +2,7 @@
 
 namespace Tests\Unit\Services\Document\Chunking;
 
-use PHPUnit\Framework\TestCase;
+use Tests\TestCase;
 use App\Services\Document\Chunking\TokenCounter;
 use App\Services\Document\Chunking\TextChunker;
 use App\Services\Document\Chunking\PdrChunker;

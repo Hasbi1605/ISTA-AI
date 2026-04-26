@@ -2,7 +2,7 @@
 
 namespace Tests\Unit\Services\Document;
 
-use PHPUnit\Framework\TestCase;
+use Tests\TestCase;
 use App\Services\Document\IngestThrottleService;
 
 class IngestThrottleServiceTest extends TestCase

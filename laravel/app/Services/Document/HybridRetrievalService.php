@@ -670,11 +670,11 @@ class HybridRetrievalService
             return $childChunks;
         }
 
-        $parentChunks = DocumentChunk::whereIn('id', array_keys($parentIds))
+        $parentChunks = DocumentChunk::whereIn('parent_id', array_keys($parentIds))
             ->where('chunk_type', 'parent')
             ->whereHas('document', fn($q) => $q->where('user_id', (int) $userId))
             ->get()
-            ->keyBy('id');
+            ->keyBy('parent_id');
 
         if ($parentChunks->isEmpty()) {
             Log::warning('HybridRetrievalService: parent chunks not found', [
