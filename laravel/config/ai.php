@@ -88,6 +88,44 @@ return [
         ],
     ],
 
+    'embedding_cascade' => [
+        'enabled' => env('AI_EMBEDDING_CASCADE_ENABLED', true),
+        'nodes' => [
+            [
+                'label' => 'Text Embedding 3 Large (Primary)',
+                'provider' => 'openai',
+                'model' => 'text-embedding-3-large',
+                'dimensions' => 3072,
+                'api_key' => env('GITHUB_TOKEN'),
+                'base_url' => 'https://models.inference.ai.azure.com',
+            ],
+            [
+                'label' => 'Text Embedding 3 Large (Backup)',
+                'provider' => 'openai',
+                'model' => 'text-embedding-3-large',
+                'dimensions' => 3072,
+                'api_key' => env('GITHUB_TOKEN_2'),
+                'base_url' => 'https://models.inference.ai.azure.com',
+            ],
+            [
+                'label' => 'Text Embedding 3 Small (Primary)',
+                'provider' => 'openai',
+                'model' => 'text-embedding-3-small',
+                'dimensions' => 1536,
+                'api_key' => env('GITHUB_TOKEN'),
+                'base_url' => 'https://models.inference.ai.azure.com',
+            ],
+            [
+                'label' => 'Text Embedding 3 Small (Backup)',
+                'provider' => 'openai',
+                'model' => 'text-embedding-3-small',
+                'dimensions' => 1536,
+                'api_key' => env('GITHUB_TOKEN_2'),
+                'base_url' => 'https://models.inference.ai.azure.com',
+            ],
+        ],
+    ],
+
     'rag' => [
         'top_k' => env('RAG_TOP_K', 5),
         'chunk_size' => env('RAG_CHUNK_SIZE', 1000),

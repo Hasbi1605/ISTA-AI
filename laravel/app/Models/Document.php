@@ -60,4 +60,9 @@ class Document extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    public function chunks(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(DocumentChunk::class);
+    }
 }
