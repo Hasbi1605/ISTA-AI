@@ -38,7 +38,7 @@ return [
         'document_summarize_enabled' => env('AI_DOCUMENT_SUMMARIZE_ENABLED', true),
         'document_delete_enabled' => env('AI_DOCUMENT_DELETE_ENABLED', true),
         'document_retrieval_enabled' => env('AI_DOCUMENT_RETRIEVAL_ENABLED', true),
-        'use_provider_file_search' => env('AI_USE_PROVIDER_FILE_SEARCH', true),
+        'use_provider_file_search' => env('AI_USE_PROVIDER_FILE_SEARCH', false),
     ],
 
     'cascade' => [
