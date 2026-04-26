@@ -274,16 +274,20 @@ class HybridRetrievalServiceTest extends TestCase
             'status' => 'ready',
         ]);
 
+        $otherParentId = md5('other_user_doc.pdf:' . $otherUser->id . ':0:Parent chunk from other us');
         $otherParent = DocumentChunk::create([
             'document_id' => $otherDoc->id,
             'chunk_type' => 'parent',
+            'parent_id' => $otherParentId,
             'parent_index' => 0,
             'text_content' => 'Parent chunk from other user - SECRET DATA',
         ]);
 
+        $userParentId = md5('test.pdf:' . $this->user->id . ':0:User parent chunk - a');
         $userParent = DocumentChunk::create([
             'document_id' => $this->document->id,
             'chunk_type' => 'parent',
+            'parent_id' => $userParentId,
             'parent_index' => 0,
             'text_content' => 'User parent chunk - allowed',
         ]);
@@ -295,7 +299,7 @@ class HybridRetrievalServiceTest extends TestCase
                 'filename' => 'test.pdf',
                 'chunk_index' => 0,
                 'chunk_id' => 999,
-                'parent_id' => $otherParent->id,
+                'parent_id' => $otherParentId,
                 'chunk_type' => 'child',
             ],
             [
@@ -304,7 +308,7 @@ class HybridRetrievalServiceTest extends TestCase
                 'filename' => 'test.pdf',
                 'chunk_index' => 1,
                 'chunk_id' => 998,
-                'parent_id' => $userParent->id,
+                'parent_id' => $userParentId,
                 'chunk_type' => 'child',
             ],
         ];
