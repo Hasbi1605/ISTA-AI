@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\Document\LaravelDocumentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -183,6 +184,36 @@ class LaravelDocumentServiceTest extends TestCase
         $this->assertGreaterThan(0, $tokens);
     }
 
+    public function test_build_summarization_prompt_uses_real_part_numbers_for_partial_mode(): void
+    {
+        $service = new LaravelDocumentService();
+
+        $reflection = new \ReflectionClass($service);
+        $method = $reflection->getMethod('buildSummarizationPrompt');
+        $method->setAccessible(true);
+
+        $prompt = $method->invoke($service, 'Isi batch contoh', 'partial', 2, 4);
+
+        $this->assertStringContainsString('bagian 2 dari 4', $prompt);
+        $this->assertStringContainsString('Isi batch contoh', $prompt);
+    }
+
+    public function test_build_summarization_prompt_uses_final_template_for_combine_mode(): void
+    {
+        $service = new LaravelDocumentService();
+
+        $reflection = new \ReflectionClass($service);
+        $method = $reflection->getMethod('buildSummarizationPrompt');
+        $method->setAccessible(true);
+
+        $prompt = $method->invoke($service, 'Ringkasan A' . "\n\n" . 'Ringkasan B', 'final', 1, 1);
+
+        $this->assertStringContainsString('Gabungkan ringkasan bagian-bagian berikut', $prompt);
+        $this->assertStringContainsString('Ringkasan A', $prompt);
+        $this->assertStringContainsString('Ringkasan B', $prompt);
+        $this->assertStringNotContainsString('Ini adalah bagian', $prompt);
+    }
+
     public function test_summarize_single_batch_with_document_chunks_returns_metadata(): void
     {
         Config::set('ai.laravel_ai.api_key', 'test-key');
@@ -211,9 +242,20 @@ class LaravelDocumentServiceTest extends TestCase
 
         $service = new class extends LaravelDocumentService {
             public array $cascadeCalls = [];
-            protected function summarizeWithCascade(string $content): array
+            protected function summarizeWithCascade(
+                string $content,
+                string $promptMode = 'single',
+                int $partNumber = 1,
+                int $totalParts = 1
+            ): array
             {
-                $this->cascadeCalls[] = $content;
+                $this->cascadeCalls[] = [
+                    'content' => $content,
+                    'prompt_mode' => $promptMode,
+                    'part_number' => $partNumber,
+                    'total_parts' => $totalParts,
+                ];
+
                 return [
                     'text' => 'Ringkasan AI dari dokumen.',
                     'model' => 'openai/gpt-4.1',
@@ -231,6 +273,9 @@ class LaravelDocumentServiceTest extends TestCase
         $this->assertEquals('doc-single.pdf', $result['sources'][0]['filename']);
         $this->assertEquals($document->id, $result['sources'][0]['document_id']);
         $this->assertCount(1, $service->cascadeCalls, 'Single-batch path should call cascade exactly once');
+        $this->assertSame('single', $service->cascadeCalls[0]['prompt_mode']);
+        $this->assertSame(1, $service->cascadeCalls[0]['part_number']);
+        $this->assertSame(1, $service->cascadeCalls[0]['total_parts']);
     }
 
     public function test_summarize_multi_batch_with_final_summary_returns_correct_metadata(): void
@@ -263,17 +308,30 @@ class LaravelDocumentServiceTest extends TestCase
         }
 
         $service = new class extends LaravelDocumentService {
-            public int $cascadeCallCount = 0;
-            protected function summarizeWithCascade(string $content): array
+            public array $cascadeCalls = [];
+            protected function summarizeWithCascade(
+                string $content,
+                string $promptMode = 'single',
+                int $partNumber = 1,
+                int $totalParts = 1
+            ): array
             {
-                $this->cascadeCallCount++;
-                if ($this->cascadeCallCount === 1) {
-                    return ['text' => 'Batch 1 summary', 'model' => 'groq/llama-3.3-70b', 'provider' => 'groq'];
+                $this->cascadeCalls[] = [
+                    'content' => $content,
+                    'prompt_mode' => $promptMode,
+                    'part_number' => $partNumber,
+                    'total_parts' => $totalParts,
+                ];
+
+                if ($promptMode === 'final') {
+                    return ['text' => 'Final combined summary', 'model' => 'openai/gpt-4o', 'provider' => 'github_models'];
                 }
-                if ($this->cascadeCallCount === 2) {
-                    return ['text' => 'Batch 2 summary', 'model' => 'groq/llama-3.3-70b', 'provider' => 'groq'];
-                }
-                return ['text' => 'Final combined summary', 'model' => 'openai/gpt-4o', 'provider' => 'github_models'];
+
+                return [
+                    'text' => "Batch {$partNumber} summary",
+                    'model' => 'groq/llama-3.3-70b',
+                    'provider' => 'groq',
+                ];
             }
         };
 
@@ -282,8 +340,22 @@ class LaravelDocumentServiceTest extends TestCase
         $this->assertEquals('success', $result['status']);
         $this->assertEquals('Final combined summary', $result['summary']);
         $this->assertEquals('openai/gpt-4o', $result['model'], 'Final summary model harus digunakan, bukan model batch');
-        $this->assertGreaterThanOrEqual(3, $service->cascadeCallCount, 'Multi-batch + final summary harus memicu setidaknya 3 cascade calls');
+        $this->assertGreaterThanOrEqual(3, count($service->cascadeCalls), 'Multi-batch + final summary harus memicu setidaknya 3 cascade calls');
         $this->assertNotEmpty($result['sources']);
+
+        $partialCalls = array_slice($service->cascadeCalls, 0, -1);
+        $finalCall = $service->cascadeCalls[count($service->cascadeCalls) - 1];
+
+        $this->assertNotEmpty($partialCalls);
+        foreach ($partialCalls as $index => $call) {
+            $this->assertSame('partial', $call['prompt_mode']);
+            $this->assertSame($index + 1, $call['part_number']);
+            $this->assertSame(count($partialCalls), $call['total_parts']);
+        }
+
+        $this->assertSame('final', $finalCall['prompt_mode']);
+        $this->assertSame(1, $finalCall['part_number']);
+        $this->assertSame(1, $finalCall['total_parts']);
     }
 
     public function test_summarize_fallback_provider_when_primary_fails(): void
@@ -318,7 +390,13 @@ class LaravelDocumentServiceTest extends TestCase
 
         $service = new class extends LaravelDocumentService {
             public array $providerCalls = [];
-            protected function runSummarizationOnNode(array $node, \Laravel\Ai\AnonymousAgent $agent, string $content): string
+            protected function runSummarizationOnNode(
+                array $node,
+                string $content,
+                string $promptMode = 'single',
+                int $partNumber = 1,
+                int $totalParts = 1
+            ): string
             {
                 $this->providerCalls[] = $node['model'];
 
@@ -373,5 +451,46 @@ class LaravelDocumentServiceTest extends TestCase
         $this->assertEquals('Ringkasan dari file fallback', $result['summary']);
         $this->assertNotEmpty($result['sources']);
         $this->assertEquals('file_attachment', $result['sources'][0]['mode']);
+    }
+
+    public function test_summarize_calls_chat_completions_endpoint_not_responses(): void
+    {
+        Config::set('ai.cascade.enabled', true);
+        Config::set('ai.cascade.nodes', [[
+            'label' => 'Test Node',
+            'provider' => 'openai',
+            'model' => 'test-model',
+            'api_key' => 'test-key',
+            'base_url' => 'https://test.example/v1',
+        ]]);
+
+        Http::fake([
+            'https://test.example/v1/chat/completions' => Http::response([
+                'choices' => [[
+                    'message' => ['content' => 'Ringkasan hasil dari /chat/completions'],
+                ]],
+            ], 200),
+            'https://test.example/v1/responses' => Http::response(
+                ['error' => ['code' => 'api_not_supported']],
+                404
+            ),
+        ]);
+
+        $service = new class extends LaravelDocumentService {
+            public function summarize(string $content): array
+            {
+                return $this->summarizeWithCascade($content);
+            }
+        };
+
+        $result = $service->summarize('konten dokumen test.');
+
+        $this->assertEquals('test-model', $result['model']);
+        $this->assertStringContainsString('/chat/completions', $result['text'] ?? '');
+
+        Http::assertSent(function ($request) {
+            return str_ends_with($request->url(), '/chat/completions')
+                && !str_ends_with($request->url(), '/responses');
+        });
     }
 }
