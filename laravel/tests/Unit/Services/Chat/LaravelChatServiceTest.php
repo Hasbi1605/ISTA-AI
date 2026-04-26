@@ -460,4 +460,50 @@ class LaravelChatServiceTest extends TestCase
         $this->assertCount(1, $results);
         $this->assertEquals('Single Result', $results[0]['title']);
     }
+
+    public function test_uses_langsearch_with_backup_key_only(): void
+    {
+        Config::set('ai.laravel_ai.model', 'gpt-4o-mini');
+        Config::set('ai.laravel_ai.api_key', 'test-key');
+        Config::set('ai.laravel_ai.web_search.enabled', true);
+        
+        Config::set('ai.langsearch.api_key', null);
+        Config::set('ai.langsearch.api_key_backup', 'backup-key');
+        Config::set('ai.langsearch.api_url', 'https://api.langsearch.com/v1/web-search');
+        
+        $service = new LaravelChatService();
+        
+        $reflection = new \ReflectionClass($service);
+        $property = $reflection->getProperty('useLangSearch');
+        $property->setAccessible(true);
+        
+        $this->assertTrue($property->getValue($service));
+    }
+
+    public function test_perform_lang_search_with_backup_key_only_returns_results(): void
+    {
+        Config::set('ai.langsearch.api_key', null);
+        Config::set('ai.langsearch.api_key_backup', 'backup-key');
+        Config::set('ai.langsearch.api_url', 'https://api.langsearch.com/v1/web-search');
+        
+        Http::fake([
+            'api.langsearch.com/v1/web-search' => Http::response([
+                'data' => [
+                    'webPages' => [
+                        'value' => [
+                            ['name' => 'Result from backup', 'snippet' => 'Desc', 'url' => 'https://backup.com'],
+                        ]
+                    ]
+                ]
+            ], 200),
+        ]);
+        
+        Cache::flush();
+        
+        $service = new LaravelChatService();
+        $results = $service->performLangSearch('test query');
+        
+        $this->assertCount(1, $results);
+        $this->assertEquals('Result from backup', $results[0]['title']);
+    }
 }

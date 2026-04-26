@@ -32,7 +32,7 @@ class LaravelChatService
         $this->cascadeEnabled = config('ai.cascade.enabled', true);
         $this->cascadeNodes = config('ai.cascade.nodes', []);
         $this->langSearchService = null;
-        $this->useLangSearch = config('ai.langsearch.api_key') !== null;
+        $this->useLangSearch = config('ai.langsearch.api_key') !== null || config('ai.langsearch.api_key_backup') !== null;
     }
 
     protected function getLangSearchService(): ?LangSearchService
