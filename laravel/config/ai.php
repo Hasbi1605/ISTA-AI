@@ -155,6 +155,17 @@ return [
         ],
     ],
 
+    'langsearch' => [
+        'api_key' => env('LANGSEARCH_API_KEY'),
+        'api_key_backup' => env('LANGSEARCH_API_KEY_BACKUP'),
+        'api_url' => env('LANGSEARCH_API_URL', 'https://api.langsearch.com/v1/web-search'),
+        'rerank_url' => env('LANGSEARCH_RERANK_URL', 'https://api.langsearch.com/v1/rerank'),
+        'rerank_model' => env('LANGSEARCH_RERANK_MODEL', 'langsearch-reranker-v1'),
+        'timeout' => env('LANGSEARCH_TIMEOUT', 10),
+        'rerank_timeout' => env('LANGSEARCH_RERANK_TIMEOUT', 8),
+        'cache_ttl' => env('LANGSEARCH_CACHE_TTL', 300),
+    ],
+
     'prompts' => [
         'rag' => <<<'PROMPT'
 Anda adalah asisten AI yang menjawab berdasarkan dokumen yang diberikan.
