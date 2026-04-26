@@ -101,15 +101,21 @@ class LaravelDocumentService
 
             if ($totalTokens <= $this->maxTokensPerBatch) {
                 $content = implode("\n\n", $chunks);
-                $result = $this->summarizeWithCascade($content);
+                $result = $this->summarizeWithCascade($content, 'single');
                 $summary = $result['text'] ?? '';
                 $usedModel = $result['model'] ?? $this->model;
             } else {
                 $batches = $this->createBatches($chunks);
                 $batchSummaries = [];
+                $totalBatches = count($batches);
 
-                foreach ($batches as $batchContent) {
-                    $batchResult = $this->summarizeWithCascade($batchContent);
+                foreach ($batches as $index => $batchContent) {
+                    $batchResult = $this->summarizeWithCascade(
+                        $batchContent,
+                        'partial',
+                        $index + 1,
+                        $totalBatches
+                    );
                     if (!empty($batchResult['text'])) {
                         $batchSummaries[] = $batchResult['text'];
                     }
@@ -125,7 +131,7 @@ class LaravelDocumentService
                 $combinedSummary = implode("\n\n", $batchSummaries);
 
                 if (count($batchSummaries) > 1) {
-                    $finalResult = $this->summarizeWithCascade($combinedSummary);
+                    $finalResult = $this->summarizeWithCascade($combinedSummary, 'final');
                     $summary = $finalResult['text'] ?? $combinedSummary;
                     $usedModel = $finalResult['model'] ?? $this->model;
                 } else {
@@ -296,21 +302,26 @@ class LaravelDocumentService
         return app(\Laravel\Ai\AiManager::class)->textProvider('temp_cascade');
     }
 
-    protected function summarizeWithCascade(string $content): array
+    protected function summarizeWithCascade(
+        string $content,
+        string $promptMode = 'single',
+        int $partNumber = 1,
+        int $totalParts = 1
+    ): array
     {
         $nodes = $this->cascadeEnabled && !empty($this->cascadeNodes)
             ? $this->cascadeNodes
             : [['label' => 'Default', 'provider' => 'openai', 'model' => $this->model, 'api_key' => config('ai.laravel_ai.api_key')]];
 
-        $agent = AnonymousAgent::make(
-            instructions: 'Anda adalah asisten AI yang merangkum dokumen. Berikan ringkasan singkat dan akurat dari bagian dokumen yang diberikan.',
-            messages: [],
-            tools: []
-        );
-
         foreach ($nodes as $node) {
             try {
-                $text = $this->runSummarizationOnNode($node, $agent, $content);
+                $text = $this->runSummarizationOnNode(
+                    $node,
+                    $content,
+                    $promptMode,
+                    $partNumber,
+                    $totalParts
+                );
                 return [
                     'text' => $text,
                     'model' => $node['model'],
@@ -326,7 +337,12 @@ class LaravelDocumentService
             }
         }
 
-        $text = $this->runSummarizationDefault($agent, $content);
+        $text = $this->runSummarizationDefault(
+            $content,
+            $promptMode,
+            $partNumber,
+            $totalParts
+        );
 
         return [
             'text' => $text,
@@ -335,18 +351,29 @@ class LaravelDocumentService
         ];
     }
 
-    protected function runSummarizationOnNode(array $node, AnonymousAgent $agent, string $content): string
+    protected function runSummarizationOnNode(
+        array $node,
+        string $content,
+        string $promptMode = 'single',
+        int $partNumber = 1,
+        int $totalParts = 1
+    ): string
     {
         return $this->callChatCompletion(
             baseUrl: $node['base_url'] ?? 'https://api.openai.com/v1',
             apiKey: $node['api_key'] ?? '',
             model: $node['model'],
             systemPrompt: $this->getSummarizationInstructions(),
-            userPrompt: $this->buildSummarizationPrompt($content),
+            userPrompt: $this->buildSummarizationPrompt($content, $promptMode, $partNumber, $totalParts),
         );
     }
 
-    protected function runSummarizationDefault(AnonymousAgent $agent, string $content): string
+    protected function runSummarizationDefault(
+        string $content,
+        string $promptMode = 'single',
+        int $partNumber = 1,
+        int $totalParts = 1
+    ): string
     {
         $baseUrl = config('ai.laravel_ai.base_url', 'https://api.openai.com/v1');
         $apiKey = config('ai.laravel_ai.api_key', '');
@@ -356,7 +383,7 @@ class LaravelDocumentService
             apiKey: $apiKey,
             model: $this->model,
             systemPrompt: $this->getSummarizationInstructions(),
-            userPrompt: $this->buildSummarizationPrompt($content),
+            userPrompt: $this->buildSummarizationPrompt($content, $promptMode, $partNumber, $totalParts),
         );
     }
 
@@ -421,18 +448,41 @@ class LaravelDocumentService
         return 'Anda adalah asisten AI yang merangkum dokumen. Berikan ringkasan singkat dan akurat dari bagian dokumen yang diberikan.';
     }
 
-    protected function buildSummarizationPrompt(string $content): string
+    protected function buildSummarizationPrompt(
+        string $content,
+        string $mode = 'single',
+        int $partNumber = 1,
+        int $totalParts = 1
+    ): string
     {
-        $template = config('ai.prompts.summarization.partial');
-        if (is_string($template) && trim($template) !== '') {
-            return str_replace(
-                ['{batch}', '{part_number}', '{total_parts}'],
-                [$content, '1', '1'],
-                $template
-            );
+        if ($mode === 'final') {
+            $template = config('ai.prompts.summarization.final');
+            if (is_string($template) && trim($template) !== '') {
+                return str_replace('{combined_summaries}', $content, $template);
+            }
+
+            return 'Gabungkan ringkasan bagian-bagian berikut menjadi ringkasan akhir yang padat dan akurat: ' . $content;
         }
 
-        return 'Rangkum bagian dokumen berikut dengan detail dan akurat: ' . $content;
+        if ($mode === 'partial') {
+            $template = config('ai.prompts.summarization.partial');
+            if (is_string($template) && trim($template) !== '') {
+                return str_replace(
+                    ['{batch}', '{part_number}', '{total_parts}'],
+                    [$content, (string) $partNumber, (string) $totalParts],
+                    $template
+                );
+            }
+
+            return 'Rangkum bagian dokumen berikut dengan detail dan akurat: ' . $content;
+        }
+
+        $template = config('ai.prompts.summarization.single');
+        if (is_string($template) && trim($template) !== '') {
+            return str_replace('{document}', $content, $template);
+        }
+
+        return 'Rangkum dokumen berikut dengan detail dan akurat: ' . $content;
     }
 
     public function deleteDocument(string $filename, ?string $userId = null): bool

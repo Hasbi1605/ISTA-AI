@@ -14,9 +14,9 @@ class PdfToImageRenderer
 
     public function __construct()
     {
-        $this->dpi = config('ai.vision_cascade.image_dpi', 150);
-        $this->format = config('ai.vision_cascade.image_format', 'png');
-        $this->maxPages = config('ai.vision_cascade.max_pages', 20);
+        $this->dpi = (int) config('ai.ocr.image_dpi', 200);
+        $this->format = config('ai.ocr.image_format', 'png');
+        $this->maxPages = (int) config('ai.ocr.max_pages', 20);
     }
 
     public function renderToImages(string $pdfPath): array

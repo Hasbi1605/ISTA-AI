@@ -23,6 +23,30 @@ class OcrServicesTest extends TestCase
         $this->assertInstanceOf(PdfToImageRenderer::class, $renderer);
     }
 
+    public function test_pdf_to_image_renderer_reads_image_settings_from_ocr_config(): void
+    {
+        config([
+            'ai.ocr.image_dpi' => 275,
+            'ai.ocr.image_format' => 'jpeg',
+            'ai.ocr.max_pages' => 7,
+            'ai.vision_cascade.max_pages' => 99,
+        ]);
+
+        $renderer = new PdfToImageRenderer();
+        $reflection = new \ReflectionClass($renderer);
+
+        $dpi = $reflection->getProperty('dpi');
+        $dpi->setAccessible(true);
+        $format = $reflection->getProperty('format');
+        $format->setAccessible(true);
+        $maxPages = $reflection->getProperty('maxPages');
+        $maxPages->setAccessible(true);
+
+        $this->assertSame(275, $dpi->getValue($renderer));
+        $this->assertSame('jpeg', $format->getValue($renderer));
+        $this->assertSame(7, $maxPages->getValue($renderer));
+    }
+
     public function test_ocr_orchestrator_can_be_instantiated(): void
     {
         config(['ai.ocr.enabled' => false]);

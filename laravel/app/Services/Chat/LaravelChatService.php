@@ -404,6 +404,7 @@ PROMPT;
     ): \Generator {
         $baseUrl = rtrim($node['base_url'] ?? 'https://api.openai.com/v1', '/');
         $url = $baseUrl . '/chat/completions';
+        $label = $node['label'] ?? $node['model'] ?? 'unknown';
 
         $body = [
             'model' => $node['model'],
@@ -413,6 +414,13 @@ PROMPT;
             ],
             'stream' => true,
         ];
+
+        Log::info('LaravelChatService: starting stream', [
+            'label' => $label,
+            'model' => $node['model'] ?? null,
+            'base_url' => $baseUrl,
+            'sources_count' => count($initialSources),
+        ]);
 
         $response = Http::withToken((string) ($node['api_key'] ?? ''))
             ->withHeaders(['Accept' => 'text/event-stream'])
@@ -471,6 +479,12 @@ PROMPT;
         if (!empty($sources)) {
             yield "\n[SOURCES:" . json_encode($sources) . "]\n";
         }
+
+        Log::info('LaravelChatService: stream completed', [
+            'label' => $label,
+            'model' => $node['model'] ?? null,
+            'sources_count' => count($sources),
+        ]);
     }
 
     protected function shouldFallback(\Throwable $e): bool
