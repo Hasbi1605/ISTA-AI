@@ -355,7 +355,11 @@ class LaravelDocumentRetrievalService implements DocumentRetrievalInterface
 
     protected function computeEmbeddingsForDocument(Document $document, string $model, int $dimensions): void
     {
-        $chunks = $document->chunks()->whereNull('embedding')->orWhere('embedding_model', '!=', $model)->get();
+        $chunks = $document->chunks()
+            ->where(function($q) use ($model) {
+                $q->whereNull('embedding')->orWhere('embedding_model', '!=', $model);
+            })
+            ->get();
         if ($chunks->isEmpty()) return;
 
         try {
@@ -369,14 +373,15 @@ class LaravelDocumentRetrievalService implements DocumentRetrievalInterface
 
             $i = 0;
             foreach ($batches as $index => $batch) {
-                $response = $this->embeddingCascade->embed($batch);
+                $response = $this->embeddingCascade->embed($batch, $model);
                 
                 $currentBatchChunks = $batchChunks->values()[$index];
                 foreach ($currentBatchChunks as $j => $chunk) {
+                    $actualEmbedding = $response->embeddings[$j];
                     $chunk->update([
-                        'embedding' => $response->embeddings[$j],
+                        'embedding' => $actualEmbedding,
                         'embedding_model' => $response->meta->model, // Use actual model returned
-                        'embedding_dimensions' => $dimensions,
+                        'embedding_dimensions' => count($actualEmbedding),
                     ]);
                 }
             }
@@ -520,7 +525,7 @@ class LaravelDocumentRetrievalService implements DocumentRetrievalInterface
 
     protected function cosineSimilarity(array $a, array $b): float
     {
-        if (empty($a) || empty($b)) {
+        if (empty($a) || empty($b) || count($a) !== count($b)) {
             return 0.0;
         }
 
@@ -528,8 +533,8 @@ class LaravelDocumentRetrievalService implements DocumentRetrievalInterface
         $normA = 0;
         $normB = 0;
 
-        $minLen = min(count($a), count($b));
-        for ($i = 0; $i < $minLen; $i++) {
+        $count = count($a);
+        for ($i = 0; $i < $count; $i++) {
             $dotProduct += $a[$i] * $b[$i];
             $normA += $a[$i] * $a[$i];
             $normB += $b[$i] * $b[$i];
