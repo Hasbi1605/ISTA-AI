@@ -293,17 +293,19 @@ class HybridRetrievalService
             $this->pdrParentOverlap
         );
 
-        $parentIds = [];
+        $filename = $document->original_name;
+        $userId = (string) $document->user_id;
         
         foreach ($parentChunks as $pIndex => $parentChunk) {
+            $parentId = md5("{$filename}:{$userId}:{$pIndex}:" . substr($parentChunk['content'], 0, 50));
+            
             $parent = $document->chunks()->create([
                 'text_content' => $parentChunk['content'],
                 'chunk_type' => 'parent',
+                'parent_id' => $parentId,
                 'parent_index' => $pIndex,
                 'page_number' => $parentChunk['page_number'] ?? null,
             ]);
-            
-            $parentIds[$parent->id] = $parent->id;
 
             $childChunks = $this->splitText(
                 $parentChunk['content'],
@@ -315,7 +317,7 @@ class HybridRetrievalService
                 $document->chunks()->create([
                     'text_content' => $childChunk['content'],
                     'chunk_type' => 'child',
-                    'parent_id' => $parent->id,
+                    'parent_id' => $parentId,
                     'child_index' => $cIndex,
                     'page_number' => $childChunk['page_number'] ?? null,
                 ]);
@@ -324,7 +326,7 @@ class HybridRetrievalService
 
         Log::info('HybridRetrievalService: PDR chunks created', [
             'document_id' => $document->id,
-            'parent_count' => count($parentIds),
+            'parent_count' => count($parentChunks),
         ]);
     }
 
@@ -670,11 +672,11 @@ class HybridRetrievalService
             return $childChunks;
         }
 
-        $parentChunks = DocumentChunk::whereIn('id', array_keys($parentIds))
+        $parentChunks = DocumentChunk::whereIn('parent_id', array_keys($parentIds))
             ->where('chunk_type', 'parent')
             ->whereHas('document', fn($q) => $q->where('user_id', (int) $userId))
             ->get()
-            ->keyBy('id');
+            ->keyBy('parent_id');
 
         if ($parentChunks->isEmpty()) {
             Log::warning('HybridRetrievalService: parent chunks not found', [

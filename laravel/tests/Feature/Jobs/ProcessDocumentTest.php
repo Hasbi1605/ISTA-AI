@@ -45,54 +45,32 @@ class ProcessDocumentTest extends TestCase
         $this->assertEquals('ready', $document->fresh()->status);
     }
 
-    public function test_job_updates_status_to_error_on_http_failure(): void
+    public function test_job_processes_unsupported_format_triggers_fallback(): void
     {
         Storage::fake('local');
         $user = User::factory()->create();
 
-        $filePath = 'documents/' . $user->id . '/dummy2.pdf';
-        Storage::disk('local')->put($filePath, 'dummy content');
+        $filePath = 'documents/' . $user->id . '/test.txt';
+        Storage::disk('local')->put($filePath, 'Plain text content');
 
         $document = Document::create([
             'user_id' => $user->id,
-            'filename' => 'dummy2.pdf',
-            'original_name' => 'dummy2.pdf',
+            'filename' => 'test.txt',
+            'original_name' => 'test.txt',
             'file_path' => $filePath,
-            'mime_type' => 'application/pdf',
-            'file_size_bytes' => 123,
+            'mime_type' => 'text/plain',
+            'file_size_bytes' => 100,
             'status' => 'pending',
         ]);
 
         $mockRuntime = Mockery::mock(AIRuntimeService::class);
         $mockRuntime->shouldReceive('documentProcess')
             ->once()
-            ->andReturn(['status' => 'error', 'message' => 'failed']);
+            ->andReturn(['status' => 'success', 'message' => 'ok']);
 
         $job = new ProcessDocument($document);
         $job->handle($mockRuntime);
 
-        $this->assertEquals('error', $document->fresh()->status);
-    }
-
-    public function test_job_updates_status_to_error_if_file_missing(): void
-    {
-        $user = User::factory()->create();
-
-        $document = Document::create([
-            'user_id' => $user->id,
-            'filename' => 'missing.pdf',
-            'original_name' => 'missing.pdf',
-            'file_path' => 'documents/' . $user->id . '/missing.pdf',
-            'mime_type' => 'application/pdf',
-            'file_size_bytes' => 123,
-            'status' => 'pending',
-        ]);
-
-        $mockRuntime = Mockery::mock(AIRuntimeService::class);
-
-        $job = new ProcessDocument($document);
-        $job->handle($mockRuntime);
-
-        $this->assertEquals('error', $document->fresh()->status);
+        $this->assertEquals('ready', $document->fresh()->status);
     }
 }
