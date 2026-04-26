@@ -4,6 +4,7 @@ namespace App\Services\Document;
 
 use App\Models\Document;
 use App\Models\DocumentChunk;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Laravel\Ai\AiManager;
 use Laravel\Ai\AnonymousAgent;
@@ -336,34 +337,88 @@ class LaravelDocumentService
 
     protected function runSummarizationOnNode(array $node, AnonymousAgent $agent, string $content): string
     {
-        $provider = $this->getProviderForNode($node, $agent);
-
-        $prompt = new AgentPrompt(
-            agent: $agent,
-            prompt: $this->buildSummarizationPrompt($content),
-            attachments: [],
-            provider: $provider,
+        return $this->callChatCompletion(
+            baseUrl: $node['base_url'] ?? 'https://api.openai.com/v1',
+            apiKey: $node['api_key'] ?? '',
             model: $node['model'],
+            systemPrompt: $this->getSummarizationInstructions(),
+            userPrompt: $this->buildSummarizationPrompt($content),
         );
-
-        $result = $provider->prompt($prompt);
-
-        return $result->text ?? '';
     }
 
     protected function runSummarizationDefault(AnonymousAgent $agent, string $content): string
     {
-        $defaultProvider = $this->ai->textProvider();
+        $baseUrl = config('ai.laravel_ai.base_url', 'https://api.openai.com/v1');
+        $apiKey = config('ai.laravel_ai.api_key', '');
 
-        $result = $defaultProvider->prompt(new AgentPrompt(
-            agent: $agent,
-            prompt: $this->buildSummarizationPrompt($content),
-            attachments: [],
-            provider: $defaultProvider,
+        return $this->callChatCompletion(
+            baseUrl: $baseUrl,
+            apiKey: $apiKey,
             model: $this->model,
-        ));
+            systemPrompt: $this->getSummarizationInstructions(),
+            userPrompt: $this->buildSummarizationPrompt($content),
+        );
+    }
 
-        return $result->text ?? '';
+    /**
+     * Call provider's `/chat/completions` directly. Bypasses laravel/ai SDK
+     * which always calls `/responses` (Responses API) — unsupported by GitHub
+     * Models endpoint that the cascade targets. Same approach as
+     * LaravelChatService::streamChatCompletion (PR #107) but for non-streaming
+     * summarization use case.
+     */
+    protected function callChatCompletion(
+        string $baseUrl,
+        string $apiKey,
+        string $model,
+        string $systemPrompt,
+        string $userPrompt
+    ): string {
+        $url = rtrim($baseUrl, '/') . '/chat/completions';
+
+        $response = Http::withToken($apiKey)
+            ->acceptJson()
+            ->asJson()
+            ->timeout((int) config('ai.summarization.http_timeout', 120))
+            ->post($url, [
+                'model' => $model,
+                'messages' => [
+                    ['role' => 'system', 'content' => $systemPrompt],
+                    ['role' => 'user', 'content' => $userPrompt],
+                ],
+                'temperature' => (float) config('ai.summarization.temperature', 0.2),
+            ]);
+
+        if (!$response->successful()) {
+            throw new \RuntimeException(sprintf(
+                'Summarization HTTP %d at %s: %s',
+                $response->status(),
+                $url,
+                substr((string) $response->body(), 0, 500)
+            ));
+        }
+
+        $payload = $response->json();
+        $text = $payload['choices'][0]['message']['content'] ?? '';
+
+        if (!is_string($text) || trim($text) === '') {
+            throw new \RuntimeException(
+                'Summarization returned empty content from ' . $url
+            );
+        }
+
+        return $text;
+    }
+
+    protected function getSummarizationInstructions(): string
+    {
+        $instructions = config('ai.prompts.summarization.instructions');
+
+        if (is_string($instructions) && trim($instructions) !== '') {
+            return $instructions;
+        }
+
+        return 'Anda adalah asisten AI yang merangkum dokumen. Berikan ringkasan singkat dan akurat dari bagian dokumen yang diberikan.';
     }
 
     protected function buildSummarizationPrompt(string $content): string

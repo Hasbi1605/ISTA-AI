@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\Document\LaravelDocumentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -373,5 +374,46 @@ class LaravelDocumentServiceTest extends TestCase
         $this->assertEquals('Ringkasan dari file fallback', $result['summary']);
         $this->assertNotEmpty($result['sources']);
         $this->assertEquals('file_attachment', $result['sources'][0]['mode']);
+    }
+
+    public function test_summarize_calls_chat_completions_endpoint_not_responses(): void
+    {
+        Config::set('ai.cascade.enabled', true);
+        Config::set('ai.cascade.nodes', [[
+            'label' => 'Test Node',
+            'provider' => 'openai',
+            'model' => 'test-model',
+            'api_key' => 'test-key',
+            'base_url' => 'https://test.example/v1',
+        ]]);
+
+        Http::fake([
+            'https://test.example/v1/chat/completions' => Http::response([
+                'choices' => [[
+                    'message' => ['content' => 'Ringkasan hasil dari /chat/completions'],
+                ]],
+            ], 200),
+            'https://test.example/v1/responses' => Http::response(
+                ['error' => ['code' => 'api_not_supported']],
+                404
+            ),
+        ]);
+
+        $service = new class extends LaravelDocumentService {
+            public function summarize(string $content): array
+            {
+                return $this->summarizeWithCascade($content);
+            }
+        };
+
+        $result = $service->summarize('konten dokumen test.');
+
+        $this->assertEquals('test-model', $result['model']);
+        $this->assertStringContainsString('/chat/completions', $result['text'] ?? '');
+
+        Http::assertSent(function ($request) {
+            return str_ends_with($request->url(), '/chat/completions')
+                && !str_ends_with($request->url(), '/responses');
+        });
     }
 }
