@@ -515,4 +515,47 @@ class ProcessDocumentTest extends TestCase
 
         $this->assertFalse($rendererCalled, 'Renderer must not be called when preview is already ready.');
     }
+
+    public function test_render_preview_job_discards_missing_document_models(): void
+    {
+        $user = User::factory()->create();
+
+        $document = Document::create([
+            'user_id' => $user->id,
+            'filename' => 'missing-preview.pdf',
+            'original_name' => 'missing-preview.pdf',
+            'file_path' => 'documents/'.$user->id.'/missing-preview.pdf',
+            'mime_type' => 'application/pdf',
+            'file_size_bytes' => 123,
+            'status' => 'ready',
+            'preview_status' => Document::PREVIEW_STATUS_PENDING,
+        ]);
+
+        $job = new RenderDocumentPreview($document);
+
+        $this->assertTrue($job->deleteWhenMissingModels);
+    }
+
+    public function test_render_preview_failed_hook_skips_deleted_document(): void
+    {
+        $user = User::factory()->create();
+
+        $document = Document::create([
+            'user_id' => $user->id,
+            'filename' => 'deleted-preview.pdf',
+            'original_name' => 'deleted-preview.pdf',
+            'file_path' => 'documents/'.$user->id.'/deleted-preview.pdf',
+            'mime_type' => 'application/pdf',
+            'file_size_bytes' => 123,
+            'status' => 'ready',
+            'preview_status' => Document::PREVIEW_STATUS_PENDING,
+        ]);
+
+        $job = new RenderDocumentPreview($document);
+        $document->delete();
+
+        $job->failed(new \RuntimeException('Preview render failed after delete'));
+
+        $this->assertDatabaseMissing('documents', ['id' => $document->id]);
+    }
 }

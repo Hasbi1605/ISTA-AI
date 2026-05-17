@@ -3,6 +3,7 @@
 namespace Tests\Feature\Documents;
 
 use App\Livewire\Chat\ChatIndex;
+use App\Models\CloudStorageFile;
 use App\Models\Document;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -33,6 +34,17 @@ class DocumentDeletionTest extends TestCase
             'file_size_bytes' => 123,
             'status' => 'ready',
         ]);
+        CloudStorageFile::create([
+            'user_id' => $user->id,
+            'provider' => 'google_drive',
+            'direction' => CloudStorageFile::DIRECTION_IMPORT,
+            'local_type' => Document::class,
+            'local_id' => $document->id,
+            'external_id' => 'drive-document-delete-test',
+            'name' => 'delete_chat.pdf',
+            'mime_type' => 'application/pdf',
+            'synced_at' => now(),
+        ]);
 
         Http::fake([
             '*' => Http::response(['message' => 'success'], 200),
@@ -43,6 +55,10 @@ class DocumentDeletionTest extends TestCase
             ->call('deleteDocument', $document->id);
 
         $this->assertDatabaseMissing('documents', ['id' => $document->id]);
+        $this->assertDatabaseMissing('cloud_storage_files', [
+            'local_type' => Document::class,
+            'local_id' => $document->id,
+        ]);
         Storage::disk('local')->assertMissing($filePath);
         $component->assertSee('Dokumen berhasil dihapus.');
         Http::assertSent(function ($request) use ($document, $user) {

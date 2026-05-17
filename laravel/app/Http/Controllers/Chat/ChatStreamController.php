@@ -121,7 +121,7 @@ class ChatStreamController extends Controller
         Conversation $conversation,
         \App\Models\User $user,
     ): void {
-        $streamClaimKey = $orchestrator->acquireStreamClaim($conversationId);
+        $streamClaimKey = $orchestrator->acquireStreamRunner($conversationId);
         if ($streamClaimKey === null) {
             // Runner lain (job/stream lain) sudah claim latest user message.
             $this->sendSseEvent('done', '1');
