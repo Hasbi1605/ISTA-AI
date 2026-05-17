@@ -97,6 +97,44 @@
                             try {
                                 const container = document.getElementById(this.containerId);
                                 if (container) { container.innerHTML = ''; }
+                                const documentKey = this.config?.document?.key || this.containerId;
+                                window.memoOnlyOfficeState = window.memoOnlyOfficeState || {};
+                                window.memoOnlyOfficeState[documentKey] = {
+                                    containerId: this.containerId,
+                                    dirty: false,
+                                    lastChangeAt: 0,
+                                    lastReadyAt: Date.now(),
+                                };
+                                const existingEvents = this.config.events || {};
+                                this.config.events = {
+                                    ...existingEvents,
+                                    onDocumentReady: (...args) => {
+                                        window.memoOnlyOfficeState[documentKey] = {
+                                            ...(window.memoOnlyOfficeState[documentKey] || {}),
+                                            containerId: this.containerId,
+                                            dirty: false,
+                                            lastReadyAt: Date.now(),
+                                        };
+                                        existingEvents.onDocumentReady?.(...args);
+                                    },
+                                    onDocumentStateChange: (event) => {
+                                        window.memoOnlyOfficeState[documentKey] = {
+                                            ...(window.memoOnlyOfficeState[documentKey] || {}),
+                                            containerId: this.containerId,
+                                            dirty: Boolean(event?.data),
+                                            lastChangeAt: Date.now(),
+                                        };
+                                        existingEvents.onDocumentStateChange?.(event);
+                                    },
+                                    onError: (...args) => {
+                                        window.memoOnlyOfficeState[documentKey] = {
+                                            ...(window.memoOnlyOfficeState[documentKey] || {}),
+                                            containerId: this.containerId,
+                                            lastErrorAt: Date.now(),
+                                        };
+                                        existingEvents.onError?.(...args);
+                                    },
+                                };
                                 this.editor = new DocsAPI.DocEditor(this.containerId, this.config);
                             } catch (error) {
                                 console.error('OnlyOffice editor gagal dimuat', error);
@@ -113,6 +151,10 @@
                     destroy() {
                         if (this.editor && typeof this.editor.destroyEditor === 'function') {
                             this.editor.destroyEditor();
+                        }
+                        const documentKey = this.config?.document?.key || this.containerId;
+                        if (window.memoOnlyOfficeState?.[documentKey]) {
+                            window.memoOnlyOfficeState[documentKey].destroyedAt = Date.now();
                         }
                         this.editor = null;
                     }

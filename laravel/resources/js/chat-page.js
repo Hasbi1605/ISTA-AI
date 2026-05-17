@@ -2607,6 +2607,7 @@ const registerChatPageData = (Alpine) => {
             this.downloadError = '';
 
             try {
+                await this.waitForOnlyOfficeToSettle();
                 await this.forceSaveMemo(forceSaveUrl, versionId);
                 this.downloadStatus = type === 'pdf' ? 'Menyiapkan PDF...' : 'Menyiapkan DOCX...';
 
@@ -2634,6 +2635,37 @@ const registerChatPageData = (Alpine) => {
                 this.downloadLoading = null;
                 this.downloadStatus = '';
             }
+        },
+
+        async waitForOnlyOfficeToSettle() {
+            const minQuietMs = 900;
+            const maxWaitMs = 2500;
+            const startedAt = Date.now();
+
+            await this.sleep(1000);
+
+            while (Date.now() - startedAt < maxWaitMs) {
+                const state = this.latestOnlyOfficeState();
+                const lastChangeAt = Number(state?.lastChangeAt || 0);
+
+                if (!lastChangeAt || Date.now() - lastChangeAt >= minQuietMs) {
+                    return;
+                }
+
+                await this.sleep(Math.min(250, minQuietMs - (Date.now() - lastChangeAt)));
+            }
+        },
+
+        latestOnlyOfficeState() {
+            const states = Object.values(window.memoOnlyOfficeState || {});
+
+            return states
+                .filter((state) => !state?.destroyedAt || Number(state.destroyedAt) < Number(state.lastReadyAt || state.lastChangeAt || 0))
+                .sort((a, b) => Number(b?.lastChangeAt || b?.lastReadyAt || 0) - Number(a?.lastChangeAt || a?.lastReadyAt || 0))[0] || null;
+        },
+
+        sleep(ms) {
+            return new Promise((resolve) => window.setTimeout(resolve, Math.max(0, Number(ms) || 0)));
         },
 
         async forceSaveMemo(url, versionId = null) {
@@ -2829,6 +2861,8 @@ const registerChatPageData = (Alpine) => {
                 return;
             }
 
+            await this.waitForOnlyOfficeToSettle();
+
             const baseUrl = this.$root?.dataset?.memoForceSaveBaseUrl || '/chat/memos';
             const versionId = $wire.activeMemoVersionId || document.getElementById('memo-version-select')?.value || null;
             const response = await fetch(`${baseUrl}/${memoId}/force-save`, {
@@ -2850,6 +2884,37 @@ const registerChatPageData = (Alpine) => {
                 const message = await this.errorMessage(response);
                 throw new Error(message || 'Perubahan editor belum tersimpan.');
             }
+        },
+
+        async waitForOnlyOfficeToSettle() {
+            const minQuietMs = 900;
+            const maxWaitMs = 2500;
+            const startedAt = Date.now();
+
+            await this.sleep(1000);
+
+            while (Date.now() - startedAt < maxWaitMs) {
+                const state = this.latestOnlyOfficeState();
+                const lastChangeAt = Number(state?.lastChangeAt || 0);
+
+                if (!lastChangeAt || Date.now() - lastChangeAt >= minQuietMs) {
+                    return;
+                }
+
+                await this.sleep(Math.min(250, minQuietMs - (Date.now() - lastChangeAt)));
+            }
+        },
+
+        latestOnlyOfficeState() {
+            const states = Object.values(window.memoOnlyOfficeState || {});
+
+            return states
+                .filter((state) => !state?.destroyedAt || Number(state.destroyedAt) < Number(state.lastReadyAt || state.lastChangeAt || 0))
+                .sort((a, b) => Number(b?.lastChangeAt || b?.lastReadyAt || 0) - Number(a?.lastChangeAt || a?.lastReadyAt || 0))[0] || null;
+        },
+
+        sleep(ms) {
+            return new Promise((resolve) => window.setTimeout(resolve, Math.max(0, Number(ms) || 0)));
         },
 
         getCsrfToken() {
