@@ -298,6 +298,46 @@ class MemoPolicyTest extends TestCase
             ->assertJson(['status' => 'no_changes']);
     }
 
+    public function test_force_save_retries_transient_command_failure(): void
+    {
+        config([
+            'services.onlyoffice.jwt_secret' => 'force-secret',
+            'services.onlyoffice.internal_url' => 'http://onlyoffice',
+            'services.onlyoffice.force_save_wait_seconds' => 1,
+            'services.onlyoffice.force_save_poll_microseconds' => 1000,
+            'services.onlyoffice.force_save_command_attempts' => 2,
+            'services.onlyoffice.force_save_command_retry_microseconds' => 50000,
+        ]);
+
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        $memo = $this->createMemo($user);
+        $attempts = 0;
+
+        Http::fake(function (HttpRequest $request) use (&$attempts, $memo) {
+            if (str_starts_with($request->url(), 'http://onlyoffice/command')) {
+                $attempts++;
+
+                if ($attempts === 1) {
+                    return Http::response(['error' => 'temporary'], 502);
+                }
+
+                $commandPayload = (new JwtSigner('force-secret'))->verify((string) $request->data()['token']);
+                app(MemoForceSaveService::class)->markSucceeded((string) $commandPayload['userdata'], $memo);
+
+                return Http::response(['error' => 0], 200);
+            }
+
+            return Http::response('unexpected request', 500);
+        });
+
+        $this->actingAs($user)
+            ->postJson(route('memos.force-save', $memo))
+            ->assertOk()
+            ->assertJson(['status' => 'saved']);
+
+        $this->assertSame(2, $attempts);
+    }
+
     protected function createMemo(User $user): Memo
     {
         return Memo::create([

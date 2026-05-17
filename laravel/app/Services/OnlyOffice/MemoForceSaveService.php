@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 
 class MemoForceSaveService
 {
@@ -36,15 +37,38 @@ class MemoForceSaveService
             'exp' => time() + 300,
         ];
 
-        $response = Http::acceptJson()
-            ->asJson()
-            ->timeout($this->commandTimeout())
-            ->post($this->commandUrl($documentKey), [
-                'token' => app(JwtSigner::class)->sign($payload),
-            ]);
+        $response = null;
+        $lastException = null;
 
-        if (! $response->successful()) {
+        for ($attempt = 1; $attempt <= $this->commandAttempts(); $attempt++) {
+            try {
+                $response = Http::acceptJson()
+                    ->asJson()
+                    ->timeout($this->commandTimeout())
+                    ->post($this->commandUrl($documentKey), [
+                        'token' => app(JwtSigner::class)->sign($payload),
+                    ]);
+
+                if ($response->successful()) {
+                    break;
+                }
+            } catch (Throwable $e) {
+                $lastException = $e;
+            }
+
+            if ($attempt < $this->commandAttempts()) {
+                usleep($this->commandRetryMicroseconds());
+            }
+        }
+
+        if (! $response?->successful()) {
             Cache::forget($cacheKey);
+            logger()->warning('OnlyOffice force-save command failed', [
+                'memo_id' => $memo->id,
+                'version_id' => $version?->id,
+                'status' => $response?->status(),
+                'error' => $lastException?->getMessage(),
+            ]);
 
             throw new ForceSaveException(
                 'OnlyOffice belum bisa menyimpan perubahan editor.',
@@ -174,6 +198,16 @@ class MemoForceSaveService
     protected function commandTimeout(): int
     {
         return max(1, (int) config('services.onlyoffice.force_save_command_timeout', 10));
+    }
+
+    protected function commandAttempts(): int
+    {
+        return max(1, (int) config('services.onlyoffice.force_save_command_attempts', 2));
+    }
+
+    protected function commandRetryMicroseconds(): int
+    {
+        return max(50_000, (int) config('services.onlyoffice.force_save_command_retry_microseconds', 300_000));
     }
 
     protected function pollMicroseconds(): int
