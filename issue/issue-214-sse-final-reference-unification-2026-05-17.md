@@ -40,3 +40,20 @@ Typewriter SSE sudah memakai bubble yang sama dengan jawaban final, tetapi pada 
 - Source cards tidak duplikat untuk URL/dokumen yang sama.
 - Final-content tidak membuat typewriter terasa reset/terpotong untuk perubahan kecil.
 - Verifikasi relevan lulus atau kegagalan dijelaskan.
+
+## Follow-up: Race Polling vs SSE
+
+### Temuan
+Perbaikan referensi belum menyelesaikan typewriter 2x karena ada race berbeda:
+
+- `wire:poll.3s="refreshPendingChatState"` tetap aktif selama pending conversation.
+- SSE menyimpan assistant message ke database sebelum typewriter browser selesai mengetik.
+- Jika polling berjalan di sela itu, Livewire memanggil `refreshPendingChatState()` tanpa `alreadyStreamedMessageId`.
+- Backend menganggap jawaban selesai lewat fallback/background dan mengisi `$newMessageId`.
+- Blade lalu merender assistant final dengan `assistantTypewriter`, sehingga user melihat typewriter live SSE lalu typewriter final output.
+
+### Fix Lanjutan
+1. Tambahkan marker backend bahwa conversation aktif sedang menunggu SSE live.
+2. Saat polling biasa melihat completion untuk conversation yang sedang SSE, jangan set `$newMessageId`, jangan render bubble persisted, dan jangan dispatch `assistant-message-persisted` non-preserve untuk conversation itu.
+3. Saat SSE `done` datang dengan `message-id`, preserve bubble live walaupun polling sebelumnya sudah menghapus conversation dari pending list.
+4. Jika stream error/gagal, frontend melepas marker backend agar polling fallback bisa menampilkan error/jawaban final.

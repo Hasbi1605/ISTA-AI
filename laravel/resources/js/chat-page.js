@@ -913,6 +913,7 @@ const registerChatPageData = (Alpine) => {
                 if (msg && this.isActiveConversation(conversationId)) {
                     this.stalePendingWarning = msg;
                 }
+                this.markStreamFailed(conversationId);
                 this.closeChatStream(conversationId);
                 // Polling will recover the final state from DB
             });
@@ -935,6 +936,7 @@ const registerChatPageData = (Alpine) => {
             });
 
             es.onerror = () => {
+                this.markStreamFailed(conversationId);
                 this.closeChatStream(conversationId);
             };
         },
@@ -1040,6 +1042,14 @@ const registerChatPageData = (Alpine) => {
             this.streamingFinalText = rawFinalText !== '' ? rawFinalText : null;
             this.streaming = true;
             this.queueAssistantTypewriterFinalText(normalizedFinalText);
+        },
+
+        markStreamFailed(conversationId) {
+            if (!this.$wire || typeof this.$wire.markStreamFailed !== 'function') {
+                return;
+            }
+
+            this.$wire.markStreamFailed(conversationId);
         },
 
         refreshPendingAfterStreamingSettles(conversationId, streamedMessageId = null) {

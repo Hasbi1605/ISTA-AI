@@ -492,6 +492,7 @@ class ChatUiTest extends TestCase
         $this->assertStringContainsString('queueFinalStreamingText(finalText)', $chatPageJs);
         $this->assertStringContainsString('refreshPendingAfterStreamingSettles(conversationId, streamedMessageId', $chatPageJs);
         $this->assertStringContainsString('refreshPendingChatState(streamedMessageId, this.isActiveConversation(conversationId))', $chatPageJs);
+        $this->assertStringContainsString('markStreamFailed(conversationId)', $chatPageJs);
         $this->assertStringContainsString('shouldPreserveCurrentStream', $chatPageJs);
         $this->assertStringContainsString('preserveStream', $chatPageJs);
         $this->assertStringContainsString('afterStreamingTypewriterSettles(() => {', $chatPageJs);
@@ -1278,6 +1279,70 @@ class ChatUiTest extends TestCase
         $messages = collect($component->get('messages'));
         $this->assertTrue($messages->contains(fn (array $message) => (int) ($message['id'] ?? 0) === (int) $assistant->id));
         $this->assertTrue($messages->contains(fn (array $message) => $message['content'] === 'Jawaban SSE tetap memakai bubble live.'));
+    }
+
+    public function test_polling_during_active_stream_does_not_trigger_final_typewriter(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::create([
+            'user_id' => $user->id,
+            'title' => 'Polling while SSE stream test',
+        ]);
+
+        Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'user',
+            'content' => 'Tolong jawab lewat SSE tanpa typewriter kedua.',
+        ]);
+
+        $component = Livewire::actingAs($user)
+            ->test(ChatIndex::class, ['id' => $conversation->id])
+            ->set('streamingConversationId', $conversation->id)
+            ->assertSet('pendingConversationIds', [$conversation->id]);
+
+        $assistant = Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'assistant',
+            'content' => 'Jawaban SSE sudah tersimpan tetapi typewriter live belum selesai.',
+        ]);
+        $conversation->touch();
+
+        $component
+            ->call('refreshPendingChatState')
+            ->assertSet('pendingConversationIds', [$conversation->id])
+            ->assertSet('newMessageId', null)
+            ->assertSet('preservedStreamMessageId', null)
+            ->assertSet('streamingConversationId', $conversation->id)
+            ->assertDontSee('Jawaban SSE sudah tersimpan tetapi typewriter live belum selesai.', false)
+            ->assertDontSee('wire:key="msg-typing-'.$assistant->id.'"', false);
+
+        $component
+            ->call('refreshPendingChatState', $assistant->id, true)
+            ->assertSet('newMessageId', null)
+            ->assertSet('preservedStreamMessageId', $assistant->id)
+            ->assertSet('streamingConversationId', null)
+            ->assertDontSee('wire:key="chat-message-'.$assistant->id.'"', false)
+            ->assertDontSee('wire:key="msg-typing-'.$assistant->id.'"', false)
+            ->assertDispatched('assistant-message-persisted', function (string $_event, array $payload) use ($conversation, $assistant) {
+                return (int) ($payload['conversationId'] ?? 0) === (int) $conversation->id
+                    && (int) ($payload['messageId'] ?? 0) === (int) $assistant->id
+                    && (bool) ($payload['preserveStream'] ?? false) === true;
+            });
+    }
+
+    public function test_stream_failure_clears_streaming_conversation_marker_for_polling_fallback(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::create([
+            'user_id' => $user->id,
+            'title' => 'SSE failure fallback marker test',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ChatIndex::class, ['id' => $conversation->id])
+            ->set('streamingConversationId', $conversation->id)
+            ->call('markStreamFailed', $conversation->id)
+            ->assertSet('streamingConversationId', null);
     }
 
     public function test_refresh_pending_chat_state_does_not_load_completed_inactive_conversation(): void
