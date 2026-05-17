@@ -43,6 +43,17 @@ def _require_safe_filename(filename: str | None) -> str:
     return base
 
 
+def _require_supported_extension(filename: str) -> str:
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Tipe file .{ext} tidak didukung. Gunakan: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
+        )
+
+    return ext
+
+
 def _stream_upload_with_limit(upload_file: UploadFile, dest_path: str) -> None:
     """Write *upload_file* to *dest_path* in chunks.
 
@@ -95,12 +106,7 @@ def upload_document(
 
     file_id = str(uuid.uuid4())
     safe_filename = _require_safe_filename(file.filename)
-    ext = safe_filename.rsplit(".", 1)[-1].lower() if "." in safe_filename else ""
-    if ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Tipe file .{ext} tidak didukung. Gunakan: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
-        )
+    _require_supported_extension(safe_filename)
     temp_file_path = os.path.join(temp_dir, f"{file_id}_{safe_filename}")
 
     try:
@@ -190,6 +196,7 @@ def extract_tables_endpoint(file: UploadFile = File(...)):
 
     file_id = str(uuid.uuid4())
     safe_filename = _require_safe_filename(file.filename)
+    _require_supported_extension(safe_filename)
     temp_file_path = os.path.join(temp_dir, f"{file_id}_{safe_filename}")
 
     try:
@@ -218,6 +225,7 @@ def extract_content_endpoint(file: UploadFile = File(...)):
 
     file_id = str(uuid.uuid4())
     safe_filename = _require_safe_filename(file.filename)
+    _require_supported_extension(safe_filename)
     temp_file_path = os.path.join(temp_dir, f"{file_id}_{safe_filename}")
 
     try:

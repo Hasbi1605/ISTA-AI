@@ -15,15 +15,24 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class MemoWorkspace extends Component
 {
     private const DRAFT_THREAD_KEY = 'draft';
 
+    private const HISTORY_LOAD_LIMIT = 100;
+
     public ?int $activeMemoId = null;
 
     public ?int $activeMemoVersionId = null;
+
+    #[Locked]
+    public ?array $editorConfigCache = null;
+
+    #[Locked]
+    public ?string $editorConfigCacheSignature = null;
 
     public string $memoType = 'memo_internal';
 
@@ -434,6 +443,8 @@ class MemoWorkspace extends Component
     public function editorConfig(): ?array
     {
         if (! $this->activeMemoId) {
+            $this->forgetEditorConfigCache();
+
             return null;
         }
 
@@ -443,6 +454,8 @@ class MemoWorkspace extends Component
             ->first();
 
         if (! $memo) {
+            $this->forgetEditorConfigCache();
+
             return null;
         }
 
@@ -451,13 +464,26 @@ class MemoWorkspace extends Component
         $filePath = $version?->file_path ?: $memo->file_path;
 
         if (! $filePath) {
+            $this->forgetEditorConfigCache();
+
             return null;
+        }
+
+        $versionId = $version?->id;
+        $cacheSignature = implode(':', [
+            Auth::id(),
+            $memo->id,
+            $versionId ?? 'current',
+            $filePath,
+        ]);
+
+        if ($this->editorConfigCacheSignature === $cacheSignature && $this->editorConfigCache !== null) {
+            return $this->editorConfigCache;
         }
 
         $signer = app(JwtSigner::class);
         $laravelInternalUrl = rtrim((string) config('services.onlyoffice.laravel_internal_url', config('app.url')), '/');
         $ttlMinutes = max(1, (int) config('services.onlyoffice.signed_url_ttl_minutes', 30));
-        $versionId = $version?->id;
         $ooToken = app(MemoDocumentKey::class)->generateFileToken($memo, $versionId, $ttlMinutes);
         $documentPath = URL::temporarySignedRoute('memos.file.signed', now()->addMinutes($ttlMinutes), array_filter([
             'memo' => $memo,
@@ -495,7 +521,16 @@ class MemoWorkspace extends Component
 
         $config['token'] = $signer->sign($config);
 
-        return $config;
+        $this->editorConfigCacheSignature = $cacheSignature;
+        $this->editorConfigCache = $config;
+
+        return $this->editorConfigCache;
+    }
+
+    protected function forgetEditorConfigCache(): void
+    {
+        $this->editorConfigCache = null;
+        $this->editorConfigCacheSignature = null;
     }
 
     protected function editorMemoVersion(Memo $memo): ?MemoVersion
@@ -519,6 +554,8 @@ class MemoWorkspace extends Component
         $memos = Memo::with('currentVersion')
             ->where('user_id', Auth::id())
             ->orderBy('updated_at', 'desc')
+            ->orderBy('id', 'desc')
+            ->limit(self::HISTORY_LOAD_LIMIT)
             ->get();
 
         $activeMemoVersions = $this->activeMemoId
@@ -929,6 +966,7 @@ class MemoWorkspace extends Component
     {
         $value = preg_replace('/\s+/u', ' ', trim($value)) ?? $value;
         $value = preg_replace('/[\.,;]\s+(?:bagian\s+(?:isi|lain|lainnya)|metadata|data\s+(?:lain|lainnya|yang\s+lain)|yang\s+lain|lainnya)\b.*$/iu', '', $value) ?? $value;
+        $value = preg_replace('/\s+(?:untuk|agar|supaya)\s+(?:semua|bagian|memo|dokumen|selanjutnya)\b.*$/iu', '', $value) ?? $value;
         $value = preg_replace('/^(?:untuk|kepada|ke)\s+/iu', '', $value) ?? $value;
 
         return trim($value, " \t\n\r\0\x0B\"'.,;:");

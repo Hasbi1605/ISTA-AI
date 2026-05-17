@@ -50,6 +50,8 @@ class OnlyOfficeCallbackController extends Controller
         // ── Status 4: no users currently editing ────────────────────────────
         // All editors have closed the document; no file to save. Acknowledge.
         if ($status === 4) {
+            app(MemoDocumentKey::class)->invalidateEditorKey($memo, $version);
+
             return response()->json(['error' => 0]);
         }
 
@@ -189,9 +191,6 @@ class OnlyOfficeCallbackController extends Controller
                         app(MemoForceSaveService::class)->markSucceeded((string) ($callback['userdata'] ?? ''), $memo, $version);
                     }
 
-                    if ($status === 2) {
-                        app(MemoDocumentKey::class)->invalidateEditorKey($memo, $version);
-                    }
                 });
             } finally {
                 @unlink($tempPath);

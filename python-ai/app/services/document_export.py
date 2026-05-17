@@ -489,6 +489,9 @@ def export_content(content_html: str, target_format: str, file_name: str | None 
 
     tables = _extract_tables_from_html(content_html)
 
+    if target in {"xlsx", "csv"} and not tables:
+        raise ValueError("Format spreadsheet hanya tersedia untuk konten yang memiliki tabel.")
+
     if target == "xlsx":
         return ExportArtifact(
             filename=f"{base_name}.xlsx",

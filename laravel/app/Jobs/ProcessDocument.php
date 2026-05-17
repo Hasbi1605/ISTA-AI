@@ -34,8 +34,6 @@ class ProcessDocument implements ShouldQueue
      * the queue to silently discard the job instead of throwing an exception.
      *
      * Soft-deleted documents are handled inside handle() via fresh()->trashed().
-     *
-     * @var bool
      */
     public bool $deleteWhenMissingModels = true;
 
@@ -151,24 +149,24 @@ class ProcessDocument implements ShouldQueue
             return;
         }
 
-            // 3. Send to Python Microservice (with extended timeout for embedding)
-            $pythonUrl = rtrim((string) config('services.ai_document_service.url', config('services.ai_service.url', 'http://127.0.0.1:8001')), '/')
-                .'/api/documents/process';
-            $token = config('services.ai_document_service.token', config('services.ai_service.token'));
+        // 3. Send to Python Microservice (with extended timeout for embedding)
+        $pythonUrl = rtrim((string) config('services.ai_document_service.url', config('services.ai_service.url', 'http://127.0.0.1:8001')), '/')
+            .'/api/documents/process';
+        $token = config('services.ai_document_service.token', config('services.ai_service.token'));
 
-            $response = Http::timeout(900) // 15 minutes timeout for large documents
-                ->withHeaders([
-                    'Authorization' => "Bearer {$token}",
-                ])
-                ->attach(
-                    'file',
-                    $fileContent,
-                    $this->document->original_name
-                )
-                ->post($pythonUrl, [
-                    'user_id' => (string) $this->document->user_id,
-                    'document_id' => (string) $this->document->id,
-                ]);
+        $response = Http::timeout(900) // 15 minutes timeout for large documents
+            ->withHeaders([
+                'Authorization' => "Bearer {$token}",
+            ])
+            ->attach(
+                'file',
+                $fileContent,
+                $this->document->original_name
+            )
+            ->post($pythonUrl, [
+                'user_id' => (string) $this->document->user_id,
+                'document_id' => (string) $this->document->id,
+            ]);
 
         if ($response->successful()) {
             $freshDocument = $this->document->fresh();
@@ -233,8 +231,8 @@ class ProcessDocument implements ShouldQueue
 
             $this->document = $freshDocument;
 
-                // 5. Dispatch preview rendering job as a fallback if the
-                // eager upload-time dispatch has not already completed it.
+            // 5. Dispatch preview rendering job as a fallback if the
+            // eager upload-time dispatch has not already completed it.
             try {
                 $freshDocument = $this->document->fresh();
                 if ($freshDocument !== null && $freshDocument->preview_status !== Document::PREVIEW_STATUS_READY) {
@@ -269,7 +267,11 @@ class ProcessDocument implements ShouldQueue
             return;
         }
 
-        $this->document->update(['status' => 'error']);
+        Document::query()
+            ->whereKey($this->document->id)
+            ->whereIn('status', ['pending', 'processing'])
+            ->update(['status' => 'error']);
+
         logger()->error("Document processing permanently failed for ID {$this->document->id}: ".$exception->getMessage());
     }
 

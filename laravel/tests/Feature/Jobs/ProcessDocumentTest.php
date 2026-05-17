@@ -6,7 +6,9 @@ use App\Jobs\ProcessDocument;
 use App\Jobs\RenderDocumentPreview;
 use App\Models\Document;
 use App\Models\User;
+use App\Services\Documents\DocumentPreviewRenderer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
@@ -35,7 +37,7 @@ class ProcessDocumentTest extends TestCase
         $user = User::factory()->create();
 
         // Create dummy file
-        $filePath = 'documents/' . $user->id . '/dummy.pdf';
+        $filePath = 'documents/'.$user->id.'/dummy.pdf';
         Storage::disk('local')->put($filePath, 'dummy content');
 
         $document = Document::create([
@@ -68,7 +70,7 @@ class ProcessDocumentTest extends TestCase
         config()->set('services.ai_document_service.url', 'http://python-ai-docs:8002');
         $user = User::factory()->create();
 
-        $filePath = 'documents/' . $user->id . '/dummy2.pdf';
+        $filePath = 'documents/'.$user->id.'/dummy2.pdf';
         Storage::disk('local')->put($filePath, 'dummy content');
 
         $document = Document::create([
@@ -99,7 +101,7 @@ class ProcessDocumentTest extends TestCase
             'user_id' => $user->id,
             'filename' => 'failed-callback.pdf',
             'original_name' => 'failed-callback.pdf',
-            'file_path' => 'documents/' . $user->id . '/failed-callback.pdf',
+            'file_path' => 'documents/'.$user->id.'/failed-callback.pdf',
             'mime_type' => 'application/pdf',
             'file_size_bytes' => 123,
             'status' => 'processing',
@@ -107,7 +109,7 @@ class ProcessDocumentTest extends TestCase
 
         $job = new ProcessDocument($document);
         // Register this job's own claim token in cache so the guard passes.
-        \Illuminate\Support\Facades\Cache::put(
+        Cache::put(
             'doc_process_claim:'.$document->id,
             $this->readClaimToken($job),
             300,
@@ -125,7 +127,7 @@ class ProcessDocumentTest extends TestCase
             'user_id' => $user->id,
             'filename' => 'missing.pdf',
             'original_name' => 'missing.pdf',
-            'file_path' => 'documents/' . $user->id . '/missing.pdf',
+            'file_path' => 'documents/'.$user->id.'/missing.pdf',
             'mime_type' => 'application/pdf',
             'file_size_bytes' => 123,
             'status' => 'pending',
@@ -176,7 +178,7 @@ class ProcessDocumentTest extends TestCase
         config()->set('services.ai_document_service.url', 'http://python-ai-docs:8002');
 
         // Force the dispatcher to throw to simulate a queue connection failure.
-        \Illuminate\Support\Facades\Queue::shouldReceive('connection')
+        Queue::shouldReceive('connection')
             ->andThrow(new \RuntimeException('queue down'));
 
         $user = User::factory()->create();
@@ -364,7 +366,7 @@ class ProcessDocumentTest extends TestCase
         Http::fake([
             '*/api/documents/process' => function () use ($document) {
                 // Simulate Job B starting handle(): new token written to cache.
-                \Illuminate\Support\Facades\Cache::put(
+                Cache::put(
                     'doc_process_claim:'.$document->id,
                     'new-job-token-from-job-B',
                     300,
@@ -445,7 +447,7 @@ class ProcessDocumentTest extends TestCase
         $jobA = new ProcessDocument($document);
 
         // Register a *different* token to simulate that Job B replaced Job A's claim.
-        \Illuminate\Support\Facades\Cache::put(
+        Cache::put(
             'doc_process_claim:'.$document->id,
             'newer-job-B-token',
             300,
@@ -479,6 +481,26 @@ class ProcessDocumentTest extends TestCase
         $this->assertSame('error', $document->fresh()->status);
     }
 
+    public function test_failed_does_not_overwrite_ready_status_when_claim_cache_is_missing(): void
+    {
+        $user = User::factory()->create();
+
+        $document = Document::create([
+            'user_id' => $user->id,
+            'filename' => 'ready-after-cache-loss.pdf',
+            'original_name' => 'ready-after-cache-loss.pdf',
+            'file_path' => 'documents/'.$user->id.'/ready-after-cache-loss.pdf',
+            'mime_type' => 'application/pdf',
+            'file_size_bytes' => 123,
+            'status' => 'ready',
+        ]);
+
+        $job = new ProcessDocument($document);
+        $job->failed(new \RuntimeException('stale failure after newer success'));
+
+        $this->assertSame('ready', $document->fresh()->status);
+    }
+
     // -------------------------------------------------------------------------
     // Stale-job guard: RenderDocumentPreview
     // -------------------------------------------------------------------------
@@ -500,17 +522,17 @@ class ProcessDocumentTest extends TestCase
         ]);
 
         $rendererCalled = false;
-        $renderer = new class($rendererCalled) extends \App\Services\Documents\DocumentPreviewRenderer
+        $renderer = new class($rendererCalled) extends DocumentPreviewRenderer
         {
             public function __construct(private bool &$called) {}
 
-            public function render(\App\Models\Document $document): void
+            public function render(Document $document): void
             {
                 $this->called = true;
             }
         };
 
-        $job = new \App\Jobs\RenderDocumentPreview($document);
+        $job = new RenderDocumentPreview($document);
         $job->handle($renderer);
 
         $this->assertFalse($rendererCalled, 'Renderer must not be called when preview is already ready.');

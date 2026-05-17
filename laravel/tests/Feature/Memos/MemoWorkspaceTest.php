@@ -673,6 +673,37 @@ class MemoWorkspaceTest extends TestCase
         $this->assertSame($firstKey, $secondKey);
     }
 
+    public function test_editor_config_reuses_file_token_across_same_memo_rerenders(): void
+    {
+        config([
+            'services.onlyoffice.jwt_secret' => 'workspace-secret',
+            'services.onlyoffice.laravel_internal_url' => 'http://laravel:8000',
+        ]);
+
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        $memo = Memo::create([
+            'user_id' => $user->id,
+            'title' => 'Memo Token Stable',
+            'memo_type' => 'memo_internal',
+            'file_path' => 'memos/'.$user->id.'/memo.docx',
+            'status' => Memo::STATUS_GENERATED,
+        ]);
+
+        $component = Livewire::actingAs($user)
+            ->test(MemoWorkspace::class)
+            ->call('loadMemo', $memo->id);
+
+        $firstConfig = $component->instance()->editorConfig();
+        $component->set('memoPrompt', 'perubahan state biasa');
+        $secondConfig = $component->instance()->editorConfig();
+
+        parse_str((string) parse_url($firstConfig['document']['url'], PHP_URL_QUERY), $firstQuery);
+        parse_str((string) parse_url($secondConfig['document']['url'], PHP_URL_QUERY), $secondQuery);
+
+        $this->assertSame($firstQuery['oo_token'], $secondQuery['oo_token']);
+        $this->assertSame($firstConfig['token'], $secondConfig['token']);
+    }
+
     public function test_generate_configuration_allows_blank_signatory_and_preserves_it_for_ai_service(): void
     {
         Storage::fake('local');
@@ -908,6 +939,58 @@ class MemoWorkspaceTest extends TestCase
         Http::assertSent(fn ($request) => $request['configuration']['date'] === '13 Mei 2026'
             && ! array_key_exists('body_override', $request['configuration']));
         $this->assertSame('13 Mei 2026', $memo->refresh()->configuration['date']);
+    }
+
+    public function test_revision_chat_strips_trailing_generic_instruction_from_date_value(): void
+    {
+        Storage::fake('local');
+        Http::fake([
+            '*/api/memos/generate-body' => Http::response($this->validMemoDocxBytes(), 200, [
+                'X-Memo-Searchable-Text-B64' => base64_encode('Memo revisi tanggal'),
+                'X-Memo-Page-Size' => 'letter',
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            ]),
+        ]);
+
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        $memo = Memo::create([
+            'user_id' => $user->id,
+            'title' => 'Memo Revisi Tanggal Generik',
+            'memo_type' => 'memo_internal',
+            'file_path' => 'memos/'.$user->id.'/memo.docx',
+            'status' => Memo::STATUS_GENERATED,
+            'searchable_text' => 'Memo Revisi Tanggal Generik',
+            'configuration' => [
+                'number' => 'TGL-1/IST/YK/01/2026',
+                'recipient' => 'Kepala Bagian Protokol',
+                'sender' => 'Kepala Istana Kepresidenan Yogyakarta',
+                'subject' => 'Memo Revisi Tanggal Generik',
+                'date' => '12 Mei 2026',
+                'content' => 'Isi memo saat ini.',
+                'signatory' => 'Deni Mulyana',
+                'page_size' => 'letter',
+                'page_size_mode' => 'auto',
+            ],
+        ]);
+        $version = $memo->versions()->create([
+            'version_number' => 1,
+            'label' => 'Versi 1',
+            'file_path' => $memo->file_path,
+            'status' => Memo::STATUS_GENERATED,
+            'configuration' => $memo->configuration,
+            'searchable_text' => $memo->searchable_text,
+        ]);
+        $memo->forceFill(['current_version_id' => $version->id])->save();
+
+        Livewire::actingAs($user)
+            ->test(MemoWorkspace::class)
+            ->call('loadMemo', $memo->id)
+            ->set('memoPrompt', 'tanggal jadi 1 Januari 2026 untuk semua memo selanjutnya')
+            ->call('sendMemoChat')
+            ->assertHasNoErrors();
+
+        Http::assertSent(fn ($request) => $request['configuration']['date'] === '1 Januari 2026');
+        $this->assertSame('1 Januari 2026', $memo->refresh()->configuration['date']);
     }
 
     public function test_revision_chat_applies_name_typo_without_regenerating_unrelated_body(): void

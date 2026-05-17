@@ -3,16 +3,18 @@
 namespace App\Services;
 
 use App\Models\Conversation;
-use App\Models\Message;
 use App\Models\Document;
+use App\Models\Message;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\QueryException;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class ChatOrchestrationService
 {
     private const STREAM_CLAIM_TTL_SECONDS = 240;
+
     private const SANITIZE_REPLACEMENTS = [
         '/\bchunks?\b/i' => 'bagian dokumen',
         '/\bchunk(?:ing|ed)?\b/i' => 'bagian dokumen',
@@ -25,11 +27,12 @@ class ChatOrchestrationService
 
     public function createConversationIfNeeded(?int $currentConversationId, string $prompt): int
     {
-        if (!$currentConversationId) {
+        if (! $currentConversationId) {
             $conversation = Conversation::create([
                 'user_id' => Auth::id(),
-                'title' => substr($prompt, 0, 50) . '...'
+                'title' => substr($prompt, 0, 50).'...',
             ]);
+
             return $conversation->id;
         }
 
@@ -44,15 +47,31 @@ class ChatOrchestrationService
         return $currentConversationId;
     }
 
-    public function saveUserMessage(int $conversationId, string $prompt): array
+    /**
+     * @param  array<int, int|string>  $documentIds
+     */
+    public function saveUserMessage(int $conversationId, string $prompt, array $documentIds = []): array
     {
         $userMessage = Message::create([
             'conversation_id' => $conversationId,
             'role' => 'user',
-            'content' => $prompt
+            'content' => $prompt,
+            'document_ids' => $this->normalizeDocumentIds($documentIds),
         ]);
 
         return $userMessage->toArray();
+    }
+
+    /**
+     * @param  array<int, int|string>  $documentIds
+     * @return list<int>
+     */
+    public function normalizeDocumentIds(array $documentIds): array
+    {
+        return array_values(array_unique(array_filter(
+            array_map(fn ($id) => is_numeric($id) ? (int) $id : null, $documentIds),
+            fn ($id) => $id !== null && $id > 0,
+        )));
     }
 
     /**
@@ -173,7 +192,7 @@ class ChatOrchestrationService
 
     public function getSourcePolicy(?array $documentFilenames): string
     {
-        return !empty($documentFilenames) ? 'document_context' : 'hybrid_realtime_auto';
+        return ! empty($documentFilenames) ? 'document_context' : 'hybrid_realtime_auto';
     }
 
     public function shouldAllowAutoRealtimeWeb(?array $documentFilenames): bool
@@ -196,12 +215,13 @@ class ChatOrchestrationService
         $documentSources = [];
 
         foreach ($normalizedSources as $source) {
-            if (!empty($source['url'])) {
+            if (! empty($source['url'])) {
                 $webSources[] = $source;
+
                 continue;
             }
 
-            if (!empty($source['filename'])) {
+            if (! empty($source['filename'])) {
                 $documentSources[] = $source['filename'];
             }
         }
@@ -212,10 +232,10 @@ class ChatOrchestrationService
             return "\n\n---\nDokumen rujukan: **{$documentSources[0]}**";
         }
 
-        $lines = ["", "", "---", "**Rujukan:**"];
+        $lines = ['', '', '---', '**Rujukan:**'];
 
         foreach ($webSources as $source) {
-            $title = !empty($source['title']) ? $source['title'] : parse_url($source['url'], PHP_URL_HOST);
+            $title = ! empty($source['title']) ? $source['title'] : parse_url($source['url'], PHP_URL_HOST);
             $lines[] = "- [{$title}]({$source['url']})";
         }
 
@@ -269,6 +289,7 @@ class ChatOrchestrationService
     {
         $cleanContent = preg_replace('/\[SOURCES:\[.+?\]\]/s', '', $fullResponse);
         $cleanContent = $this->sanitizeAssistantOutput((string) $cleanContent);
+
         return trim($cleanContent);
     }
 
@@ -384,6 +405,7 @@ class ChatOrchestrationService
         }
 
         $value = Cache::get($claimKey);
+
         return $value === 'intent' || $value === 'active';
     }
 
@@ -398,8 +420,8 @@ class ChatOrchestrationService
             // terakhir agar baik SSE stream maupun background job tidak bisa
             // menyimpan dua assistant message untuk satu user message yang sama.
             // Ini adalah single source of truth untuk race condition di kedua jalur.
-            return \Illuminate\Support\Facades\DB::transaction(function () use ($conversationId, $content) {
-                $latestUserMessage = \App\Models\Message::query()
+            return DB::transaction(function () use ($conversationId, $content) {
+                $latestUserMessage = Message::query()
                     ->where('conversation_id', $conversationId)
                     ->where('role', 'user')
                     ->latest('id')
@@ -410,7 +432,7 @@ class ChatOrchestrationService
                 // - jika sukses (is_error=false): skip (idempotent)
                 // - jika error (is_error=true): upgrade menjadi jawaban sukses
                 if ($latestUserMessage !== null) {
-                    $latestAssistant = \App\Models\Message::query()
+                    $latestAssistant = Message::query()
                         ->where('conversation_id', $conversationId)
                         ->where('role', 'assistant')
                         ->where('id', '>', $latestUserMessage->id)
@@ -456,8 +478,8 @@ class ChatOrchestrationService
             // tidak duplikat jika stream dan job keduanya gagal bersamaan.
             // Jika sudah ada assistant message (normal atau error) setelah user message
             // terakhir, skip — ini mencegah error stream menimpa jawaban sukses dari job.
-            return \Illuminate\Support\Facades\DB::transaction(function () use ($conversationId, $content) {
-                $latestUserMessage = \App\Models\Message::query()
+            return DB::transaction(function () use ($conversationId, $content) {
+                $latestUserMessage = Message::query()
                     ->where('conversation_id', $conversationId)
                     ->where('role', 'user')
                     ->latest('id')
@@ -465,7 +487,7 @@ class ChatOrchestrationService
                     ->first();
 
                 if ($latestUserMessage !== null) {
-                    $latestAssistant = \App\Models\Message::query()
+                    $latestAssistant = Message::query()
                         ->where('conversation_id', $conversationId)
                         ->where('role', 'assistant')
                         ->where('id', '>', $latestUserMessage->id)
@@ -523,7 +545,7 @@ class ChatOrchestrationService
 
     public function extractStreamMetadata(string $chunk, string $buffer = ''): array
     {
-        $combined = $buffer . $chunk;
+        $combined = $buffer.$chunk;
         $modelName = null;
         $sources = null;
 
@@ -551,7 +573,7 @@ class ChatOrchestrationService
             $tail = substr($combined, $markerPos);
             $isComplete = preg_match('/^\[MODEL:(.+?)\]\n?/s', $tail) === 1;
 
-            if (!$isComplete) {
+            if (! $isComplete) {
                 $nextBuffer = $tail;
                 $combined = substr($combined, 0, $markerPos);
                 break;
@@ -581,6 +603,7 @@ class ChatOrchestrationService
 
             if ($combined[$jsonStart] !== '[') {
                 $searchOffset = $jsonStart;
+
                 continue;
             }
 
@@ -595,6 +618,7 @@ class ChatOrchestrationService
 
             if ($combined[$jsonEnd + 1] !== ']') {
                 $searchOffset = $jsonEnd + 1;
+
                 continue;
             }
 
@@ -628,11 +652,13 @@ class ChatOrchestrationService
             if ($inString) {
                 if ($escape) {
                     $escape = false;
+
                     continue;
                 }
 
                 if ($char === '\\') {
                     $escape = true;
+
                     continue;
                 }
 
@@ -645,11 +671,13 @@ class ChatOrchestrationService
 
             if ($char === '"') {
                 $inString = true;
+
                 continue;
             }
 
             if ($char === '[') {
                 $depth++;
+
                 continue;
             }
 

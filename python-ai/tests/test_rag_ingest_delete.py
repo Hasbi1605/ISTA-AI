@@ -52,6 +52,30 @@ def test_delete_document_vectors_scopes_filename_by_user(monkeypatch):
     }]
 
 
+def test_delete_chroma_ids_with_retry_recovers_from_transient_failure(monkeypatch):
+    from app.services import rag_ingest
+
+    monkeypatch.setattr(rag_ingest.time, "sleep", lambda _seconds: None)
+
+    calls = {"count": 0, "ids": None}
+
+    def flaky_delete(*, ids):
+        calls["count"] += 1
+        calls["ids"] = ids
+        if calls["count"] == 1:
+            raise RuntimeError("transient chroma delete failure")
+
+    success = rag_ingest._delete_chroma_ids_with_retry(
+        flaky_delete,
+        ["old-parent-1", "old-parent-2"],
+        "stale parent chunks",
+        "doc-123",
+    )
+
+    assert success is True
+    assert calls == {"count": 2, "ids": ["old-parent-1", "old-parent-2"]}
+
+
 def test_process_document_returns_false_on_partial_batch_failure(monkeypatch, tmp_path):
     """
     Regression for H2: when at least one embedding batch fails during ingest,
