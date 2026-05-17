@@ -24,9 +24,10 @@ class MemoFileController extends Controller
         // Require a valid memo-bound session token (oo_token) generated at editor-open
         // time. The token is random, TTL-limited, and stored in cache — not derivable
         // from the URL itself, preventing replay by anyone who captures the signed URL.
+        $versionId = $this->requestedVersionId($request);
         $ooToken = $request->query('oo_token', '');
         abort_unless(
-            is_string($ooToken) && $ooToken !== '' && app(MemoDocumentKey::class)->validateFileToken($ooToken, $memo),
+            is_string($ooToken) && $ooToken !== '' && app(MemoDocumentKey::class)->validateFileToken($ooToken, $memo, $versionId),
             Response::HTTP_FORBIDDEN,
             'Token akses memo tidak valid atau sudah kedaluwarsa.'
         );
@@ -64,7 +65,7 @@ class MemoFileController extends Controller
     {
         $this->authorizeView($request, $memo);
 
-        $version = $this->resolveVersion($request, $memo);
+        $version = $this->resolveVersion($request, $memo, allowBodyVersionId: true);
 
         try {
             $result = $forceSave->forceSave($memo, $version);
@@ -110,16 +111,14 @@ class MemoFileController extends Controller
         return $base.'.'.strtolower($extension);
     }
 
-    protected function resolveVersion(Request $request, Memo $memo): ?MemoVersion
+    protected function resolveVersion(Request $request, Memo $memo, bool $allowBodyVersionId = false): ?MemoVersion
     {
-        $versionId = $request->query('version_id', $request->input('version_id'));
+        $versionId = $this->requestedVersionId($request, $allowBodyVersionId);
 
-        if ($versionId !== null && $versionId !== '') {
-            abort_unless(is_numeric($versionId), Response::HTTP_NOT_FOUND);
-
+        if ($versionId !== null) {
             return MemoVersion::query()
                 ->where('memo_id', $memo->id)
-                ->whereKey((int) $versionId)
+                ->whereKey($versionId)
                 ->firstOrFail();
         }
 
@@ -127,6 +126,23 @@ class MemoFileController extends Controller
 
         return $memo->currentVersion
             ?: $memo->versions()->orderByDesc('version_number')->first();
+    }
+
+    protected function requestedVersionId(Request $request, bool $allowBodyVersionId = false): ?int
+    {
+        $versionId = $request->query('version_id');
+
+        if (($versionId === null || $versionId === '') && $allowBodyVersionId) {
+            $versionId = $request->input('version_id');
+        }
+
+        if ($versionId === null || $versionId === '') {
+            return null;
+        }
+
+        abort_unless(is_numeric($versionId), Response::HTTP_NOT_FOUND);
+
+        return (int) $versionId;
     }
 
     protected function authorizeView(Request $request, Memo $memo): void

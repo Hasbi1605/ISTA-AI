@@ -56,7 +56,10 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
-     * Send the email verification notification.
+     * Send an account email verification OTP for an existing user.
+     *
+     * New registrations use the cache-backed PendingRegistrationWorkflowService
+     * until the account is created and marked verified.
      *
      * @return void
      */

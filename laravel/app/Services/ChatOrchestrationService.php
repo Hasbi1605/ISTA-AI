@@ -522,25 +522,24 @@ class ChatOrchestrationService
             $combined = preg_replace('/\[MODEL:.+?\]\n?/', '', $combined, 1) ?? $combined;
         }
 
-        if (preg_match('/\[SOURCES:(\[.+?\])\]/s', $combined, $matches)) {
-            $parsedSources = json_decode($matches[1], true);
-            if (is_array($parsedSources)) {
-                $sources = $parsedSources;
-            }
-            $combined = preg_replace('/\[SOURCES:\[.+?\]\]/s', '', $combined, 1) ?? $combined;
+        [$combined, $sourcesBuffer, $parsedSources] = $this->extractSourcesMetadata($combined);
+        if (is_array($parsedSources)) {
+            $sources = $parsedSources;
+        }
+
+        if ($sourcesBuffer !== '') {
+            return [$combined, $sourcesBuffer, $modelName, $sources];
         }
 
         $nextBuffer = '';
-        foreach (['[SOURCES:', '[MODEL:'] as $marker) {
+        foreach (['[MODEL:'] as $marker) {
             $markerPos = strrpos($combined, $marker);
             if ($markerPos === false) {
                 continue;
             }
 
             $tail = substr($combined, $markerPos);
-            $isComplete = $marker === '[SOURCES:'
-                ? preg_match('/^\[SOURCES:(\[.+?\])\]/s', $tail) === 1
-                : preg_match('/^\[MODEL:(.+?)\]\n?/s', $tail) === 1;
+            $isComplete = preg_match('/^\[MODEL:(.+?)\]\n?/s', $tail) === 1;
 
             if (!$isComplete) {
                 $nextBuffer = $tail;
@@ -550,5 +549,108 @@ class ChatOrchestrationService
         }
 
         return [$combined, $nextBuffer, $modelName, $sources];
+    }
+
+    private function extractSourcesMetadata(string $combined): array
+    {
+        $sources = null;
+        $searchOffset = 0;
+        $marker = '[SOURCES:';
+        $markerLength = strlen($marker);
+
+        while (($markerPos = strpos($combined, $marker, $searchOffset)) !== false) {
+            $jsonStart = $markerPos + $markerLength;
+
+            if (strlen($combined) <= $jsonStart) {
+                return [
+                    substr($combined, 0, $markerPos),
+                    substr($combined, $markerPos),
+                    $sources,
+                ];
+            }
+
+            if ($combined[$jsonStart] !== '[') {
+                $searchOffset = $jsonStart;
+                continue;
+            }
+
+            $jsonEnd = $this->findJsonArrayEnd($combined, $jsonStart);
+            if ($jsonEnd === null || strlen($combined) <= $jsonEnd + 1) {
+                return [
+                    substr($combined, 0, $markerPos),
+                    substr($combined, $markerPos),
+                    $sources,
+                ];
+            }
+
+            if ($combined[$jsonEnd + 1] !== ']') {
+                $searchOffset = $jsonEnd + 1;
+                continue;
+            }
+
+            $json = substr($combined, $jsonStart, $jsonEnd - $jsonStart + 1);
+            $parsedSources = json_decode($json, true);
+            if (is_array($parsedSources)) {
+                $sources = $parsedSources;
+            }
+
+            $combined = substr($combined, 0, $markerPos).substr($combined, $jsonEnd + 2);
+            $searchOffset = $markerPos;
+        }
+
+        return [$combined, '', $sources];
+    }
+
+    private function findJsonArrayEnd(string $text, int $start): ?int
+    {
+        if (($text[$start] ?? null) !== '[') {
+            return null;
+        }
+
+        $depth = 0;
+        $inString = false;
+        $escape = false;
+        $length = strlen($text);
+
+        for ($i = $start; $i < $length; $i++) {
+            $char = $text[$i];
+
+            if ($inString) {
+                if ($escape) {
+                    $escape = false;
+                    continue;
+                }
+
+                if ($char === '\\') {
+                    $escape = true;
+                    continue;
+                }
+
+                if ($char === '"') {
+                    $inString = false;
+                }
+
+                continue;
+            }
+
+            if ($char === '"') {
+                $inString = true;
+                continue;
+            }
+
+            if ($char === '[') {
+                $depth++;
+                continue;
+            }
+
+            if ($char === ']') {
+                $depth--;
+                if ($depth === 0) {
+                    return $i;
+                }
+            }
+        }
+
+        return null;
     }
 }

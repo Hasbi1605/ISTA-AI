@@ -26,7 +26,7 @@ class PasswordResetLinkServiceTest extends TestCase
         } catch (ValidationException $e) {
             $this->assertArrayHasKey('forgot_email', $e->errors());
             $this->assertSame(
-                'Email belum terverifikasi. Silakan daftar ulang lalu verifikasi kode OTP.',
+                'Email belum terverifikasi. Verifikasi akun dengan OTP terbaru sebelum meminta reset kata sandi.',
                 $e->errors()['forgot_email'][0],
             );
         }

@@ -212,4 +212,45 @@ class ChatOrchestrationServiceTest extends TestCase
             ['url' => 'https://example.com', 'title' => 'Contoh'],
         ], $secondPass[3]);
     }
+
+    public function test_extract_stream_metadata_handles_source_strings_containing_brackets(): void
+    {
+        $service = new ChatOrchestrationService();
+        $sourcesJson = json_encode([
+            [
+                'url' => 'https://example.com',
+                'title' => 'Judul ] dengan bracket',
+                'snippet' => 'Nilai "quoted"',
+            ],
+        ]);
+
+        $result = $service->extractStreamMetadata(
+            'Jawaban [SOURCES:'.$sourcesJson.'] selesai',
+            ''
+        );
+
+        $this->assertSame('Jawaban  selesai', $result[0]);
+        $this->assertSame('', $result[1]);
+        $this->assertSame([
+            [
+                'url' => 'https://example.com',
+                'title' => 'Judul ] dengan bracket',
+                'snippet' => 'Nilai "quoted"',
+            ],
+        ], $result[3]);
+    }
+
+    public function test_extract_stream_metadata_removes_balanced_malformed_sources_without_throwing(): void
+    {
+        $service = new ChatOrchestrationService();
+
+        $result = $service->extractStreamMetadata(
+            'Jawaban [SOURCES:[{"url":}]] selesai',
+            ''
+        );
+
+        $this->assertSame('Jawaban  selesai', $result[0]);
+        $this->assertSame('', $result[1]);
+        $this->assertNull($result[3]);
+    }
 }

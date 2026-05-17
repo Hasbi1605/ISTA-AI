@@ -14,7 +14,7 @@ class PasswordResetLinkService
 
         if ($user && is_null($user->email_verified_at)) {
             throw ValidationException::withMessages([
-                $errorField => 'Email belum terverifikasi. Silakan daftar ulang lalu verifikasi kode OTP.',
+                $errorField => 'Email belum terverifikasi. Verifikasi akun dengan OTP terbaru sebelum meminta reset kata sandi.',
             ]);
         }
 

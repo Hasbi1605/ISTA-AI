@@ -46,7 +46,7 @@ new #[Layout('layouts.guest')] class extends Component
 
         if ($user->verification_code_expires_at && now()->greaterThan($user->verification_code_expires_at)) {
             throw ValidationException::withMessages([
-                'verification_code_input' => 'Kode OTP sudah kedaluwarsa. Klik Kirim ulang OTP atau daftar ulang bila sesi tetap gagal.',
+                'verification_code_input' => 'Kode OTP sudah kedaluwarsa. Klik Kirim ulang OTP untuk mendapatkan kode akun terbaru.',
             ]);
         }
 

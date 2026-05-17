@@ -16,6 +16,6 @@ return [
     'failed' => 'Email atau kata sandi tidak sesuai dengan data kami.',
     'password' => 'Kata sandi yang diberikan tidak benar.',
     'throttle' => 'Terlalu banyak percobaan login. Silakan coba lagi dalam :seconds detik.',
-    'unverified' => 'Login gagal. Akun belum terverifikasi, silakan daftar ulang dan selesaikan verifikasi OTP.',
+    'unverified' => 'Login gagal. Akun belum terverifikasi. Gunakan OTP verifikasi terbaru atau minta OTP baru dari halaman verifikasi email.',
 
 ];
