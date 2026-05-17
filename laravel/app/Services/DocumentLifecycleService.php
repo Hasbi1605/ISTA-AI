@@ -304,6 +304,7 @@ class DocumentLifecycleService
         $this->deleteDocumentVectors($document);
         $this->deleteDocumentFile($document);
         $this->deleteDocumentPreview($document);
+        $document->cloudStorageFiles()->delete();
     }
 
     private function deleteDocumentPreview(Document $document): void

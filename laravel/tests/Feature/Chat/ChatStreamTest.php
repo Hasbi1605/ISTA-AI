@@ -875,7 +875,10 @@ class ChatStreamTest extends TestCase
         ]);
 
         $orchestrator = app(ChatOrchestrationService::class);
-        $claimKey = $orchestrator->acquireStreamClaim($conversation->id);
+        $intentKey = $orchestrator->createStreamIntent($conversation->id);
+        $this->assertNotNull($intentKey);
+
+        $claimKey = $orchestrator->acquireStreamRunner($conversation->id);
         $this->assertNotNull($claimKey);
 
         $aiCalled = false;
@@ -1048,7 +1051,7 @@ class ChatStreamTest extends TestCase
 
         $orchestrator = app(ChatOrchestrationService::class);
 
-        $preClaimKey = $orchestrator->acquireStreamClaim($conversation->id);
+        $preClaimKey = $orchestrator->createStreamIntent($conversation->id);
         $this->assertNotNull($preClaimKey, 'Pre-claim harus berhasil dibuat');
 
         $aiCalled = false;
@@ -1105,17 +1108,42 @@ class ChatStreamTest extends TestCase
         $orchestrator = app(ChatOrchestrationService::class);
 
         // First: intent claim (sendMessage path)
-        $intentKey = $orchestrator->acquireStreamClaim($conversation->id);
+        $intentKey = $orchestrator->createStreamIntent($conversation->id);
         $this->assertNotNull($intentKey, 'Intent claim harus berhasil');
 
         // Second: stream adopts intent → active
-        $activeKey = $orchestrator->acquireStreamClaim($conversation->id);
+        $activeKey = $orchestrator->acquireStreamRunner($conversation->id);
         $this->assertNotNull($activeKey, 'Stream pertama harus bisa adopt intent');
         $this->assertSame($intentKey, $activeKey);
 
         // Third: duplicate stream tries to adopt active → rejected
-        $duplicateKey = $orchestrator->acquireStreamClaim($conversation->id);
+        $duplicateKey = $orchestrator->acquireStreamRunner($conversation->id);
         $this->assertNull($duplicateKey, 'Stream duplikat harus ditolak saat claim sudah active');
+
+        $orchestrator->releaseStreamClaim($activeKey);
+    }
+
+    public function test_direct_stream_claim_becomes_active_and_rejects_duplicate_runner(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::create([
+            'user_id' => $user->id,
+            'title' => 'Direct stream claim test',
+        ]);
+
+        Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'user',
+            'content' => 'Pertanyaan direct stream',
+        ]);
+
+        $orchestrator = app(ChatOrchestrationService::class);
+
+        $activeKey = $orchestrator->acquireStreamRunner($conversation->id);
+        $this->assertNotNull($activeKey, 'Stream pertama harus membuat active claim langsung');
+
+        $duplicateKey = $orchestrator->acquireStreamRunner($conversation->id);
+        $this->assertNull($duplicateKey, 'Stream kedua harus ditolak setelah direct stream active');
 
         $orchestrator->releaseStreamClaim($activeKey);
     }
@@ -1141,7 +1169,7 @@ class ChatStreamTest extends TestCase
         $orchestrator = app(ChatOrchestrationService::class);
 
         // Simulate sendMessage() creating intent claim
-        $claimKey = $orchestrator->acquireStreamClaim($conversation->id);
+        $claimKey = $orchestrator->createStreamIntent($conversation->id);
         $this->assertNotNull($claimKey);
         $this->assertTrue($orchestrator->hasActiveStreamClaim($conversation->id));
 

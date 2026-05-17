@@ -314,43 +314,53 @@ class ChatOrchestrationService
         return sprintf('chat:stream-claim:conversation:%d:user-message:%d', $conversationId, (int) $latestUserMessage->id);
     }
 
-    /**
-     * Acquire or adopt a stream claim for the latest user message.
-     *
-     * Two-state claim lifecycle:
-     *   - 'intent'  : created by sendMessage() before EventSource opens.
-     *                 Signals to the fallback job that a stream is expected.
-     *   - 'active'  : upgraded by executeStream() when it adopts the intent.
-     *                 Duplicate streams that see 'active' are rejected.
-     *
-     * sendMessage() always calls this to create an 'intent' claim.
-     * executeStream() calls this to adopt 'intent' → 'active', or create
-     * 'active' directly if no prior intent exists.
-     * If the claim is already 'active' (duplicate stream), returns null.
-     */
-    public function acquireStreamClaim(int $conversationId): ?string
+    public function createStreamIntent(int $conversationId): ?string
     {
         $claimKey = $this->streamClaimKeyForLatestUserMessage($conversationId);
         if ($claimKey === null) {
             return null;
         }
 
-        $current = Cache::get($claimKey);
+        Cache::add($claimKey, 'intent', now()->addSeconds(self::STREAM_CLAIM_TTL_SECONDS));
 
-        if ($current === null) {
-            // No claim yet — create intent (sendMessage path) or active (direct stream).
-            Cache::add($claimKey, 'intent', now()->addSeconds(self::STREAM_CLAIM_TTL_SECONDS));
-            return $claimKey;
+        return $claimKey;
+    }
+
+    /**
+     * Atomically acquire the single stream runner slot for the latest user
+     * message. The stream can either adopt a sendMessage intent or create an
+     * active claim directly when a stream request reaches the server first.
+     */
+    public function acquireStreamRunner(int $conversationId): ?string
+    {
+        $claimKey = $this->streamClaimKeyForLatestUserMessage($conversationId);
+        if ($claimKey === null) {
+            return null;
         }
 
-        if ($current === 'intent') {
-            // Adopt intent → upgrade to active (stream runner path).
-            Cache::put($claimKey, 'active', now()->addSeconds(self::STREAM_CLAIM_TTL_SECONDS));
-            return $claimKey;
+        $lock = Cache::lock($claimKey.':lock', 5);
+
+        if (! $lock->get()) {
+            return null;
         }
 
-        // Already 'active' — duplicate stream, reject.
-        return null;
+        try {
+            $current = Cache::get($claimKey);
+
+            if ($current === 'active') {
+                return null;
+            }
+
+            if ($current === null || $current === 'intent') {
+                Cache::put($claimKey, 'active', now()->addSeconds(self::STREAM_CLAIM_TTL_SECONDS));
+
+                return $claimKey;
+            }
+
+            return null;
+        } finally {
+            $lock->release();
+        }
     }
 
     public function releaseStreamClaim(?string $claimKey): void

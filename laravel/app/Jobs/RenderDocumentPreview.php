@@ -19,6 +19,8 @@ class RenderDocumentPreview implements ShouldBeUniqueUntilProcessing, ShouldQueu
 
     public int $timeout = 300;
 
+    public bool $deleteWhenMissingModels = true;
+
     public function __construct(public Document $document)
     {
         $this->onQueue('document-previews');
@@ -54,12 +56,23 @@ class RenderDocumentPreview implements ShouldBeUniqueUntilProcessing, ShouldQueu
 
     public function failed(\Throwable $exception): void
     {
-        $this->document->forceFill([
+        $fresh = $this->document->fresh();
+
+        if ($fresh === null) {
+            logger()->info('RenderDocumentPreview failed hook skipped — document already deleted', [
+                'document_id' => $this->document->id,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return;
+        }
+
+        $fresh->forceFill([
             'preview_status' => Document::PREVIEW_STATUS_FAILED,
         ])->save();
 
         logger()->error('RenderDocumentPreview job permanently failed', [
-            'document_id' => $this->document->id,
+            'document_id' => $fresh->id,
             'error' => $exception->getMessage(),
         ]);
     }

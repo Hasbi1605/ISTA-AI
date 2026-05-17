@@ -5,6 +5,7 @@ namespace Tests\Feature\Chat;
 use App\Jobs\GenerateChatResponse;
 use App\Jobs\ProcessDocument;
 use App\Livewire\Chat\ChatIndex;
+use App\Models\CloudStorageFile;
 use App\Models\Conversation;
 use App\Models\Document;
 use App\Models\Message;
@@ -721,6 +722,74 @@ class ChatUiTest extends TestCase
             'role' => 'assistant',
             'content' => 'Maaf, jawaban gagal diproses. Silakan coba kirim ulang.',
         ]);
+    }
+
+    public function test_delete_conversation_removes_message_cloud_storage_files(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::create([
+            'user_id' => $user->id,
+            'title' => 'Conversation dengan export',
+        ]);
+        $message = Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'assistant',
+            'content' => 'Jawaban yang pernah diexport',
+        ]);
+        CloudStorageFile::create([
+            'user_id' => $user->id,
+            'provider' => 'google_drive',
+            'direction' => CloudStorageFile::DIRECTION_EXPORT,
+            'local_type' => Message::class,
+            'local_id' => $message->id,
+            'external_id' => 'drive-message-delete-test',
+            'name' => 'jawaban.pdf',
+            'mime_type' => 'application/pdf',
+            'synced_at' => now(),
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ChatIndex::class, ['id' => $conversation->id])
+            ->call('deleteConversation', $conversation->id);
+
+        $this->assertDatabaseMissing('cloud_storage_files', [
+            'local_type' => Message::class,
+            'local_id' => $message->id,
+        ]);
+        $this->assertDatabaseMissing('messages', ['id' => $message->id]);
+        $this->assertDatabaseMissing('conversations', ['id' => $conversation->id]);
+    }
+
+    public function test_load_conversation_orders_messages_by_id_when_timestamps_match(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::create([
+            'user_id' => $user->id,
+            'title' => 'Same timestamp ordering',
+        ]);
+        $timestamp = now()->startOfSecond();
+        $userMessage = Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'user',
+            'content' => 'Pertanyaan timestamp sama',
+            'created_at' => $timestamp,
+            'updated_at' => $timestamp,
+        ]);
+        $assistantMessage = Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'assistant',
+            'content' => 'Jawaban timestamp sama',
+            'created_at' => $timestamp,
+            'updated_at' => $timestamp,
+        ]);
+
+        $component = Livewire::actingAs($user)
+            ->test(ChatIndex::class, ['id' => $conversation->id]);
+
+        $this->assertSame(
+            [$userMessage->id, $assistantMessage->id],
+            array_column($component->get('messages'), 'id')
+        );
     }
 
     public function test_generate_chat_response_saves_error_message_when_ai_service_returns_sentinel(): void

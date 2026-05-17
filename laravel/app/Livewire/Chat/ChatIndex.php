@@ -147,7 +147,8 @@ class ChatIndex extends Component
         $conversation = Conversation::where('id', $id)
             ->where('user_id', Auth::id())
             ->with(['messages' => function ($query) {
-                $query->orderBy('created_at', 'asc');
+                $query->orderBy('created_at', 'asc')
+                    ->orderBy('id', 'asc');
             }])
             ->firstOrFail();
 
@@ -552,10 +553,18 @@ class ChatIndex extends Component
             ->first();
 
         if ($conversation) {
-            // Delete all messages first
-            $conversation->messages()->delete();
-            // Delete the conversation
-            $conversation->delete();
+            DB::transaction(function () use ($conversation) {
+                $messageIds = $conversation->messages()->pluck('id');
+
+                if ($messageIds->isNotEmpty()) {
+                    CloudStorageFile::query()
+                        ->where('local_type', Message::class)
+                        ->whereIn('local_id', $messageIds)
+                        ->delete();
+                }
+
+                $conversation->delete();
+            });
 
             // If we deleted the current conversation, reset
             if ($this->currentConversationId == $id) {
@@ -643,10 +652,9 @@ class ChatIndex extends Component
         $this->loadConversations();
         $this->dispatch('conversation-activated', id: $conversationIdForRequest);
 
-        // Acquire stream claim as early as possible (right after user message is
-        // persisted) so background job fallback can observe active stream intent
-        // even before EventSource is fully connected.
-        $orchestrator->acquireStreamClaim($conversationIdForRequest);
+        // Create stream intent as early as possible so the background job
+        // fallback can defer while EventSource is still connecting.
+        $orchestrator->createStreamIntent($conversationIdForRequest);
         $this->streamingConversationId = $conversationIdForRequest;
 
         GenerateChatResponse::dispatch(
