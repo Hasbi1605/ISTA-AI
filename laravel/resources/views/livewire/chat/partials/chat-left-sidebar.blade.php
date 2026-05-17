@@ -139,16 +139,15 @@
                     <li class="group relative" wire:key="{{ $groupKey === 'today' ? 'chat-history-visible-' : 'chat-history-'.$groupKey.'-' }}{{ $conversation->id }}" x-show="isHistoryVisible(@js($conversation->title))">
                         <a href="{{ route('chat', ['id' => $conversation->id, 'tab' => $tab]) }}" @click="navigateToConversation($event, {{ $conversation->id }}); if(isMobile) showLeftSidebar = false;"
                            data-chat-history-id="{{ $conversation->id }}"
-                           :aria-busy="isLoading({{ (int) $conversation->id }}) ? 'true' : 'false'"
+                           :aria-busy="(isLoading({{ (int) $conversation->id }}) || isPending({{ (int) $conversation->id }})) ? 'true' : 'false'"
                            :class="{ 'is-active': isActive({{ $conversation->id }}) }"
                            class="chat-history-item {{ (int) $currentConversationId === (int) $conversation->id ? 'is-active' : '' }}">
                             <span class="mr-2.5 flex h-4 w-4 flex-shrink-0 items-center justify-center text-stone-400 dark:text-gray-500">
-                                <img x-show="!isLoading({{ (int) $conversation->id }})" src="{{ $uiIcons['historyLight'] }}" alt="" class="h-4 w-4 dark:hidden" />
-                                <img x-show="!isLoading({{ (int) $conversation->id }})" src="{{ $uiIcons['historyDark'] }}" alt="" class="hidden h-4 w-4 dark:block" />
-                                <span x-show="isLoading({{ (int) $conversation->id }})" class="h-3.5 w-3.5 rounded-full border border-current border-t-transparent text-ista-primary animate-spin dark:text-amber-200" style="display: none;" aria-hidden="true"></span>
+                                <img x-show="!(isLoading({{ (int) $conversation->id }}) || isPending({{ (int) $conversation->id }}))" src="{{ $uiIcons['historyLight'] }}" alt="" class="h-4 w-4 dark:hidden" />
+                                <img x-show="!(isLoading({{ (int) $conversation->id }}) || isPending({{ (int) $conversation->id }}))" src="{{ $uiIcons['historyDark'] }}" alt="" class="hidden h-4 w-4 dark:block" />
+                                <span x-show="isLoading({{ (int) $conversation->id }}) || isPending({{ (int) $conversation->id }})" class="h-3.5 w-3.5 rounded-full border border-current border-t-transparent text-ista-primary animate-spin dark:text-amber-200" style="display: none;" aria-hidden="true"></span>
                             </span>
                             <span class="min-w-0 flex-1 truncate text-[13.2px]" title="{{ $conversation->title }}">{{ $conversation->title }}</span>
-                            <span x-show="isPending({{ $conversation->id }})" class="ml-auto h-3 w-3 shrink-0 rounded-full border border-current border-t-transparent animate-spin" style="display: none;"></span>
                             <span x-show="isCompleteUnread({{ $conversation->id }})" class="ml-auto h-2.5 w-2.5 shrink-0 rounded-full bg-sky-500 shadow-[0_0_0_3px_rgba(14,165,233,0.12)]" style="display: none;" aria-label="Jawaban baru tersedia"></span>
                         </a>
                         <button type="button" wire:click="deleteConversation({{ $conversation->id }})"
