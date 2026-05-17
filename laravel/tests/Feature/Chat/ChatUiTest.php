@@ -491,8 +491,13 @@ class ChatUiTest extends TestCase
         $this->assertStringContainsString('queueAssistantTypewriterFinalText(finalText)', $chatPageJs);
         $this->assertStringContainsString('queueFinalStreamingText(finalText)', $chatPageJs);
         $this->assertStringContainsString('refreshPendingAfterStreamingSettles(conversationId, streamedMessageId', $chatPageJs);
+        $this->assertStringContainsString('refreshPendingChatState(streamedMessageId, this.isActiveConversation(conversationId))', $chatPageJs);
+        $this->assertStringContainsString('shouldPreserveCurrentStream', $chatPageJs);
+        $this->assertStringContainsString('preserveStream', $chatPageJs);
         $this->assertStringContainsString('afterStreamingTypewriterSettles(() => {', $chatPageJs);
         $this->assertStringContainsString('revealStreamingSources()', $chatPageJs);
+        $this->assertStringContainsString('resolvedMessageId()', $chatPageJs);
+        $this->assertStringContainsString('resolvedHtml()', $chatPageJs);
         $this->assertStringContainsString('CHAT_SOURCE_REVEAL_BEFORE_REFRESH_MS', $chatPageJs);
         $this->assertStringContainsString('CHAT_LOADING_PHASE_DELAY_MS', $chatPageJs);
         $this->assertStringContainsString('CHAT_PENDING_STALE_WARNING_MS', $chatPageJs);
@@ -547,7 +552,10 @@ class ChatUiTest extends TestCase
             ->assertDontSee('wire:click="$set(\'tab\', \'chat\')"', false)
             ->assertSee('data-chat-conversation-id=', false)
             ->assertSee('data-chat-last-message-role=', false)
-            ->assertSee('data-chat-last-user-message-created-at=', false);
+            ->assertSee('data-chat-last-user-message-created-at=', false)
+            ->assertSee('x-if="streamedAssistantMessageId && streamingText !== \'\'"', false)
+            ->assertSee('messageId: () => streamedAssistantMessageId', false)
+            ->assertSee('html: () => streamingHtml', false);
     }
 
     public function test_chat_route_with_conversation_id_loads_selected_conversation_messages(): void
@@ -1222,6 +1230,51 @@ class ChatUiTest extends TestCase
             });
     }
 
+    public function test_refresh_pending_chat_state_can_preserve_streamed_message_bubble(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::create([
+            'user_id' => $user->id,
+            'title' => 'Preserved SSE streamed refresh test',
+        ]);
+
+        Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'user',
+            'content' => 'Tolong jawab lewat SSE dan jangan flicker.',
+        ]);
+
+        $component = Livewire::actingAs($user)
+            ->test(ChatIndex::class, ['id' => $conversation->id])
+            ->assertSet('pendingConversationIds', [$conversation->id]);
+
+        $assistant = Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'assistant',
+            'content' => 'Jawaban SSE tetap memakai bubble live.',
+        ]);
+        $conversation->touch();
+
+        $component
+            ->call('refreshPendingChatState', $assistant->id, true)
+            ->assertSet('pendingConversationIds', [])
+            ->assertSet('newMessageId', null)
+            ->assertSet('preservedStreamMessageId', $assistant->id)
+            ->assertSee('data-chat-last-assistant-message-id="'.$assistant->id.'"', false)
+            ->assertDontSee('wire:key="chat-message-'.$assistant->id.'"', false)
+            ->assertDontSee('data-answer-message-id="'.$assistant->id.'"', false)
+            ->assertDispatched('chat-pending-state-updated', pendingConversationIds: [])
+            ->assertDispatched('assistant-message-persisted', function (string $_event, array $payload) use ($conversation, $assistant) {
+                return (int) ($payload['conversationId'] ?? 0) === (int) $conversation->id
+                    && (int) ($payload['messageId'] ?? 0) === (int) $assistant->id
+                    && (bool) ($payload['preserveStream'] ?? false) === true;
+            });
+
+        $messages = collect($component->get('messages'));
+        $this->assertTrue($messages->contains(fn (array $message) => (int) ($message['id'] ?? 0) === (int) $assistant->id));
+        $this->assertTrue($messages->contains(fn (array $message) => $message['content'] === 'Jawaban SSE tetap memakai bubble live.'));
+    }
+
     public function test_refresh_pending_chat_state_does_not_load_completed_inactive_conversation(): void
     {
         $user = User::factory()->create();
@@ -1294,6 +1347,10 @@ class ChatUiTest extends TestCase
             ->assertSee('prose prose-p:my-1 prose-headings:my-2', false)
             ->assertSee('x-html="streamingHtml"', false)
             ->assertSee('x-if="sourcesVisible && sources && Array.isArray(sources) && sources.length > 0"', false)
+            ->assertSee('x-if="streamedAssistantMessageId && streamingText !== \'\'"', false)
+            ->assertSee('messageId: () => streamedAssistantMessageId', false)
+            ->assertSee('html: () => streamingHtml', false)
+            ->assertSee('resolvedMessageId()', false)
             ->assertDontSee('x-show="modelName"', false);
     }
 

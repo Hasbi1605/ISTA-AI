@@ -277,6 +277,18 @@ class MemoWorkspaceTest extends TestCase
             ->assertSee('Nomor memo wajib diisi.', false);
     }
 
+    public function test_generate_button_submits_configuration_form_from_sticky_composer(): void
+    {
+        $user = User::factory()->create(['email_verified_at' => now()]);
+
+        Livewire::actingAs($user)
+            ->test(MemoWorkspace::class)
+            ->assertSee('id="memo-config-form"', false)
+            ->assertSee('form="memo-config-form"', false)
+            ->assertSee('wire:submit="generateConfiguredMemo"', false)
+            ->assertDontSee('wire:click="generateConfiguredMemo"', false);
+    }
+
     public function test_generated_memo_chat_thread_is_restored_when_loading_memo_history(): void
     {
         Storage::fake('local');

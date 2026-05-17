@@ -666,10 +666,21 @@ const registerChatPageData = (Alpine) => {
             this.registerWireListener('assistant-message-persisted', (data) => {
                 const payload = normalizeWirePayload(data);
                 const ackConversationId = Number(payload.conversationId || 0);
+                const ackMessageId = Number(payload.messageId || 0);
+                const preserveStream = Boolean(payload.preserveStream);
                 const { conversationId } = this.getConversationMeta();
                 const targetConversationId = ackConversationId > 0 ? ackConversationId : conversationId;
+                const shouldPreserveCurrentStream = preserveStream
+                    && ackMessageId > 0
+                    && targetConversationId
+                    && this.isActiveConversation(targetConversationId)
+                    && Number(this.streamedAssistantMessageId || 0) === ackMessageId;
 
-                if (targetConversationId && this.isActiveConversation(targetConversationId)) {
+                if (shouldPreserveCurrentStream) {
+                    this.streaming = true;
+                    this.streamedAssistantMessageId = ackMessageId;
+                    this.revealStreamingSources();
+                } else if (targetConversationId && this.isActiveConversation(targetConversationId)) {
                     this.resetStreamingState();
                 }
 
@@ -953,7 +964,7 @@ const registerChatPageData = (Alpine) => {
                 }
 
                 if (streamedMessageId) {
-                    this.$wire.refreshPendingChatState(streamedMessageId);
+                    this.$wire.refreshPendingChatState(streamedMessageId, this.isActiveConversation(conversationId));
                     return;
                 }
 
@@ -1803,9 +1814,12 @@ const registerChatPageData = (Alpine) => {
 
     Alpine.data('chatAnswerActions', (config = {}) => ({
         messageId: Number(config.messageId || 0),
+        messageIdSource: config.messageId,
         html: config.html || '',
+        htmlSource: config.html,
         exportUrl: config.exportUrl || '',
         exportFileName: config.exportFileName || 'ista-ai-export',
+        exportFileNameSource: config.exportFileName,
         driveUploadAvailable: Boolean(config.driveUploadAvailable),
         exportMenuOpen: false,
         driveMenuOpen: false,
@@ -1816,9 +1830,42 @@ const registerChatPageData = (Alpine) => {
         driveError: '',
         driveResult: null,
 
+        resolvedConfigValue(value, fallback = '') {
+            if (typeof value === 'function') {
+                return value() || fallback;
+            }
+
+            return value || fallback;
+        },
+
+        resolvedMessageId() {
+            const source = typeof this.messageIdSource === 'function'
+                ? this.messageIdSource()
+                : this.messageId;
+            const id = Number(source || 0);
+
+            return Number.isFinite(id) && id > 0 ? id : 0;
+        },
+
+        resolvedHtml() {
+            return String(this.resolvedConfigValue(this.htmlSource, this.html) || '');
+        },
+
+        resolvedExportFileName() {
+            const configured = String(this.resolvedConfigValue(this.exportFileNameSource, this.exportFileName) || '').trim();
+
+            if (configured !== '') {
+                return configured;
+            }
+
+            const messageId = this.resolvedMessageId();
+
+            return messageId > 0 ? `ista-ai-jawaban-${messageId}` : 'ista-ai-export';
+        },
+
         plainText() {
             const wrapper = document.createElement('div');
-            wrapper.innerHTML = this.html || '';
+            wrapper.innerHTML = this.resolvedHtml();
 
             return this.normalizePlainText(this.nodeToPlainText(wrapper));
         },
@@ -1895,6 +1942,10 @@ const registerChatPageData = (Alpine) => {
         driveButtonLabel() {
             if (!this.driveUploadAvailable) {
                 return 'Google Drive belum tersedia untuk jawaban ini.';
+            }
+
+            if (!this.resolvedMessageId()) {
+                return 'Jawaban belum tersimpan.';
             }
 
             return this.driveLoading ? 'Mengupload ke Google Drive' : 'Upload ke Google Drive';
@@ -1985,7 +2036,7 @@ const registerChatPageData = (Alpine) => {
                 return fileNameMatch[1];
             }
 
-            return `${this.exportFileName}.${format}`;
+            return `${this.resolvedExportFileName()}.${format}`;
         },
 
         async exportAs(format) {
@@ -2006,9 +2057,9 @@ const registerChatPageData = (Alpine) => {
                         'X-CSRF-TOKEN': this.getCsrfToken(),
                     },
                     body: JSON.stringify({
-                        content_html: this.html,
+                        content_html: this.resolvedHtml(),
                         target_format: format,
-                        file_name: this.exportFileName,
+                        file_name: this.resolvedExportFileName(),
                     }),
                 });
 
@@ -2029,7 +2080,9 @@ const registerChatPageData = (Alpine) => {
         },
 
         async uploadToGoogleDrive(format) {
-            if (!this.messageId || this.driveLoading || !this.driveUploadAvailable) {
+            const messageId = this.resolvedMessageId();
+
+            if (!messageId || this.driveLoading || !this.driveUploadAvailable) {
                 return;
             }
 
@@ -2039,7 +2092,7 @@ const registerChatPageData = (Alpine) => {
             this.driveResult = null;
 
             try {
-                const result = await this.$wire.saveAnswerToGoogleDrive(this.messageId, format);
+                const result = await this.$wire.saveAnswerToGoogleDrive(messageId, format);
 
                 if (!result?.ok) {
                     throw new Error(result?.message || 'Upload ke Google Drive gagal.');

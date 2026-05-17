@@ -76,6 +76,8 @@ class ChatIndex extends Component
 
     public $newMessageId = null;
 
+    public $preservedStreamMessageId = null;
+
     // Maximum chats to show before "Show More"
     const MAX_VISIBLE_CHATS = 10;
 
@@ -149,6 +151,7 @@ class ChatIndex extends Component
 
         $this->currentConversationId = $conversation->id;
         $this->messages = $conversation->messages->toArray();
+        $this->preservedStreamMessageId = null;
         if ($clearNewMessageId) {
             $this->newMessageId = null;
         }
@@ -164,6 +167,7 @@ class ChatIndex extends Component
         $this->conversationDocuments = [];
         $this->sources = [];
         $this->newMessageId = null;
+        $this->preservedStreamMessageId = null;
         $this->attachmentUploadStatus = null;
         $this->attachmentUploadMessage = '';
         $this->uploadingAttachmentName = null;
@@ -568,6 +572,7 @@ class ChatIndex extends Component
         }
 
         $this->newMessageId = null;
+        $this->preservedStreamMessageId = null;
 
         $this->validate([
             'prompt' => 'required|string|min:1|max:8000',
@@ -652,11 +657,12 @@ class ChatIndex extends Component
         ];
     }
 
-    public function refreshPendingChatState(?int $alreadyStreamedMessageId = null): void
+    public function refreshPendingChatState(?int $alreadyStreamedMessageId = null, bool $preserveActiveStream = false): void
     {
         $alreadyStreamedMessageId = $alreadyStreamedMessageId !== null && $alreadyStreamedMessageId > 0
             ? $alreadyStreamedMessageId
             : null;
+        $preserveActiveStream = $preserveActiveStream && $alreadyStreamedMessageId !== null;
         $previousPendingIds = collect($this->pendingConversationIds)
             ->map(fn ($id) => (int) $id)
             ->values();
@@ -675,16 +681,28 @@ class ChatIndex extends Component
                 ->where('role', 'assistant')
                 ->latest('id')
                 ->value('id');
-
-            if (
-                $completedIds->contains($activeConversationId)
+            $shouldPreserveActiveStream = $preserveActiveStream
+                && $completedIds->contains($activeConversationId)
                 && $latestAssistantId
-                && (int) $latestAssistantId !== $alreadyStreamedMessageId
-            ) {
-                $this->newMessageId = (int) $latestAssistantId;
-            }
+                && (int) $latestAssistantId === $alreadyStreamedMessageId;
 
-            $this->loadConversation($activeConversationId, clearNewMessageId: false);
+            if ($shouldPreserveActiveStream) {
+                $this->newMessageId = null;
+                $this->preservedStreamMessageId = (int) $latestAssistantId;
+                $this->syncActiveAssistantMessageIntoState($activeConversationId, (int) $latestAssistantId);
+            } else {
+                $this->preservedStreamMessageId = null;
+
+                if (
+                    $completedIds->contains($activeConversationId)
+                    && $latestAssistantId
+                    && (int) $latestAssistantId !== $alreadyStreamedMessageId
+                ) {
+                    $this->newMessageId = (int) $latestAssistantId;
+                }
+
+                $this->loadConversation($activeConversationId, clearNewMessageId: false);
+            }
         }
 
         foreach ($completedIds as $completedConversationId) {
@@ -693,11 +711,17 @@ class ChatIndex extends Component
                 ->where('role', 'assistant')
                 ->latest('id')
                 ->value('id');
+            $shouldPreserveCompletedStream = $preserveActiveStream
+                && $activeConversationId !== null
+                && (int) $completedConversationId === $activeConversationId
+                && $latestAssistantId
+                && (int) $latestAssistantId === $alreadyStreamedMessageId;
 
             $this->dispatch(
                 'assistant-message-persisted',
                 conversationId: (int) $completedConversationId,
                 messageId: $latestAssistantId ? (int) $latestAssistantId : null,
+                preserveStream: $shouldPreserveCompletedStream,
             );
         }
     }
@@ -720,6 +744,26 @@ class ChatIndex extends Component
         $createdAt = $latestMessage->created_at;
 
         return $createdAt === null || $createdAt->greaterThan(now()->subMinutes(30));
+    }
+
+    private function syncActiveAssistantMessageIntoState(int $conversationId, int $assistantId): void
+    {
+        $assistant = Message::query()
+            ->whereKey($assistantId)
+            ->where('conversation_id', $conversationId)
+            ->where('role', 'assistant')
+            ->first();
+
+        if (! $assistant) {
+            return;
+        }
+
+        $this->messages = collect($this->messages)
+            ->reject(fn (array $message) => (int) ($message['id'] ?? 0) === $assistantId)
+            ->push($assistant->toArray())
+            ->sortBy(fn (array $message) => (int) ($message['id'] ?? 0))
+            ->values()
+            ->all();
     }
 
     private function dispatchPendingConversationState(): void

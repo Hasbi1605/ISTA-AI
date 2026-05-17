@@ -89,7 +89,7 @@
         @endif
 
         @if (! $activeMemoId || $showMemoConfiguration)
-            <form wire:submit="generateConfiguredMemo" class="chat-form memo-config-panel">
+            <form id="memo-config-form" wire:submit="generateConfiguredMemo" class="chat-form memo-config-panel">
                 <div class="border-b border-stone-100 bg-white px-4 py-4 dark:border-gray-800 dark:bg-gray-900">
                     <div class="flex items-start justify-between gap-3">
                         <div class="min-w-0">
@@ -310,8 +310,8 @@
                         </p>
                     </div>
                 @endif
-                <button type="button"
-                        wire:click="generateConfiguredMemo"
+                <button type="submit"
+                        form="memo-config-form"
                         wire:loading.attr="disabled"
                         wire:target="generateConfiguredMemo,generateFromChat"
                         :disabled="$wire.isGenerating"
