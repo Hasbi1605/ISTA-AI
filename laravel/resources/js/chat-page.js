@@ -13,7 +13,6 @@ const CHAT_PENDING_RECENT_TTL_MS = 3 * 60 * 1000;
 const CHAT_PENDING_STALE_WARNING_MS = 45 * 1000;
 const CHAT_MESSAGE_ACK_TIMEOUT_MS = 10 * 1000;
 const CHAT_LOADING_PHASE_DELAY_MS = 2500;
-const CHAT_SOURCE_REVEAL_BEFORE_REFRESH_MS = 650;
 const MARKDOWN_RENDER_OPTIONS = {
     async: false,
     breaks: false,
@@ -97,22 +96,6 @@ const normalizeAssistantSources = (sources = []) => {
 
         return normalized;
     }, []);
-};
-
-const hasAssistantSources = (sources = []) => normalizeAssistantSources(sources).length > 0;
-
-const stripAssistantReferenceFooter = (value = '', sources = []) => {
-    const text = String(value || '');
-    if (text === '' || !hasAssistantSources(sources)) {
-        return text;
-    }
-
-    const stripped = text
-        .replace(/\n{2,}---[ \t]*\n[ \t]*(?:\*\*)?(?:Rujukan|Referensi|Sources?)(?::)?(?:\*\*)?[ \t]*\n(?:[ \t]*[-*]\s+.*(?:\n|$))+$/iu, '')
-        .replace(/\n{2,}---[ \t]*\n[ \t]*Dokumen rujukan:\s*(?:\*\*)?.+?(?:\*\*)?[ \t]*$/iu, '')
-        .trimEnd();
-
-    return stripped === '' ? text : stripped;
 };
 
 const createAssistantTypewriterState = (config = {}) => ({
@@ -757,7 +740,6 @@ const registerChatPageData = (Alpine) => {
                 if (shouldPreserveCurrentStream) {
                     this.streaming = true;
                     this.streamedAssistantMessageId = ackMessageId;
-                    this.revealStreamingSources();
                 } else if (targetConversationId && this.isActiveConversation(targetConversationId)) {
                     this.resetStreamingState();
                 }
@@ -1037,11 +1019,9 @@ const registerChatPageData = (Alpine) => {
 
         queueFinalStreamingText(finalText) {
             const rawFinalText = typeof finalText === 'string' ? finalText : '';
-            const normalizedFinalText = stripAssistantReferenceFooter(rawFinalText, this.sources);
-
             this.streamingFinalText = rawFinalText !== '' ? rawFinalText : null;
             this.streaming = true;
-            this.queueAssistantTypewriterFinalText(normalizedFinalText);
+            this.queueAssistantTypewriterFinalText(rawFinalText);
         },
 
         markStreamFailed(conversationId) {
@@ -1072,14 +1052,6 @@ const registerChatPageData = (Alpine) => {
             }
 
             this.afterStreamingTypewriterSettles(() => {
-                this.revealStreamingSources();
-
-                const refreshDelay = this.sourcesVisible ? CHAT_SOURCE_REVEAL_BEFORE_REFRESH_MS : 0;
-                if (refreshDelay > 0) {
-                    window.setTimeout(refreshPendingState, refreshDelay);
-                    return;
-                }
-
                 refreshPendingState();
             });
         },

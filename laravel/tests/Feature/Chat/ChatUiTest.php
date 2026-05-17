@@ -496,10 +496,10 @@ class ChatUiTest extends TestCase
         $this->assertStringContainsString('shouldPreserveCurrentStream', $chatPageJs);
         $this->assertStringContainsString('preserveStream', $chatPageJs);
         $this->assertStringContainsString('afterStreamingTypewriterSettles(() => {', $chatPageJs);
-        $this->assertStringContainsString('revealStreamingSources()', $chatPageJs);
+        $this->assertStringNotContainsString('this.revealStreamingSources();', $chatPageJs);
         $this->assertStringContainsString('resolvedMessageId()', $chatPageJs);
         $this->assertStringContainsString('resolvedHtml()', $chatPageJs);
-        $this->assertStringContainsString('CHAT_SOURCE_REVEAL_BEFORE_REFRESH_MS', $chatPageJs);
+        $this->assertStringNotContainsString('CHAT_SOURCE_REVEAL_BEFORE_REFRESH_MS', $chatPageJs);
         $this->assertStringContainsString('CHAT_LOADING_PHASE_DELAY_MS', $chatPageJs);
         $this->assertStringContainsString('CHAT_PENDING_STALE_WARNING_MS', $chatPageJs);
         $this->assertStringNotContainsString('this.streamingText = this.streamingFinalText', $chatPageJs);
@@ -1416,7 +1416,7 @@ class ChatUiTest extends TestCase
             ->assertSee('x-show="streamingText !== \'\'"', false)
             ->assertSee('prose prose-p:my-1 prose-headings:my-2', false)
             ->assertSee('x-html="streamingHtml"', false)
-            ->assertSee('x-if="sourcesVisible && sources && Array.isArray(sources) && sources.length > 0"', false)
+            ->assertDontSee('x-if="sourcesVisible && sources && Array.isArray(sources) && sources.length > 0"', false)
             ->assertSee('x-if="streamedAssistantMessageId && streamingText !== \'\'"', false)
             ->assertSee('messageId: () => streamedAssistantMessageId', false)
             ->assertSee('html: () => streamingHtml', false)
@@ -1424,7 +1424,7 @@ class ChatUiTest extends TestCase
             ->assertDontSee('x-show="modelName"', false);
     }
 
-    public function test_streaming_final_content_strips_duplicate_source_footer_before_revealing_cards(): void
+    public function test_streaming_final_content_preserves_reference_footer_inside_live_bubble(): void
     {
         $chatPageJs = file_get_contents(resource_path('js/chat-page.js'));
         $chatMessagesBlade = file_get_contents(resource_path('views/livewire/chat/partials/chat-messages.blade.php'));
@@ -1432,11 +1432,14 @@ class ChatUiTest extends TestCase
         $this->assertIsString($chatPageJs);
         $this->assertIsString($chatMessagesBlade);
         $this->assertStringContainsString('const normalizeAssistantSources', $chatPageJs);
-        $this->assertStringContainsString('const stripAssistantReferenceFooter', $chatPageJs);
         $this->assertStringContainsString('this.typewriterSources = normalizeAssistantSources(sources);', $chatPageJs);
-        $this->assertStringContainsString('stripAssistantReferenceFooter(rawFinalText, this.sources)', $chatPageJs);
+        $this->assertStringContainsString('this.queueAssistantTypewriterFinalText(rawFinalText);', $chatPageJs);
         $this->assertStringContainsString('pendingDisplayText.startsWith(nextFinalText)', $chatPageJs);
-        $this->assertStringContainsString(':key="source.url || source.filename || idx"', $chatMessagesBlade);
+        $this->assertStringNotContainsString('stripAssistantReferenceFooter', $chatPageJs);
+        $this->assertStringNotContainsString('extractAssistantSourcesFromFooter', $chatPageJs);
+        $this->assertStringNotContainsString('this.revealStreamingSources();', $chatPageJs);
+        $this->assertStringNotContainsString('x-if="sourcesVisible && sources && Array.isArray(sources) && sources.length > 0"', $chatMessagesBlade);
+        $this->assertStringNotContainsString(':key="source.url || source.filename || idx"', $chatMessagesBlade);
     }
 
     public function test_chat_history_groups_today_by_jakarta_date(): void

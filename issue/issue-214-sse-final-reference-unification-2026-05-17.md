@@ -1,12 +1,15 @@
 # SSE Final Reference Unification
 
 ## Latar Belakang
-Typewriter SSE sudah memakai bubble yang sama dengan jawaban final, tetapi pada web search final text masih menambahkan footer `Rujukan:` ke dalam bubble sementara source cards SSE juga tampil di bawahnya. Saat `final-content` sedikit berbeda dari teks yang sudah diketik, helper typewriter juga bisa melakukan reset yang terlihat seperti jawaban terpotong.
+Typewriter SSE sudah memakai bubble yang sama dengan jawaban final, tetapi live SSE masih punya jalur renderer tambahan: metadata `sources` dipecah menjadi kartu `RUJUKAN` di bawah bubble. Setelah refresh, final/persisted renderer menampilkan footer `Dokumen rujukan:` atau `Rujukan:` sebagai bagian dari isi bubble karena konten itu memang disimpan di database.
+
+Koreksi dari QA manual: sumber kebenaran UX adalah tampilan final setelah refresh. Jadi live SSE harus mengikuti final renderer, bukan memecah rujukan menjadi kartu terpisah.
 
 ## Tujuan
 - Streaming SSE dan final state tetap memakai satu bubble live tanpa flicker.
-- Footer rujukan markdown dari `final-content` tidak tampil ganda ketika source cards SSE tersedia.
-- Source cards SSE dideduplikasi sebelum ditampilkan.
+- `final-content` SSE diketik apa adanya agar sama dengan isi message yang tersimpan.
+- Footer rujukan markdown tetap berada di bubble live, sama seperti final setelah refresh.
+- Kartu `RUJUKAN` live tidak muncul sebagai renderer kedua.
 - Typewriter tidak reset penuh ketika final text hanya berbeda pada whitespace atau lebih pendek sedikit dari buffer yang sudah diketik.
 
 ## Ruang Lingkup
@@ -19,16 +22,15 @@ Typewriter SSE sudah memakai bubble yang sama dengan jawaban final, tetapi pada 
 - Tidak menambah migrasi untuk menyimpan sources secara terstruktur.
 
 ## Risiko
-- Regex strip footer harus hanya aktif saat source cards tersedia agar jawaban lama tanpa metadata tetap menampilkan rujukan.
-- Dedupe URL tidak boleh menghapus dokumen berbeda yang punya nama sama secara tidak sengaja.
+- Menghapus kartu live berarti metadata `sources` SSE hanya dipakai sebagai metadata internal, bukan renderer UI.
 - Perubahan typewriter harus tetap menjaga fallback polling non-SSE.
 
 ## Langkah Implementasi
-1. Tambahkan normalizer source SSE dengan dedupe berdasarkan URL atau filename.
-2. Tambahkan helper untuk menghapus footer rujukan dari final text hanya saat source cards tersedia.
-3. Ubah `queueFinalStreamingText()` agar memakai final text yang sudah dinormalisasi.
-4. Perhalus `queueAssistantTypewriterFinalText()` agar tidak reset pada final text yang hanya trim/lebih pendek dari buffer.
-5. Tambahkan test kontrak UI untuk memastikan helper normalisasi tersedia dan dipakai.
+1. Pastikan `queueFinalStreamingText()` mengirim `final-content` mentah ke typewriter tanpa strip footer.
+2. Hapus jalur reveal kartu `RUJUKAN` live setelah SSE selesai/persisted.
+3. Hapus template kartu source live dari streaming bubble.
+4. Pertahankan perilaku `queueAssistantTypewriterFinalText()` agar tidak reset pada final text yang hanya trim/lebih pendek dari buffer.
+5. Tambahkan test kontrak UI untuk memastikan live tidak memecah footer rujukan menjadi kartu.
 
 ## Rencana Verifikasi
 - `cd laravel && php artisan test --filter=ChatUiTest`
@@ -36,8 +38,8 @@ Typewriter SSE sudah memakai bubble yang sama dengan jawaban final, tetapi pada 
 - `cd laravel && git diff --check`
 
 ## Kriteria Selesai
-- SSE web search tidak menampilkan `Rujukan:` di bubble sekaligus source cards di bawahnya.
-- Source cards tidak duplikat untuk URL/dokumen yang sama.
+- SSE tidak menampilkan kartu `RUJUKAN` terpisah di bawah bubble.
+- Footer `Dokumen rujukan:`/`Rujukan:` dari `final-content` tetap muncul di bubble live.
 - Final-content tidak membuat typewriter terasa reset/terpotong untuk perubahan kecil.
 - Verifikasi relevan lulus atau kegagalan dijelaskan.
 
