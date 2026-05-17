@@ -724,7 +724,7 @@ class MemoWorkspace extends Component
         ];
 
         foreach ($bodyChangePatterns as $pattern) {
-            if (preg_match($pattern, $normalized)) {
+            if (preg_match($pattern, $normalized) && ! $this->hasBodyPreservationInstruction($normalized)) {
                 return false;
             }
         }
@@ -733,6 +733,18 @@ class MemoWorkspace extends Component
             '/\b(?:tembusan|penerima|yth\.?|kalimat\s+penutup|penutup|penandatangan|tanda\s+tangan|tanggal\s+memo)\b/u',
             $normalized,
         ) === 1;
+    }
+
+    protected function hasBodyPreservationInstruction(string $normalizedInstruction): bool
+    {
+        return preg_match(
+            '/\b(?:bagian\s+isi|isi|body|bagian\s+lain|data\s+lain|yang\s+lain)\b.*\b(?:jangan\s+(?:diubah|berubah|mengubah)|pertahankan|tetap|tanpa\s+perubahan)\b/u',
+            $normalizedInstruction,
+        ) === 1
+            || preg_match(
+                '/\b(?:jangan\s+(?:diubah|berubah|mengubah)|pertahankan|tetap|tanpa\s+perubahan)\b.*\b(?:bagian\s+isi|isi|body|bagian\s+lain|data\s+lain|yang\s+lain)\b/u',
+                $normalizedInstruction,
+            ) === 1;
     }
 
     protected function memoConfigurationSummary(): string
@@ -916,6 +928,7 @@ class MemoWorkspace extends Component
     protected function cleanRevisionValue(string $value): string
     {
         $value = preg_replace('/\s+/u', ' ', trim($value)) ?? $value;
+        $value = preg_replace('/[\.,;]\s+(?:bagian\s+(?:isi|lain|lainnya)|metadata|data\s+(?:lain|lainnya|yang\s+lain)|yang\s+lain|lainnya)\b.*$/iu', '', $value) ?? $value;
         $value = preg_replace('/^(?:untuk|kepada|ke)\s+/iu', '', $value) ?? $value;
 
         return trim($value, " \t\n\r\0\x0B\"'.,;:");

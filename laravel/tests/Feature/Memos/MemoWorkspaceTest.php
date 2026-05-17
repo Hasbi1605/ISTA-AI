@@ -838,7 +838,7 @@ class MemoWorkspaceTest extends TestCase
         Livewire::actingAs($user)
             ->test(MemoWorkspace::class)
             ->call('loadMemo', $memo->id)
-            ->set('memoPrompt', 'Ubah Yth menjadi Koordinator Informatika Ngaglik')
+            ->set('memoPrompt', 'Ubah Yth. menjadi Koordinator Informatika Ngaglik. Bagian isi jangan diubah.')
             ->call('sendMemoChat')
             ->assertHasNoErrors()
             ->assertDispatched('memo-document-ready');
