@@ -183,7 +183,7 @@
                              Rujukan:
                          </p>
                          <div class="flex flex-wrap gap-2">
-                             <template x-for="(source, idx) in sources" :key="idx">
+                             <template x-for="(source, idx) in sources" :key="source.url || source.filename || idx">
                                  <div>
                                      <template x-if="source.type === 'web' && source.url">
                                          <a :href="source.url" target="_blank" rel="noopener noreferrer"

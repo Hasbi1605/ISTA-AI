@@ -41,6 +41,80 @@ const renderSafeStreamingMarkdown = (value = '') => {
     }
 };
 
+const normalizeAssistantSourceUrl = (url = '') => {
+    const rawUrl = String(url || '').trim();
+    if (rawUrl === '') {
+        return '';
+    }
+
+    try {
+        const parsed = new URL(rawUrl);
+        parsed.hash = '';
+        parsed.pathname = parsed.pathname.replace(/\/+$/, '') || '/';
+
+        return parsed.toString();
+    } catch (_) {
+        return rawUrl.replace(/\/+$/, '');
+    }
+};
+
+const normalizeAssistantSources = (sources = []) => {
+    if (!Array.isArray(sources)) {
+        return [];
+    }
+
+    const seen = new Set();
+
+    return sources.reduce((normalized, source) => {
+        if (!source || typeof source !== 'object') {
+            return normalized;
+        }
+
+        const url = normalizeAssistantSourceUrl(source.url || '');
+        const filename = String(source.filename || '').trim();
+        const title = String(source.title || '').trim();
+
+        if (url === '' && filename === '') {
+            return normalized;
+        }
+
+        const key = url !== ''
+            ? `web:${url.toLowerCase()}`
+            : `doc:${filename.toLowerCase()}`;
+
+        if (seen.has(key)) {
+            return normalized;
+        }
+
+        seen.add(key);
+        normalized.push({
+            ...source,
+            type: source.type || (url !== '' ? 'web' : 'document'),
+            url,
+            filename,
+            title,
+        });
+
+        return normalized;
+    }, []);
+};
+
+const hasAssistantSources = (sources = []) => normalizeAssistantSources(sources).length > 0;
+
+const stripAssistantReferenceFooter = (value = '', sources = []) => {
+    const text = String(value || '');
+    if (text === '' || !hasAssistantSources(sources)) {
+        return text;
+    }
+
+    const stripped = text
+        .replace(/\n{2,}---[ \t]*\n[ \t]*(?:\*\*)?(?:Rujukan|Referensi|Sources?)(?::)?(?:\*\*)?[ \t]*\n(?:[ \t]*[-*]\s+.*(?:\n|$))+$/iu, '')
+        .replace(/\n{2,}---[ \t]*\n[ \t]*Dokumen rujukan:\s*(?:\*\*)?.+?(?:\*\*)?[ \t]*$/iu, '')
+        .trimEnd();
+
+    return stripped === '' ? text : stripped;
+};
+
 const createAssistantTypewriterState = (config = {}) => ({
     typewriterFullText: String(config.content || ''),
     typewriterDisplayedText: '',
@@ -49,7 +123,7 @@ const createAssistantTypewriterState = (config = {}) => ({
     typewriterTimer: null,
     typewriterDoneCallback: null,
     typewriterMarkdownRenderFrame: null,
-    typewriterSources: Array.isArray(config.sources) ? config.sources : [],
+    typewriterSources: normalizeAssistantSources(config.sources),
     typewriterSourcesVisible: false,
     typewriterInitialDelay: Number.isFinite(Number(config.initialDelay)) ? Number(config.initialDelay) : 80,
     typewriterEmptyInitialDelay: Number.isFinite(Number(config.emptyInitialDelay)) ? Number(config.emptyInitialDelay) : 30,
@@ -105,7 +179,7 @@ const createAssistantTypewriterState = (config = {}) => ({
     },
 
     setAssistantTypewriterSources(sources) {
-        this.typewriterSources = Array.isArray(sources) ? sources : [];
+        this.typewriterSources = normalizeAssistantSources(sources);
         this.typewriterSourcesVisible = false;
     },
 
@@ -131,6 +205,10 @@ const createAssistantTypewriterState = (config = {}) => ({
             this.typewriterQueue += nextFinalText.substring(pendingDisplayText.length);
         } else if (nextFinalText.startsWith(this.typewriterDisplayedText)) {
             this.typewriterQueue = nextFinalText.substring(this.typewriterDisplayedText.length);
+        } else if (pendingDisplayText.startsWith(nextFinalText) || pendingDisplayText.trimEnd() === nextFinalText.trimEnd()) {
+            this.typewriterDisplayedText = nextFinalText;
+            this.typewriterQueue = '';
+            this.renderAssistantTypewriterMarkdownNow();
         } else {
             this.typewriterDisplayedText = '';
             this.typewriterQueue = nextFinalText;
@@ -945,6 +1023,10 @@ const registerChatPageData = (Alpine) => {
 
         setStreamingSources(sources) {
             this.setAssistantTypewriterSources(sources);
+
+            if (this.streamingFinalText) {
+                this.queueFinalStreamingText(this.streamingFinalText);
+            }
         },
 
         revealStreamingSources() {
@@ -952,9 +1034,12 @@ const registerChatPageData = (Alpine) => {
         },
 
         queueFinalStreamingText(finalText) {
-            this.streamingFinalText = typeof finalText === 'string' ? finalText : null;
+            const rawFinalText = typeof finalText === 'string' ? finalText : '';
+            const normalizedFinalText = stripAssistantReferenceFooter(rawFinalText, this.sources);
+
+            this.streamingFinalText = rawFinalText !== '' ? rawFinalText : null;
             this.streaming = true;
-            this.queueAssistantTypewriterFinalText(finalText);
+            this.queueAssistantTypewriterFinalText(normalizedFinalText);
         },
 
         refreshPendingAfterStreamingSettles(conversationId, streamedMessageId = null) {

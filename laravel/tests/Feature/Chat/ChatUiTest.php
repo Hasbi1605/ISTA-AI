@@ -1359,6 +1359,21 @@ class ChatUiTest extends TestCase
             ->assertDontSee('x-show="modelName"', false);
     }
 
+    public function test_streaming_final_content_strips_duplicate_source_footer_before_revealing_cards(): void
+    {
+        $chatPageJs = file_get_contents(resource_path('js/chat-page.js'));
+        $chatMessagesBlade = file_get_contents(resource_path('views/livewire/chat/partials/chat-messages.blade.php'));
+
+        $this->assertIsString($chatPageJs);
+        $this->assertIsString($chatMessagesBlade);
+        $this->assertStringContainsString('const normalizeAssistantSources', $chatPageJs);
+        $this->assertStringContainsString('const stripAssistantReferenceFooter', $chatPageJs);
+        $this->assertStringContainsString('this.typewriterSources = normalizeAssistantSources(sources);', $chatPageJs);
+        $this->assertStringContainsString('stripAssistantReferenceFooter(rawFinalText, this.sources)', $chatPageJs);
+        $this->assertStringContainsString('pendingDisplayText.startsWith(nextFinalText)', $chatPageJs);
+        $this->assertStringContainsString(':key="source.url || source.filename || idx"', $chatMessagesBlade);
+    }
+
     public function test_chat_history_groups_today_by_jakarta_date(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-05-09 10:00:00', 'Asia/Jakarta'));
