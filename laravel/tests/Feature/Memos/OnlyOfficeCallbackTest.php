@@ -568,38 +568,33 @@ class OnlyOfficeCallbackTest extends TestCase
         $memo = $this->createMemo($user);
         $key = $this->callbackKey($memo);
 
-        // First save: same key + status but URL is unique per save (OnlyOffice behaviour).
+        // First force-save: same key + status but URL is unique per save (OnlyOffice behaviour).
         $token1 = (new JwtSigner('callback-secret'))->sign([
-            'status' => 2,
+            'status' => 6,
             'key' => $key,
             'url' => 'https://onlyoffice.test/save-v1.docx',
             'exp' => time() + 60,
         ]);
 
         $this->postJson(route('onlyoffice.callback', $memo), [
-            'status' => 2,
+            'status' => 6,
             'key' => $key,
             'url' => 'https://onlyoffice.test/save-v1.docx',
             'token' => $token1,
         ])->assertOk()->assertJson(['error' => 0]);
 
-        // Invalidate the editor key so the second save (with the same key cached
-        // at editor-open time) is still accepted by validateFreshDocumentKey.
-        // In real sessions OnlyOffice would use the same cached editor key.
-        // We just need to test that the replay guard uses key+status+url.
-
-        // Second save in the same session: same key + status, but different URL
+        // Second force-save in the same session: same key + status, but different URL
         // (OnlyOffice generates a new download URL for each save output).
         // Fingerprint is key:status:url — since URL differs this is NOT a replay.
         $token2 = (new JwtSigner('callback-secret'))->sign([
-            'status' => 2,
+            'status' => 6,
             'key' => $key,
             'url' => 'https://onlyoffice.test/save-v2.docx',
             'exp' => time() + 60,
         ]);
 
         $this->postJson(route('onlyoffice.callback', $memo), [
-            'status' => 2,
+            'status' => 6,
             'key' => $key,
             'url' => 'https://onlyoffice.test/save-v2.docx',
             'token' => $token2,
@@ -1037,6 +1032,78 @@ class OnlyOfficeCallbackTest extends TestCase
         ])->assertForbidden();
 
         Http::assertNothingSent();
+    }
+
+    public function test_callback_status_2_invalidates_editor_key_for_next_session(): void
+    {
+        config([
+            'services.onlyoffice.jwt_secret' => 'callback-secret',
+            'services.onlyoffice.internal_url' => 'https://onlyoffice.test',
+        ]);
+        Storage::fake('local');
+        Http::fake([
+            'https://onlyoffice.test/final-save.docx' => Http::response(self::fakeDocxBytes('final'), 200),
+        ]);
+
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        $memo = $this->createMemo($user);
+        $initialKey = $this->callbackKey($memo);
+        $url = 'https://onlyoffice.test/final-save.docx';
+        $token = (new JwtSigner('callback-secret'))->sign([
+            'status' => 2,
+            'key' => $initialKey,
+            'url' => $url,
+            'exp' => time() + 60,
+        ]);
+
+        $this->postJson(route('onlyoffice.callback', $memo), [
+            'status' => 2,
+            'key' => $initialKey,
+            'url' => $url,
+            'token' => $token,
+        ])->assertOk()->assertJson(['error' => 0]);
+
+        $nextKey = app(MemoDocumentKey::class)->forEditor($memo->refresh(), $memo->currentVersion?->refresh());
+
+        $this->assertNotSame($initialKey, $nextKey);
+    }
+
+    public function test_callback_status_6_keeps_active_editor_key(): void
+    {
+        config([
+            'services.onlyoffice.jwt_secret' => 'callback-secret',
+            'services.onlyoffice.internal_url' => 'https://onlyoffice.test',
+        ]);
+        Storage::fake('local');
+        Http::fake([
+            'https://onlyoffice.test/force-save.docx' => Http::response(self::fakeDocxBytes('force'), 200),
+        ]);
+
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        $memo = $this->createMemo($user);
+        $version = $memo->currentVersion()->firstOrFail();
+        $initialKey = $this->callbackKey($memo, $version);
+        $url = 'https://onlyoffice.test/force-save.docx';
+        $token = (new JwtSigner('callback-secret'))->sign([
+            'status' => 6,
+            'key' => $initialKey,
+            'url' => $url,
+            'exp' => time() + 60,
+        ]);
+
+        $this->postJson(route('onlyoffice.callback', [
+            'memo' => $memo,
+            'version_id' => $version->id,
+        ]), [
+            'status' => 6,
+            'key' => $initialKey,
+            'url' => $url,
+            'token' => $token,
+        ])->assertOk()->assertJson(['error' => 0]);
+
+        $activeKey = app(MemoDocumentKey::class)->forEditor($memo->refresh(), $memo->currentVersion?->refresh());
+
+        $this->assertSame($initialKey, $activeKey);
     }
 
     // -------------------------------------------------------------------------

@@ -52,6 +52,8 @@ class MemoWorkspace extends Component
 
     public string $memoAdditionalInstruction = '';
 
+    public string $memoRegenerateMode = 'preserve_document';
+
     public array $memoChatMessages = [];
 
     public array $memoChatThreads = [];
@@ -257,7 +259,9 @@ class MemoWorkspace extends Component
         $this->isGenerating = true;
 
         try {
-            $instruction = 'Generate ulang memo aktif dari konfigurasi terbaru. Gunakan seluruh metadata, isi, penutup, penandatangan, tembusan, dan format dokumen yang sedang tampil di panel konfigurasi.';
+            $instruction = $this->memoRegenerateMode === 'form_only'
+                ? 'Generate ulang memo aktif dari konfigurasi terbaru. Gunakan seluruh metadata, isi, penutup, penandatangan, tembusan, dan format dokumen yang sedang tampil di panel konfigurasi.'
+                : 'Generate ulang memo aktif dari konfigurasi terbaru. Gunakan metadata dari panel konfigurasi dan pertahankan isi dokumen terbaru sebagai baseline kecuali konfigurasi meminta perubahan.';
             $generationService = app(MemoGenerationService::class);
             $configuration = array_merge($this->memoConfigurationPayload(), [
                 'revision_instruction' => $instruction,
@@ -472,6 +476,9 @@ class MemoWorkspace extends Component
             'documentType' => 'word',
             'editorConfig' => [
                 'callbackUrl' => $laravelInternalUrl.$callbackPath,
+                'customization' => [
+                    'forcesave' => true,
+                ],
                 'mode' => 'edit',
                 'lang' => 'id',
                 'user' => [
@@ -544,6 +551,7 @@ class MemoWorkspace extends Component
                 'memoCarbonCopy' => ['nullable', 'string', 'max:2000'],
                 'memoPageSize' => ['required', 'in:auto,folio,letter'],
                 'memoAdditionalInstruction' => ['nullable', 'string', 'max:2000'],
+                'memoRegenerateMode' => ['required', 'in:preserve_document,form_only'],
             ], [
                 'memoNumber.required' => 'Nomor memo wajib diisi.',
                 'memoRecipient.required' => 'Yth. wajib diisi.',
@@ -604,10 +612,20 @@ class MemoWorkspace extends Component
 
     protected function memoConfiguredRevisionContext(string $instruction): string
     {
-        return implode("\n\n", array_filter([
+        $sections = [
             $this->memoDraftContext(),
             "Instruksi revisi wajib diterapkan:\n".trim($instruction),
-        ], fn (string $section) => trim($section) !== ''));
+        ];
+
+        if ($this->memoRegenerateMode === 'preserve_document') {
+            $bodyOnly = $this->currentMemoBodyForRevision();
+
+            if ($bodyOnly !== '') {
+                array_unshift($sections, "Isi memo saat ini:\n".$bodyOnly);
+            }
+        }
+
+        return implode("\n\n", array_filter($sections, fn (string $section) => trim($section) !== ''));
     }
 
     protected function memoRevisionContext(string $instruction): string
@@ -1115,6 +1133,7 @@ class MemoWorkspace extends Component
             ? $storedPageSizeMode
             : (in_array($storedPageSize, array_keys($this->memoPageSizes()), true) ? $storedPageSize : $this->memoPageSize);
         $this->memoAdditionalInstruction = (string) ($configuration['additional_instruction'] ?? '');
+        $this->memoRegenerateMode = 'preserve_document';
     }
 
     protected function resetMemoConfiguration(): void
@@ -1132,6 +1151,7 @@ class MemoWorkspace extends Component
         $this->memoCarbonCopy = '';
         $this->memoPageSize = 'auto';
         $this->memoAdditionalInstruction = '';
+        $this->memoRegenerateMode = 'preserve_document';
     }
 
     /**

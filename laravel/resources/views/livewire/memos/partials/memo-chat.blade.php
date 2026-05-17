@@ -89,7 +89,7 @@
         @endif
 
         @if (! $activeMemoId || $showMemoConfiguration)
-            <form id="memo-config-form" wire:submit="generateConfiguredMemo" class="chat-form memo-config-panel">
+            <form id="memo-config-form" @submit.prevent="submitMemoConfiguration($wire)" class="chat-form memo-config-panel">
                 <div class="border-b border-stone-100 bg-white px-4 py-4 dark:border-gray-800 dark:bg-gray-900">
                     <div class="flex items-start justify-between gap-3">
                         <div class="min-w-0">
@@ -202,6 +202,17 @@
                                   class="memo-config-textarea"></textarea>
                         @error('memoAdditionalInstruction') <p class="memo-config-error">{{ $message }}</p> @enderror
                     </div>
+
+                    @if ($activeMemoId)
+                        <div class="mt-3">
+                            <label class="memo-config-label">Mode generate ulang</label>
+                            <select wire:model="memoRegenerateMode" class="memo-config-control">
+                                <option value="preserve_document">Pertahankan isi dokumen terbaru</option>
+                                <option value="form_only">Gunakan isi form saja</option>
+                            </select>
+                            @error('memoRegenerateMode') <p class="memo-config-error">{{ $message }}</p> @enderror
+                        </div>
+                    @endif
                 </div>
             </form>
         @endif
@@ -310,14 +321,21 @@
                         </p>
                     </div>
                 @endif
+                <div x-show="memoSyncError" x-cloak class="mb-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-left dark:border-amber-900/60 dark:bg-amber-950/30">
+                    <p class="text-[12px] font-semibold text-amber-800 dark:text-amber-200" x-text="memoSyncError"></p>
+                </div>
                 <button type="submit"
                         form="memo-config-form"
                         wire:loading.attr="disabled"
                         wire:target="generateConfiguredMemo,generateFromChat"
-                        :disabled="$wire.isGenerating"
+                        :disabled="memoSyncLoading || $wire.isGenerating"
                         class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-ista-primary px-4 text-[13px] font-semibold text-white shadow-sm transition hover:bg-ista-dark active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50">
-                    <span wire:loading.remove wire:target="generateConfiguredMemo,generateFromChat">{{ $activeMemoId ? 'Buat ulang dari konfigurasi' : 'Buat memo' }}</span>
-                    <span wire:loading.inline-flex wire:target="generateConfiguredMemo,generateFromChat" class="items-center gap-2">
+                    <span x-show="memoSyncLoading" x-cloak class="inline-flex items-center gap-2">
+                        <span class="h-3.5 w-3.5 rounded-full border-2 border-white/70 border-t-transparent animate-spin" aria-hidden="true"></span>
+                        <span>Menyimpan perubahan...</span>
+                    </span>
+                    <span x-show="!memoSyncLoading" wire:loading.remove wire:target="generateConfiguredMemo,generateFromChat">{{ $activeMemoId ? 'Buat ulang dari konfigurasi' : 'Buat memo' }}</span>
+                    <span x-show="!memoSyncLoading" wire:loading.inline-flex wire:target="generateConfiguredMemo,generateFromChat" class="items-center gap-2">
                         <span class="h-3.5 w-3.5 rounded-full border-2 border-white/70 border-t-transparent animate-spin" aria-hidden="true"></span>
                         <span>Memproses...</span>
                     </span>
@@ -326,6 +344,9 @@
         @elseif ($activeMemoId)
             <form @submit.prevent="submitMemoRevision($wire, $refs.memoInput)" class="chat-form relative rounded-xl shadow-sm bg-white dark:bg-gray-800 border border-stone-200/60 dark:border-gray-700 transition-colors">
                 <div class="px-3 pb-3 pt-3 w-full">
+                    <div x-show="memoSyncError" x-cloak class="mb-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-left dark:border-amber-900/60 dark:bg-amber-950/30">
+                        <p class="text-[12px] font-semibold text-amber-800 dark:text-amber-200" x-text="memoSyncError"></p>
+                    </div>
                     <textarea
                         wire:model="memoPrompt"
                         x-ref="memoInput"

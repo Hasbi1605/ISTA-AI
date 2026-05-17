@@ -6,6 +6,7 @@ use App\Models\Memo;
 use App\Models\MemoVersion;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 
 class MemoDocumentKey
 {
@@ -89,10 +90,22 @@ class MemoDocumentKey
             ?? $memo->updated_at?->timestamp
             ?? now()->timestamp;
         $path = $version?->file_path ?: ($memo->file_path ?: '');
-        $pathHash = substr(sha1($path), 0, 12);
+        $fileHash = $this->fileHash($path);
+        $pathHash = substr(sha1($path.'|'.$fileHash), 0, 12);
         $scope = $version ? 'v'.$version->id : 'current';
 
         return 'memo-'.$memo->id.'-'.$scope.'-'.$timestamp.'-'.$pathHash;
+    }
+
+    protected function fileHash(string $path): string
+    {
+        if ($path === '' || ! Storage::disk('local')->exists($path)) {
+            return '';
+        }
+
+        $absolutePath = Storage::disk('local')->path($path);
+
+        return is_file($absolutePath) ? (hash_file('sha1', $absolutePath) ?: '') : '';
     }
 
     protected function editorCacheKey(Memo $memo, ?MemoVersion $version = null): string

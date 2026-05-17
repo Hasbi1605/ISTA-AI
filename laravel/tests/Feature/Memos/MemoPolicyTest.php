@@ -6,6 +6,7 @@ use App\Models\Memo;
 use App\Models\MemoVersion;
 use App\Models\User;
 use App\Services\OnlyOffice\JwtSigner;
+use App\Services\OnlyOffice\MemoForceSaveService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\Cache;
@@ -232,6 +233,69 @@ class MemoPolicyTest extends TestCase
         $this->assertStringEndsWith('-pdf', $conversionPayload['key']);
         $this->assertStringContainsString('version_id='.$secondVersion->id, $conversionPayload['url']);
         $this->assertSame('Memo-Test.docx', $conversionPayload['title']);
+    }
+
+    public function test_owner_can_force_save_selected_memo_version(): void
+    {
+        config([
+            'services.onlyoffice.jwt_secret' => 'force-secret',
+            'services.onlyoffice.internal_url' => 'http://onlyoffice',
+            'services.onlyoffice.force_save_wait_seconds' => 1,
+            'services.onlyoffice.force_save_poll_microseconds' => 1000,
+        ]);
+
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        $memo = $this->createMemo($user);
+        [, $secondVersion] = $this->createMemoVersions($memo);
+        $memo->forceFill([
+            'file_path' => $secondVersion->file_path,
+            'current_version_id' => $secondVersion->id,
+        ])->save();
+
+        $commandPayload = null;
+
+        Http::fake(function (HttpRequest $request) use (&$commandPayload, $memo, $secondVersion) {
+            if (str_starts_with($request->url(), 'http://onlyoffice/command')) {
+                $commandPayload = (new JwtSigner('force-secret'))->verify((string) $request->data()['token']);
+                app(MemoForceSaveService::class)->markSucceeded((string) $commandPayload['userdata'], $memo, $secondVersion);
+
+                return Http::response(['error' => 0], 200);
+            }
+
+            return Http::response('unexpected request', 500);
+        });
+
+        $this->actingAs($user)
+            ->postJson(route('memos.force-save', $memo), [
+                'version_id' => $secondVersion->id,
+            ])
+            ->assertOk()
+            ->assertJson(['status' => 'saved']);
+
+        $this->assertIsArray($commandPayload);
+        $this->assertSame('forcesave', $commandPayload['c']);
+        $this->assertStringStartsWith('memo-'.$memo->id.'-v'.$secondVersion->id.'-', $commandPayload['key']);
+        $this->assertStringStartsWith('memo-force-save:'.$memo->id.':'.$secondVersion->id.':', $commandPayload['userdata']);
+    }
+
+    public function test_force_save_no_changes_is_treated_as_success(): void
+    {
+        config([
+            'services.onlyoffice.jwt_secret' => 'force-secret',
+            'services.onlyoffice.internal_url' => 'http://onlyoffice',
+        ]);
+
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        $memo = $this->createMemo($user);
+
+        Http::fake([
+            'http://onlyoffice/command*' => Http::response(['error' => 4], 200),
+        ]);
+
+        $this->actingAs($user)
+            ->postJson(route('memos.force-save', $memo))
+            ->assertOk()
+            ->assertJson(['status' => 'no_changes']);
     }
 
     protected function createMemo(User $user): Memo

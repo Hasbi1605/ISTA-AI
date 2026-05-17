@@ -2594,15 +2594,22 @@ const registerChatPageData = (Alpine) => {
 
     Alpine.data('memoDocumentDownloads', () => ({
         downloadLoading: null,
+        downloadStatus: '',
+        downloadError: '',
 
-        async downloadMemo(url, type, fallbackName, versionId = null) {
+        async downloadMemo(url, type, fallbackName, versionId = null, forceSaveUrl = null) {
             if (this.downloadLoading) {
                 return;
             }
 
             this.downloadLoading = type;
+            this.downloadStatus = 'Menyimpan perubahan editor...';
+            this.downloadError = '';
 
             try {
+                await this.forceSaveMemo(forceSaveUrl, versionId);
+                this.downloadStatus = type === 'pdf' ? 'Menyiapkan PDF...' : 'Menyiapkan DOCX...';
+
                 const response = await fetch(this.versionedUrl(url, versionId), {
                     cache: 'no-store',
                     credentials: 'same-origin',
@@ -2621,8 +2628,52 @@ const registerChatPageData = (Alpine) => {
                     response.headers.get('Content-Disposition') || '',
                     fallbackName,
                 ));
+            } catch (error) {
+                this.downloadError = error?.message || 'Unduhan belum bisa disiapkan.';
             } finally {
                 this.downloadLoading = null;
+                this.downloadStatus = '';
+            }
+        },
+
+        async forceSaveMemo(url, versionId = null) {
+            if (!url) {
+                return;
+            }
+
+            const selectedVersionId = document.getElementById('memo-version-select')?.value || versionId;
+            const response = await fetch(url, {
+                method: 'POST',
+                cache: 'no-store',
+                credentials: 'same-origin',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': this.getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({
+                    version_id: selectedVersionId || null,
+                }),
+            });
+
+            if (!response.ok) {
+                const message = await this.errorMessage(response);
+                throw new Error(message || 'Perubahan editor belum tersimpan.');
+            }
+        },
+
+        getCsrfToken() {
+            return document.querySelector('meta[name="csrf-token"]')?.content || '';
+        },
+
+        async errorMessage(response) {
+            try {
+                const data = await response.clone().json();
+
+                return data?.message || '';
+            } catch (error) {
+                return await response.text();
             }
         },
 
@@ -2677,6 +2728,8 @@ const registerChatPageData = (Alpine) => {
         memoPhase2Timeout: null,
         memoPhase2Done: false,
         memoShimmerActive: false,
+        memoSyncLoading: false,
+        memoSyncError: '',
 
         init() {
             const mediaQuery = window.matchMedia('(max-width: 1023px)');
@@ -2715,31 +2768,102 @@ const registerChatPageData = (Alpine) => {
             this.showMemoSidebar = false;
         },
 
-        submitMemoRevision($wire, textarea) {
+        async submitMemoRevision($wire, textarea) {
             const message = (textarea?.value || '').trim();
 
             if (!message || this.memoRevisionLoading || $wire.isGenerating) {
                 return;
             }
 
+            this.memoSyncError = '';
             this.memoRevisionText = message;
             this.memoRevisionLoading = true;
             this.memoShimmerActive = true;
-            this.startMemoLoadingPhase();
+            this.memoLoadingPhase = 'Menyimpan perubahan editor';
+            this.memoLoadingPhaseKey++;
 
-            textarea.value = '';
-            textarea.style.height = 'auto';
-            textarea.dispatchEvent(new Event('input', { bubbles: true }));
             this.scrollMemoChatToBottom();
 
-            $wire.sendMemoChat(message)
-                .catch(() => {})
-                .finally(() => {
-                    this.memoRevisionText = '';
-                    this.memoRevisionLoading = false;
-                    this.resetMemoLoadingPhase();
-                    this.scrollMemoChatToBottom();
-                });
+            try {
+                await this.forceSaveActiveMemo($wire);
+                this.startMemoLoadingPhase();
+
+                textarea.value = '';
+                textarea.style.height = 'auto';
+                textarea.dispatchEvent(new Event('input', { bubbles: true }));
+                this.scrollMemoChatToBottom();
+
+                await $wire.sendMemoChat(message);
+            } catch (error) {
+                this.memoSyncError = error?.message || 'Perubahan editor belum tersimpan.';
+            } finally {
+                this.memoRevisionText = '';
+                this.memoRevisionLoading = false;
+                this.resetMemoLoadingPhase();
+                this.scrollMemoChatToBottom();
+            }
+        },
+
+        async submitMemoConfiguration($wire) {
+            if (this.memoSyncLoading || $wire.isGenerating) {
+                return;
+            }
+
+            this.memoSyncError = '';
+            this.memoSyncLoading = true;
+
+            try {
+                await this.forceSaveActiveMemo($wire);
+                await $wire.generateConfiguredMemo();
+            } catch (error) {
+                this.memoSyncError = error?.message || 'Perubahan editor belum tersimpan.';
+            } finally {
+                this.memoSyncLoading = false;
+            }
+        },
+
+        async forceSaveActiveMemo($wire) {
+            const memoId = Number($wire.activeMemoId || 0);
+
+            if (!memoId) {
+                return;
+            }
+
+            const baseUrl = this.$root?.dataset?.memoForceSaveBaseUrl || '/chat/memos';
+            const versionId = $wire.activeMemoVersionId || document.getElementById('memo-version-select')?.value || null;
+            const response = await fetch(`${baseUrl}/${memoId}/force-save`, {
+                method: 'POST',
+                cache: 'no-store',
+                credentials: 'same-origin',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': this.getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({
+                    version_id: versionId,
+                }),
+            });
+
+            if (!response.ok) {
+                const message = await this.errorMessage(response);
+                throw new Error(message || 'Perubahan editor belum tersimpan.');
+            }
+        },
+
+        getCsrfToken() {
+            return document.querySelector('meta[name="csrf-token"]')?.content || '';
+        },
+
+        async errorMessage(response) {
+            try {
+                const data = await response.clone().json();
+
+                return data?.message || '';
+            } catch (error) {
+                return await response.text();
+            }
         },
 
         memoLoadingLabels() {

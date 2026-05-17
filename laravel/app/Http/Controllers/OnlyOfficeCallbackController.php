@@ -7,6 +7,7 @@ use App\Models\MemoVersion;
 use App\Services\OnlyOffice\DocxTextExtractor;
 use App\Services\OnlyOffice\JwtSigner;
 use App\Services\OnlyOffice\MemoDocumentKey;
+use App\Services\OnlyOffice\MemoForceSaveService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -91,6 +92,8 @@ class OnlyOfficeCallbackController extends Controller
                 'description' => 'Force-save error reported by OnlyOffice. Document may not have been saved.',
             ]);
 
+            app(MemoForceSaveService::class)->markFailed((string) ($callback['userdata'] ?? ''), $memo, $version);
+
             return response()->json(['error' => 0]);
         }
 
@@ -123,7 +126,7 @@ class OnlyOfficeCallbackController extends Controller
             $lockKey = 'oo_save_lock:'.$memo->id.':'.($version?->id ?? 'base');
             $lock = Cache::lock($lockKey, 30);
 
-            $lock->block(10, function () use ($memo, $version, $path, $response, $callback, $replayCacheKey) {
+            $lock->block(10, function () use ($memo, $version, $path, $response, $callback, $replayCacheKey, $status) {
                 // Re-check replay inside the lock to guard against a concurrent
                 // thread that passed the fast-path check above.
                 if (Cache::has($replayCacheKey)) {
@@ -185,6 +188,14 @@ class OnlyOfficeCallbackController extends Controller
                 // before this point (network errors, DOCX validation, lock
                 // contention) are never incorrectly blocked as replays.
                 $this->markCallbackProcessed($replayCacheKey, $callback);
+
+                if ($status === 6) {
+                    app(MemoForceSaveService::class)->markSucceeded((string) ($callback['userdata'] ?? ''), $memo, $version);
+                }
+
+                if ($status === 2) {
+                    app(MemoDocumentKey::class)->invalidateEditorKey($memo, $version);
+                }
             });
         }
 

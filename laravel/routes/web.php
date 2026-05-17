@@ -54,6 +54,7 @@ Route::middleware(['auth', 'verified'])
     ->group(function () {
         Route::get('/{memo}/download', [MemoFileController::class, 'download'])->name('download');
         Route::get('/{memo}/export-pdf', [MemoFileController::class, 'exportPdf'])->name('export.pdf');
+        Route::post('/{memo}/force-save', [MemoFileController::class, 'forceSave'])->name('force-save');
     });
 
 Route::middleware(['auth', 'verified'])

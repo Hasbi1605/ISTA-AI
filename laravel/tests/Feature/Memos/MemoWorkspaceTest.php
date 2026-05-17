@@ -303,7 +303,7 @@ class MemoWorkspaceTest extends TestCase
             ->test(MemoWorkspace::class)
             ->assertSee('id="memo-config-form"', false)
             ->assertSee('form="memo-config-form"', false)
-            ->assertSee('wire:submit="generateConfiguredMemo"', false)
+            ->assertSee('@submit.prevent="submitMemoConfiguration($wire)"', false)
             ->assertDontSee('wire:click="generateConfiguredMemo"', false);
     }
 
@@ -480,7 +480,8 @@ class MemoWorkspaceTest extends TestCase
         Http::assertSent(fn ($request) => ($request['configuration']['revision_instruction'] ?? '') !== ''
             && $request['configuration']['content'] === "Nama: Eko Prasetyo\nNIP: 199411172025211057\nKeperluan: Koordinasi layanan internal."
             && str_contains($request['context'], 'Isi/poin wajib:')
-            && ! str_contains($request['context'], 'Isi memo saat ini:'));
+            && str_contains($request['context'], 'Isi memo saat ini:')
+            && str_contains($request['context'], 'Memo hasil konfigurasi'));
     }
 
     public function test_loading_memo_without_optional_closing_clears_stale_form_values(): void

@@ -6,7 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Memo;
 use App\Models\MemoVersion;
 use App\Services\OnlyOffice\DocumentConverter;
+use App\Services\OnlyOffice\ForceSaveException;
+use App\Services\OnlyOffice\MemoForceSaveService;
 use App\Services\OnlyOffice\MemoDocumentKey;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -57,6 +60,23 @@ class MemoFileController extends Controller
         ]);
     }
 
+    public function forceSave(Request $request, Memo $memo, MemoForceSaveService $forceSave): JsonResponse
+    {
+        $this->authorizeView($request, $memo);
+
+        $version = $this->resolveVersion($request, $memo);
+
+        try {
+            $result = $forceSave->forceSave($memo, $version);
+        } catch (ForceSaveException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], $e->responseStatus());
+        }
+
+        return response()->json($result);
+    }
+
     protected function fileResponse(Memo $memo, string $disposition, ?MemoVersion $version = null): BinaryFileResponse
     {
         $path = $version?->file_path ?: $memo->file_path;
@@ -92,7 +112,7 @@ class MemoFileController extends Controller
 
     protected function resolveVersion(Request $request, Memo $memo): ?MemoVersion
     {
-        $versionId = $request->query('version_id');
+        $versionId = $request->query('version_id', $request->input('version_id'));
 
         if ($versionId !== null && $versionId !== '') {
             abort_unless(is_numeric($versionId), Response::HTTP_NOT_FOUND);

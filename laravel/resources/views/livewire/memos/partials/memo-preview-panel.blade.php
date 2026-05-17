@@ -38,11 +38,12 @@
                     </svg>
                     <span class="hidden sm:inline">Regenerate</span>
                 </button>
-                <button type="button"
-                        data-download-url="{{ route('memos.download', $memoDownloadRouteParameters) }}"
-                        data-download-version-id="{{ $activeMemoVersionId }}"
-                        data-download-filename="{{ e(($title ?: 'memo').'.docx') }}"
-                        @click="downloadMemo($el.dataset.downloadUrl, 'docx', $el.dataset.downloadFilename, $el.dataset.downloadVersionId)"
+                    <button type="button"
+                            data-download-url="{{ route('memos.download', $memoDownloadRouteParameters) }}"
+                            data-force-save-url="{{ route('memos.force-save', ['memo' => $activeMemoId]) }}"
+                            data-download-version-id="{{ $activeMemoVersionId }}"
+                            data-download-filename="{{ e(($title ?: 'memo').'.docx') }}"
+                            @click="downloadMemo($el.dataset.downloadUrl, 'docx', $el.dataset.downloadFilename, $el.dataset.downloadVersionId, $el.dataset.forceSaveUrl)"
                         wire:loading.attr="disabled"
                         wire:target="switchMemoVersion,generateRevisionFromChat,generateFromChat,generateConfiguredMemo"
                         :disabled="downloadLoading !== null"
@@ -54,11 +55,12 @@
                     </svg>
                     <span class="hidden sm:inline">DOCX</span>
                 </button>
-                <button type="button"
-                        data-download-url="{{ route('memos.export.pdf', $memoDownloadRouteParameters) }}"
-                        data-download-version-id="{{ $activeMemoVersionId }}"
-                        data-download-filename="{{ e(($title ?: 'memo').'.pdf') }}"
-                        @click="downloadMemo($el.dataset.downloadUrl, 'pdf', $el.dataset.downloadFilename, $el.dataset.downloadVersionId)"
+                    <button type="button"
+                            data-download-url="{{ route('memos.export.pdf', $memoDownloadRouteParameters) }}"
+                            data-force-save-url="{{ route('memos.force-save', ['memo' => $activeMemoId]) }}"
+                            data-download-version-id="{{ $activeMemoVersionId }}"
+                            data-download-filename="{{ e(($title ?: 'memo').'.pdf') }}"
+                            @click="downloadMemo($el.dataset.downloadUrl, 'pdf', $el.dataset.downloadFilename, $el.dataset.downloadVersionId, $el.dataset.forceSaveUrl)"
                         wire:loading.attr="disabled"
                         wire:target="switchMemoVersion,generateRevisionFromChat,generateFromChat,generateConfiguredMemo"
                         :disabled="downloadLoading !== null"
@@ -70,6 +72,7 @@
                     </svg>
                     <span class="hidden sm:inline">PDF</span>
                 </button>
+                <span x-show="downloadStatus || downloadError" x-cloak x-text="downloadStatus || downloadError" class="hidden max-w-[190px] truncate text-[11px] font-medium text-stone-500 dark:text-gray-400 md:inline" :class="{ 'text-amber-700 dark:text-amber-200': downloadError }" role="status" aria-live="polite"></span>
             </div>
         @endif
     </div>

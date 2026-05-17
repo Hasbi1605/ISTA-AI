@@ -88,6 +88,9 @@ class MemoCanvas extends Component
             'documentType' => 'word',
             'editorConfig' => [
                 'callbackUrl' => $laravelInternalUrl.$callbackPath,
+                'customization' => [
+                    'forcesave' => true,
+                ],
                 'mode' => 'edit',
                 'lang' => 'id',
                 'user' => [

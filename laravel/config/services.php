@@ -61,6 +61,9 @@ return [
         'jwt_secret' => env('ONLYOFFICE_JWT_SECRET'),
         'signed_url_ttl_minutes' => env('ONLYOFFICE_SIGNED_URL_TTL_MINUTES', 30),
         'conversion_timeout' => env('ONLYOFFICE_CONVERSION_TIMEOUT', 120),
+        'force_save_wait_seconds' => env('ONLYOFFICE_FORCE_SAVE_WAIT_SECONDS', 12),
+        'force_save_command_timeout' => env('ONLYOFFICE_FORCE_SAVE_COMMAND_TIMEOUT', 10),
+        'force_save_poll_microseconds' => env('ONLYOFFICE_FORCE_SAVE_POLL_MICROSECONDS', 250000),
     ],
 
     'google_drive' => [
