@@ -59,6 +59,35 @@ class MemoPolicyTest extends TestCase
         $this->assertSame('docx-v2', file_get_contents($response->baseResponse->getFile()->getPathname()));
     }
 
+    public function test_get_download_ignores_body_version_id_and_uses_query_only(): void
+    {
+        Storage::fake('local');
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        $memo = $this->createMemo($user);
+        [$firstVersion, $secondVersion] = $this->createMemoVersions($memo);
+        Storage::disk('local')->put($firstVersion->file_path, 'docx-v1');
+        Storage::disk('local')->put($secondVersion->file_path, 'docx-v2');
+
+        $memo->forceFill([
+            'file_path' => $firstVersion->file_path,
+            'current_version_id' => $firstVersion->id,
+        ])->save();
+
+        $response = $this->actingAs($user)
+            ->call(
+                'GET',
+                route('memos.download', $memo),
+                [],
+                [],
+                [],
+                ['CONTENT_TYPE' => 'application/json'],
+                json_encode(['version_id' => $secondVersion->id])
+            );
+
+        $response->assertOk()->assertDownload('Memo-Test.docx');
+        $this->assertSame('docx-v1', file_get_contents($response->baseResponse->getFile()->getPathname()));
+    }
+
     public function test_non_owner_cannot_download_memo_file(): void
     {
         Storage::fake('local');
@@ -120,6 +149,27 @@ class MemoPolicyTest extends TestCase
             ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
 
         $this->assertSame('docx-v2', file_get_contents($response->baseResponse->getFile()->getPathname()));
+    }
+
+    public function test_signed_file_route_rejects_token_for_different_memo_version(): void
+    {
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        $memo = $this->createMemo($user);
+        [$firstVersion, $secondVersion] = $this->createMemoVersions($memo);
+
+        $ooToken = Str::random(40);
+        Cache::put('oo_file_token:'.$ooToken, [
+            'memo_id' => $memo->id,
+            'version_id' => $firstVersion->id,
+        ], now()->addHour());
+
+        $path = URL::temporarySignedRoute('memos.file.signed', now()->addHour(), [
+            'memo' => $memo,
+            'version_id' => $secondVersion->id,
+            'oo_token' => $ooToken,
+        ], false);
+
+        $this->get($path)->assertForbidden();
     }
 
     public function test_export_pdf_converts_stored_memo_docx_through_onlyoffice(): void

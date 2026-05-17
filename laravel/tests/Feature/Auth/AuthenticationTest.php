@@ -130,7 +130,7 @@ class AuthenticationTest extends TestCase
         $component->call('login');
 
         $component
-            ->assertHasErrors(['form.email' => 'Login gagal. Akun belum terverifikasi, silakan daftar ulang dan selesaikan verifikasi OTP.'])
+            ->assertHasErrors(['form.email' => 'Login gagal. Akun belum terverifikasi. Gunakan OTP verifikasi terbaru atau minta OTP baru dari halaman verifikasi email.'])
             ->assertNoRedirect();
 
         $this->assertGuest();

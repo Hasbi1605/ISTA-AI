@@ -93,7 +93,7 @@ class PasswordResetTest extends TestCase
         Volt::test('pages.auth.forgot-password')
             ->set('email', $user->email)
             ->call('sendPasswordResetLink')
-            ->assertHasErrors(['email' => 'Email belum terverifikasi. Silakan daftar ulang lalu verifikasi kode OTP.']);
+            ->assertHasErrors(['email' => 'Email belum terverifikasi. Verifikasi akun dengan OTP terbaru sebelum meminta reset kata sandi.']);
 
         Notification::assertNothingSent();
     }

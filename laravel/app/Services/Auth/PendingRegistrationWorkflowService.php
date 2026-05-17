@@ -13,6 +13,12 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
+/**
+ * Registration OTP workflow for users that do not exist yet.
+ *
+ * This intentionally stays separate from account email verification OTP, which
+ * belongs to an existing User row and is stored on users.verification_code.
+ */
 class PendingRegistrationWorkflowService
 {
     public function __construct(

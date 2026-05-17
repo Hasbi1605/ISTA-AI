@@ -58,10 +58,10 @@ class MemoDocumentKey
      * OnlyOffice can retry the initial file fetch, but the URL is no longer
      * replayable after that window expires.
      *
-     * Returns true only if the token is valid, belongs to the given memo,
-     * and has not yet expired.
+     * Returns true only if the token is valid, belongs to the given memo and
+     * version, and has not yet expired.
      */
-    public function validateFileToken(string $token, Memo $memo): bool
+    public function validateFileToken(string $token, Memo $memo, ?int $versionId): bool
     {
         $cacheKey = 'oo_file_token:'.$token;
         $data = Cache::get($cacheKey);
@@ -74,6 +74,10 @@ class MemoDocumentKey
             return false;
         }
 
+        if ($this->normalizeVersionId($data['version_id'] ?? null) !== $versionId) {
+            return false;
+        }
+
         // First use: shrink TTL to a 60-second retry window so the URL cannot
         // be replayed as a long-lived bearer token by anyone who captured it.
         if (! ($data['used'] ?? false)) {
@@ -82,6 +86,15 @@ class MemoDocumentKey
 
         // Token still in cache (either not yet used, or within retry window).
         return true;
+    }
+
+    private function normalizeVersionId(mixed $versionId): ?int
+    {
+        if ($versionId === null || $versionId === '') {
+            return null;
+        }
+
+        return (int) $versionId;
     }
 
     protected function baseKey(Memo $memo, ?MemoVersion $version = null): string

@@ -6,6 +6,13 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 
+/**
+ * Cache-backed OTP state for new registrations only.
+ *
+ * Existing accounts that need to verify a changed or legacy email address use
+ * User::sendEmailVerificationNotification() and the users.verification_code
+ * columns instead.
+ */
 class PendingRegistrationService
 {
     public function pendingRegistrationKey(string $token): string

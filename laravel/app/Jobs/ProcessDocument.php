@@ -133,17 +133,12 @@ class ProcessDocument implements ShouldQueue
             // Token matches (or cache expired for a retry) → continue.
         }
 
-            // 2. Prepare file - Try both private and public paths
-            $filePath = Storage::disk('local')->path($this->document->file_path);
-
-            // Laravel 11+ stores in private/ by default
-            if (! file_exists($filePath)) {
-                $filePath = Storage::disk('local')->path('private/'.$this->document->file_path);
-            }
+        // 2. Prepare file. The local disk is rooted at storage/app/private.
+        $filePath = Storage::disk('local')->path($this->document->file_path);
 
         if (! file_exists($filePath)) {
             $this->updateStatusIfClaimOwned('error');
-            logger()->error("Document processing failed for ID {$this->document->id}: File not found. Tried: {$this->document->file_path} and private/{$this->document->file_path}");
+            logger()->error("Document processing failed for ID {$this->document->id}: File not found at {$this->document->file_path}");
 
             return;
         }
