@@ -150,14 +150,18 @@
                         <li class="group relative" wire:key="memo-sidebar-{{ $groupKey }}-{{ $memo->id }}" x-show="isMemoVisible(@js($memo->title))">
                             <button
                                 type="button"
-                                wire:click="loadMemo({{ $memo->id }})"
+                                @click="loadMemo({{ $memo->id }})"
                                 data-memo-history-id="{{ $memo->id }}"
+                                :aria-busy="isLoadingMemo({{ (int) $memo->id }}) ? 'true' : 'false'"
                                 :class="{ 'is-active': activeMemoId === {{ (int) $memo->id }} }"
                                 class="chat-history-item items-start gap-2.5 py-2.5 pr-9 {{ (int) $activeMemoHistoryId === (int) $memo->id ? 'is-active' : '' }}"
                             >
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mt-0.5 flex-shrink-0 text-stone-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
+                                <span class="mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center text-stone-400 dark:text-gray-500">
+                                    <svg x-show="!isLoadingMemo({{ (int) $memo->id }})" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                    <span x-show="isLoadingMemo({{ (int) $memo->id }})" class="h-3.5 w-3.5 rounded-full border border-current border-t-transparent text-ista-primary animate-spin dark:text-amber-200" style="display: none;" aria-hidden="true"></span>
+                                </span>
                                 <span class="min-w-0 flex-1">
                                     <span class="block truncate text-[13.2px] font-medium" title="{{ $memo->title }}">{{ $memo->title }}</span>
                                     <span class="mt-1 block text-[10.5px] text-stone-400 dark:text-gray-500">

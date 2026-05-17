@@ -1697,6 +1697,8 @@ const registerChatPageData = (Alpine) => {
         memoSectionKeys: (config.memoSectionKeys || MEMO_HISTORY_SECTION_KEYS).map((section) => String(section)),
         memoSearch: '',
         memoTitles: (config.memoTitles || []).map((title) => String(title || '')),
+        loadingMemoId: null,
+        memoLoadToken: 0,
 
         init() {
             this.$nextTick(() => this.syncActiveMemoItem());
@@ -1739,6 +1741,10 @@ const registerChatPageData = (Alpine) => {
             }
 
             return this.memoTitles.some((title) => String(title || '').toLowerCase().includes(search));
+        },
+
+        isLoadingMemo(id) {
+            return this.loadingMemoId === Number(id);
         },
 
         availableMemoSectionKeys() {
@@ -1809,6 +1815,51 @@ const registerChatPageData = (Alpine) => {
                     }
                 }
             });
+        },
+
+        loadMemo(id) {
+            const memoId = Number(id);
+            const previousMemoId = this.activeMemoId;
+
+            if (!Number.isFinite(memoId) || memoId <= 0) {
+                return Promise.resolve({ stale: false });
+            }
+
+            if (previousMemoId === memoId) {
+                this.syncActiveMemoItem();
+                return Promise.resolve({ stale: false });
+            }
+
+            const memoLoadToken = this.memoLoadToken + 1;
+            this.memoLoadToken = memoLoadToken;
+            this.loadingMemoId = memoId;
+
+            return this.$wire.loadMemo(memoId)
+                .then(() => {
+                    if (this.memoLoadToken !== memoLoadToken) {
+                        return { stale: true };
+                    }
+
+                    this.setActiveMemo(memoId);
+
+                    return { stale: false };
+                })
+                .catch((error) => {
+                    if (this.memoLoadToken === memoLoadToken) {
+                        this.setActiveMemo(previousMemoId);
+                    }
+
+                    throw error;
+                })
+                .finally(() => {
+                    if (this.memoLoadToken !== memoLoadToken) {
+                        return;
+                    }
+
+                    if (this.loadingMemoId === memoId) {
+                        this.loadingMemoId = null;
+                    }
+                });
         },
     }));
 

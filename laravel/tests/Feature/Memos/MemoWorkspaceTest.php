@@ -189,11 +189,16 @@ class MemoWorkspaceTest extends TestCase
             ->assertSee('chat-history-item', false)
             ->assertSee('wire:click="deleteMemo', false)
             ->assertSee('data-memo-history-id=', false)
+            ->assertSee('@click="loadMemo(', false)
+            ->assertSee(':aria-busy="isLoadingMemo(', false)
+            ->assertSee('x-show="isLoadingMemo(', false)
+            ->assertSee('border-t-transparent text-ista-primary animate-spin', false)
             ->assertSee('Memo Hari Ini', false)
             ->assertSee('Memo Minggu Ini', false)
             ->assertSee('Memo Bulan Ini', false)
             ->assertSee('Memo Lama', false)
             ->assertSee('Tidak ada memo yang cocok.', false)
+            ->assertDontSee('wire:click="loadMemo', false)
             ->assertDontSee('Versi 1', false)
             ->assertDontSee('Today', false)
             ->assertDontSee('Previous 7 Days', false)
@@ -201,6 +206,19 @@ class MemoWorkspaceTest extends TestCase
             ->assertDontSee('7 Hari Terakhir ·', false)
             ->assertDontSee('30 Hari Terakhir ·', false)
             ->assertDontSee('Memo Internal', false);
+    }
+
+    public function test_memo_history_alpine_component_tracks_loading_state(): void
+    {
+        $chatPageJs = file_get_contents(resource_path('js/chat-page.js'));
+
+        $this->assertStringContainsString('loadingMemoId: null', $chatPageJs);
+        $this->assertStringContainsString('memoLoadToken: 0', $chatPageJs);
+        $this->assertStringContainsString('isLoadingMemo(id)', $chatPageJs);
+        $this->assertStringContainsString('loadMemo(id)', $chatPageJs);
+        $this->assertStringContainsString('this.loadingMemoId = memoId', $chatPageJs);
+        $this->assertStringContainsString('return this.$wire.loadMemo(memoId)', $chatPageJs);
+        $this->assertStringContainsString('this.loadingMemoId = null', $chatPageJs);
     }
 
     public function test_loading_memo_history_does_not_refresh_timestamp_or_move_sidebar_group(): void
