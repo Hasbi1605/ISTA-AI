@@ -19,6 +19,25 @@ const MARKDOWN_RENDER_OPTIONS = {
     gfm: true,
 };
 
+const formatChatTimeLabel = (date = new Date()) => {
+    const parsedDate = date instanceof Date ? date : new Date(date);
+    const safeDate = Number.isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
+
+    try {
+        return `${new Intl.DateTimeFormat('id-ID', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+            timeZone: 'Asia/Jakarta',
+        }).format(safeDate)} WIB`;
+    } catch (_) {
+        const hours = String(safeDate.getHours()).padStart(2, '0');
+        const minutes = String(safeDate.getMinutes()).padStart(2, '0');
+
+        return `${hours}:${minutes} WIB`;
+    }
+};
+
 const escapeHtmlForMarkdown = (value = '') => String(value)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -572,8 +591,11 @@ const registerChatPageData = (Alpine) => {
         shimmerActive: false,
         streamingFinalText: null,
         streamedAssistantMessageId: null,
+        streamingActionsReady: false,
+        streamingTimeLabel: '',
         _messageCompleteHandler: null,
         chatMutationObserver: null,
+        streamingResizeObserver: null,
         wireListeners: [],
         windowListeners: [],
         activeEventSources: {},
@@ -692,6 +714,7 @@ const registerChatPageData = (Alpine) => {
                 this.chatMutationObserver = new MutationObserver(() => this.scrollToBottom());
                 this.chatMutationObserver.observe(chatBox, { childList: true, subtree: true, characterData: true });
             }
+            this.observeStreamingAnswerResize();
 
             this._messageCompleteHandler = () => this.resetStreamingState();
             window.addEventListener('message-complete', this._messageCompleteHandler);
@@ -728,6 +751,7 @@ const registerChatPageData = (Alpine) => {
                 const payload = normalizeWirePayload(data);
                 const ackConversationId = Number(payload.conversationId || 0);
                 const ackMessageId = Number(payload.messageId || 0);
+                const ackCreatedAt = payload.createdAt || payload.created_at || null;
                 const preserveStream = Boolean(payload.preserveStream);
                 const { conversationId } = this.getConversationMeta();
                 const targetConversationId = ackConversationId > 0 ? ackConversationId : conversationId;
@@ -740,6 +764,14 @@ const registerChatPageData = (Alpine) => {
                 if (shouldPreserveCurrentStream) {
                     this.streaming = true;
                     this.streamedAssistantMessageId = ackMessageId;
+                    this.streamingActionsReady = false;
+                    if (ackCreatedAt) {
+                        this.streamingTimeLabel = formatChatTimeLabel(ackCreatedAt);
+                    }
+                    this.settleStreamingLayout(() => {
+                        this.streamingActionsReady = this.streamingText !== '' && Number(this.streamedAssistantMessageId || 0) > 0;
+                        this.scrollToBottom();
+                    });
                 } else if (targetConversationId && this.isActiveConversation(targetConversationId)) {
                     this.resetStreamingState();
                 }
@@ -882,6 +914,14 @@ const registerChatPageData = (Alpine) => {
                 }
             });
 
+            es.addEventListener('message-created-at', (e) => {
+                if (!this.isActiveConversation(conversationId)) {
+                    return;
+                }
+
+                this.streamingTimeLabel = formatChatTimeLabel(e.data || new Date());
+            });
+
             es.addEventListener('final-content', (e) => {
                 const content = e.data || '';
                 streamState.finalText = content !== '' ? content : null;
@@ -951,6 +991,10 @@ const registerChatPageData = (Alpine) => {
                 this.chatMutationObserver.disconnect();
                 this.chatMutationObserver = null;
             }
+            if (this.streamingResizeObserver) {
+                this.streamingResizeObserver.disconnect();
+                this.streamingResizeObserver = null;
+            }
             if (this.wireListeners && this.wireListeners.length > 0) {
                 this.wireListeners.forEach((cleanup) => {
                     if (typeof cleanup === 'function') {
@@ -1014,6 +1058,30 @@ const registerChatPageData = (Alpine) => {
             this.scheduleAssistantTypewriterMarkdownRender();
         },
 
+        observeStreamingAnswerResize() {
+            if (typeof window.ResizeObserver === 'undefined') {
+                return;
+            }
+
+            this.$nextTick(() => {
+                const target = this.$refs.streamingMessage;
+                if (!target) {
+                    return;
+                }
+
+                if (!this.streamingResizeObserver) {
+                    this.streamingResizeObserver = new window.ResizeObserver(() => {
+                        if (this.streaming) {
+                            this.scrollToBottom();
+                        }
+                    });
+                }
+
+                this.streamingResizeObserver.disconnect();
+                this.streamingResizeObserver.observe(target);
+            });
+        },
+
         setStreamingSources(sources) {
             this.setAssistantTypewriterSources(sources);
 
@@ -1030,6 +1098,13 @@ const registerChatPageData = (Alpine) => {
             const rawFinalText = typeof finalText === 'string' ? finalText : '';
             this.streamingFinalText = rawFinalText !== '' ? rawFinalText : null;
             this.streaming = true;
+            this.streamingActionsReady = false;
+            if (rawFinalText !== '') {
+                this.hasFirstAssistantChunk = true;
+                this.clearPendingStaleTimeout();
+                this.stalePendingWarning = '';
+                this.moveToAnswerPhase();
+            }
             this.queueAssistantTypewriterFinalText(rawFinalText);
         },
 
@@ -1061,7 +1136,41 @@ const registerChatPageData = (Alpine) => {
             }
 
             this.afterStreamingTypewriterSettles(() => {
-                refreshPendingState();
+                this.settleStreamingLayout(() => {
+                    this.streamingActionsReady = this.streamingText !== '' && Number(this.streamedAssistantMessageId || 0) > 0;
+                    this.$nextTick(() => {
+                        this.scrollToBottom();
+                        refreshPendingState();
+                    });
+                });
+            });
+        },
+
+        settleStreamingLayout(callback = null) {
+            this.observeStreamingAnswerResize();
+            this.renderStreamingMarkdownNow();
+            this.$nextTick(() => {
+                const finish = () => {
+                    this.scrollToBottomNow();
+
+                    if (typeof callback === 'function') {
+                        callback();
+                    }
+
+                    this.$nextTick(() => {
+                        this.scrollToBottomNow();
+                    });
+                };
+
+                if (typeof window.requestAnimationFrame !== 'function') {
+                    finish();
+                    return;
+                }
+
+                window.requestAnimationFrame(() => {
+                    this.scrollToBottomNow();
+                    window.requestAnimationFrame(finish);
+                });
             });
         },
 
@@ -1087,6 +1196,8 @@ const registerChatPageData = (Alpine) => {
             this.appendAssistantTypewriterText(chunk);
             this.streaming = true;
             this.hasFirstAssistantChunk = true;
+            this.clearPendingStaleTimeout();
+            this.stalePendingWarning = '';
             this.moveToAnswerPhase();
         },
 
@@ -1114,6 +1225,9 @@ const registerChatPageData = (Alpine) => {
         startStreamingPlaceholder(context = 'general') {
             this.resetStreamingState(false);
             this.streaming = true;
+            this.streamingTimeLabel = formatChatTimeLabel();
+            this.streamingActionsReady = false;
+            this.observeStreamingAnswerResize();
             this.loadingContext = context;
             this.loadingPhaseKey++;
             this.loadingPhase = this.loadingPhaseLabels()[0];
@@ -1172,6 +1286,8 @@ const registerChatPageData = (Alpine) => {
             this.sources = [];
             this.sourcesVisible = false;
             this.streamedAssistantMessageId = null;
+            this.streamingActionsReady = false;
+            this.streamingTimeLabel = '';
 
             if (stopStreaming) {
                 this.streaming = false;
@@ -1199,18 +1315,22 @@ const registerChatPageData = (Alpine) => {
             return ['AI sedang berpikir', 'Menampilkan jawaban'];
         },
 
+        scrollToBottomNow(smooth = false) {
+            const chatBox = this.$refs.chatBox;
+
+            if (!chatBox) {
+                return;
+            }
+
+            chatBox.scrollTo({
+                top: chatBox.scrollHeight,
+                behavior: smooth ? 'smooth' : 'auto',
+            });
+        },
+
         scrollToBottom(smooth = false) {
             this.$nextTick(() => {
-                const chatBox = this.$refs.chatBox;
-
-                if (!chatBox) {
-                    return;
-                }
-
-                chatBox.scrollTo({
-                    top: chatBox.scrollHeight,
-                    behavior: smooth ? 'smooth' : 'auto',
-                });
+                this.scrollToBottomNow(smooth);
             });
         },
     }));

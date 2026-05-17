@@ -173,7 +173,7 @@ class ChatStreamTest extends TestCase
                     ?string $source_policy = null,
                     bool $allow_auto_realtime_web = true,
                     ?array $document_ids = null,
-                ?string $request_id = null,
+                    ?string $request_id = null,
                 ): \Generator {
                     $this->captured = $messages;
                     yield 'OK';
@@ -561,7 +561,7 @@ class ChatStreamTest extends TestCase
                     ?string $source_policy = null,
                     bool $allow_auto_realtime_web = true,
                     ?array $document_ids = null,
-                ?string $request_id = null,
+                    ?string $request_id = null,
                 ): \Generator {
                     $this->captured->documentIds = $document_ids;
                     $this->captured->filenames = $document_filenames;
@@ -637,6 +637,7 @@ class ChatStreamTest extends TestCase
         $this->assertStringContainsString('event: final-content', $body);
         $this->assertStringContainsString('data: Jawaban tersimpan.', $body);
         $this->assertStringContainsString('event: message-id', $body);
+        $this->assertStringContainsString('event: message-created-at', $body);
     }
 
     public function test_stream_final_content_event_includes_source_footer(): void
@@ -676,6 +677,7 @@ class ChatStreamTest extends TestCase
         $this->assertStringContainsString('data: Jawaban dengan sumber.', $body);
         $this->assertStringContainsString('data: ---', $body);
         $this->assertStringContainsString('data: Dokumen rujukan: **dokumen-uji.pdf**', $body);
+        $this->assertStringContainsString('event: message-created-at', $body);
         $this->assertDatabaseHas('messages', [
             'conversation_id' => $conversation->id,
             'role' => 'assistant',
@@ -725,7 +727,7 @@ class ChatStreamTest extends TestCase
                     ?string $source_policy = null,
                     bool $allow_auto_realtime_web = true,
                     ?array $document_ids = null,
-                ?string $request_id = null,
+                    ?string $request_id = null,
                 ): \Generator {
                     $this->called = true;
                     yield 'Chunk yang tidak boleh dikirim.';
@@ -898,7 +900,7 @@ class ChatStreamTest extends TestCase
                     ?string $source_policy = null,
                     bool $allow_auto_realtime_web = true,
                     ?array $document_ids = null,
-                ?string $request_id = null,
+                    ?string $request_id = null,
                 ): \Generator {
                     $this->called = true;
                     yield 'Tidak boleh dipanggil saat stream claim aktif';
@@ -960,7 +962,7 @@ class ChatStreamTest extends TestCase
                     ?string $source_policy = null,
                     bool $allow_auto_realtime_web = true,
                     ?array $document_ids = null,
-                ?string $request_id = null,
+                    ?string $request_id = null,
                 ): \Generator {
                     $this->called = true;
                     yield 'Tidak boleh dipanggil karena stream sudah jawab';
@@ -1017,7 +1019,7 @@ class ChatStreamTest extends TestCase
                     ?string $source_policy = null,
                     bool $allow_auto_realtime_web = true,
                     ?array $document_ids = null,
-                ?string $request_id = null,
+                    ?string $request_id = null,
                 ): \Generator {
                     $orchestrator = app(ChatOrchestrationService::class);
                     $this->claimWasActiveInsideSendChat = $orchestrator->hasActiveStreamClaim((int) $this->conversation->id);
@@ -1071,7 +1073,7 @@ class ChatStreamTest extends TestCase
                     ?string $source_policy = null,
                     bool $allow_auto_realtime_web = true,
                     ?array $document_ids = null,
-                ?string $request_id = null,
+                    ?string $request_id = null,
                 ): \Generator {
                     $this->called = true;
                     yield 'Stream jalan meski pre-claim ada';
@@ -1195,7 +1197,7 @@ class ChatStreamTest extends TestCase
                     ?string $source_policy = null,
                     bool $allow_auto_realtime_web = true,
                     ?array $document_ids = null,
-                ?string $request_id = null,
+                    ?string $request_id = null,
                 ): \Generator {
                     $this->called = true;
                     yield 'Jawaban fallback dari job.';
@@ -1241,7 +1243,7 @@ class ChatStreamTest extends TestCase
         $docContext = $orchestrator->getActiveDocumentContext($documentIds);
 
         // Reconstruct history from DB (same as controller does)
-        $dbMessages = \App\Models\Message::query()
+        $dbMessages = Message::query()
             ->where('conversation_id', $conversation->id)
             ->orderBy('id', 'asc')
             ->get(['role', 'content'])

@@ -495,6 +495,19 @@ class ChatUiTest extends TestCase
         $this->assertStringContainsString('refreshPendingChatState(streamedMessageId, this.isActiveConversation(conversationId))', $chatPageJs);
         $this->assertStringContainsString('markStreamFailed(conversationId)', $chatPageJs);
         $this->assertStringContainsString('finalQueued: false', $chatPageJs);
+        $this->assertStringContainsString('formatChatTimeLabel', $chatPageJs);
+        $this->assertStringContainsString('streamingActionsReady: false', $chatPageJs);
+        $this->assertStringContainsString('streamingTimeLabel: \'\'', $chatPageJs);
+        $this->assertStringContainsString("es.addEventListener('message-created-at'", $chatPageJs);
+        $this->assertStringContainsString('formatChatTimeLabel(e.data || new Date())', $chatPageJs);
+        $this->assertStringContainsString('ackCreatedAt', $chatPageJs);
+        $this->assertStringContainsString('formatChatTimeLabel(ackCreatedAt)', $chatPageJs);
+        $this->assertStringContainsString('observeStreamingAnswerResize()', $chatPageJs);
+        $this->assertStringContainsString('new window.ResizeObserver', $chatPageJs);
+        $this->assertStringContainsString('settleStreamingLayout(() => {', $chatPageJs);
+        $this->assertStringContainsString('scrollToBottomNow(smooth = false)', $chatPageJs);
+        $this->assertStringContainsString('this.clearPendingStaleTimeout();', $chatPageJs);
+        $this->assertStringContainsString('this.moveToAnswerPhase();', $chatPageJs);
         $this->assertStringContainsString('shouldPreserveCurrentStream', $chatPageJs);
         $this->assertStringContainsString('preserveStream', $chatPageJs);
         $this->assertStringContainsString('afterStreamingTypewriterSettles(() => {', $chatPageJs);
@@ -561,7 +574,7 @@ class ChatUiTest extends TestCase
             ->assertSee('data-chat-conversation-id=', false)
             ->assertSee('data-chat-last-message-role=', false)
             ->assertSee('data-chat-last-user-message-created-at=', false)
-            ->assertSee('x-if="streamedAssistantMessageId && streamingText !== \'\'"', false)
+            ->assertSee('x-show="streamingActionsReady && streamedAssistantMessageId && streamingText !== \'\'"', false)
             ->assertSee('messageId: () => streamedAssistantMessageId', false)
             ->assertSee('html: () => streamingHtml', false);
     }
@@ -1343,6 +1356,7 @@ class ChatUiTest extends TestCase
             ->assertDispatched('assistant-message-persisted', function (string $_event, array $payload) use ($conversation, $assistant) {
                 return (int) ($payload['conversationId'] ?? 0) === (int) $conversation->id
                     && (int) ($payload['messageId'] ?? 0) === (int) $assistant->id
+                    && ! empty($payload['createdAt'])
                     && (bool) ($payload['preserveStream'] ?? false) === true;
             });
 
@@ -1396,6 +1410,7 @@ class ChatUiTest extends TestCase
             ->assertDispatched('assistant-message-persisted', function (string $_event, array $payload) use ($conversation, $assistant) {
                 return (int) ($payload['conversationId'] ?? 0) === (int) $conversation->id
                     && (int) ($payload['messageId'] ?? 0) === (int) $assistant->id
+                    && ! empty($payload['createdAt'])
                     && (bool) ($payload['preserveStream'] ?? false) === true;
             });
     }
@@ -1487,10 +1502,16 @@ class ChatUiTest extends TestCase
             ->assertSee('prose prose-p:my-1 prose-headings:my-2', false)
             ->assertSee('x-html="streamingHtml"', false)
             ->assertDontSee('x-if="sourcesVisible && sources && Array.isArray(sources) && sources.length > 0"', false)
-            ->assertSee('x-if="streamedAssistantMessageId && streamingText !== \'\'"', false)
+            ->assertSee('x-ref="streamingMessage"', false)
+            ->assertSee('w-full sm:max-w-3xl flex items-start gap-2 sm:gap-4 px-0 sm:px-8', false)
+            ->assertSee('flex flex-col gap-1 min-w-0 w-full items-start text-left', false)
+            ->assertSee('x-show="streamingTimeLabel"', false)
+            ->assertSee('x-show="streamingActionsReady && streamedAssistantMessageId && streamingText !== \'\'"', false)
             ->assertSee('messageId: () => streamedAssistantMessageId', false)
             ->assertSee('html: () => streamingHtml', false)
+            ->assertSee(':class="streamingText === \'\' ? \'inline-flex items-center w-auto\' : \'\'"', false)
             ->assertSee('resolvedMessageId()', false)
+            ->assertDontSee('flex flex-row items-start gap-4 px-2 sm:px-8', false)
             ->assertDontSee('x-show="modelName"', false);
     }
 
@@ -1504,6 +1525,7 @@ class ChatUiTest extends TestCase
         $this->assertStringContainsString('const normalizeAssistantSources', $chatPageJs);
         $this->assertStringContainsString('this.typewriterSources = normalizeAssistantSources(sources);', $chatPageJs);
         $this->assertStringContainsString("es.addEventListener('final-content'", $chatPageJs);
+        $this->assertStringContainsString("es.addEventListener('message-created-at'", $chatPageJs);
         $this->assertStringContainsString('this.queueFinalStreamingText(streamState.finalText);', $chatPageJs);
         $this->assertStringContainsString('streamState.finalQueued = true;', $chatPageJs);
         $this->assertStringContainsString('streamState.finalText && !streamState.finalQueued', $chatPageJs);

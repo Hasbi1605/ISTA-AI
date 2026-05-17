@@ -1,3 +1,8 @@
+@php
+    $assistantAnswerBubbleClass = 'rounded-2xl rounded-bl-sm bg-white/80 backdrop-blur-sm dark:bg-gray-800 border border-stone-200/60 dark:border-gray-800 px-4 py-3 text-[14.5px] leading-relaxed text-stone-700 dark:text-gray-100 prose prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-li:my-0 prose-li:marker:text-stone-800 prose-a:text-sky-700 prose-a:decoration-sky-600/80 hover:prose-a:text-sky-800 dark:prose-headings:text-white dark:prose-p:text-gray-100 dark:prose-strong:text-white dark:prose-ul:text-gray-100 dark:prose-ol:text-gray-100 dark:prose-li:text-gray-100 dark:prose-li:marker:text-white dark:prose-a:text-sky-300 dark:prose-a:decoration-sky-300/90 dark:hover:prose-a:text-sky-200 pb-1';
+    $assistantErrorBubbleClass = 'rounded-2xl rounded-bl-sm bg-rose-50/95 backdrop-blur-sm dark:bg-rose-950/30 border border-rose-200/80 dark:border-rose-500/30 px-4 py-3 text-[14.5px] leading-relaxed text-rose-900 dark:text-rose-100 prose prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-li:my-0 prose-li:marker:text-rose-700 prose-a:text-rose-700 prose-a:decoration-rose-500/80 hover:prose-a:text-rose-900 dark:prose-headings:text-rose-100 dark:prose-p:text-rose-100 dark:prose-strong:text-rose-50 dark:prose-ul:text-rose-100 dark:prose-ol:text-rose-100 dark:prose-li:text-rose-100 dark:prose-li:marker:text-rose-100 dark:prose-a:text-rose-200 dark:prose-a:decoration-rose-200/90 dark:hover:prose-a:text-white pb-1';
+@endphp
+
 <div x-data="chatMessages"
      class="mx-auto min-h-0 w-full max-w-4xl flex-1 overflow-y-auto px-3 py-5 sm:px-6 sm:py-7 space-y-6 sm:space-y-8"
      x-ref="chatBox"
@@ -65,8 +70,8 @@
                             ]);
                             $exportFileName = 'ista-ai-jawaban-' . $message['id'];
                             $assistantBubbleClass = $isAssistantError
-                                ? 'rounded-2xl rounded-bl-sm bg-rose-50/95 backdrop-blur-sm dark:bg-rose-950/30 border border-rose-200/80 dark:border-rose-500/30 px-4 py-3 text-[14.5px] leading-relaxed text-rose-900 dark:text-rose-100 prose prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-li:my-0 prose-li:marker:text-rose-700 prose-a:text-rose-700 prose-a:decoration-rose-500/80 hover:prose-a:text-rose-900 dark:prose-headings:text-rose-100 dark:prose-p:text-rose-100 dark:prose-strong:text-rose-50 dark:prose-ul:text-rose-100 dark:prose-ol:text-rose-100 dark:prose-li:text-rose-100 dark:prose-li:marker:text-rose-100 dark:prose-a:text-rose-200 dark:prose-a:decoration-rose-200/90 dark:hover:prose-a:text-white pb-1'
-                                : 'rounded-2xl rounded-bl-sm bg-white/80 backdrop-blur-sm dark:bg-gray-800 border border-stone-200/60 dark:border-gray-800 px-4 py-3 text-[14.5px] leading-relaxed text-stone-700 dark:text-gray-100 prose prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-li:my-0 prose-li:marker:text-stone-800 prose-a:text-sky-700 prose-a:decoration-sky-600/80 hover:prose-a:text-sky-800 dark:prose-headings:text-white dark:prose-p:text-gray-100 dark:prose-strong:text-white dark:prose-ul:text-gray-100 dark:prose-ol:text-gray-100 dark:prose-li:text-gray-100 dark:prose-li:marker:text-white dark:prose-a:text-sky-300 dark:prose-a:decoration-sky-300/90 dark:hover:prose-a:text-sky-200 pb-1';
+                                ? $assistantErrorBubbleClass
+                                : $assistantAnswerBubbleClass;
                         @endphp
                         <div
                             wire:key="chat-answer-actions-{{ $message['id'] }}"
@@ -132,60 +137,67 @@
     </template>
 
     <div
-          class="flex justify-start"
-         x-show="streaming">
-        <div class="w-full sm:max-w-3xl flex flex-row items-start gap-4 px-2 sm:px-8">
-             <div class="shrink-0 h-8 w-8 rounded-full bg-white border border-stone-200 shadow-sm p-1 flex items-center justify-center">
-                 <img src="{{ asset('images/ista/logo.png') }}" alt="ISTA AI" class="h-full w-full object-contain" />
-             </div>
-             <div class="flex flex-col gap-1 items-start w-full">
-                 <div class="flex items-center gap-2 mb-1">
-                     <span class="text-[13px] font-bold text-stone-800 dark:text-[#F8FAFC]">ISTA AI</span>
-                  </div>
-                   <div class="rounded-2xl rounded-bl-sm bg-white/80 backdrop-blur-sm dark:bg-gray-800 border border-stone-200/60 dark:border-gray-800 px-4 py-3 text-[14.5px] leading-relaxed text-stone-700 dark:text-gray-100 prose prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-li:my-0 prose-li:marker:text-stone-800 prose-a:text-sky-700 prose-a:decoration-sky-600/80 hover:prose-a:text-sky-800 dark:prose-headings:text-white dark:prose-p:text-gray-100 dark:prose-strong:text-white dark:prose-ul:text-gray-100 dark:prose-ol:text-gray-100 dark:prose-li:text-gray-100 dark:prose-li:marker:text-white dark:prose-a:text-sky-300 dark:prose-a:decoration-sky-300/90 dark:hover:prose-a:text-sky-200 pb-1"
-                       :class="streamingText === '' ? 'inline-flex items-center w-auto' : 'w-full max-w-[656px]'"
-                       role="status"
-                       aria-live="polite">
-<div x-show="streamingText === ''" class="inline-flex items-center gap-2.5 py-1">
-                          <span class="relative inline-flex h-4 w-4 items-center justify-center">
-                              <span class="absolute inset-0 animate-spin" style="animation-duration: 2.8s; animation-timing-function: linear;">
-                                  <span class="absolute left-1/2 top-0 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-gray-400/90 dark:bg-[#64748B]"></span>
-                                  <span class="absolute left-[12%] top-[62%] h-1.5 w-1.5 rounded-full bg-gray-400/75 dark:bg-[#64748B]/90"></span>
-                                  <span class="absolute right-[12%] top-[62%] h-1.5 w-1.5 rounded-full bg-gray-400/60 dark:bg-[#64748B]/80"></span>
-                              </span>
-                              <span class="absolute left-1/2 top-0 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-gray-500/90 dark:bg-[#94A3B8] animate-pulse" style="animation-duration: 1.3s;"></span>
-                              <span class="absolute left-[12%] top-[62%] h-1.5 w-1.5 rounded-full bg-gray-500/80 dark:bg-[#94A3B8]/90 animate-pulse" style="animation-duration: 1.5s; animation-delay: 0.12s;"></span>
-                              <span class="absolute right-[12%] top-[62%] h-1.5 w-1.5 rounded-full bg-gray-500/70 dark:bg-[#94A3B8]/80 animate-pulse" style="animation-duration: 1.7s; animation-delay: 0.24s;"></span>
-                          </span>
-                          <span class="ista-loading-shimmer ista-label-enter text-[12px] font-medium whitespace-nowrap"
-                                x-text="loadingPhase"
-                                x-effect="
-                                    loadingPhaseKey;
-                                    $el.classList.remove('ista-label-enter');
-                                    void $el.offsetWidth;
-                                    $el.classList.add('ista-label-enter');
-                                "
-                          ></span>
+        class="flex justify-start"
+        x-show="streaming"
+        x-ref="streamingMessage">
+        <div class="w-full sm:max-w-3xl flex items-start gap-2 sm:gap-4 px-0 sm:px-8">
+            <div class="shrink-0 h-8 w-8 rounded-full flex items-center justify-center bg-white border border-stone-200 shadow-sm p-1">
+                <img src="{{ asset('images/ista/logo.png') }}" alt="ISTA AI" class="h-full w-full object-contain" />
+            </div>
+            <div class="flex flex-col gap-1 min-w-0 w-full items-start text-left">
+                <div class="flex items-center gap-2 mb-1 justify-start">
+                    <span class="text-[13px] font-bold text-stone-800 dark:text-[#F8FAFC]">ISTA AI</span>
+                    <span x-show="streamingTimeLabel" class="text-[10px] text-gray-400 dark:text-[#64748B]" x-text="streamingTimeLabel"></span>
+                </div>
+                <div
+                    x-data="chatAnswerActions({
+                        messageId: () => streamedAssistantMessageId,
+                        html: () => streamingHtml,
+                        exportUrl: @js(route('documents.export')),
+                        exportFileName: () => streamedAssistantMessageId ? `ista-ai-jawaban-${streamedAssistantMessageId}` : 'ista-ai-export',
+                        driveUploadAvailable: @js($googleDriveUploadAvailable ?? false),
+                    })"
+                    :data-answer-message-id="streamedAssistantMessageId || null"
+                    class="w-full max-w-[656px]"
+                >
+                    <div class="{{ $assistantAnswerBubbleClass }}"
+                         :class="streamingText === '' ? 'inline-flex items-center w-auto' : ''"
+                         x-ref="streamingAnswerBubble"
+                         role="status"
+                         aria-live="polite">
+                        <div x-show="streamingText === ''" class="inline-flex items-center gap-2.5 py-1">
+                            <span class="relative inline-flex h-4 w-4 items-center justify-center">
+                                <span class="absolute inset-0 animate-spin" style="animation-duration: 2.8s; animation-timing-function: linear;">
+                                    <span class="absolute left-1/2 top-0 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-gray-400/90 dark:bg-[#64748B]"></span>
+                                    <span class="absolute left-[12%] top-[62%] h-1.5 w-1.5 rounded-full bg-gray-400/75 dark:bg-[#64748B]/90"></span>
+                                    <span class="absolute right-[12%] top-[62%] h-1.5 w-1.5 rounded-full bg-gray-400/60 dark:bg-[#64748B]/80"></span>
+                                </span>
+                                <span class="absolute left-1/2 top-0 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-gray-500/90 dark:bg-[#94A3B8] animate-pulse" style="animation-duration: 1.3s;"></span>
+                                <span class="absolute left-[12%] top-[62%] h-1.5 w-1.5 rounded-full bg-gray-500/80 dark:bg-[#94A3B8]/90 animate-pulse" style="animation-duration: 1.5s; animation-delay: 0.12s;"></span>
+                                <span class="absolute right-[12%] top-[62%] h-1.5 w-1.5 rounded-full bg-gray-500/70 dark:bg-[#94A3B8]/80 animate-pulse" style="animation-duration: 1.7s; animation-delay: 0.24s;"></span>
+                            </span>
+                            <span class="ista-loading-shimmer ista-label-enter text-[12px] font-medium whitespace-nowrap"
+                                  x-text="loadingPhase"
+                                  x-effect="
+                                      loadingPhaseKey;
+                                      $el.classList.remove('ista-label-enter');
+                                      void $el.offsetWidth;
+                                      $el.classList.add('ista-label-enter');
+                                  "
+                            ></span>
                         </div>
-                    <div x-show="streamingText !== ''" class="break-words [overflow-wrap:anywhere]" x-html="streamingHtml"></div>
-                  </div>
-                  <p x-show="stalePendingWarning" x-transition.opacity class="mt-2 max-w-[656px] rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] font-medium text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100" role="status" aria-live="polite" x-text="stalePendingWarning"></p>
+                        <div x-show="streamingText !== ''" class="break-words [overflow-wrap:anywhere]" x-html="streamingHtml"></div>
+                    </div>
+                    <p x-show="stalePendingWarning" x-transition.opacity class="mt-2 max-w-[656px] rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] font-medium text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100" role="status" aria-live="polite" x-text="stalePendingWarning"></p>
 
-                 <template x-if="streamedAssistantMessageId && streamingText !== ''">
-                     <div
-                         x-data="chatAnswerActions({
-                             messageId: () => streamedAssistantMessageId,
-                             html: () => streamingHtml,
-                             exportUrl: @js(route('documents.export')),
-                             exportFileName: () => streamedAssistantMessageId ? `ista-ai-jawaban-${streamedAssistantMessageId}` : 'ista-ai-export',
-                             driveUploadAvailable: @js($googleDriveUploadAvailable ?? false),
-                         })"
-                         class="w-full max-w-[656px]"
-                     >
-                         @include('livewire.chat.partials.assistant-answer-actions')
-                     </div>
-                 </template>
-
+                    <div
+                        x-show="streamingActionsReady && streamedAssistantMessageId && streamingText !== ''"
+                        x-transition.opacity
+                        style="display: none;"
+                    >
+                        @include('livewire.chat.partials.assistant-answer-actions')
+                    </div>
+                </div>
             </div>
         </div>
     </div>

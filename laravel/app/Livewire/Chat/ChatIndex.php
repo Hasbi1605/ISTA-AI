@@ -715,11 +715,12 @@ class ChatIndex extends Component
             && ! $suppressActiveStreamRefresh
             && ($previousPendingIds->contains($activeConversationId) || $currentPendingIds->contains($activeConversationId) || $alreadyStreamedMessageId !== null)
         ) {
-            $latestAssistantId = Message::query()
+            $latestAssistant = Message::query()
                 ->where('conversation_id', $activeConversationId)
                 ->where('role', 'assistant')
                 ->latest('id')
-                ->value('id');
+                ->first(['id', 'created_at']);
+            $latestAssistantId = $latestAssistant?->id;
             $shouldPreserveActiveStream = $preserveActiveStream
                 && $latestAssistantId
                 && (int) $latestAssistantId === $alreadyStreamedMessageId;
@@ -758,11 +759,12 @@ class ChatIndex extends Component
                 continue;
             }
 
-            $latestAssistantId = Message::query()
+            $latestAssistant = Message::query()
                 ->where('conversation_id', (int) $completedConversationId)
                 ->where('role', 'assistant')
                 ->latest('id')
-                ->value('id');
+                ->first(['id', 'created_at']);
+            $latestAssistantId = $latestAssistant?->id;
             $shouldPreserveCompletedStream = $preserveActiveStream
                 && $activeConversationId !== null
                 && (int) $completedConversationId === $activeConversationId
@@ -773,6 +775,7 @@ class ChatIndex extends Component
                 'assistant-message-persisted',
                 conversationId: (int) $completedConversationId,
                 messageId: $latestAssistantId ? (int) $latestAssistantId : null,
+                createdAt: $this->formatMessageCreatedAtForBrowser($latestAssistant),
                 preserveStream: $shouldPreserveCompletedStream,
             );
         }
@@ -816,6 +819,11 @@ class ChatIndex extends Component
             ->sortBy(fn (array $message) => (int) ($message['id'] ?? 0))
             ->values()
             ->all();
+    }
+
+    private function formatMessageCreatedAtForBrowser(?Message $message): ?string
+    {
+        return $message?->created_at?->timezone('Asia/Jakarta')->toIso8601String();
     }
 
     private function dispatchPendingConversationState(): void

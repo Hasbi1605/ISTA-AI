@@ -75,3 +75,23 @@ QA manual menunjukkan kasus timing baru:
 1. Saat event `final-content` diterima untuk conversation aktif, langsung panggil `queueFinalStreamingText()`.
 2. Tandai `streamState.finalQueued` supaya event `done` tidak mengantrekan final text yang sama dua kali.
 3. Pertahankan event `done` sebagai fallback bila `final-content` belum sempat di-queue.
+
+## Follow-up: Layout Live SSE Harus Sama Dengan Final
+
+### Temuan
+QA visual berikutnya menunjukkan konten live SSE sudah benar, tetapi layout setelah typewriter masih terasa berbeda dari final setelah refresh:
+
+- Wrapper streaming memakai spacing berbeda (`gap-4 px-2`) dari wrapper final (`gap-2 sm:gap-4 px-0 sm:px-8`).
+- Parent live belum memakai `min-w-0` dan container action yang sama dengan final.
+- Header live belum punya timestamp seperti message final.
+- Action buttons bisa muncul sebelum render markdown final dan scroll benar-benar stabil.
+- Scroll hanya bergantung pada `MutationObserver`, padahal tinggi bubble berubah terus selama typewriter dan saat markdown akhir dirender ulang.
+
+### Fix Lanjutan
+1. Samakan struktur Blade live SSE dengan struktur assistant final: avatar, header, bubble, container action, max-width, dan spacing.
+2. Tambahkan label waktu live berbasis zona `Asia/Jakarta` agar header live tidak berubah bentuk setelah refresh.
+3. Tahan action buttons sampai typewriter dan final layout settle.
+4. Tambahkan `ResizeObserver` untuk bubble streaming supaya scroll mengikuti perubahan tinggi bubble sampai posisi akhir stabil.
+5. Tambahkan final settle phase: render markdown final, tunggu frame layout, scroll ulang, lalu refresh/preserve Livewire state.
+6. Kirim timestamp persisted message dari SSE/Livewire (`message-created-at`/`createdAt`) supaya header live memakai waktu yang sama dengan final setelah refresh.
+7. Bersihkan stale warning begitu chunk atau `final-content` valid muncul, agar warning lama tidak tertinggal di bawah bubble final live.

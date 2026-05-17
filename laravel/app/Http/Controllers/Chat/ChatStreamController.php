@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Chat;
 use App\Http\Controllers\Controller;
 use App\Models\Conversation;
 use App\Models\Message;
+use App\Models\User;
 use App\Services\AIService;
 use App\Services\ChatOrchestrationService;
 use Illuminate\Http\Request;
@@ -15,7 +16,7 @@ class ChatStreamController extends Controller
 {
     public function stream(Request $request, int $conversationId): StreamedResponse
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
 
         // Validate conversation ownership
@@ -104,9 +105,6 @@ class ChatStreamController extends Controller
     /**
      * Core streaming logic — extracted so it can be called directly in tests
      * without needing to execute a StreamedResponse closure.
-     *
-     * @param  \App\Models\User  $user
-     * @param  \App\Models\Conversation  $conversation
      */
     public function executeStream(
         AIService $aiService,
@@ -119,124 +117,128 @@ class ChatStreamController extends Controller
         bool $webSearchMode,
         int $conversationId,
         Conversation $conversation,
-        \App\Models\User $user,
+        User $user,
     ): void {
         $streamClaimKey = $orchestrator->acquireStreamRunner($conversationId);
         if ($streamClaimKey === null) {
             // Runner lain (job/stream lain) sudah claim latest user message.
             $this->sendSseEvent('done', '1');
+
             return;
         }
 
         try {
-        // Single-runner claim: jika assistant message sudah ada untuk user message
-        // terakhir (job selesai duluan), stream tidak perlu memanggil AI sama sekali.
-        // Ini mencegah user melihat chunk dari jawaban berbeda lalu final DB berubah.
-        if ($orchestrator->assistantAlreadyAnswered($conversationId)) {
-            $this->sendSseEvent('done', '1');
-            return;
-        }
+            // Single-runner claim: jika assistant message sudah ada untuk user message
+            // terakhir (job selesai duluan), stream tidak perlu memanggil AI sama sekali.
+            // Ini mencegah user melihat chunk dari jawaban berbeda lalu final DB berubah.
+            if ($orchestrator->assistantAlreadyAnswered($conversationId)) {
+                $this->sendSseEvent('done', '1');
 
-        $fullResponse = '';
-        $streamBuffer = '';
-        $sources = [];
-        $errorStreamDetected = false;
-
-        try {
-            foreach (
-                $aiService->sendChat(
-                    $history,
-                    $documentFilenames,
-                    (string) $user->id,
-                    $webSearchMode,
-                    $sourcePolicy,
-                    $allowAutoRealtimeWeb,
-                    $resolvedDocumentIds,
-                ) as $rawChunk
-            ) {
-                // Abort if browser disconnected
-                if (connection_aborted()) {
-                    return;
-                }
-
-                [$chunk, $streamBuffer, $parsedModelName, $parsedSources] = $orchestrator->extractStreamMetadata(
-                    (string) $rawChunk,
-                    $streamBuffer
-                );
-
-                if ($parsedModelName !== null) {
-                    $this->sendSseEvent('model-name', $parsedModelName);
-                }
-
-                if (! empty($parsedSources)) {
-                    $sources = $parsedSources;
-                    $this->sendSseEvent('sources', json_encode($sources));
-                }
-
-                if ($fullResponse === '' && str_starts_with((string) $chunk, AIService::ERROR_SENTINEL)) {
-                    $errorStreamDetected = true;
-                }
-
-                if ($errorStreamDetected) {
-                    $fullResponse .= (string) $chunk;
-                    continue;
-                }
-
-                $chunk = $orchestrator->sanitizeAssistantOutput((string) $chunk);
-
-                if ($chunk !== '') {
-                    $fullResponse .= $chunk;
-                    $this->sendSseEvent('chunk', $chunk);
-                }
+                return;
             }
-        } catch (\Throwable $e) {
-            Log::error('ChatStreamController: stream error', [
-                'conversation_id' => $conversationId,
-                'user_id' => $user->id,
-                'message' => $e->getMessage(),
-            ]);
-            $this->sendSseEvent('error', 'Maaf, terjadi kesalahan saat streaming jawaban.');
+
+            $fullResponse = '';
+            $streamBuffer = '';
+            $sources = [];
+            $errorStreamDetected = false;
+
+            try {
+                foreach (
+                    $aiService->sendChat(
+                        $history,
+                        $documentFilenames,
+                        (string) $user->id,
+                        $webSearchMode,
+                        $sourcePolicy,
+                        $allowAutoRealtimeWeb,
+                        $resolvedDocumentIds,
+                    ) as $rawChunk
+                ) {
+                    // Abort if browser disconnected
+                    if (connection_aborted()) {
+                        return;
+                    }
+
+                    [$chunk, $streamBuffer, $parsedModelName, $parsedSources] = $orchestrator->extractStreamMetadata(
+                        (string) $rawChunk,
+                        $streamBuffer
+                    );
+
+                    if ($parsedModelName !== null) {
+                        $this->sendSseEvent('model-name', $parsedModelName);
+                    }
+
+                    if (! empty($parsedSources)) {
+                        $sources = $parsedSources;
+                        $this->sendSseEvent('sources', json_encode($sources));
+                    }
+
+                    if ($fullResponse === '' && str_starts_with((string) $chunk, AIService::ERROR_SENTINEL)) {
+                        $errorStreamDetected = true;
+                    }
+
+                    if ($errorStreamDetected) {
+                        $fullResponse .= (string) $chunk;
+
+                        continue;
+                    }
+
+                    $chunk = $orchestrator->sanitizeAssistantOutput((string) $chunk);
+
+                    if ($chunk !== '') {
+                        $fullResponse .= $chunk;
+                        $this->sendSseEvent('chunk', $chunk);
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::error('ChatStreamController: stream error', [
+                    'conversation_id' => $conversationId,
+                    'user_id' => $user->id,
+                    'message' => $e->getMessage(),
+                ]);
+                $this->sendSseEvent('error', 'Maaf, terjadi kesalahan saat streaming jawaban.');
+                $this->sendSseEvent('done', '1');
+
+                return;
+            }
+
+            // Detect error sentinel from AIService
+            if (str_starts_with($fullResponse, AIService::ERROR_SENTINEL)) {
+                $errorContent = substr($fullResponse, strlen(AIService::ERROR_SENTINEL));
+                $errorContent = trim($errorContent) !== '' ? trim($errorContent) : 'Maaf, ISTA AI gagal merespon. Silakan coba lagi.';
+
+                $orchestrator->saveErrorMessage($conversationId, $errorContent, $user->id);
+                $conversation->touch();
+
+                $this->sendSseEvent('error', $errorContent);
+                $this->sendSseEvent('done', '1');
+
+                return;
+            }
+
+            // Build final content with sources
+            $cleanContent = $orchestrator->cleanResponseContent($fullResponse);
+
+            if (! empty($sources)) {
+                $cleanContent .= $orchestrator->sanitizeAndFormatSources($sources);
+            }
+
+            if ($cleanContent === '') {
+                $cleanContent = 'Maaf, ISTA AI belum menerima jawaban yang bisa ditampilkan. Silakan coba lagi.';
+            }
+
+            $this->sendSseEvent('final-content', $cleanContent);
+
+            // Persist final message via saveAssistantMessage which now enforces
+            // idempotency under DB lockForUpdate — safe against race with background job.
+            $saved = $orchestrator->saveAssistantMessage($conversationId, $cleanContent, $user->id);
+            if ($saved !== null) {
+                $conversation->touch();
+                $this->sendSseEvent('message-id', (string) $saved->id);
+                $this->sendSseEvent('message-created-at', $saved->created_at?->timezone('Asia/Jakarta')->toIso8601String() ?? now('Asia/Jakarta')->toIso8601String());
+            }
+
             $this->sendSseEvent('done', '1');
-
-            return;
-        }
-
-        // Detect error sentinel from AIService
-        if (str_starts_with($fullResponse, AIService::ERROR_SENTINEL)) {
-            $errorContent = substr($fullResponse, strlen(AIService::ERROR_SENTINEL));
-            $errorContent = trim($errorContent) !== '' ? trim($errorContent) : 'Maaf, ISTA AI gagal merespon. Silakan coba lagi.';
-
-            $orchestrator->saveErrorMessage($conversationId, $errorContent, $user->id);
-            $conversation->touch();
-
-            $this->sendSseEvent('error', $errorContent);
-            $this->sendSseEvent('done', '1');
-
-            return;
-        }
-
-        // Build final content with sources
-        $cleanContent = $orchestrator->cleanResponseContent($fullResponse);
-
-        if (! empty($sources)) {
-            $cleanContent .= $orchestrator->sanitizeAndFormatSources($sources);
-        }
-
-        if ($cleanContent === '') {
-            $cleanContent = 'Maaf, ISTA AI belum menerima jawaban yang bisa ditampilkan. Silakan coba lagi.';
-        }
-
-        $this->sendSseEvent('final-content', $cleanContent);
-
-        // Persist final message via saveAssistantMessage which now enforces
-        // idempotency under DB lockForUpdate — safe against race with background job.
-        $saved = $orchestrator->saveAssistantMessage($conversationId, $cleanContent, $user->id);
-        if ($saved !== null) {
-            $conversation->touch();
-            $this->sendSseEvent('message-id', (string) $saved->id);
-        }
-
-        $this->sendSseEvent('done', '1');
         } finally {
             $orchestrator->releaseStreamClaim($streamClaimKey);
         }
