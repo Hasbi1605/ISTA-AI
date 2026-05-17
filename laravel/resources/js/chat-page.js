@@ -833,6 +833,7 @@ const registerChatPageData = (Alpine) => {
             };
             const streamState = {
                 finalText: null,
+                finalQueued: false,
                 hasFirstAssistantChunk: false,
                 streamedAssistantMessageId: null,
             };
@@ -884,9 +885,16 @@ const registerChatPageData = (Alpine) => {
             es.addEventListener('final-content', (e) => {
                 const content = e.data || '';
                 streamState.finalText = content !== '' ? content : null;
+                streamState.finalQueued = false;
 
                 if (this.isActiveConversation(conversationId)) {
-                    this.streamingFinalText = streamState.finalText;
+                    if (streamState.finalText) {
+                        this.queueFinalStreamingText(streamState.finalText);
+                        streamState.finalQueued = true;
+                        return;
+                    }
+
+                    this.streamingFinalText = null;
                 }
             });
 
@@ -905,8 +913,9 @@ const registerChatPageData = (Alpine) => {
                 const streamedMessageId = streamState.streamedAssistantMessageId;
 
                 if (this.isActiveConversation(conversationId)) {
-                    if (streamState.finalText) {
+                    if (streamState.finalText && !streamState.finalQueued) {
                         this.queueFinalStreamingText(streamState.finalText);
+                        streamState.finalQueued = true;
                     }
                 }
 

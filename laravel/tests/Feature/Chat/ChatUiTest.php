@@ -493,6 +493,7 @@ class ChatUiTest extends TestCase
         $this->assertStringContainsString('refreshPendingAfterStreamingSettles(conversationId, streamedMessageId', $chatPageJs);
         $this->assertStringContainsString('refreshPendingChatState(streamedMessageId, this.isActiveConversation(conversationId))', $chatPageJs);
         $this->assertStringContainsString('markStreamFailed(conversationId)', $chatPageJs);
+        $this->assertStringContainsString('finalQueued: false', $chatPageJs);
         $this->assertStringContainsString('shouldPreserveCurrentStream', $chatPageJs);
         $this->assertStringContainsString('preserveStream', $chatPageJs);
         $this->assertStringContainsString('afterStreamingTypewriterSettles(() => {', $chatPageJs);
@@ -1433,6 +1434,10 @@ class ChatUiTest extends TestCase
         $this->assertIsString($chatMessagesBlade);
         $this->assertStringContainsString('const normalizeAssistantSources', $chatPageJs);
         $this->assertStringContainsString('this.typewriterSources = normalizeAssistantSources(sources);', $chatPageJs);
+        $this->assertStringContainsString("es.addEventListener('final-content'", $chatPageJs);
+        $this->assertStringContainsString('this.queueFinalStreamingText(streamState.finalText);', $chatPageJs);
+        $this->assertStringContainsString('streamState.finalQueued = true;', $chatPageJs);
+        $this->assertStringContainsString('streamState.finalText && !streamState.finalQueued', $chatPageJs);
         $this->assertStringContainsString('this.queueAssistantTypewriterFinalText(rawFinalText);', $chatPageJs);
         $this->assertStringContainsString('pendingDisplayText.startsWith(nextFinalText)', $chatPageJs);
         $this->assertStringNotContainsString('stripAssistantReferenceFooter', $chatPageJs);

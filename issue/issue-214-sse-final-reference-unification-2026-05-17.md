@@ -59,3 +59,19 @@ Perbaikan referensi belum menyelesaikan typewriter 2x karena ada race berbeda:
 2. Saat polling biasa melihat completion untuk conversation yang sedang SSE, jangan set `$newMessageId`, jangan render bubble persisted, dan jangan dispatch `assistant-message-persisted` non-preserve untuk conversation itu.
 3. Saat SSE `done` datang dengan `message-id`, preserve bubble live walaupun polling sebelumnya sudah menghapus conversation dari pending list.
 4. Jika stream error/gagal, frontend melepas marker backend agar polling fallback bisa menampilkan error/jawaban final.
+
+## Follow-up: Final-content Harus Masuk Live Sebelum Done
+
+### Temuan
+QA manual menunjukkan kasus timing baru:
+
+- `final-content` SSE sudah membawa footer `Dokumen rujukan:` yang sama dengan isi DB.
+- Frontend sebelumnya hanya menyimpan `streamState.finalText` saat event `final-content`.
+- Footer baru dikirim ke typewriter saat event `done`.
+- Di sela `final-content`/`message-id` sampai `done`, UI sudah bisa terlihat selesai dan action buttons sudah muncul, tetapi footer rujukan belum terlihat di bubble live.
+- Setelah refresh, persisted renderer menampilkan footer tersebut, sehingga live dan final tetap terasa tidak sama.
+
+### Fix Lanjutan
+1. Saat event `final-content` diterima untuk conversation aktif, langsung panggil `queueFinalStreamingText()`.
+2. Tandai `streamState.finalQueued` supaya event `done` tidak mengantrekan final text yang sama dua kali.
+3. Pertahankan event `done` sebagai fallback bila `final-content` belum sempat di-queue.
