@@ -315,7 +315,7 @@ class MemoWorkspaceTest extends TestCase
             'services.onlyoffice.laravel_internal_url' => 'http://laravel:8000',
         ]);
         Http::fake([
-            '*/api/memos/generate-body' => Http::response('docx-bytes', 200, [
+            '*/api/memos/generate-body' => Http::response($this->validMemoDocxBytes(), 200, [
                 'X-Memo-Searchable-Text-B64' => base64_encode('Isi memo rapat lingkungan'),
                 'X-Memo-Page-Size' => 'letter',
                 'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -391,7 +391,7 @@ class MemoWorkspaceTest extends TestCase
     {
         Storage::fake('local');
         Http::fake([
-            '*/api/memos/generate-body' => Http::response('docx-bytes', 200, [
+            '*/api/memos/generate-body' => Http::response($this->validMemoDocxBytes(), 200, [
                 'X-Memo-Searchable-Text-B64' => base64_encode('Isi memo dengan penutup manual'),
                 'X-Memo-Page-Size' => 'letter',
                 'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -432,7 +432,7 @@ class MemoWorkspaceTest extends TestCase
             'services.onlyoffice.laravel_internal_url' => 'http://laravel:8000',
         ]);
         Http::fake([
-            '*/api/memos/generate-body' => Http::response('docx-bytes', 200, [
+            '*/api/memos/generate-body' => Http::response($this->validMemoDocxBytes(), 200, [
                 'X-Memo-Searchable-Text-B64' => base64_encode('Memo hasil konfigurasi'),
                 'X-Memo-Page-Size' => 'letter',
                 'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -543,7 +543,7 @@ class MemoWorkspaceTest extends TestCase
             'services.onlyoffice.laravel_internal_url' => 'http://laravel:8000',
         ]);
         Http::fake([
-            '*/api/memos/generate-body' => Http::response('revised-docx-bytes', 200, [
+            '*/api/memos/generate-body' => Http::response($this->validMemoDocxBytes(), 200, [
                 'X-Memo-Searchable-Text-B64' => base64_encode('Memo revisi dengan tembusan baru'),
                 'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             ]),
@@ -677,7 +677,7 @@ class MemoWorkspaceTest extends TestCase
     {
         Storage::fake('local');
         Http::fake([
-            '*/api/memos/generate-body' => Http::response('docx-bytes', 200, [
+            '*/api/memos/generate-body' => Http::response($this->validMemoDocxBytes(), 200, [
                 'X-Memo-Searchable-Text-B64' => base64_encode('Memo tanpa nama penandatangan'),
                 'X-Memo-Page-Size' => 'letter',
                 'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -712,7 +712,7 @@ class MemoWorkspaceTest extends TestCase
     {
         Storage::fake('local');
         Http::fake([
-            '*/api/memos/generate-body' => Http::response('revised-docx-bytes', 200, [
+            '*/api/memos/generate-body' => Http::response($this->validMemoDocxBytes(), 200, [
                 'X-Memo-Searchable-Text-B64' => base64_encode('Memo revisi penerima'),
                 'X-Memo-Page-Size' => 'letter',
                 'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -767,11 +767,100 @@ class MemoWorkspaceTest extends TestCase
         $this->assertArrayNotHasKey('body_override', $memo->configuration);
     }
 
+    public function test_revision_chat_uses_clean_manual_body_when_docx_text_has_split_metadata(): void
+    {
+        Storage::fake('local');
+        Http::fake([
+            '*/api/memos/generate-body' => Http::response($this->validMemoDocxBytes(), 200, [
+                'X-Memo-Searchable-Text-B64' => base64_encode('Memo revisi penerima bersih'),
+                'X-Memo-Page-Size' => 'letter',
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            ]),
+        ]);
+
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        $searchableText = implode("\n", [
+            'KEMENTERIAN SEKRETARIAT NEGARA RI',
+            'SEKRETARIAT PRESIDEN',
+            'ISTANA KEPRESIDENAN YOGYAKARTA',
+            'MEMORANDUM',
+            'Nomor EVAL-08/IST/YK/05/2026',
+            'Yth.',
+            ':',
+            'Koordinator TI',
+            'Dari',
+            ':',
+            'Kepala Istana Kepresidenan Yogyakarta',
+            'Hal',
+            ':',
+            'Penyampaian Kendala Akses Sistem Persuratan',
+            'Tanggal',
+            ':',
+            '7 Mei 2026',
+            'Waktu kejadian ditetapkan berdasarkan laporan unit terkait.',
+            'Demikian disampaikan untuk menjadi perhatian dan tindak lanjut sebagaimana mestinya.',
+            'Ngetes Perubahan Manual doang...HEhe...',
+            'QRTTE',
+            'Deni Mulyana',
+            'Tembusan:',
+            'Kepala Bagian Keamanan',
+        ]);
+        $memo = Memo::create([
+            'user_id' => $user->id,
+            'title' => 'Penyampaian Kendala Akses Sistem Persuratan',
+            'memo_type' => 'memo_internal',
+            'file_path' => 'memos/'.$user->id.'/memo-awal.docx',
+            'status' => Memo::STATUS_GENERATED,
+            'searchable_text' => $searchableText,
+            'configuration' => [
+                'number' => 'EVAL-08/IST/YK/05/2026',
+                'recipient' => 'Koordinator TI',
+                'sender' => 'Kepala Istana Kepresidenan Yogyakarta',
+                'subject' => 'Penyampaian Kendala Akses Sistem Persuratan',
+                'date' => '7 Mei 2026',
+                'content' => 'Waktu kejadian ditetapkan berdasarkan laporan unit terkait.',
+                'signatory' => 'Deni Mulyana',
+                'carbon_copy' => 'Kepala Bagian Keamanan',
+                'page_size' => 'letter',
+                'page_size_mode' => 'auto',
+            ],
+        ]);
+        $version = $memo->versions()->create([
+            'version_number' => 1,
+            'label' => 'Versi 1',
+            'file_path' => $memo->file_path,
+            'status' => Memo::STATUS_GENERATED,
+            'configuration' => $memo->configuration,
+            'searchable_text' => $searchableText,
+        ]);
+        $memo->forceFill(['current_version_id' => $version->id])->save();
+
+        Livewire::actingAs($user)
+            ->test(MemoWorkspace::class)
+            ->call('loadMemo', $memo->id)
+            ->set('memoPrompt', 'Ubah Yth menjadi Koordinator Informatika Ngaglik')
+            ->call('sendMemoChat')
+            ->assertHasNoErrors()
+            ->assertDispatched('memo-document-ready');
+
+        $expectedBody = "Waktu kejadian ditetapkan berdasarkan laporan unit terkait.\nNgetes Perubahan Manual doang...HEhe...";
+
+        Http::assertSent(fn ($request) => $request['configuration']['recipient'] === 'Koordinator Informatika Ngaglik'
+            && $request['configuration']['body_override'] === $expectedBody
+            && $request['context'] === $expectedBody
+            && ! str_contains($request['context'], 'Yth')
+            && ! str_contains($request['context'], 'Koordinator TI')
+            && ! str_contains($request['context'], 'Dari')
+            && ! str_contains($request['context'], 'Hal')
+            && ! str_contains($request['context'], 'Tanggal')
+            && ! str_contains($request['context'], 'QRTTE'));
+    }
+
     public function test_revision_chat_applies_new_date_when_instruction_mentions_old_and_new_dates(): void
     {
         Storage::fake('local');
         Http::fake([
-            '*/api/memos/generate-body' => Http::response('revised-docx-bytes', 200, [
+            '*/api/memos/generate-body' => Http::response($this->validMemoDocxBytes(), 200, [
                 'X-Memo-Searchable-Text-B64' => base64_encode('Memo revisi tanggal'),
                 'X-Memo-Page-Size' => 'letter',
                 'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -825,7 +914,7 @@ class MemoWorkspaceTest extends TestCase
     {
         Storage::fake('local');
         Http::fake([
-            '*/api/memos/generate-body' => Http::response('revised-docx-bytes', 200, [
+            '*/api/memos/generate-body' => Http::response($this->validMemoDocxBytes(), 200, [
                 'X-Memo-Searchable-Text-B64' => base64_encode('Memo revisi typo nama'),
                 'X-Memo-Page-Size' => 'letter',
                 'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -891,7 +980,7 @@ class MemoWorkspaceTest extends TestCase
     {
         Storage::fake('local');
         Http::fake([
-            '*/api/memos/generate-body' => Http::response('revised-docx-bytes', 200, [
+            '*/api/memos/generate-body' => Http::response($this->validMemoDocxBytes(), 200, [
                 'X-Memo-Searchable-Text-B64' => base64_encode('Memo revisi format bernomor'),
                 'X-Memo-Page-Size' => 'letter',
                 'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',

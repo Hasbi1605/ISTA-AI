@@ -67,7 +67,7 @@ class OnlyOfficeCallbackTest extends TestCase
         ]);
         Storage::fake('local');
         Http::fake([
-            'https://onlyoffice.test/file.docx' => Http::response(self::fakeDocxBytes(), 200),
+            'https://onlyoffice.test/file.docx' => Http::response($this->validMemoDocxBytes(), 200),
         ]);
 
         $user = User::factory()->create(['email_verified_at' => now()]);
@@ -106,7 +106,7 @@ class OnlyOfficeCallbackTest extends TestCase
         ]);
         Storage::fake('local');
         Http::fake([
-            'https://ista-ai.app/cache/files/data/output.docx*' => Http::response(self::fakeDocxBytes(), 200),
+            'https://ista-ai.app/cache/files/data/output.docx*' => Http::response($this->validMemoDocxBytes(), 200),
         ]);
 
         $user = User::factory()->create(['email_verified_at' => now()]);
@@ -140,7 +140,7 @@ class OnlyOfficeCallbackTest extends TestCase
         ]);
         Storage::fake('local');
         Http::fake([
-            'https://onlyoffice.test/header-file.docx' => Http::response(self::fakeDocxBytes(), 200),
+            'https://onlyoffice.test/header-file.docx' => Http::response($this->validMemoDocxBytes(), 200),
         ]);
 
         $user = User::factory()->create(['email_verified_at' => now()]);
@@ -172,7 +172,7 @@ class OnlyOfficeCallbackTest extends TestCase
         ]);
         Storage::fake('local');
         Http::fake([
-            'https://onlyoffice.test/body-file.docx' => Http::response(self::fakeDocxBytes(), 200),
+            'https://onlyoffice.test/body-file.docx' => Http::response($this->validMemoDocxBytes(), 200),
         ]);
 
         $user = User::factory()->create(['email_verified_at' => now()]);
@@ -475,7 +475,7 @@ class OnlyOfficeCallbackTest extends TestCase
         ]);
         Storage::fake('local');
         Http::fake([
-            'https://onlyoffice.test/replay.docx' => Http::response(self::fakeDocxBytes(), 200),
+            'https://onlyoffice.test/replay.docx' => Http::response($this->validMemoDocxBytes(), 200),
         ]);
 
         $user = User::factory()->create(['email_verified_at' => now()]);
@@ -525,12 +525,13 @@ class OnlyOfficeCallbackTest extends TestCase
         Http::fake([
             'https://onlyoffice.test/transient-file.docx' => function () use (&$callCount) {
                 $callCount++;
+
                 // First attempt: OnlyOffice returns a transient non-DOCX error page
                 // (e.g., a 200 HTML error from a temporarily overloaded server).
                 // Second attempt: the real DOCX is available.
                 return $callCount === 1
                     ? Http::response('<html>Service Unavailable</html>', 200)
-                    : Http::response(self::fakeDocxBytes(), 200);
+                    : Http::response($this->validMemoDocxBytes(), 200);
             },
         ]);
 
@@ -560,8 +561,8 @@ class OnlyOfficeCallbackTest extends TestCase
         ]);
         Storage::fake('local');
         Http::fake([
-            'https://onlyoffice.test/save-v1.docx' => Http::response(self::fakeDocxBytes('v1'), 200),
-            'https://onlyoffice.test/save-v2.docx' => Http::response(self::fakeDocxBytes('v2'), 200),
+            'https://onlyoffice.test/save-v1.docx' => Http::response($this->validMemoDocxBytes(), 200),
+            'https://onlyoffice.test/save-v2.docx' => Http::response($this->validMemoDocxBytes(), 200),
         ]);
 
         $user = User::factory()->create(['email_verified_at' => now()]);
@@ -653,7 +654,7 @@ class OnlyOfficeCallbackTest extends TestCase
         ]);
         Storage::fake('local');
         Http::fake([
-            'https://onlyoffice.test/version-one.docx' => Http::response(self::fakeDocxBytes('v1'), 200),
+            'https://onlyoffice.test/version-one.docx' => Http::response($this->validMemoDocxBytes(), 200),
         ]);
 
         $user = User::factory()->create(['email_verified_at' => now()]);
@@ -668,8 +669,8 @@ class OnlyOfficeCallbackTest extends TestCase
             'searchable_text' => 'Versi 2',
         ]);
 
-        Storage::disk('local')->put($versionOne->file_path, self::fakeDocxBytes('original-v1'));
-        Storage::disk('local')->put($versionTwo->file_path, self::fakeDocxBytes('current-v2'));
+        Storage::disk('local')->put($versionOne->file_path, self::corruptDocxBytes('original-v1'));
+        Storage::disk('local')->put($versionTwo->file_path, self::corruptDocxBytes('current-v2'));
 
         $memo->forceFill([
             'file_path' => $versionTwo->file_path,
@@ -717,7 +718,7 @@ class OnlyOfficeCallbackTest extends TestCase
         ]);
         Storage::fake('local');
         Http::fake([
-            'https://onlyoffice.test/legacy-version-one.docx' => Http::response(self::fakeDocxBytes(), 200),
+            'https://onlyoffice.test/legacy-version-one.docx' => Http::response(self::corruptDocxBytes(), 200),
         ]);
 
         $user = User::factory()->create(['email_verified_at' => now()]);
@@ -773,7 +774,7 @@ class OnlyOfficeCallbackTest extends TestCase
         ]);
         Storage::fake('local');
         Http::fake([
-            'https://onlyoffice.test/stale-current.docx' => Http::response(self::fakeDocxBytes(), 200),
+            'https://onlyoffice.test/stale-current.docx' => Http::response(self::corruptDocxBytes(), 200),
         ]);
 
         $user = User::factory()->create(['email_verified_at' => now()]);
@@ -890,7 +891,7 @@ class OnlyOfficeCallbackTest extends TestCase
         $this->assertStringContainsString('diedit manual', $version?->searchable_text ?? '');
     }
 
-    public function test_callback_still_succeeds_if_docx_extraction_fails(): void
+    public function test_callback_rejects_corrupt_zip_prefixed_docx_and_keeps_existing_file(): void
     {
         config([
             'services.onlyoffice.jwt_secret' => 'callback-secret',
@@ -898,16 +899,13 @@ class OnlyOfficeCallbackTest extends TestCase
         ]);
         Storage::fake('local');
 
-        // Send PK-prefixed but otherwise corrupt content: passes the ZIP magic
-        // bytes check but fails DOCX parsing so text extraction returns ''.
         Http::fake([
-            'https://onlyoffice.test/corrupt.docx' => Http::response(self::fakeDocxBytes('corrupt'), 200),
+            'https://onlyoffice.test/corrupt.docx' => Http::response(self::corruptDocxBytes('corrupt'), 200),
         ]);
 
         $user = User::factory()->create(['email_verified_at' => now()]);
         $memo = $this->createMemo($user);
-        $originalSearchableText = $memo->searchable_text;
-        $originalVersionText = $memo->currentVersion->searchable_text;
+        Storage::disk('local')->put($memo->file_path, 'original-content');
 
         $key = $this->callbackKey($memo);
         $url = 'https://onlyoffice.test/corrupt.docx';
@@ -918,25 +916,16 @@ class OnlyOfficeCallbackTest extends TestCase
             'exp' => time() + 60,
         ]);
 
-        // Callback harus tetap sukses meski ekstraksi gagal
         $this->postJson(route('onlyoffice.callback', $memo), [
             'status' => 2,
             'key' => $key,
             'url' => $url,
             'token' => $token,
-        ])->assertOk()->assertJson(['error' => 0]);
+        ])->assertStatus(502);
 
-        $memo->refresh();
-
-        // searchable_text tidak boleh kosong — fallback ke nilai lama atau title
-        $this->assertNotEmpty($memo->searchable_text);
-        $this->assertNotEmpty($memo->currentVersion?->searchable_text);
-
-        // Jika nilai awal ada, harus dipertahankan; jika null, fallback ke title
-        $expectedMemo = $originalSearchableText ?: $memo->title;
-        $expectedVersion = $originalVersionText ?: $memo->title;
-        $this->assertSame($expectedMemo, $memo->searchable_text);
-        $this->assertSame($expectedVersion, $memo->currentVersion?->searchable_text);
+        $this->assertSame('original-content', Storage::disk('local')->get($memo->file_path));
+        $this->assertSame($memo->title, $memo->refresh()->searchable_text);
+        $this->assertSame($memo->title, $memo->currentVersion?->searchable_text);
     }
 
     public function test_callback_status_2_updates_searchable_text_for_non_current_version(): void
@@ -1042,7 +1031,7 @@ class OnlyOfficeCallbackTest extends TestCase
         ]);
         Storage::fake('local');
         Http::fake([
-            'https://onlyoffice.test/final-save.docx' => Http::response(self::fakeDocxBytes('final'), 200),
+            'https://onlyoffice.test/final-save.docx' => Http::response($this->validMemoDocxBytes(), 200),
         ]);
 
         $user = User::factory()->create(['email_verified_at' => now()]);
@@ -1076,7 +1065,7 @@ class OnlyOfficeCallbackTest extends TestCase
         ]);
         Storage::fake('local');
         Http::fake([
-            'https://onlyoffice.test/force-save.docx' => Http::response(self::fakeDocxBytes('force'), 200),
+            'https://onlyoffice.test/force-save.docx' => Http::response($this->validMemoDocxBytes(), 200),
         ]);
 
         $user = User::factory()->create(['email_verified_at' => now()]);
@@ -1111,17 +1100,13 @@ class OnlyOfficeCallbackTest extends TestCase
     // -------------------------------------------------------------------------
 
     /**
-     * Build a minimal fake DOCX payload for tests.
-     *
-     * The returned string starts with the ZIP magic bytes (PK\x03\x04) so it
-     * passes the controller's validateDocxResponse() signature check, while
-     * remaining small enough for fast in-memory test assertions.
+     * Build corrupt bytes that look like the beginning of a ZIP file.
      */
-    private static function fakeDocxBytes(string $tag = ''): string
+    private static function corruptDocxBytes(string $tag = ''): string
     {
         $padding = str_repeat("\x00", max(0, 20 - strlen($tag)));
 
-        return "PK\x03\x04" . $padding . $tag;
+        return "PK\x03\x04".$padding.$tag;
     }
 
     protected function callbackKey(Memo $memo, ?MemoVersion $version = null): string
@@ -1137,6 +1122,7 @@ class OnlyOfficeCallbackTest extends TestCase
             'memo_type' => 'memo_internal',
             'file_path' => 'memos/'.$user->id.'/memo.docx',
             'status' => Memo::STATUS_GENERATED,
+            'searchable_text' => 'Memo Test',
         ]);
 
         $version = $memo->versions()->create([

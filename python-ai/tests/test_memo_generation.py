@@ -553,6 +553,94 @@ def test_generate_memo_docx_uses_body_override_without_calling_text_generator():
     assert "Isi memo saat ini tetap dipertahankan." in draft.searchable_text
 
 
+def test_generate_memo_docx_strips_split_metadata_from_body_override():
+    body_override = "\n".join(
+        [
+            "KEMENTERIAN SEKRETARIAT NEGARA RI",
+            "SEKRETARIAT PRESIDEN",
+            "ISTANA KEPRESIDENAN YOGYAKARTA",
+            "MEMORANDUM",
+            "Nomor EVAL-08/IST/YK/05/2026",
+            "Yth.",
+            ":",
+            "Koordinator TI",
+            "Dari",
+            ":",
+            "Kepala Istana Kepresidenan Yogyakarta",
+            "Hal",
+            ":",
+            "Penyampaian Kendala Akses Sistem Persuratan",
+            "Tanggal",
+            ":",
+            "7 Mei 2026",
+            "Waktu kejadian ditetapkan berdasarkan laporan unit terkait.",
+            "Ngetes Perubahan Manual doang...HEhe...",
+            "QRTTE",
+            "Deni Mulyana",
+        ]
+    )
+
+    draft = generate_memo_docx(
+        memo_type="memo_internal",
+        title="Penyampaian Kendala Akses Sistem Persuratan",
+        context="Fallback tidak boleh dipakai.",
+        text_generator=lambda prompt: (_ for _ in ()).throw(AssertionError("text generator should not be called")),
+        configuration={
+            "number": "EVAL-08/IST/YK/05/2026",
+            "recipient": "Koordinator Informatika Ngaglik",
+            "sender": "Kepala Istana Kepresidenan Yogyakarta",
+            "subject": "Penyampaian Kendala Akses Sistem Persuratan",
+            "date": "7 Mei 2026",
+            "body_override": body_override,
+            "signatory": "Deni Mulyana",
+            "page_size": "letter",
+        },
+    )
+
+    assert "Waktu kejadian ditetapkan berdasarkan laporan unit terkait." in draft.searchable_text
+    assert "Ngetes Perubahan Manual" in draft.searchable_text
+    assert draft.searchable_text.count("Koordinator Informatika Ngaglik") == 1
+    assert "Koordinator TI" not in draft.searchable_text
+    assert "QRTTE" not in draft.searchable_text
+
+
+def test_generate_memo_docx_preserves_body_lines_that_start_with_metadata_words():
+    body_override = "\n".join(
+        [
+            "Yth.",
+            ":",
+            "Koordinator TI",
+            "Hal",
+            ":",
+            "Evaluasi Layanan",
+            "Hal ini perlu ditindaklanjuti oleh unit terkait.",
+            "Dari hasil evaluasi, akses pengguna perlu diperbaiki.",
+            "Tanggal pelaksanaan tindak lanjut ditetapkan setelah koordinasi.",
+        ]
+    )
+
+    draft = generate_memo_docx(
+        memo_type="memo_internal",
+        title="Evaluasi Layanan",
+        context="Fallback tidak boleh dipakai.",
+        text_generator=lambda prompt: (_ for _ in ()).throw(AssertionError("text generator should not be called")),
+        configuration={
+            "number": "EVAL-08/IST/YK/05/2026",
+            "recipient": "Koordinator TI",
+            "sender": "Kepala Istana Kepresidenan Yogyakarta",
+            "subject": "Evaluasi Layanan",
+            "date": "7 Mei 2026",
+            "body_override": body_override,
+            "signatory": "Deni Mulyana",
+            "page_size": "letter",
+        },
+    )
+
+    assert "Hal ini perlu ditindaklanjuti oleh unit terkait." in draft.searchable_text
+    assert "Dari hasil evaluasi, akses pengguna perlu diperbaiki." in draft.searchable_text
+    assert "Tanggal pelaksanaan tindak lanjut ditetapkan setelah koordinasi." in draft.searchable_text
+
+
 def test_generate_memo_docx_treats_mohon_tindak_lanjut_as_generated_closing():
     closing = "Mohon tindak lanjut sesuai poin-poin tersebut agar proses pembaruan aplikasi dapat terlaksana dengan lancar dan terkoordinasi dengan baik."
 

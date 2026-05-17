@@ -4,6 +4,7 @@ namespace App\Livewire\Memos;
 
 use App\Models\Memo;
 use App\Models\MemoVersion;
+use App\Services\Memo\MemoDocumentStructureExtractor;
 use App\Services\Memo\MemoGenerationService;
 use App\Services\Memo\MemoLifecycleService;
 use App\Services\OnlyOffice\JwtSigner;
@@ -90,6 +91,7 @@ class MemoWorkspace extends Component
         if (! $memo) {
             $this->memoStatusMessage = 'Memo tidak ditemukan atau Anda tidak memiliki akses.';
             $this->addSystemMessage('Memo tidak ditemukan atau Anda tidak memiliki akses. Pilih memo lain dari riwayat atau buat memo baru.');
+
             return;
         }
 
@@ -376,6 +378,7 @@ class MemoWorkspace extends Component
 
         if (! $memo) {
             $this->addSystemMessage('Memo aktif tidak ditemukan. Pilih memo lain dari riwayat atau buat memo baru.');
+
             return;
         }
 
@@ -385,6 +388,7 @@ class MemoWorkspace extends Component
 
         if (! $version) {
             $this->addSystemMessage('Versi memo tidak ditemukan. Pilih versi lain dari riwayat versi.');
+
             return;
         }
 
@@ -593,6 +597,23 @@ class MemoWorkspace extends Component
         ];
     }
 
+    /**
+     * @return array<string, string>
+     */
+    protected function memoStructureHints(): array
+    {
+        return [
+            'number' => trim($this->memoNumber),
+            'recipient' => trim($this->memoRecipient),
+            'sender' => trim($this->memoSender),
+            'subject' => trim($this->title),
+            'date' => trim($this->memoDate),
+            'closing' => trim($this->memoClosing),
+            'signatory' => trim($this->memoSignatory),
+            'carbon_copy' => trim($this->memoCarbonCopy),
+        ];
+    }
+
     protected function memoDraftContext(): string
     {
         $sections = [];
@@ -664,7 +685,10 @@ class MemoWorkspace extends Component
             return '';
         }
 
-        return $this->memoBodyForRevision((string) $activeMemoText);
+        return app(MemoDocumentStructureExtractor::class)->bodyFromSearchableText(
+            (string) $activeMemoText,
+            $this->memoStructureHints(),
+        );
     }
 
     protected function shouldPreserveCurrentBodyForRevision(string $instruction, string $body = ''): bool
@@ -820,69 +844,6 @@ class MemoWorkspace extends Component
                 ) ?? $line;
             })
             ->implode(PHP_EOL);
-    }
-
-    protected function memoBodyForRevision(string $searchableText): string
-    {
-        $lines = preg_split('/\R+/', $searchableText) ?: [];
-        $bodyLines = [];
-
-        foreach ($lines as $line) {
-            $line = trim((string) $line);
-
-            if ($line === '') {
-                continue;
-            }
-
-            if ($this->isOfficialMemoStructureLine($line)) {
-                continue;
-            }
-
-            if (preg_match('/^Tembusan\s*:/iu', $line)) {
-                break;
-            }
-
-            if (in_array(mb_strtolower($line), ['qr', 'tte'], true)) {
-                break;
-            }
-
-            if (trim($this->memoSignatory) !== '' && mb_strtolower($line) === mb_strtolower(trim($this->memoSignatory))) {
-                break;
-            }
-
-            if (trim($this->memoClosing) !== '' && mb_strtolower($line) === mb_strtolower(trim($this->memoClosing))) {
-                continue;
-            }
-
-            if (preg_match('/^(?:demikian|atas perhatian|atas kerja sama)\b/iu', $line)) {
-                continue;
-            }
-
-            $bodyLines[] = $line;
-        }
-
-        return trim(implode("\n", $bodyLines));
-    }
-
-    protected function isOfficialMemoStructureLine(string $line): bool
-    {
-        $normalized = mb_strtolower(trim($line));
-
-        $exactLines = [
-            'kementerian sekretariat negara ri',
-            'sekretariat presiden',
-            'istana kepresidenan yogyakarta',
-            'memorandum',
-            'dokumen ini telah ditandatangani secara elektronik menggunakan sertifikat elektronik',
-            'yang diterbitkan oleh balai sertifikasi elektronik (bsre).',
-        ];
-
-        if (in_array($normalized, $exactLines, true)) {
-            return true;
-        }
-
-        return preg_match('/^(?:yth\.?|dari|hal|tanggal)\s*:/iu', $line) === 1
-            || preg_match('/^nomor\s+\S+/iu', $line) === 1;
     }
 
     protected function applyRecipientRevision(string $instruction): void

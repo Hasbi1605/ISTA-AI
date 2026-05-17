@@ -77,7 +77,7 @@ class MemoCanvasTest extends TestCase
     {
         Storage::fake('local');
         Http::fake([
-            '*/api/memos/generate-body' => Http::response('docx-bytes', 200, [
+            '*/api/memos/generate-body' => Http::response($this->validMemoDocxBytes(), 200, [
                 'X-Memo-Searchable-Text-B64' => base64_encode('Memo Test searchable'),
                 'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             ]),

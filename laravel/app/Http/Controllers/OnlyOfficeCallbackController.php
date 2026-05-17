@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Memo;
 use App\Models\MemoVersion;
 use App\Services\OnlyOffice\DocxTextExtractor;
+use App\Services\OnlyOffice\DocxValidator;
 use App\Services\OnlyOffice\JwtSigner;
 use App\Services\OnlyOffice\MemoDocumentKey;
 use App\Services\OnlyOffice\MemoForceSaveService;
@@ -19,19 +20,6 @@ use Symfony\Component\HttpFoundation\Response;
 
 class OnlyOfficeCallbackController extends Controller
 {
-    /**
-     * Minimum acceptable size (bytes) for a downloaded DOCX response.
-     * A minimal DOCX file (ZIP archive) is several kilobytes; anything
-     * smaller is likely an error page or empty payload.
-     */
-    private const MIN_DOCX_BYTES = 4;
-
-    /**
-     * Maximum acceptable size (bytes) for a downloaded DOCX response.
-     * 50 MB is a generous upper bound for memo documents.
-     */
-    private const MAX_DOCX_BYTES = 50 * 1024 * 1024;
-
     public function __invoke(Request $request, Memo $memo): JsonResponse
     {
         $token = $this->extractToken($request);
@@ -116,87 +104,98 @@ class OnlyOfficeCallbackController extends Controller
             $response = Http::timeout(60)->get($url);
             abort_unless($response->successful(), Response::HTTP_BAD_GATEWAY, 'Gagal mengunduh file dari OnlyOffice.');
 
-            // Validate the downloaded body before writing to disk.
-            $this->validateDocxResponse($response->body());
+            $tempPath = $this->writeTemporaryDocx($response->body());
 
-            $path = $version?->file_path ?: ($memo->file_path ?: 'memos/'.$memo->user_id.'/'.$memo->id.'.docx');
-
-            // Acquire a per-memo lock to prevent concurrent callbacks from
-            // overwriting the same file in an uncontrolled way.
-            $lockKey = 'oo_save_lock:'.$memo->id.':'.($version?->id ?? 'base');
-            $lock = Cache::lock($lockKey, 30);
-
-            $lock->block(10, function () use ($memo, $version, $path, $response, $callback, $replayCacheKey, $status) {
-                // Re-check replay inside the lock to guard against a concurrent
-                // thread that passed the fast-path check above.
-                if (Cache::has($replayCacheKey)) {
-                    abort(Response::HTTP_CONFLICT, 'Callback OnlyOffice sudah diproses (anti-replay).');
+            try {
+                try {
+                    app(DocxValidator::class)->assertValidPath($tempPath, 'File dari OnlyOffice');
+                } catch (RuntimeException $e) {
+                    abort(Response::HTTP_BAD_GATEWAY, $e->getMessage());
                 }
 
-                Storage::disk('local')->put($path, $response->body());
+                $freshText = app(DocxTextExtractor::class)->extract($tempPath);
+                $docxBytes = file_get_contents($tempPath);
+                abort_if($docxBytes === false, Response::HTTP_BAD_GATEWAY, 'Gagal membaca file sementara dari OnlyOffice.');
 
-                // Extract fresh searchable text from the newly saved DOCX so that
-                // subsequent AI revisions read the user's manual edits, not the
-                // stale AI-generated text stored before the edit session.
-                $absolutePath = Storage::disk('local')->path($path);
-                $freshText = app(DocxTextExtractor::class)->extract($absolutePath);
+                $path = $version?->file_path ?: ($memo->file_path ?: 'memos/'.$memo->user_id.'/'.$memo->id.'.docx');
 
-                if ($version) {
-                    $newSearchableText = $freshText !== ''
-                        ? $freshText
-                        : ($version->searchable_text ?: $memo->searchable_text ?: $memo->title);
+                // Acquire a per-memo lock to prevent concurrent callbacks from
+                // overwriting the same file in an uncontrolled way.
+                $lockKey = 'oo_save_lock:'.$memo->id.':'.($version?->id ?? 'base');
+                $lock = Cache::lock($lockKey, 30);
 
-                    $version->forceFill([
-                        'file_path' => $path,
-                        'status' => Memo::STATUS_EDITED,
-                        'searchable_text' => $newSearchableText,
-                    ])->save();
+                $lock->block(10, function () use ($memo, $version, $path, $docxBytes, $freshText, $callback, $replayCacheKey, $status) {
+                    // Re-check replay inside the lock to guard against a concurrent
+                    // thread that passed the fast-path check above.
+                    if (Cache::has($replayCacheKey)) {
+                        abort(Response::HTTP_CONFLICT, 'Callback OnlyOffice sudah diproses (anti-replay).');
+                    }
 
-                    if ((int) $memo->current_version_id === (int) $version->id || $memo->current_version_id === null) {
+                    abort_unless(
+                        Storage::disk('local')->put($path, $docxBytes),
+                        Response::HTTP_INTERNAL_SERVER_ERROR,
+                        'Gagal menyimpan file memo dari OnlyOffice.'
+                    );
+
+                    if ($version) {
+                        $newSearchableText = $freshText !== ''
+                            ? $freshText
+                            : ($version->searchable_text ?: $memo->searchable_text ?: $memo->title);
+
+                        $version->forceFill([
+                            'file_path' => $path,
+                            'status' => Memo::STATUS_EDITED,
+                            'searchable_text' => $newSearchableText,
+                        ])->save();
+
+                        if ((int) $memo->current_version_id === (int) $version->id || $memo->current_version_id === null) {
+                            $memo->forceFill([
+                                'file_path' => $path,
+                                'status' => Memo::STATUS_EDITED,
+                                'searchable_text' => $newSearchableText,
+                            ])->save();
+                        }
+
+                    } else {
+                        $newSearchableText = $freshText !== ''
+                            ? $freshText
+                            : ($memo->searchable_text ?: $memo->title);
+
                         $memo->forceFill([
                             'file_path' => $path,
                             'status' => Memo::STATUS_EDITED,
                             'searchable_text' => $newSearchableText,
                         ])->save();
+
+                        $currentVersion = $memo->currentVersion()->first();
+
+                        if ($currentVersion) {
+                            $currentVersion->forceFill([
+                                'file_path' => $path,
+                                'status' => Memo::STATUS_EDITED,
+                                'searchable_text' => $newSearchableText,
+                            ])->save();
+                        }
                     }
 
-                } else {
-                    $newSearchableText = $freshText !== ''
-                        ? $freshText
-                        : ($memo->searchable_text ?: $memo->title);
+                    // Mark the callback as successfully processed only after the
+                    // file has been written and all DB updates committed.
+                    // This ensures that retries triggered by transient failures
+                    // before this point (network errors, DOCX validation, lock
+                    // contention) are never incorrectly blocked as replays.
+                    $this->markCallbackProcessed($replayCacheKey, $callback);
 
-                    $memo->forceFill([
-                        'file_path' => $path,
-                        'status' => Memo::STATUS_EDITED,
-                        'searchable_text' => $newSearchableText,
-                    ])->save();
-
-                    $currentVersion = $memo->currentVersion()->first();
-
-                    if ($currentVersion) {
-                        $currentVersion->forceFill([
-                            'file_path' => $path,
-                            'status' => Memo::STATUS_EDITED,
-                            'searchable_text' => $newSearchableText,
-                        ])->save();
+                    if ($status === 6) {
+                        app(MemoForceSaveService::class)->markSucceeded((string) ($callback['userdata'] ?? ''), $memo, $version);
                     }
-                }
 
-                // Mark the callback as successfully processed only after the
-                // file has been written and all DB updates committed.
-                // This ensures that retries triggered by transient failures
-                // before this point (network errors, DOCX validation, lock
-                // contention) are never incorrectly blocked as replays.
-                $this->markCallbackProcessed($replayCacheKey, $callback);
-
-                if ($status === 6) {
-                    app(MemoForceSaveService::class)->markSucceeded((string) ($callback['userdata'] ?? ''), $memo, $version);
-                }
-
-                if ($status === 2) {
-                    app(MemoDocumentKey::class)->invalidateEditorKey($memo, $version);
-                }
-            });
+                    if ($status === 2) {
+                        app(MemoDocumentKey::class)->invalidateEditorKey($memo, $version);
+                    }
+                });
+            } finally {
+                @unlink($tempPath);
+            }
         }
 
         return response()->json(['error' => 0]);
@@ -334,38 +333,17 @@ class OnlyOfficeCallbackController extends Controller
         abort_unless(hash_equals($expectedKey, $key), Response::HTTP_CONFLICT, 'Sesi dokumen OnlyOffice sudah kedaluwarsa.');
     }
 
-    /**
-     * Validate the raw bytes of a file downloaded from OnlyOffice before
-     * persisting it to disk.
-     *
-     * Checks:
-     *  1. Size is within the expected range for a DOCX memo.
-     *  2. The body starts with the ZIP magic bytes (PK) that every valid
-     *     DOCX file must contain, blocking plaintext error pages and other
-     *     non-DOCX payloads from being silently written to memo storage.
-     */
-    protected function validateDocxResponse(string $body): void
+    protected function writeTemporaryDocx(string $body): string
     {
-        $size = strlen($body);
+        $tempPath = tempnam(sys_get_temp_dir(), 'oo-memo-');
+        abort_if($tempPath === false, Response::HTTP_INTERNAL_SERVER_ERROR, 'Gagal membuat file sementara OnlyOffice.');
 
-        abort_if(
-            $size < self::MIN_DOCX_BYTES,
-            Response::HTTP_BAD_GATEWAY,
-            'File dari OnlyOffice terlalu kecil untuk DOCX valid ('.$size.' bytes).'
-        );
+        if (file_put_contents($tempPath, $body) === false) {
+            @unlink($tempPath);
+            abort(Response::HTTP_INTERNAL_SERVER_ERROR, 'Gagal menulis file sementara OnlyOffice.');
+        }
 
-        abort_if(
-            $size > self::MAX_DOCX_BYTES,
-            Response::HTTP_BAD_GATEWAY,
-            'File dari OnlyOffice melebihi batas ukuran maksimum.'
-        );
-
-        // DOCX files are ZIP archives; the first two bytes are always 'PK'.
-        abort_unless(
-            str_starts_with($body, 'PK'),
-            Response::HTTP_BAD_GATEWAY,
-            'File dari OnlyOffice bukan format DOCX/ZIP yang valid.'
-        );
+        return $tempPath;
     }
 
     protected function isTrustedOnlyOfficeUrl(string $url): bool

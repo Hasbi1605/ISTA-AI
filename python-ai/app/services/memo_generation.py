@@ -1437,12 +1437,14 @@ def _build_searchable_text(memo_type: str, config: dict[str, str], body: str) ->
 
 def _sanitize_memo_body(body: str, config: dict[str, str]) -> str:
     clean = _strip_external_source_artifacts(body)
+    clean = _strip_memo_structure_artifacts(clean, config)
     clean = _strip_forbidden_body_sections(clean)
     clean = _strip_configured_carbon_copy_lines(clean, config.get("carbon_copy", ""))
     clean = _strip_markdown_artifacts(clean)
     clean = _strip_evaluation_artifacts(clean)
     clean = _strip_body_closing_sentences(clean)
     clean = _remove_configured_closing(clean, config.get("closing", ""))
+    clean = _remove_configured_signatory(clean, config.get("signatory", ""))
     clean = _strip_instruction_artifacts(clean, config)
     clean = _strip_unconfigured_honorific_data(clean, config)
     clean = _strip_unconfigured_time_facts(clean, config)
@@ -1455,6 +1457,73 @@ def _sanitize_memo_body(body: str, config: dict[str, str]) -> str:
     clean = _merge_orphan_numbered_markers(clean)
     return _normalize_generated_text(clean)
 
+
+def _strip_memo_structure_artifacts(text: str, config: dict[str, str]) -> str:
+    output: list[str] = []
+    skip_metadata_value = False
+
+    for raw_line in (text or "").splitlines():
+        line = raw_line.strip()
+
+        if not line:
+            if output and output[-1] != "":
+                output.append("")
+            continue
+
+        if skip_metadata_value:
+            if line == ":":
+                continue
+            skip_metadata_value = False
+            continue
+
+        normalized = line.lower()
+        if normalized in {
+            "kementerian sekretariat negara ri",
+            "sekretariat presiden",
+            "istana kepresidenan yogyakarta",
+            "memorandum",
+        }:
+            continue
+
+        number_match = re.match(r"^nomor\s+(.+)$", line, flags=re.IGNORECASE)
+        if number_match:
+            value = number_match.group(1).strip()
+            configured_number = config.get("number", "").strip()
+            if (
+                configured_number
+                and _normalize_comparison_text(value) == _normalize_comparison_text(configured_number)
+            ) or (not configured_number and re.search(r"[/\\-]", value)):
+                continue
+
+        metadata_match = re.match(
+            r"^(yth\.?|dari|hal|tanggal)(?:\s*:?\s*$|\s*:\s*(.*)$)",
+            line,
+            flags=re.IGNORECASE,
+        )
+        if metadata_match:
+            skip_metadata_value = not (metadata_match.group(2) or "").strip()
+            continue
+
+        if line == ":" or re.fullmatch(r"[-_=—\s]{3,}", line):
+            continue
+
+        if normalized in {"qr", "tte", "qrtte"}:
+            break
+
+        output.append(line)
+
+    return "\n".join(output).strip()
+
+def _remove_configured_signatory(text: str, signatory: str) -> str:
+    clean_signatory = _normalize_comparison_text(signatory)
+    if not clean_signatory:
+        return text
+
+    return "\n".join(
+        block
+        for block in _split_blocks(text)
+        if _normalize_comparison_text(block) != clean_signatory
+    ).strip()
 
 def _merge_orphan_numbered_markers(text: str) -> str:
     blocks = _split_blocks(text)

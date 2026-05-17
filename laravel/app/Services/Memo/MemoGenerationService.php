@@ -5,11 +5,13 @@ namespace App\Services\Memo;
 use App\Models\Memo;
 use App\Models\MemoVersion;
 use App\Models\User;
-use Illuminate\Support\Facades\Http;
+use App\Services\OnlyOffice\DocxValidator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Throwable;
 
 class MemoGenerationService
 {
@@ -37,23 +39,32 @@ class MemoGenerationService
         $configuration = $this->normalizeConfiguration($configuration);
         $draft = $this->requestDraft($memoType, $title, $context, $configuration);
         $configuration = $this->applyResolvedPageSize($configuration, $draft['page_size']);
+        $path = null;
 
-        $memo = Memo::create([
-            'user_id' => $user->id,
-            'title' => $title,
-            'memo_type' => $memoType,
-            'status' => Memo::STATUS_GENERATED,
-            'source_document_ids' => array_values(array_unique(array_map('intval', $sourceDocumentIds))),
-            'configuration' => $configuration,
-            'searchable_text' => $draft['searchable_text'],
-        ]);
+        try {
+            return DB::transaction(function () use ($user, $memoType, $title, $sourceDocumentIds, $configuration, $draft, &$path) {
+                $memo = Memo::create([
+                    'user_id' => $user->id,
+                    'title' => $title,
+                    'memo_type' => $memoType,
+                    'status' => Memo::STATUS_GENERATED,
+                    'source_document_ids' => array_values(array_unique(array_map('intval', $sourceDocumentIds))),
+                    'configuration' => $configuration,
+                    'searchable_text' => $draft['searchable_text'],
+                ]);
 
-        $path = $this->storeDraft($memo, $draft['content'], 1);
-        $version = $this->createVersion($memo, 1, $path, $configuration, $draft['searchable_text']);
+                $path = $this->storeDraft($memo, $draft['content'], 1);
+                $version = $this->createVersion($memo, 1, $path, $configuration, $draft['searchable_text']);
 
-        $this->activateVersion($memo, $version);
+                $this->activateVersion($memo, $version);
 
-        return $memo;
+                return $memo;
+            });
+        } catch (Throwable $e) {
+            $this->deleteStoredDraft($path);
+
+            throw $e;
+        }
     }
 
     public function generateRevision(Memo $memo, string $context, array $configuration = [], ?string $revisionInstruction = null): MemoVersion
@@ -66,12 +77,11 @@ class MemoGenerationService
         $title = (string) ($configuration['subject'] ?? $memo->title);
         $draft = $this->requestDraft($memo->memo_type, $title, $context, $configuration);
         $configuration = $this->applyResolvedPageSize($configuration, $draft['page_size']);
+        $path = null;
 
-        return DB::transaction(function () use ($memo, $draft, $configuration) {
-            $lockedMemo = Memo::lockForUpdate()->findOrFail($memo->id);
-            $path = null;
-
-            try {
+        try {
+            return DB::transaction(function () use ($memo, $draft, $configuration, &$path) {
+                $lockedMemo = Memo::lockForUpdate()->findOrFail($memo->id);
                 $versionNumber = ((int) $lockedMemo->versions()->max('version_number')) + 1;
                 $path = $this->storeDraft($lockedMemo, $draft['content'], $versionNumber);
 
@@ -87,14 +97,12 @@ class MemoGenerationService
                 $this->activateVersion($lockedMemo, $version);
 
                 return $version;
-            } catch (\Throwable $e) {
-                if ($path) {
-                    Storage::delete($path);
-                }
+            });
+        } catch (Throwable $e) {
+            $this->deleteStoredDraft($path);
 
-                throw $e;
-            }
-        });
+            throw $e;
+        }
     }
 
     public function generateRevisionFromBody(Memo $memo, string $body, array $configuration = [], ?string $revisionInstruction = null): MemoVersion
@@ -110,12 +118,11 @@ class MemoGenerationService
         ]);
         $draft = $this->requestDraft($memo->memo_type, $title, $body, $requestConfiguration);
         $storedConfiguration = $this->applyResolvedPageSize($storedConfiguration, $draft['page_size']);
+        $path = null;
 
-        return DB::transaction(function () use ($memo, $draft, $storedConfiguration) {
-            $lockedMemo = Memo::lockForUpdate()->findOrFail($memo->id);
-            $path = null;
-
-            try {
+        try {
+            return DB::transaction(function () use ($memo, $draft, $storedConfiguration, &$path) {
+                $lockedMemo = Memo::lockForUpdate()->findOrFail($memo->id);
                 $versionNumber = ((int) $lockedMemo->versions()->max('version_number')) + 1;
                 $path = $this->storeDraft($lockedMemo, $draft['content'], $versionNumber);
 
@@ -131,14 +138,12 @@ class MemoGenerationService
                 $this->activateVersion($lockedMemo, $version);
 
                 return $version;
-            } catch (\Throwable $e) {
-                if ($path) {
-                    Storage::delete($path);
-                }
+            });
+        } catch (Throwable $e) {
+            $this->deleteStoredDraft($path);
 
-                throw $e;
-            }
-        });
+            throw $e;
+        }
     }
 
     public function activateVersion(Memo $memo, MemoVersion $version, bool $touch = true): Memo
@@ -222,10 +227,22 @@ class MemoGenerationService
 
     protected function storeDraft(Memo $memo, string $content, int $versionNumber): string
     {
+        app(DocxValidator::class)->assertValidBytes($content, 'Draft memo');
+
         $path = 'memos/'.$memo->user_id.'/'.$memo->id.'-v'.$versionNumber.'-'.Str::uuid().'.docx';
-        Storage::disk('local')->put($path, $content);
+
+        if (! Storage::disk('local')->put($path, $content)) {
+            throw new RuntimeException('Gagal menyimpan file DOCX memo.');
+        }
 
         return $path;
+    }
+
+    protected function deleteStoredDraft(?string $path): void
+    {
+        if ($path) {
+            Storage::disk('local')->delete($path);
+        }
     }
 
     /**
