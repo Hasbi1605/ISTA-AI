@@ -107,6 +107,8 @@ class ChatUiTest extends TestCase
             ->test(ChatIndex::class)
             ->assertDontSee('Lampiran: PDF, DOCX, XLSX, atau CSV', false)
             ->assertSee('ISTA AI dapat keliru', false)
+            ->assertSee('Pengaturan Akun', false)
+            ->assertSee(route('profile', ['from' => 'chat']), false)
             ->assertDontSee('Memuat chat...', false)
             ->assertDontSee('Tambahkan ke chat', false)
             ->assertDontSee('Batal pilih semua', false)
@@ -484,6 +486,17 @@ class ChatUiTest extends TestCase
         $this->assertStringContainsString('ensureVisibleStreamPlaceholder(conversationId, loadingContext)', $chatPageJs);
         $this->assertStringContainsString('this.closeChatStream(conversationId)', $chatPageJs);
         $this->assertStringContainsString('this.isActiveConversation(targetConversationId)', $chatPageJs);
+        $this->assertStringContainsString('createAssistantTypewriterState', $chatPageJs);
+        $this->assertStringContainsString("Alpine.data('assistantTypewriter'", $chatPageJs);
+        $this->assertStringContainsString('queueAssistantTypewriterFinalText(finalText)', $chatPageJs);
+        $this->assertStringContainsString('queueFinalStreamingText(finalText)', $chatPageJs);
+        $this->assertStringContainsString('refreshPendingAfterStreamingSettles(conversationId, streamedMessageId', $chatPageJs);
+        $this->assertStringContainsString('afterStreamingTypewriterSettles(() => {', $chatPageJs);
+        $this->assertStringContainsString('revealStreamingSources()', $chatPageJs);
+        $this->assertStringContainsString('CHAT_SOURCE_REVEAL_BEFORE_REFRESH_MS', $chatPageJs);
+        $this->assertStringContainsString('CHAT_LOADING_PHASE_DELAY_MS', $chatPageJs);
+        $this->assertStringContainsString('CHAT_PENDING_STALE_WARNING_MS', $chatPageJs);
+        $this->assertStringNotContainsString('this.streamingText = this.streamingFinalText', $chatPageJs);
         $this->assertStringNotContainsString('activeEventSource: null', $chatPageJs);
         $this->assertStringNotContainsString('this.activeEventSource = es', $chatPageJs);
         $this->assertStringNotContainsString('showAllHistory', $chatPageJs);
@@ -1268,12 +1281,19 @@ class ChatUiTest extends TestCase
     public function test_streaming_answer_uses_final_answer_bubble_style(): void
     {
         $user = User::factory()->create();
+        $assistantBubbleBlade = file_get_contents(resource_path('views/livewire/chat/partials/assistant-answer-bubble.blade.php'));
+        $this->assertIsString($assistantBubbleBlade);
+        $this->assertStringContainsString('assistantTypewriter({', $assistantBubbleBlade);
+        $this->assertStringContainsString('x-html="typewriterHtml"', $assistantBubbleBlade);
+        $this->assertStringNotContainsString('typewriterEffect()', $assistantBubbleBlade);
+        $this->assertStringNotContainsString('displayedContent', $assistantBubbleBlade);
 
         Livewire::actingAs($user)
             ->test(ChatIndex::class)
             ->assertSee('x-show="streamingText !== \'\'"', false)
             ->assertSee('prose prose-p:my-1 prose-headings:my-2', false)
             ->assertSee('x-html="streamingHtml"', false)
+            ->assertSee('x-if="sourcesVisible && sources && Array.isArray(sources) && sources.length > 0"', false)
             ->assertDontSee('x-show="modelName"', false);
     }
 

@@ -79,69 +79,14 @@
                             })"
                             class="w-full max-w-[656px]"
                             >
-                            @if($message['id'] == $newMessageId)
-                                <div
-                                    wire:ignore
-                                    wire:key="msg-typing-{{ $message['id'] }}"
-                                    class="{{ $assistantBubbleClass }}"
-                                    x-data="{
-                                        content: @js((string) $assistantHtml),
-                                        displayedContent: '',
-                                        typewriterEffect() {
-                                            let i = 0;
-                                            const type = () => {
-                                                if (i < this.content.length) {
-                                                    const remaining = this.content.length - i;
-                                                    const chunkSize = remaining > 1400 ? 12 : (remaining > 800 ? 9 : 6);
-                                                    const speed = remaining > 1400 ? 4 : (remaining > 800 ? 6 : 10);
-
-                                                    let nextChunk = this.content.substring(i, i + chunkSize);
-                                                    if (nextChunk.startsWith('<')) {
-                                                        const tagEnd = this.content.indexOf('>', i);
-                                                        if (tagEnd !== -1) {
-                                                            nextChunk = this.content.substring(i, tagEnd + 1);
-                                                        }
-                                                    } else {
-                                                        const nextTagStart = nextChunk.indexOf('<');
-                                                        if (nextTagStart > 0) {
-                                                            nextChunk = this.content.substring(i, i + nextTagStart);
-                                                        }
-                                                    }
-
-                                                    this.displayedContent += nextChunk;
-                                                    i += nextChunk.length;
-
-                                                    setTimeout(type, speed);
-                                                }
-                                            };
-                                            setTimeout(type, 80);
-                                        }
-                                    }"
-                                    x-init="typewriterEffect()"
-                                >
-                                    @if($isAssistantError)
-                                        <div class="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-rose-700 dark:text-rose-200">
-                                            <span class="flex h-4 w-4 items-center justify-center rounded-full bg-rose-100 text-[10px] dark:bg-rose-500/20">!</span>
-                                            Gagal memproses jawaban
-                                        </div>
-                                    @endif
-                                    <div x-html="displayedContent"></div>
-                                </div>
-                            @else
-                                <div
-                                    wire:key="msg-static-{{ $message['id'] }}"
-                                    class="{{ $assistantBubbleClass }}"
-                                >
-                                    @if($isAssistantError)
-                                        <div class="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-rose-700 dark:text-rose-200">
-                                            <span class="flex h-4 w-4 items-center justify-center rounded-full bg-rose-100 text-[10px] dark:bg-rose-500/20">!</span>
-                                            Gagal memproses jawaban
-                                        </div>
-                                    @endif
-                                    <div x-html="@js((string) $assistantHtml)"></div>
-                                </div>
-
-                            @endif
+                            @include('livewire.chat.partials.assistant-answer-bubble', [
+                                'assistantBubbleClass' => $assistantBubbleClass,
+                                'assistantHtml' => (string) $assistantHtml,
+                                'content' => (string) $message['content'],
+                                'isAssistantError' => $isAssistantError,
+                                'messageId' => (int) $message['id'],
+                                'shouldType' => (int) $message['id'] === (int) $newMessageId,
+                            ])
 
                             <div data-answer-actions class="mt-2 flex flex-wrap items-center gap-1 text-[12px] text-[#64748B] dark:text-[#94A3B8]">
                                 <button
@@ -383,7 +328,7 @@
                   </div>
                   <p x-show="stalePendingWarning" x-transition.opacity class="mt-2 max-w-[656px] rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] font-medium text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100" role="status" aria-live="polite" x-text="stalePendingWarning"></p>
 
-                  <template x-if="sources && Array.isArray(sources) && sources.length > 0">
+                  <template x-if="sourcesVisible && sources && Array.isArray(sources) && sources.length > 0">
                      <div class="mt-2.5 w-full text-left"
                           x-transition:enter="transition ease-out duration-300 transform"
                           x-transition:enter-start="opacity-0 translate-y-2"

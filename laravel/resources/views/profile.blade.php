@@ -58,7 +58,30 @@
                 </div>
             </header>
 
+            @php
+                $profileReturn = match (request()->query('from')) {
+                    'chat' => [
+                        'label' => 'Kembali ke Chat',
+                        'url' => route('chat', ['tab' => 'chat']),
+                    ],
+                    'memo' => [
+                        'label' => 'Kembali ke Memo',
+                        'url' => route('chat', ['tab' => 'memo']),
+                    ],
+                    default => null,
+                };
+            @endphp
+
             <main class="relative z-10 mx-auto flex min-h-[calc(100vh-136px)] w-full max-w-[640px] flex-col items-center pt-8 pb-20 px-5 sm:px-10 font-sans">
+                @if ($profileReturn)
+                    <a href="{{ $profileReturn['url'] }}" class="group mb-4 inline-flex self-start items-center gap-2 rounded-full border border-white/40 bg-white/70 px-4 py-2 text-[13px] font-bold text-stone-700 shadow-sm backdrop-blur-md transition hover:-translate-x-0.5 hover:border-ista-primary/40 hover:text-ista-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ista-primary dark:border-gray-700/80 dark:bg-gray-900/70 dark:text-gray-200 dark:hover:border-amber-300/40 dark:hover:text-amber-300">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform group-hover:-translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+                        </svg>
+                        <span>{{ $profileReturn['label'] }}</span>
+                    </a>
+                @endif
+
                 <div class="w-full" x-data="{ activeTab: 'profile', tabs: ['profile', 'password', 'delete'], selectTab(tab) { this.activeTab = tab; this.$nextTick(() => document.getElementById(`${tab}-tab`)?.focus()); }, moveTab(delta) { const current = this.tabs.indexOf(this.activeTab); const next = (current + delta + this.tabs.length) % this.tabs.length; this.selectTab(this.tabs[next]); } }">
                     <div class="group/card ista-glass-card">
                         <div class="absolute inset-0 z-0 -translate-x-[200%] bg-gradient-to-tr from-white/0 via-white/40 to-white/0 group-hover/card:animate-[shimmer_1s_ease-out]"></div>

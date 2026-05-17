@@ -12,6 +12,8 @@ const CHAT_PENDING_MARKER_TTL_MS = 10 * 60 * 1000;
 const CHAT_PENDING_RECENT_TTL_MS = 3 * 60 * 1000;
 const CHAT_PENDING_STALE_WARNING_MS = 45 * 1000;
 const CHAT_MESSAGE_ACK_TIMEOUT_MS = 10 * 1000;
+const CHAT_LOADING_PHASE_DELAY_MS = 2500;
+const CHAT_SOURCE_REVEAL_BEFORE_REFRESH_MS = 650;
 const MARKDOWN_RENDER_OPTIONS = {
     async: false,
     breaks: false,
@@ -38,6 +40,167 @@ const renderSafeStreamingMarkdown = (value = '') => {
         });
     }
 };
+
+const createAssistantTypewriterState = (config = {}) => ({
+    typewriterFullText: String(config.content || ''),
+    typewriterDisplayedText: '',
+    typewriterHtml: '',
+    typewriterQueue: '',
+    typewriterTimer: null,
+    typewriterDoneCallback: null,
+    typewriterMarkdownRenderFrame: null,
+    typewriterSources: Array.isArray(config.sources) ? config.sources : [],
+    typewriterSourcesVisible: false,
+    typewriterInitialDelay: Number.isFinite(Number(config.initialDelay)) ? Number(config.initialDelay) : 80,
+    typewriterEmptyInitialDelay: Number.isFinite(Number(config.emptyInitialDelay)) ? Number(config.emptyInitialDelay) : 30,
+
+    clearAssistantTypewriterTimer() {
+        if (this.typewriterTimer) {
+            window.clearTimeout(this.typewriterTimer);
+            this.typewriterTimer = null;
+        }
+
+        this.typewriterQueue = '';
+        this.typewriterDoneCallback = null;
+    },
+
+    clearAssistantTypewriterMarkdownRender() {
+        if (this.typewriterMarkdownRenderFrame) {
+            window.cancelAnimationFrame(this.typewriterMarkdownRenderFrame);
+            this.typewriterMarkdownRenderFrame = null;
+        }
+    },
+
+    resetAssistantTypewriter(options = {}) {
+        this.clearAssistantTypewriterTimer();
+        this.clearAssistantTypewriterMarkdownRender();
+        this.typewriterFullText = '';
+        this.typewriterDisplayedText = '';
+        this.typewriterHtml = '';
+
+        if (!options.preserveSources) {
+            this.typewriterSources = [];
+            this.typewriterSourcesVisible = false;
+        }
+    },
+
+    renderAssistantTypewriterMarkdownNow() {
+        this.clearAssistantTypewriterMarkdownRender();
+        this.typewriterHtml = renderSafeStreamingMarkdown(this.typewriterDisplayedText);
+    },
+
+    scheduleAssistantTypewriterMarkdownRender() {
+        if (this.typewriterMarkdownRenderFrame) {
+            return;
+        }
+
+        this.typewriterMarkdownRenderFrame = window.requestAnimationFrame(() => {
+            this.typewriterMarkdownRenderFrame = null;
+            this.typewriterHtml = renderSafeStreamingMarkdown(this.typewriterDisplayedText);
+
+            if (typeof this.scrollToBottom === 'function') {
+                this.scrollToBottom();
+            }
+        });
+    },
+
+    setAssistantTypewriterSources(sources) {
+        this.typewriterSources = Array.isArray(sources) ? sources : [];
+        this.typewriterSourcesVisible = false;
+    },
+
+    revealAssistantTypewriterSources() {
+        this.typewriterSourcesVisible = Array.isArray(this.typewriterSources) && this.typewriterSources.length > 0;
+    },
+
+    queueAssistantTypewriterFinalText(finalText) {
+        const nextFinalText = typeof finalText === 'string' ? finalText : '';
+        if (nextFinalText === '') {
+            return;
+        }
+
+        this.typewriterFullText = nextFinalText;
+        const pendingDisplayText = `${this.typewriterDisplayedText}${this.typewriterQueue}`;
+
+        if (nextFinalText === pendingDisplayText) {
+            this.startAssistantTypewriter();
+            return;
+        }
+
+        if (nextFinalText.startsWith(pendingDisplayText)) {
+            this.typewriterQueue += nextFinalText.substring(pendingDisplayText.length);
+        } else if (nextFinalText.startsWith(this.typewriterDisplayedText)) {
+            this.typewriterQueue = nextFinalText.substring(this.typewriterDisplayedText.length);
+        } else {
+            this.typewriterDisplayedText = '';
+            this.typewriterQueue = nextFinalText;
+            this.renderAssistantTypewriterMarkdownNow();
+        }
+
+        this.startAssistantTypewriter();
+    },
+
+    appendAssistantTypewriterText(text) {
+        const chunk = String(text || '');
+        if (chunk === '') {
+            return;
+        }
+
+        this.typewriterQueue += chunk;
+        this.startAssistantTypewriter();
+    },
+
+    startAssistantTypewriter() {
+        if (this.typewriterTimer) {
+            return;
+        }
+
+        const tick = () => {
+            this.typewriterTimer = null;
+
+            if (this.typewriterQueue === '') {
+                this.renderAssistantTypewriterMarkdownNow();
+                this.runAssistantTypewriterDoneCallback();
+                return;
+            }
+
+            const remaining = this.typewriterQueue.length;
+            const chunkSize = remaining > 1600 ? 22 : (remaining > 800 ? 18 : (remaining > 320 ? 14 : 9));
+            const nextChunk = this.typewriterQueue.substring(0, chunkSize);
+
+            this.typewriterDisplayedText += nextChunk;
+            this.typewriterQueue = this.typewriterQueue.substring(nextChunk.length);
+            this.scheduleAssistantTypewriterMarkdownRender();
+
+            const nextDelay = this.typewriterQueue.length > 1600 ? 2 : (this.typewriterQueue.length > 800 ? 3 : 5);
+            this.typewriterTimer = window.setTimeout(tick, nextDelay);
+        };
+
+        const initialDelay = this.typewriterDisplayedText === ''
+            ? this.typewriterInitialDelay
+            : this.typewriterEmptyInitialDelay;
+        this.typewriterTimer = window.setTimeout(tick, initialDelay);
+    },
+
+    afterAssistantTypewriterSettles(callback) {
+        if (this.typewriterQueue === '' && !this.typewriterTimer) {
+            callback();
+            return;
+        }
+
+        this.typewriterDoneCallback = callback;
+    },
+
+    runAssistantTypewriterDoneCallback() {
+        if (typeof this.typewriterDoneCallback !== 'function') {
+            return;
+        }
+
+        const callback = this.typewriterDoneCallback;
+        this.typewriterDoneCallback = null;
+        callback();
+    },
+});
 
 const normalizeWirePayload = (data) => (Array.isArray(data) ? (data[0] || {}) : (data || {}));
 
@@ -318,14 +481,23 @@ const registerChatPageData = (Alpine) => {
         },
     }));
 
+    Alpine.data('assistantTypewriter', (config = {}) => ({
+        ...createAssistantTypewriterState(config),
+
+        init() {
+            this.queueAssistantTypewriterFinalText(this.typewriterFullText);
+        },
+    }));
+
     Alpine.data('chatMessages', () => ({
+        ...createAssistantTypewriterState({
+            initialDelay: 30,
+            emptyInitialDelay: 0,
+        }),
         optimisticUserMessage: '',
         isSwitchingConversation: false,
         streaming: false,
-        streamingText: '',
-        streamingHtml: '',
         modelName: '',
-        sources: [],
         loadingContext: 'general',
         loadingPhase: 'AI sedang berpikir',
         loadingPhaseKey: 0,
@@ -337,10 +509,6 @@ const registerChatPageData = (Alpine) => {
         phase1Done: false,
         phase2Done: false,
         shimmerActive: false,
-        streamingQueue: '',
-        streamingTypewriterTimer: null,
-        streamingTypewriterDoneCallback: null,
-        streamingMarkdownRenderFrame: null,
         streamingFinalText: null,
         streamedAssistantMessageId: null,
         _messageCompleteHandler: null,
@@ -349,6 +517,38 @@ const registerChatPageData = (Alpine) => {
         windowListeners: [],
         activeEventSources: {},
         _chatStreamHandler: null,
+
+        get streamingText() {
+            return this.typewriterDisplayedText;
+        },
+
+        set streamingText(value) {
+            this.typewriterDisplayedText = String(value || '');
+        },
+
+        get streamingHtml() {
+            return this.typewriterHtml;
+        },
+
+        set streamingHtml(value) {
+            this.typewriterHtml = String(value || '');
+        },
+
+        get sources() {
+            return this.typewriterSources;
+        },
+
+        set sources(value) {
+            this.typewriterSources = Array.isArray(value) ? value : [];
+        },
+
+        get sourcesVisible() {
+            return this.typewriterSourcesVisible;
+        },
+
+        set sourcesVisible(value) {
+            this.typewriterSourcesVisible = Boolean(value);
+        },
 
         getConversationMeta() {
             const metaEl = this.$el.querySelector('[data-chat-conversation-id]');
@@ -461,7 +661,7 @@ const registerChatPageData = (Alpine) => {
                 this.modelName = data[0] || '';
             });
             this.registerWireListener('assistant-sources', (data) => {
-                this.sources = data[0] || [];
+                this.setStreamingSources(data[0] || []);
             });
             this.registerWireListener('assistant-message-persisted', (data) => {
                 const payload = normalizeWirePayload(data);
@@ -594,7 +794,7 @@ const registerChatPageData = (Alpine) => {
                 try {
                     const parsed = JSON.parse(e.data || '');
                     if (Array.isArray(parsed)) {
-                        this.sources = parsed;
+                        this.setStreamingSources(parsed);
                     }
                 } catch (_) {
                     // ignore malformed sources
@@ -634,24 +834,15 @@ const registerChatPageData = (Alpine) => {
 
                 if (this.isActiveConversation(conversationId)) {
                     if (streamState.finalText) {
-                        this.streamingQueue = '';
-                        this.clearStreamingTypewriter();
-                        this.streamingFinalText = streamState.finalText;
+                        this.queueFinalStreamingText(streamState.finalText);
                     }
-                    this.applyFinalStreamingText();
                 }
 
                 // Trigger wire refresh so Livewire loads the persisted message
                 // only when relevant to the visible conversation. Inactive
                 // completions still clear pending/sidebar state via dispatched
                 // assistant-message-persisted events.
-                if (this.$wire && typeof this.$wire.refreshPendingChatState === 'function') {
-                    if (streamedMessageId) {
-                        this.$wire.refreshPendingChatState(streamedMessageId);
-                    } else {
-                        this.$wire.refreshPendingChatState();
-                    }
-                }
+                this.refreshPendingAfterStreamingSettles(conversationId, streamedMessageId);
             });
 
             es.onerror = () => {
@@ -726,49 +917,78 @@ const registerChatPageData = (Alpine) => {
         },
 
         clearStreamingTypewriter() {
-            if (this.streamingTypewriterTimer) {
-                window.clearTimeout(this.streamingTypewriterTimer);
-                this.streamingTypewriterTimer = null;
-            }
-
-            this.streamingQueue = '';
-            this.streamingTypewriterDoneCallback = null;
+            this.clearAssistantTypewriterTimer();
         },
 
         clearStreamingMarkdownRender() {
-            if (this.streamingMarkdownRenderFrame) {
-                window.cancelAnimationFrame(this.streamingMarkdownRenderFrame);
-                this.streamingMarkdownRenderFrame = null;
-            }
+            this.clearAssistantTypewriterMarkdownRender();
         },
 
         renderStreamingMarkdownNow() {
-            this.clearStreamingMarkdownRender();
-            this.streamingHtml = renderSafeStreamingMarkdown(this.streamingText);
+            this.renderAssistantTypewriterMarkdownNow();
         },
 
         scheduleStreamingMarkdownRender() {
-            if (this.streamingMarkdownRenderFrame) {
+            this.scheduleAssistantTypewriterMarkdownRender();
+        },
+
+        setStreamingSources(sources) {
+            this.setAssistantTypewriterSources(sources);
+        },
+
+        revealStreamingSources() {
+            this.revealAssistantTypewriterSources();
+        },
+
+        queueFinalStreamingText(finalText) {
+            this.streamingFinalText = typeof finalText === 'string' ? finalText : null;
+            this.streaming = true;
+            this.queueAssistantTypewriterFinalText(finalText);
+        },
+
+        refreshPendingAfterStreamingSettles(conversationId, streamedMessageId = null) {
+            const refreshPendingState = () => {
+                if (!this.$wire || typeof this.$wire.refreshPendingChatState !== 'function') {
+                    return;
+                }
+
+                if (streamedMessageId) {
+                    this.$wire.refreshPendingChatState(streamedMessageId);
+                    return;
+                }
+
+                this.$wire.refreshPendingChatState();
+            };
+
+            if (!this.isActiveConversation(conversationId)) {
+                refreshPendingState();
                 return;
             }
 
-            this.streamingMarkdownRenderFrame = window.requestAnimationFrame(() => {
-                this.streamingMarkdownRenderFrame = null;
-                this.streamingHtml = renderSafeStreamingMarkdown(this.streamingText);
-                this.scrollToBottom();
+            this.afterStreamingTypewriterSettles(() => {
+                this.revealStreamingSources();
+
+                const refreshDelay = this.sourcesVisible ? CHAT_SOURCE_REVEAL_BEFORE_REFRESH_MS : 0;
+                if (refreshDelay > 0) {
+                    window.setTimeout(refreshPendingState, refreshDelay);
+                    return;
+                }
+
+                refreshPendingState();
             });
         },
 
-        applyFinalStreamingText() {
-            if (typeof this.streamingFinalText !== 'string' || this.streamingFinalText === '') {
-                return;
-            }
+        moveToAnswerPhase() {
+            this.clearLoadingPhaseTimeout();
+            this.clearPhase2Timeout();
+            this.phase1Done = true;
+            this.phase2Done = true;
+            this.shimmerActive = false;
 
-            if (this.streamingText !== this.streamingFinalText) {
-                this.streamingText = this.streamingFinalText;
+            if (this.loadingPhase !== 'Menampilkan jawaban') {
+                this.loadingPhase = 'Menampilkan jawaban';
+                this.loadingPhaseKey++;
             }
-
-            this.renderStreamingMarkdownNow();
         },
 
         handleAssistantChunk(text) {
@@ -777,80 +997,30 @@ const registerChatPageData = (Alpine) => {
                 return;
             }
 
-            this.streamingQueue += chunk;
+            this.appendAssistantTypewriterText(chunk);
             this.streaming = true;
             this.hasFirstAssistantChunk = true;
-            this.startStreamingTypewriter();
-
-            // Jangan langsung pindah ke "Menampilkan jawaban" — biarkan
-            // chain timeout fase 1→2→3 yang mengatur. Kalau fase 2 sudah
-            // selesai (phase2Done), baru boleh pindah sekarang.
-            if (this.phase2Done) {
-                this.loadingPhase = 'Menampilkan jawaban';
-                this.loadingPhaseKey++;
-                this.shimmerActive = false;
-            }
-            // Kalau belum, phase2Timeout akan memanggil tryShowAnswer()
-            // setelah fase 2 selesai.
+            this.moveToAnswerPhase();
         },
 
         startStreamingTypewriter() {
-            if (this.streamingTypewriterTimer) {
-                return;
-            }
-
-            const tick = () => {
-                this.streamingTypewriterTimer = null;
-
-                if (this.streamingQueue === '') {
-                    this.renderStreamingMarkdownNow();
-                    this.runStreamingTypewriterDoneCallback();
-                    return;
-                }
-
-                const remaining = this.streamingQueue.length;
-                const chunkSize = remaining > 1600 ? 22 : (remaining > 800 ? 18 : (remaining > 320 ? 14 : 9));
-                const nextChunk = this.streamingQueue.substring(0, chunkSize);
-
-                this.streamingText += nextChunk;
-                this.streamingQueue = this.streamingQueue.substring(nextChunk.length);
-                this.scheduleStreamingMarkdownRender();
-
-                const nextDelay = this.streamingQueue.length > 1600 ? 2 : (this.streamingQueue.length > 800 ? 3 : 5);
-                this.streamingTypewriterTimer = window.setTimeout(tick, nextDelay);
-            };
-
-            this.streamingTypewriterTimer = window.setTimeout(tick, this.streamingText === '' ? 30 : 0);
+            this.startAssistantTypewriter();
         },
 
         afterStreamingTypewriterSettles(callback) {
-            if (this.streamingQueue === '' && !this.streamingTypewriterTimer) {
-                callback();
-                return;
-            }
-
-            this.streamingTypewriterDoneCallback = callback;
+            this.afterAssistantTypewriterSettles(callback);
         },
 
         runStreamingTypewriterDoneCallback() {
-            if (typeof this.streamingTypewriterDoneCallback !== 'function') {
-                return;
-            }
-
-            const callback = this.streamingTypewriterDoneCallback;
-            this.streamingTypewriterDoneCallback = null;
-            callback();
+            this.runAssistantTypewriterDoneCallback();
         },
 
-        // Dipanggil setelah fase 2 selesai. Kalau chunk sudah ada, langsung
-        // tampilkan "Menampilkan jawaban". Kalau belum, tunggu chunk datang
-        // (assistant-output handler akan cek phase2Done).
+        // Dipanggil setelah fase 2 selesai sebagai fallback bila chunk belum
+        // datang. Chunk pertama tetap memindahkan UI ke typewriter seketika.
         tryShowAnswer() {
             this.phase2Done = true;
             if (this.hasFirstAssistantChunk) {
-                this.loadingPhase = 'Menampilkan jawaban';
-                this.loadingPhaseKey++;
-                this.shimmerActive = false;
+                this.moveToAnswerPhase();
             }
         },
 
@@ -869,15 +1039,13 @@ const registerChatPageData = (Alpine) => {
                 if (this.streaming && !this.hasFirstAssistantChunk) {
                     this.stalePendingWarning = 'Jawaban memakan waktu lebih lama dari biasanya. Tetap tunggu atau kirim ulang pertanyaan jika tidak ada perubahan.';
                 }
-            }, CHAT_PENDING_MARKER_TTL_MS);
+            }, CHAT_PENDING_STALE_WARNING_MS);
 
             const labels = this.loadingPhaseLabels();
 
             if (labels.length > 2) {
-                // Kontekstual: fase 1 (Mencari jawaban / Sedang membaca dokumen)
-                // bertahan 8000ms, lalu fase 2 (AI sedang berpikir) juga 8000ms,
-                // baru tryShowAnswer(). Chain ini tidak bisa di-cancel oleh chunk
-                // yang datang lebih awal — chunk hanya di-buffer sampai fase selesai.
+                // Kontekstual: fase awal tetap memberi sinyal pekerjaan,
+                // tetapi chunk pertama langsung memindahkan UI ke typewriter.
                 this.loadingPhaseTimeout = window.setTimeout(() => {
                     this.phase1Done = true;
                     this.loadingPhase = labels[1]; // "AI sedang berpikir"
@@ -885,14 +1053,14 @@ const registerChatPageData = (Alpine) => {
 
                     this.phase2Timeout = window.setTimeout(() => {
                         this.tryShowAnswer();
-                    }, 8000);
-                }, 8000);
+                    }, CHAT_LOADING_PHASE_DELAY_MS);
+                }, CHAT_LOADING_PHASE_DELAY_MS);
             } else {
-                // General: langsung "AI sedang berpikir", fase 2 juga 8000ms.
+                // General: langsung "AI sedang berpikir", lalu tunggu chunk.
                 this.phase1Done = true;
                 this.phase2Timeout = window.setTimeout(() => {
                     this.tryShowAnswer();
-                }, 8000);
+                }, CHAT_LOADING_PHASE_DELAY_MS);
             }
         },
 
@@ -915,6 +1083,7 @@ const registerChatPageData = (Alpine) => {
             this.streamingFinalText = null;
             this.modelName = '';
             this.sources = [];
+            this.sourcesVisible = false;
             this.streamedAssistantMessageId = null;
 
             if (stopStreaming) {

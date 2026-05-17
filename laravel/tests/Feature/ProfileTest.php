@@ -24,6 +24,41 @@ class ProfileTest extends TestCase
             ->assertSeeVolt('profile.delete-user-form');
     }
 
+    public function test_profile_page_shows_return_to_chat_link_when_opened_from_chat(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get('/profile?from=chat')
+            ->assertOk()
+            ->assertSee('Kembali ke Chat', false)
+            ->assertSee(route('chat', ['tab' => 'chat']), false)
+            ->assertDontSee('Kembali ke Memo', false);
+    }
+
+    public function test_profile_page_shows_return_to_memo_link_when_opened_from_memo(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get('/profile?from=memo')
+            ->assertOk()
+            ->assertSee('Kembali ke Memo', false)
+            ->assertSee(route('chat', ['tab' => 'memo']), false)
+            ->assertDontSee('Kembali ke Chat', false);
+    }
+
+    public function test_profile_page_hides_contextual_return_link_without_valid_source(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get('/profile?from=https://example.com')
+            ->assertOk()
+            ->assertDontSee('Kembali ke Chat', false)
+            ->assertDontSee('Kembali ke Memo', false);
+    }
+
     public function test_profile_information_can_be_updated(): void
     {
         $user = User::factory()->create();

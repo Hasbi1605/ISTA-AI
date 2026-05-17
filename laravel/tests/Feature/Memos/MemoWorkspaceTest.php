@@ -88,6 +88,7 @@ class MemoWorkspaceTest extends TestCase
             ->assertSee('Kembali ke Beranda', false)
             ->assertSee('Memo Baru', false)
             ->assertSee('Pengaturan Akun', false)
+            ->assertSee(route('profile', ['from' => 'memo']), false)
             ->assertSee('chat-tab-switch', false)
             ->assertSee('activeTab === \'memo\'', false)
             ->assertSee('darkMode = !darkMode', false)
