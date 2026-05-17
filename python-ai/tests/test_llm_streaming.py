@@ -57,6 +57,50 @@ def test_stream_with_cascade_prefers_configured_model_label(monkeypatch, model, 
     assert output[0] == expected_marker
 
 
+def test_stream_with_cascade_emits_error_sentinel_when_no_models_available():
+    from app.services import llm_streaming
+
+    output = list(
+        llm_streaming.stream_with_cascade(
+            messages=[{"role": "user", "content": "Halo"}],
+            model_list=[],
+        )
+    )
+
+    assert output == [llm_streaming.ERROR_SENTINEL + llm_streaming.AI_UNAVAILABLE_MESSAGE]
+
+
+def test_stream_with_cascade_emits_error_sentinel_when_all_models_fail(monkeypatch):
+    from app.services import llm_streaming
+
+    def fake_run_model(_model, _messages):
+        raise RuntimeError("provider unavailable")
+
+    monkeypatch.setattr(llm_streaming, "_run_model", fake_run_model)
+
+    output = list(
+        llm_streaming.stream_with_cascade(
+            messages=[{"role": "user", "content": "Halo"}],
+            model_list=[
+                {
+                    "label": "Primary",
+                    "provider": "litellm",
+                    "model_name": "primary-model",
+                    "api_key_env": "PRIMARY_TOKEN",
+                },
+                {
+                    "label": "Fallback",
+                    "provider": "litellm",
+                    "model_name": "fallback-model",
+                    "api_key_env": "FALLBACK_TOKEN",
+                },
+            ],
+        )
+    )
+
+    assert output == [llm_streaming.ERROR_SENTINEL + llm_streaming.AI_UNAVAILABLE_MESSAGE]
+
+
 def test_run_model_bedrock_converse_uses_bearer_token_and_parses_text(monkeypatch):
     from app.services import llm_streaming
 

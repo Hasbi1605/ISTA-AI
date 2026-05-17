@@ -10,7 +10,9 @@ import litellm
 from app.env_utils import get_env
 
 logger = logging.getLogger(__name__)
+ERROR_SENTINEL = "[ISTA_AI_ERROR]"
 NATIVE_TEXT_PROVIDERS = {"gemini_native", "bedrock_converse"}
+AI_UNAVAILABLE_MESSAGE = "❌ Maaf, semua layanan AI sedang tidak tersedia. Silakan coba lagi nanti."
 
 # Suppress verbose litellm output.
 litellm.set_verbose = False
@@ -344,7 +346,7 @@ def stream_with_cascade(
 
     if total == 0:
         active_logger.error("❌ Tidak ada model chat yang tersedia.")
-        yield "❌ Maaf, semua layanan AI sedang tidak tersedia. Silakan coba lagi nanti."
+        yield ERROR_SENTINEL + AI_UNAVAILABLE_MESSAGE
         return
 
     for idx, model in enumerate(model_list, start=1):
@@ -397,4 +399,4 @@ def stream_with_cascade(
             continue
 
     active_logger.error("❌ Semua %d model gagal. Tidak ada respons yang bisa dikirim.", total)
-    yield "❌ Maaf, semua layanan AI sedang tidak tersedia. Silakan coba lagi nanti."
+    yield ERROR_SENTINEL + AI_UNAVAILABLE_MESSAGE

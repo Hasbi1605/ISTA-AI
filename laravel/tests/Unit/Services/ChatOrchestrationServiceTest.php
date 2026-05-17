@@ -9,7 +9,7 @@ class ChatOrchestrationServiceTest extends TestCase
 {
     public function test_build_history_preserves_messages_without_injecting_system_prompt(): void
     {
-        $service = new ChatOrchestrationService();
+        $service = new ChatOrchestrationService;
 
         $messages = [
             ['role' => 'user', 'content' => 'Tolong ringkas agenda hari ini'],
@@ -26,7 +26,7 @@ class ChatOrchestrationServiceTest extends TestCase
 
     public function test_build_history_strips_database_fields_before_sending_to_ai(): void
     {
-        $service = new ChatOrchestrationService();
+        $service = new ChatOrchestrationService;
 
         $messages = [
             [
@@ -52,8 +52,12 @@ class ChatOrchestrationServiceTest extends TestCase
     public function test_build_history_drops_leading_assistant_after_truncation(): void
     {
         // When window boundary falls mid-pair, result must not start with assistant
-        $service = new class extends ChatOrchestrationService {
-            protected function maxHistoryMessages(): int { return 4; }
+        $service = new class extends ChatOrchestrationService
+        {
+            protected function maxHistoryMessages(): int
+            {
+                return 4;
+            }
         };
 
         // 6 messages: u1 a1 u2 a2 u3 a3
@@ -92,8 +96,12 @@ class ChatOrchestrationServiceTest extends TestCase
 
     public function test_build_history_does_not_drop_leading_user_message(): void
     {
-        $service = new class extends ChatOrchestrationService {
-            protected function maxHistoryMessages(): int { return 4; }
+        $service = new class extends ChatOrchestrationService
+        {
+            protected function maxHistoryMessages(): int
+            {
+                return 4;
+            }
         };
 
         $messages = [
@@ -116,8 +124,12 @@ class ChatOrchestrationServiceTest extends TestCase
     public function test_build_history_truncates_to_max_messages_keeping_most_recent(): void
     {
         // Use anonymous subclass to override maxHistoryMessages() without config()
-        $service = new class extends ChatOrchestrationService {
-            protected function maxHistoryMessages(): int { return 4; }
+        $service = new class extends ChatOrchestrationService
+        {
+            protected function maxHistoryMessages(): int
+            {
+                return 4;
+            }
         };
 
         $messages = [];
@@ -137,8 +149,12 @@ class ChatOrchestrationServiceTest extends TestCase
 
     public function test_build_history_does_not_truncate_when_within_limit(): void
     {
-        $service = new class extends ChatOrchestrationService {
-            protected function maxHistoryMessages(): int { return 20; }
+        $service = new class extends ChatOrchestrationService
+        {
+            protected function maxHistoryMessages(): int
+            {
+                return 20;
+            }
         };
 
         $messages = [
@@ -154,7 +170,7 @@ class ChatOrchestrationServiceTest extends TestCase
 
     public function test_single_document_source_uses_compact_reference_footer(): void
     {
-        $service = new ChatOrchestrationService();
+        $service = new ChatOrchestrationService;
 
         $footer = $service->sanitizeAndFormatSources([
             ['filename' => 'memo-rapat.pdf'],
@@ -165,7 +181,7 @@ class ChatOrchestrationServiceTest extends TestCase
 
     public function test_mixed_sources_use_adaptive_reference_block(): void
     {
-        $service = new ChatOrchestrationService();
+        $service = new ChatOrchestrationService;
 
         $footer = $service->sanitizeAndFormatSources([
             ['type' => 'web', 'title' => 'Portal Resmi', 'url' => 'https://example.com/resmi'],
@@ -181,7 +197,7 @@ class ChatOrchestrationServiceTest extends TestCase
 
     public function test_duplicate_sources_are_deduplicated_before_rendering(): void
     {
-        $service = new ChatOrchestrationService();
+        $service = new ChatOrchestrationService;
 
         $footer = $service->sanitizeAndFormatSources([
             ['type' => 'web', 'title' => 'Portal Resmi', 'url' => 'https://example.com/resmi'],
@@ -196,7 +212,7 @@ class ChatOrchestrationServiceTest extends TestCase
 
     public function test_extract_stream_metadata_buffers_split_sources_marker(): void
     {
-        $service = new ChatOrchestrationService();
+        $service = new ChatOrchestrationService;
 
         $firstPass = $service->extractStreamMetadata('Jawaban awal [SOURCES:[{"url":"https://example.com"', '');
 
@@ -215,7 +231,7 @@ class ChatOrchestrationServiceTest extends TestCase
 
     public function test_extract_stream_metadata_handles_source_strings_containing_brackets(): void
     {
-        $service = new ChatOrchestrationService();
+        $service = new ChatOrchestrationService;
         $sourcesJson = json_encode([
             [
                 'url' => 'https://example.com',
@@ -242,7 +258,7 @@ class ChatOrchestrationServiceTest extends TestCase
 
     public function test_extract_stream_metadata_removes_balanced_malformed_sources_without_throwing(): void
     {
-        $service = new ChatOrchestrationService();
+        $service = new ChatOrchestrationService;
 
         $result = $service->extractStreamMetadata(
             'Jawaban [SOURCES:[{"url":}]] selesai',
@@ -252,5 +268,22 @@ class ChatOrchestrationServiceTest extends TestCase
         $this->assertSame('Jawaban  selesai', $result[0]);
         $this->assertSame('', $result[1]);
         $this->assertNull($result[3]);
+    }
+
+    public function test_extract_stream_metadata_parses_model_marker_only_at_start(): void
+    {
+        $service = new ChatOrchestrationService;
+
+        $metadata = $service->extractStreamMetadata("[MODEL:Gemini]\nJawaban awal", '');
+
+        $this->assertSame('Jawaban awal', $metadata[0]);
+        $this->assertSame('', $metadata[1]);
+        $this->assertSame('Gemini', $metadata[2]);
+
+        $literal = $service->extractStreamMetadata('Jawaban menyebut [MODEL:Gemini] sebagai contoh.', '');
+
+        $this->assertSame('Jawaban menyebut [MODEL:Gemini] sebagai contoh.', $literal[0]);
+        $this->assertSame('', $literal[1]);
+        $this->assertNull($literal[2]);
     }
 }
