@@ -938,6 +938,13 @@ const registerChatPageData = (Alpine) => {
                 }
             });
 
+            es.addEventListener('document-warning', (e) => {
+                const msg = e.data || '';
+                if (msg && this.isActiveConversation(conversationId)) {
+                    this.stalePendingWarning = msg;
+                }
+            });
+
             es.addEventListener('error', (e) => {
                 const msg = e.data || '';
                 if (msg && this.isActiveConversation(conversationId)) {
@@ -1123,7 +1130,7 @@ const registerChatPageData = (Alpine) => {
                 }
 
                 if (streamedMessageId) {
-                    this.$wire.refreshPendingChatState(streamedMessageId, this.isActiveConversation(conversationId));
+                    this.$wire.refreshPendingChatState(streamedMessageId, this.isActiveConversation(conversationId), conversationId);
                     return;
                 }
 

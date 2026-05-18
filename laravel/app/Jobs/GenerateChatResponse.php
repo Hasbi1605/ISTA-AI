@@ -62,6 +62,7 @@ class GenerateChatResponse implements ShouldQueue
         $documentIds = $docContext['ids'];
         $sourcePolicy = $orchestrator->getSourcePolicy($documentFilenames);
         $allowAutoRealtimeWeb = $orchestrator->shouldAllowAutoRealtimeWeb($documentFilenames);
+        $documentContextError = $orchestrator->documentContextUnavailableMessage($docContext);
 
         // Jika stream sedang memegang claim untuk latest user message,
         // job jangan ikut menjadi runner paralel. Requeue sebagai fallback
@@ -71,6 +72,7 @@ class GenerateChatResponse implements ShouldQueue
             // Dengan tries=10 dan release(30), job punya ~300 detik coverage
             // untuk menunggu claim TTL (240 detik) stale sebelum fallback jalan.
             $this->release(30);
+
             return;
         }
 
@@ -78,6 +80,22 @@ class GenerateChatResponse implements ShouldQueue
         // job retry ini berjalan, tidak perlu memanggil AI lagi. Ini mencegah
         // double AI call pada happy path stream + job fallback.
         if ($orchestrator->assistantAlreadyAnswered($this->conversationId)) {
+            return;
+        }
+
+        if ($documentContextError !== null) {
+            if ($orchestrator->saveErrorMessage($this->conversationId, $documentContextError, $this->userId) !== null) {
+                Conversation::query()
+                    ->whereKey($this->conversationId)
+                    ->where('user_id', $this->userId)
+                    ->touch();
+            }
+
+            $this->logLatency('job_total', microtime(true) * 1000 - $jobStartMs, $requestId, [
+                'conversation_id' => $this->conversationId,
+                'outcome' => 'document_context_unavailable',
+            ]);
+
             return;
         }
 

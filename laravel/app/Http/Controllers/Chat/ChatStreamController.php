@@ -58,6 +58,8 @@ class ChatStreamController extends Controller
         $resolvedDocumentIds = $docContext['ids'];
         $sourcePolicy = $orchestrator->getSourcePolicy($documentFilenames);
         $allowAutoRealtimeWeb = $orchestrator->shouldAllowAutoRealtimeWeb($documentFilenames);
+        $documentContextError = $orchestrator->documentContextUnavailableMessage($docContext);
+        $documentContextWarning = $orchestrator->documentContextPartialWarning($docContext);
 
         return new StreamedResponse(function () use (
             $aiService,
@@ -67,6 +69,8 @@ class ChatStreamController extends Controller
             $resolvedDocumentIds,
             $sourcePolicy,
             $allowAutoRealtimeWeb,
+            $documentContextError,
+            $documentContextWarning,
             $webSearchMode,
             $conversationId,
             $conversation,
@@ -94,6 +98,8 @@ class ChatStreamController extends Controller
                 $conversationId,
                 $conversation,
                 $user,
+                $documentContextError,
+                $documentContextWarning,
             );
         }, 200, [
             'Content-Type' => 'text/event-stream',
@@ -119,6 +125,8 @@ class ChatStreamController extends Controller
         int $conversationId,
         Conversation $conversation,
         User $user,
+        ?string $documentContextError = null,
+        ?string $documentContextWarning = null,
     ): void {
         $streamClaimKey = $orchestrator->acquireStreamRunner($conversationId);
         if ($streamClaimKey === null) {
@@ -136,6 +144,22 @@ class ChatStreamController extends Controller
                 $this->sendSseEvent('done', '1');
 
                 return;
+            }
+
+            if ($documentContextError !== null) {
+                $saved = $orchestrator->saveErrorMessage($conversationId, $documentContextError, $user->id);
+                if ($saved !== null) {
+                    $conversation->touch();
+                }
+
+                $this->sendSseEvent('error', $documentContextError);
+                $this->sendSseEvent('done', '1');
+
+                return;
+            }
+
+            if ($documentContextWarning !== null) {
+                $this->sendSseEvent('document-warning', $documentContextWarning);
             }
 
             $fullResponse = '';

@@ -492,7 +492,7 @@ class ChatUiTest extends TestCase
         $this->assertStringContainsString('queueAssistantTypewriterFinalText(finalText)', $chatPageJs);
         $this->assertStringContainsString('queueFinalStreamingText(finalText)', $chatPageJs);
         $this->assertStringContainsString('refreshPendingAfterStreamingSettles(conversationId, streamedMessageId', $chatPageJs);
-        $this->assertStringContainsString('refreshPendingChatState(streamedMessageId, this.isActiveConversation(conversationId))', $chatPageJs);
+        $this->assertStringContainsString('refreshPendingChatState(streamedMessageId, this.isActiveConversation(conversationId), conversationId)', $chatPageJs);
         $this->assertStringContainsString('markStreamFailed(conversationId)', $chatPageJs);
         $this->assertStringContainsString('finalQueued: false', $chatPageJs);
         $this->assertStringContainsString('formatChatTimeLabel', $chatPageJs);
@@ -1363,6 +1363,52 @@ class ChatUiTest extends TestCase
         $messages = collect($component->get('messages'));
         $this->assertTrue($messages->contains(fn (array $message) => (int) ($message['id'] ?? 0) === (int) $assistant->id));
         $this->assertTrue($messages->contains(fn (array $message) => $message['content'] === 'Jawaban SSE tetap memakai bubble live.'));
+    }
+
+    public function test_refresh_pending_chat_state_does_not_preserve_stream_from_different_conversation(): void
+    {
+        $user = User::factory()->create();
+        $streamConversation = Conversation::create([
+            'user_id' => $user->id,
+            'title' => 'Stream selesai di chat lain',
+        ]);
+        $activeConversation = Conversation::create([
+            'user_id' => $user->id,
+            'title' => 'Chat aktif',
+        ]);
+
+        Message::create([
+            'conversation_id' => $streamConversation->id,
+            'role' => 'user',
+            'content' => 'Pertanyaan di chat lain.',
+        ]);
+        Message::create([
+            'conversation_id' => $activeConversation->id,
+            'role' => 'user',
+            'content' => 'Pertanyaan chat aktif.',
+        ]);
+
+        $component = Livewire::actingAs($user)
+            ->test(ChatIndex::class, ['id' => $activeConversation->id])
+            ->assertSet('currentConversationId', $activeConversation->id);
+
+        $activeAssistant = Message::create([
+            'conversation_id' => $activeConversation->id,
+            'role' => 'assistant',
+            'content' => 'Jawaban chat aktif tidak boleh dipreserve oleh stream chat lain.',
+        ]);
+        $activeConversation->touch();
+
+        $component
+            ->call('refreshPendingChatState', $activeAssistant->id, true, $streamConversation->id)
+            ->assertSet('currentConversationId', $activeConversation->id)
+            ->assertSet('preservedStreamMessageId', null)
+            ->assertSee('Jawaban chat aktif tidak boleh dipreserve oleh stream chat lain.', false)
+            ->assertDispatched('assistant-message-persisted', function (string $_event, array $payload) use ($activeConversation, $activeAssistant) {
+                return (int) ($payload['conversationId'] ?? 0) === (int) $activeConversation->id
+                    && (int) ($payload['messageId'] ?? 0) === (int) $activeAssistant->id
+                    && (bool) ($payload['preserveStream'] ?? false) === false;
+            });
     }
 
     public function test_polling_during_active_stream_does_not_trigger_final_typewriter(): void

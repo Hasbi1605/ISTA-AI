@@ -168,26 +168,65 @@ class ChatOrchestrationService
      * match the `document_filenames` array — both come from the same source.
      *
      * @param  array<int|string>  $conversationDocuments  Raw document IDs from the conversation.
-     * @return array{ids: list<int>, filenames: list<string>|null}
+     * @return array{ids: list<int>, filenames: list<string>|null, requested_ids: list<int>, unavailable_ids: list<int>, has_unavailable: bool}
      */
     public function getActiveDocumentContext(array $conversationDocuments): array
     {
+        $requestedIds = $this->normalizeDocumentIds($conversationDocuments);
+
         if (empty($conversationDocuments)) {
-            return ['ids' => [], 'filenames' => null];
+            return [
+                'ids' => [],
+                'filenames' => null,
+                'requested_ids' => [],
+                'unavailable_ids' => [],
+                'has_unavailable' => false,
+            ];
         }
 
-        $docs = Document::whereIn('id', $conversationDocuments)
+        $docs = Document::whereIn('id', $requestedIds)
             ->where('user_id', Auth::id())
             ->where('status', 'ready')
             ->get(['id', 'original_name']);
 
         $ids = $docs->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
         $filenames = $docs->pluck('original_name')->values()->all();
+        $unavailableIds = array_values(array_diff($requestedIds, $ids));
 
         return [
             'ids' => $ids,
             'filenames' => empty($filenames) ? null : $filenames,
+            'requested_ids' => $requestedIds,
+            'unavailable_ids' => $unavailableIds,
+            'has_unavailable' => $unavailableIds !== [],
         ];
+    }
+
+    /**
+     * @param  array{ids: list<int>, filenames: list<string>|null, requested_ids: list<int>, unavailable_ids: list<int>, has_unavailable: bool}  $documentContext
+     */
+    public function documentContextUnavailableMessage(array $documentContext): ?string
+    {
+        $requestedIds = $documentContext['requested_ids'] ?? [];
+        $readyIds = $documentContext['ids'] ?? [];
+
+        if ($requestedIds === [] || $readyIds !== []) {
+            return null;
+        }
+
+        return 'Dokumen yang Anda pilih belum siap atau gagal diproses, jadi ISTA AI tidak bisa menjawab dengan konteks dokumen tersebut. Periksa status dokumen lalu coba lagi.';
+    }
+
+    /**
+     * @param  array{ids: list<int>, filenames: list<string>|null, requested_ids: list<int>, unavailable_ids: list<int>, has_unavailable: bool}  $documentContext
+     */
+    public function documentContextPartialWarning(array $documentContext): ?string
+    {
+        if (empty($documentContext['ids']) || empty($documentContext['unavailable_ids'])) {
+            return null;
+        }
+
+        return 'Sebagian dokumen belum siap atau gagal diproses. ISTA AI hanya menggunakan dokumen yang sudah siap.';
     }
 
     public function getSourcePolicy(?array $documentFilenames): string

@@ -639,6 +639,127 @@ class ChatStreamTest extends TestCase
         $this->assertSame(['ready.pdf'], $captured->filenames);
     }
 
+    public function test_stream_saves_error_when_selected_documents_are_unavailable(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::create([
+            'user_id' => $user->id,
+            'title' => 'Unavailable document stream test',
+        ]);
+
+        $processingDoc = Document::create([
+            'user_id' => $user->id,
+            'filename' => 'processing.pdf',
+            'original_name' => 'processing.pdf',
+            'file_path' => 'documents/'.$user->id.'/processing.pdf',
+            'mime_type' => 'application/pdf',
+            'file_size_bytes' => 100,
+            'status' => 'processing',
+        ]);
+
+        Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'user',
+            'content' => 'Jawab berdasarkan dokumen yang dipilih.',
+            'document_ids' => [$processingDoc->id],
+        ]);
+
+        $this->app->bind(AIService::class, fn () => new class extends AIService
+        {
+            public function sendChat(
+                array $messages,
+                ?array $document_filenames = null,
+                ?string $user_id = null,
+                bool $force_web_search = false,
+                ?string $source_policy = null,
+                bool $allow_auto_realtime_web = true,
+                ?array $document_ids = null,
+                ?string $request_id = null,
+            ): \Generator {
+                throw new \RuntimeException('AI should not be called when requested documents are unavailable.');
+                yield '';
+            }
+        });
+
+        $body = $this->runExecuteStream($user, $conversation, [$processingDoc->id]);
+
+        $this->assertStringContainsString('event: error', $body);
+        $this->assertStringContainsString('Dokumen yang Anda pilih belum siap atau gagal diproses', $body);
+        $this->assertStringNotContainsString('event: chunk', $body);
+        $this->assertDatabaseHas('messages', [
+            'conversation_id' => $conversation->id,
+            'role' => 'assistant',
+            'is_error' => true,
+        ]);
+    }
+
+    public function test_job_saves_error_when_selected_documents_are_unavailable(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::create([
+            'user_id' => $user->id,
+            'title' => 'Unavailable document job test',
+        ]);
+
+        $errorDoc = Document::create([
+            'user_id' => $user->id,
+            'filename' => 'failed.pdf',
+            'original_name' => 'failed.pdf',
+            'file_path' => 'documents/'.$user->id.'/failed.pdf',
+            'mime_type' => 'application/pdf',
+            'file_size_bytes' => 100,
+            'status' => 'error',
+        ]);
+
+        Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'user',
+            'content' => 'Jawab berdasarkan dokumen gagal.',
+            'document_ids' => [$errorDoc->id],
+        ]);
+
+        $captured = new \stdClass;
+        $captured->aiCalled = false;
+        $this->app->bind(AIService::class, function () use ($captured) {
+            return new class($captured) extends AIService
+            {
+                public function __construct(private \stdClass $captured)
+                {
+                    parent::__construct();
+                }
+
+                public function sendChat(
+                    array $messages,
+                    ?array $document_filenames = null,
+                    ?string $user_id = null,
+                    bool $force_web_search = false,
+                    ?string $source_policy = null,
+                    bool $allow_auto_realtime_web = true,
+                    ?array $document_ids = null,
+                    ?string $request_id = null,
+                ): \Generator {
+                    $this->captured->aiCalled = true;
+                    yield 'AI should not answer.';
+                }
+            };
+        });
+
+        $job = new GenerateChatResponse(
+            conversationId: (int) $conversation->id,
+            userId: (int) $user->id,
+            history: [['role' => 'user', 'content' => 'Jawab berdasarkan dokumen gagal.']],
+            conversationDocuments: [$errorDoc->id],
+        );
+        $job->handle(app(AIService::class), new ChatOrchestrationService);
+
+        $this->assertFalse($captured->aiCalled);
+        $this->assertDatabaseHas('messages', [
+            'conversation_id' => $conversation->id,
+            'role' => 'assistant',
+            'is_error' => true,
+        ]);
+    }
+
     // -------------------------------------------------------------------------
     // message-id event
     // -------------------------------------------------------------------------
@@ -1307,6 +1428,8 @@ class ChatStreamTest extends TestCase
             $conversation->id,
             $conversation,
             $user,
+            $orchestrator->documentContextUnavailableMessage($docContext),
+            $orchestrator->documentContextPartialWarning($docContext),
         );
 
         return (string) ob_get_clean();

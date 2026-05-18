@@ -687,16 +687,23 @@ class ChatIndex extends Component
         }
     }
 
-    public function refreshPendingChatState(?int $alreadyStreamedMessageId = null, bool $preserveActiveStream = false): void
+    public function refreshPendingChatState(?int $alreadyStreamedMessageId = null, bool $preserveActiveStream = false, ?int $streamConversationId = null): void
     {
         $alreadyStreamedMessageId = $alreadyStreamedMessageId !== null && $alreadyStreamedMessageId > 0
             ? $alreadyStreamedMessageId
             : null;
-        $preserveActiveStream = $preserveActiveStream && $alreadyStreamedMessageId !== null;
+        $streamConversationId = $streamConversationId !== null && $streamConversationId > 0
+            ? $streamConversationId
+            : null;
         $previousPendingIds = collect($this->pendingConversationIds)
             ->map(fn ($id) => (int) $id)
             ->values();
         $activeConversationId = $this->currentConversationId ? (int) $this->currentConversationId : null;
+        $streamMatchesActiveConversation = $streamConversationId === null
+            || ($activeConversationId !== null && (int) $streamConversationId === $activeConversationId);
+        $preserveActiveStream = $preserveActiveStream
+            && $alreadyStreamedMessageId !== null
+            && $streamMatchesActiveConversation;
 
         $this->loadConversations();
 
