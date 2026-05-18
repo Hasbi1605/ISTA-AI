@@ -67,11 +67,18 @@ class ResolveStaleChats extends Command
         }
 
         $resolved = 0;
+        $skippedActiveStreams = 0;
 
         foreach ($staleConversations as $conversation) {
             $conversationId = (int) $conversation->id;
             $userId = (int) $conversation->user_id;
             try {
+                if ($orchestrator->hasActiveStreamClaim($conversationId)) {
+                    $skippedActiveStreams++;
+
+                    continue;
+                }
+
                 $result = $orchestrator->saveErrorMessage(
                     (int) $conversationId,
                     'Maaf, respon AI tidak diterima dalam batas waktu yang ditentukan. Silakan coba kirim ulang pesan Anda.',
@@ -97,8 +104,13 @@ class ResolveStaleChats extends Command
         }
 
         $this->info("Resolved {$resolved} stale chat response(s) older than {$minutes} minute(s).");
+        if ($skippedActiveStreams > 0) {
+            $this->info("Skipped {$skippedActiveStreams} stale chat response(s) with active stream claim.");
+        }
+
         Log::info('ResolveStaleChats completed', [
             'resolved' => $resolved,
+            'skipped_active_streams' => $skippedActiveStreams,
             'minutes_threshold' => $minutes,
         ]);
 

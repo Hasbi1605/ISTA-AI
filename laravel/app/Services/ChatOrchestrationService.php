@@ -13,6 +13,8 @@ use Illuminate\Support\Facades\DB;
 
 class ChatOrchestrationService
 {
+    public const MAX_DOCUMENT_CONTEXT_IDS = 50;
+
     private const STREAM_CLAIM_TTL_SECONDS = 240;
 
     private const SANITIZE_REPLACEMENTS = [
@@ -68,10 +70,12 @@ class ChatOrchestrationService
      */
     public function normalizeDocumentIds(array $documentIds): array
     {
-        return array_values(array_unique(array_filter(
+        $normalized = array_values(array_unique(array_filter(
             array_map(fn ($id) => is_numeric($id) ? (int) $id : null, $documentIds),
             fn ($id) => $id !== null && $id > 0,
         )));
+
+        return array_slice($normalized, 0, self::MAX_DOCUMENT_CONTEXT_IDS);
     }
 
     /**
@@ -174,7 +178,7 @@ class ChatOrchestrationService
     {
         $requestedIds = $this->normalizeDocumentIds($conversationDocuments);
 
-        if (empty($conversationDocuments)) {
+        if ($requestedIds === []) {
             return [
                 'ids' => [],
                 'filenames' => null,

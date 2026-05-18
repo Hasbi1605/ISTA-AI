@@ -13,6 +13,8 @@ class GoogleDriveService
 {
     private const GOOGLE_DRIVE_FOLDER_MIME = 'application/vnd.google-apps.folder';
 
+    private const GOOGLE_DRIVE_SHORTCUT_MIME = 'application/vnd.google-apps.shortcut';
+
     private const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive';
 
     public const MAX_IMPORT_FILE_SIZE_BYTES = 52_428_800;
@@ -97,19 +99,31 @@ class GoogleDriveService
         foreach ($response->getFiles() as $file) {
             $mimeType = (string) ($file->getMimeType() ?? '');
             $isFolder = $mimeType === self::GOOGLE_DRIVE_FOLDER_MIME;
-            $isGoogleWorkspaceFile = str_starts_with($mimeType, 'application/vnd.google-apps.');
+            $isShortcut = $mimeType === self::GOOGLE_DRIVE_SHORTCUT_MIME;
+            $isGoogleWorkspaceFile = str_starts_with($mimeType, 'application/vnd.google-apps.') && ! $isShortcut;
+            $shortcutDetails = $file->getShortcutDetails();
+            $shortcutTargetId = is_object($shortcutDetails) && method_exists($shortcutDetails, 'getTargetId')
+                ? trim((string) $shortcutDetails->getTargetId())
+                : '';
+            $shortcutTargetMimeType = is_object($shortcutDetails) && method_exists($shortcutDetails, 'getTargetMimeType')
+                ? trim((string) $shortcutDetails->getTargetMimeType())
+                : '';
 
             $items[] = [
                 'id' => (string) $file->getId(),
                 'name' => (string) $file->getName(),
                 'mime_type' => $mimeType,
+                'shortcut_target_id' => $shortcutTargetId !== '' ? $shortcutTargetId : null,
+                'shortcut_target_mime_type' => $shortcutTargetMimeType !== '' ? $shortcutTargetMimeType : null,
                 'web_view_link' => $file->getWebViewLink(),
                 'modified_time' => $file->getModifiedTime(),
                 'size_bytes' => $file->getSize() !== null ? (int) $file->getSize() : null,
                 'parents' => $file->getParents() ?? [],
                 'is_folder' => $isFolder,
                 'is_google_workspace_file' => $isGoogleWorkspaceFile && ! $isFolder,
-                'is_processable' => ! $isFolder && ! $isGoogleWorkspaceFile,
+                'is_shortcut' => $isShortcut,
+                'is_processable' => ! $isFolder && ! $isGoogleWorkspaceFile && ! $isShortcut,
+                'unsupported_reason' => $isShortcut ? $this->unsupportedShortcutMessage() : null,
             ];
         }
 
@@ -132,6 +146,10 @@ class GoogleDriveService
 
         if ($mimeType === self::GOOGLE_DRIVE_FOLDER_MIME) {
             throw new RuntimeException('Folder Google Drive tidak bisa diunduh sebagai dokumen.');
+        }
+
+        if ($mimeType === self::GOOGLE_DRIVE_SHORTCUT_MIME) {
+            throw new RuntimeException($this->unsupportedShortcutMessage());
         }
 
         if (str_starts_with($mimeType, 'application/vnd.google-apps.')) {
@@ -565,6 +583,11 @@ class GoogleDriveService
     private function oversizedFileMessage(): string
     {
         return 'Ukuran file Google Drive melebihi batas 50 MB.';
+    }
+
+    private function unsupportedShortcutMessage(): string
+    {
+        return 'Shortcut Google Drive belum didukung. Buka file target langsung lalu pilih file PDF, DOCX, XLSX, atau CSV.';
     }
 
     private function writeDownloadedFileToPath(mixed $response, string $tempPath): int

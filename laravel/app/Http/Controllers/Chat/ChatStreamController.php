@@ -299,10 +299,7 @@ class ChatStreamController extends Controller
                 return [];
             }
 
-            return array_values(array_filter(
-                array_map(fn ($id) => is_numeric($id) ? (int) $id : null, $decoded),
-                fn ($id) => $id !== null && $id > 0,
-            ));
+            return app(ChatOrchestrationService::class)->normalizeDocumentIds($decoded);
         } catch (\Throwable) {
             return [];
         }
@@ -327,9 +324,6 @@ class ChatStreamController extends Controller
             return $fallbackDocumentIds;
         }
 
-        return array_values(array_filter(
-            array_map(fn ($id) => is_numeric($id) ? (int) $id : null, $message->document_ids),
-            fn ($id) => $id !== null && $id > 0,
-        ));
+        return app(ChatOrchestrationService::class)->normalizeDocumentIds($message->document_ids);
     }
 }

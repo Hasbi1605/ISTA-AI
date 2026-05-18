@@ -5,6 +5,7 @@ namespace Tests\Feature\Console;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\User;
+use App\Services\ChatOrchestrationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -96,6 +97,41 @@ class ResolveStaleChatsTest extends TestCase
 
         $this->artisan('chat:resolve-stale-responses', ['--minutes' => 10])
             ->expectsOutput('No stale chat responses found.')
+            ->assertExitCode(0);
+
+        $this->assertDatabaseMissing('messages', [
+            'conversation_id' => $conversation->id,
+            'role' => 'assistant',
+            'is_error' => true,
+        ]);
+    }
+
+    public function test_command_skips_stale_conversation_with_active_stream_claim(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::create([
+            'user_id' => $user->id,
+            'title' => 'Active stream stale conversation',
+        ]);
+
+        $userMessage = Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'user',
+            'content' => 'Pesan stale tetapi stream masih aktif',
+        ]);
+        Message::withoutTimestamps(fn () => $userMessage->forceFill([
+            'created_at' => now()->subMinutes(11),
+            'updated_at' => now()->subMinutes(11),
+        ])->save());
+
+        $orchestrator = app(ChatOrchestrationService::class);
+        $orchestrator->createStreamIntent((int) $conversation->id);
+
+        $this->assertTrue($orchestrator->hasActiveStreamClaim((int) $conversation->id));
+
+        $this->artisan('chat:resolve-stale-responses', ['--minutes' => 10])
+            ->expectsOutput('Resolved 0 stale chat response(s) older than 10 minute(s).')
+            ->expectsOutput('Skipped 1 stale chat response(s) with active stream claim.')
             ->assertExitCode(0);
 
         $this->assertDatabaseMissing('messages', [

@@ -60,7 +60,43 @@ class ProcessDocumentTest extends TestCase
         $this->assertEquals('ready', $document->fresh()->status);
         Http::assertSent(function ($request) {
             return $request->url() === 'http://python-ai-docs:8002/api/documents/process'
-                && $request->hasHeader('Authorization', 'Bearer internal-token');
+                && $request->hasHeader('Authorization', 'Bearer internal-token')
+                && $request->hasFile('file', null, 'dummy.pdf');
+        });
+    }
+
+    public function test_job_uploads_document_file_as_stream_resource(): void
+    {
+        Storage::fake('local');
+        config()->set('services.ai_document_service.url', 'http://python-ai-docs:8002');
+        $user = User::factory()->create();
+
+        $filePath = 'documents/'.$user->id.'/streamed.pdf';
+        Storage::disk('local')->put($filePath, str_repeat('A', 1024));
+
+        $document = Document::create([
+            'user_id' => $user->id,
+            'filename' => 'streamed.pdf',
+            'original_name' => 'streamed.pdf',
+            'file_path' => $filePath,
+            'mime_type' => 'application/pdf',
+            'file_size_bytes' => 1024,
+            'status' => 'pending',
+        ]);
+
+        Http::fake([
+            '*' => Http::response(['message' => 'success'], 200),
+        ]);
+
+        (new ProcessDocument($document))->handle();
+
+        Http::assertSent(function ($request) {
+            $filePart = collect($request->data())->firstWhere('name', 'file');
+
+            return is_array($filePart)
+                && ($filePart['filename'] ?? null) === 'streamed.pdf'
+                && array_key_exists('contents', $filePart)
+                && ! is_string($filePart['contents']);
         });
     }
 

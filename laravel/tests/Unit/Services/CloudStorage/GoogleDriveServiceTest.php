@@ -4,6 +4,7 @@ namespace Tests\Unit\Services\CloudStorage;
 
 use App\Services\CloudStorage\GoogleDriveService;
 use Google\Service\Drive\DriveFile;
+use Google\Service\Drive\DriveFileShortcutDetails;
 use Google\Service\Exception as GoogleServiceException;
 use Tests\TestCase;
 
@@ -247,6 +248,60 @@ class GoogleDriveServiceTest extends TestCase
         $service->downloadToTemp('streamed-file-id');
     }
 
+    public function test_list_files_marks_google_drive_shortcuts_as_unsupported(): void
+    {
+        config([
+            'services.google_drive.root_folder_id' => 'root-folder-id',
+        ]);
+
+        $shortcut = $this->fakeDriveFile(
+            'shortcut-id',
+            'application/vnd.google-apps.shortcut',
+            ['root-folder-id'],
+        );
+        $shortcut->setShortcutDetails(new DriveFileShortcutDetails([
+            'targetId' => 'target-file-id',
+            'targetMimeType' => 'application/pdf',
+        ]));
+
+        $service = $this->fakeService([
+            'shortcut-id' => $shortcut,
+        ]);
+
+        $item = $service->listFiles()['items'][0];
+
+        $this->assertTrue($item['is_shortcut']);
+        $this->assertFalse($item['is_processable']);
+        $this->assertFalse($item['is_google_workspace_file']);
+        $this->assertSame('target-file-id', $item['shortcut_target_id']);
+        $this->assertSame('application/pdf', $item['shortcut_target_mime_type']);
+        $this->assertStringContainsString('Shortcut Google Drive belum didukung', $item['unsupported_reason']);
+    }
+
+    public function test_download_to_temp_rejects_shortcuts_with_specific_message(): void
+    {
+        config([
+            'services.google_drive.root_folder_id' => 'root-folder-id',
+        ]);
+
+        $service = $this->fakeService([
+            'shortcut-id' => $this->fakeDriveFile(
+                'shortcut-id',
+                'application/vnd.google-apps.shortcut',
+                ['root-folder-id'],
+            ),
+        ]);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Shortcut Google Drive belum didukung.');
+
+        try {
+            $service->downloadToTemp('shortcut-id');
+        } finally {
+            $this->assertSame(0, $service->downloadRequestCount);
+        }
+    }
+
     private function fakeService(array $files, array $downloads = []): GoogleDriveServiceFake
     {
         return new GoogleDriveServiceFake($files, $downloads);
@@ -282,7 +337,7 @@ class GoogleDriveServiceFake extends GoogleDriveService
 
     protected function listDriveFilesResponse(array $options): mixed
     {
-        return new FakeDriveListResponse([]);
+        return new FakeDriveListResponse(array_values($this->files));
     }
 
     protected function fetchDriveFileRecord(string $fileId, string $fields): DriveFile

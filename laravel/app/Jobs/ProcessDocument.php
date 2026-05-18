@@ -141,8 +141,8 @@ class ProcessDocument implements ShouldQueue
             return;
         }
 
-        $fileContent = file_get_contents($filePath);
-        if ($fileContent === false) {
+        $fileHandle = fopen($filePath, 'rb');
+        if ($fileHandle === false) {
             $this->updateStatusIfClaimOwned('error');
             logger()->error("Document processing failed for ID {$this->document->id}: unable to read file");
 
@@ -154,19 +154,23 @@ class ProcessDocument implements ShouldQueue
             .'/api/documents/process';
         $token = config('services.ai_document_service.token', config('services.ai_service.token'));
 
-        $response = Http::timeout(900) // 15 minutes timeout for large documents
-            ->withHeaders([
-                'Authorization' => "Bearer {$token}",
-            ])
-            ->attach(
-                'file',
-                $fileContent,
-                $this->document->original_name
-            )
-            ->post($pythonUrl, [
-                'user_id' => (string) $this->document->user_id,
-                'document_id' => (string) $this->document->id,
-            ]);
+        try {
+            $response = Http::timeout(900) // 15 minutes timeout for large documents
+                ->withHeaders([
+                    'Authorization' => "Bearer {$token}",
+                ])
+                ->attach(
+                    'file',
+                    $fileHandle,
+                    $this->document->original_name
+                )
+                ->post($pythonUrl, [
+                    'user_id' => (string) $this->document->user_id,
+                    'document_id' => (string) $this->document->id,
+                ]);
+        } finally {
+            fclose($fileHandle);
+        }
 
         if ($response->successful()) {
             $freshDocument = $this->document->fresh();

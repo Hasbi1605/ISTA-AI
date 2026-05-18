@@ -146,6 +146,8 @@
                                 $isFolder = (bool) ($item['is_folder'] ?? false);
                                 $isProcessable = (bool) ($item['is_processable'] ?? false);
                                 $isWorkspaceFile = (bool) ($item['is_google_workspace_file'] ?? false);
+                                $isShortcut = (bool) ($item['is_shortcut'] ?? false);
+                                $unsupportedReason = trim((string) ($item['unsupported_reason'] ?? ''));
                                 $sizeBytes = $item['size_bytes'] ?? null;
                                 $sizeLabel = $sizeBytes !== null
                                     ? number_format(max(((int) $sizeBytes) / 1024, 0.1), 1).' KB'
@@ -156,7 +158,7 @@
                                 $extension = strtoupper((string) pathinfo((string) ($item['name'] ?? ''), PATHINFO_EXTENSION));
                                 $metaParts = $isFolder
                                     ? []
-                                    : [$isWorkspaceFile ? 'Google Workspace' : ($extension !== '' ? $extension : 'File')];
+                                    : [$isShortcut ? 'Shortcut' : ($isWorkspaceFile ? 'Google Workspace' : ($extension !== '' ? $extension : 'File'))];
 
                                 if (! $isFolder && $sizeLabel !== null) {
                                     $metaParts[] = $sizeLabel;
@@ -202,6 +204,10 @@
                                                 <span class="shrink-0 rounded-full bg-sky-50 px-2.5 py-1 text-[10px] font-semibold text-sky-700 dark:bg-sky-500/10 dark:text-sky-300">
                                                     Workspace
                                                 </span>
+                                            @elseif ($isShortcut)
+                                                <span class="shrink-0 rounded-full bg-stone-100 px-2.5 py-1 text-[10px] font-semibold text-stone-600 dark:bg-gray-800 dark:text-gray-300">
+                                                    Shortcut
+                                                </span>
                                             @endif
                                         </div>
                                     </div>
@@ -237,8 +243,9 @@
                                                 wire:loading.attr="disabled"
                                                 wire:target="processFile(@js($item['id']))"
                                                 @disabled(! $isProcessable)
+                                                title="{{ ! $isProcessable && $unsupportedReason !== '' ? $unsupportedReason : '' }}"
                                                 class="inline-flex min-w-[116px] items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 {{ $isProcessable ? 'bg-ista-primary text-white hover:bg-stone-800' : 'bg-stone-100 text-stone-400 dark:bg-gray-800 dark:text-gray-500' }}">
-                                            <span wire:loading.remove wire:target="processFile(@js($item['id']))">{{ $isProcessable ? 'Pakai untuk chat' : 'Belum bisa dipakai' }}</span>
+                                            <span wire:loading.remove wire:target="processFile(@js($item['id']))">{{ $isProcessable ? 'Pakai untuk chat' : ($isShortcut ? 'Shortcut belum didukung' : 'Belum bisa dipakai') }}</span>
                                             <span wire:loading.inline-flex wire:target="processFile(@js($item['id']))" class="items-center gap-2">
                                                 <span class="h-3.5 w-3.5 rounded-full border-2 border-current border-t-transparent animate-spin"></span>
                                                 Memproses

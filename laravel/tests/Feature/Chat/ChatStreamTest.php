@@ -232,6 +232,42 @@ class ChatStreamTest extends TestCase
         $this->assertSame([(int) $selectedDoc->id], $documentIds);
     }
 
+    public function test_stream_document_ids_from_query_string_are_deduplicated_and_capped(): void
+    {
+        $method = new \ReflectionMethod(ChatStreamController::class, 'parseDocumentIds');
+        $method->setAccessible(true);
+
+        $documentIds = $method->invoke(
+            app(ChatStreamController::class),
+            json_encode(array_merge(range(1, 60), [10, 11]), JSON_THROW_ON_ERROR),
+        );
+
+        $this->assertSame(range(1, ChatOrchestrationService::MAX_DOCUMENT_CONTEXT_IDS), $documentIds);
+    }
+
+    public function test_latest_user_message_document_ids_are_deduplicated_and_capped(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::create([
+            'user_id' => $user->id,
+            'title' => 'Document id cap test',
+        ]);
+
+        Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'user',
+            'content' => 'Gunakan banyak dokumen.',
+            'document_ids' => array_merge(range(1, 60), [10, 11]),
+        ]);
+
+        $method = new \ReflectionMethod(ChatStreamController::class, 'documentIdsForLatestUserMessage');
+        $method->setAccessible(true);
+
+        $documentIds = $method->invoke(app(ChatStreamController::class), $conversation->id, []);
+
+        $this->assertSame(range(1, ChatOrchestrationService::MAX_DOCUMENT_CONTEXT_IDS), $documentIds);
+    }
+
     // -------------------------------------------------------------------------
     // DB persistence
     // -------------------------------------------------------------------------
