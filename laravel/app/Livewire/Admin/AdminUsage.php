@@ -79,6 +79,7 @@ class AdminUsage extends Component
             AIUsageEvent::FEATURE_MEMO_REVISION => 'Memo: Revisi',
             AIUsageEvent::FEATURE_GOOGLE_DRIVE_IMPORT => 'Drive Import',
             AIUsageEvent::FEATURE_GOOGLE_DRIVE_EXPORT => 'Drive Export',
+            AIUsageEvent::FEATURE_KNOWLEDGE_ADMIN => 'Knowledge (Admin)',
         ];
     }
 

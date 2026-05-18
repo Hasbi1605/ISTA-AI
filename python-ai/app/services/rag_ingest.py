@@ -24,6 +24,25 @@ from app.services.lightweight_text_splitter import LightweightRecursiveTextSplit
 logger = logging.getLogger(__name__)
 
 
+# ── Optional metadata overrides ──────────────────────────────────────────────
+# Callers (e.g. the knowledge ingest router) can set
+# ``rag_ingest._knowledge_metadata_overrides`` to a dict that will be merged
+# into every chunk's metadata. This is intentionally a module-level attribute
+# so the wrapper is process-local and resets after each ingest run.
+_knowledge_metadata_overrides: dict | None = None
+
+
+def _apply_metadata_overrides(chunk_metadata: dict) -> None:
+    overrides = _knowledge_metadata_overrides
+    if not overrides:
+        return
+
+    for key, value in overrides.items():
+        if value is None:
+            continue
+        chunk_metadata[key] = value
+
+
 def _delete_chroma_ids_with_retry(
     delete_callable,
     ids: list[str],
@@ -172,6 +191,7 @@ def process_document(
                 }
                 if document_id:
                     parent_meta["document_id"] = str(document_id)
+                _apply_metadata_overrides(parent_meta)
                 pdr_parent_docs.append((parent_id, parent.page_content, parent_meta))
 
                 children = child_splitter.split_documents([parent])
@@ -230,6 +250,7 @@ def process_document(
             chunk.metadata["chunk_index"] = idx
             if document_id:
                 chunk.metadata["document_id"] = str(document_id)
+            _apply_metadata_overrides(chunk.metadata)
             if idx == 0:
                 logger.info("🔍 INGEST: Storing chunk metadata - filename='%s', user_id='%s'", filename, str(user_id))
 
