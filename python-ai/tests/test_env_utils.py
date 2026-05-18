@@ -71,3 +71,18 @@ def test_internal_service_token_accepts_configured_secret(monkeypatch):
 
     assert get_internal_service_token() == "safe-secret"
     assert verify_token("Bearer safe-secret") is None
+
+def test_verify_token_uses_constant_time_comparison(monkeypatch):
+    import app.api_shared as shared
+
+    calls = []
+
+    def fake_compare_digest(provided, expected):
+        calls.append((provided, expected))
+        return True
+
+    monkeypatch.setenv("AI_SERVICE_TOKEN", "safe-secret")
+    monkeypatch.setattr(shared.hmac, "compare_digest", fake_compare_digest)
+
+    assert shared.verify_token("Bearer provided-secret") is None
+    assert calls == [("Bearer provided-secret", "Bearer safe-secret")]

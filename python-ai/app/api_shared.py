@@ -1,3 +1,4 @@
+import hmac
 import os
 import socket
 
@@ -32,7 +33,7 @@ def verify_token(authorization: str | None = Header(None)):
     if token is None:
         raise HTTPException(status_code=503, detail="AI Service token is not configured.")
 
-    if not authorization or authorization != f"Bearer {token}":
+    if not authorization or not hmac.compare_digest(authorization, f"Bearer {token}"):
         raise HTTPException(status_code=401, detail="Unauthorized access to AI Service.")
 
 

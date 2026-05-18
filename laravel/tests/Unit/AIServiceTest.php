@@ -23,7 +23,7 @@ class AIServiceTest extends TestCase
         config()->set('services.ai_service.timeout', " '121.5' ");
         config()->set('services.ai_service.read_timeout', ' "122.5" ');
 
-        $service = new AIService();
+        $service = new AIService;
         $reflection = new \ReflectionClass($service);
 
         $baseUrl = $reflection->getProperty('baseUrl');
@@ -64,7 +64,7 @@ class AIServiceTest extends TestCase
         $handlerStack = HandlerStack::create($mock);
         $mockClient = new Client(['handler' => $handlerStack]);
 
-        $service = new AIService();
+        $service = new AIService;
         $reflection = new \ReflectionClass($service);
         $clientProp = $reflection->getProperty('client');
         $clientProp->setAccessible(true);
@@ -82,5 +82,20 @@ class AIServiceTest extends TestCase
         $this->assertStringEndsWith(']', AIService::ERROR_SENTINEL);
         $this->assertStringNotContainsString('MODEL', AIService::ERROR_SENTINEL);
         $this->assertStringNotContainsString('SOURCES', AIService::ERROR_SENTINEL);
+    }
+
+    public function test_ai_service_redacts_sensitive_log_messages(): void
+    {
+        $service = new AIService;
+        $reflection = new \ReflectionClass($service);
+        $method = $reflection->getMethod('sanitizeLogMessage');
+        $method->setAccessible(true);
+
+        $message = 'Authorization: Bearer super-secret-token token=raw-secret GOCSPX-client-secret';
+
+        $this->assertSame(
+            'Authorization: Bearer [REDACTED] token=[REDACTED] GOCSPX-[REDACTED]',
+            $method->invoke($service, $message)
+        );
     }
 }

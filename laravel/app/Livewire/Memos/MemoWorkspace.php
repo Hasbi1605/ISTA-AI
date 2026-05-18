@@ -561,7 +561,7 @@ class MemoWorkspace extends Component
                 'lang' => 'id',
                 'user' => [
                     'id' => (string) Auth::id(),
-                    'name' => (string) Auth::user()?->name,
+                    'name' => $this->safeEditorUserName((string) Auth::user()?->name),
                 ],
             ],
             'exp' => now()->addMinutes($ttlMinutes)->getTimestamp(),
@@ -573,6 +573,15 @@ class MemoWorkspace extends Component
         $this->editorConfigCache = $config;
 
         return $this->editorConfigCache;
+    }
+
+    protected function safeEditorUserName(string $name): string
+    {
+        $clean = preg_replace('/[<>"`]+/u', ' ', $name) ?? '';
+        $clean = preg_replace("/[^\p{L}\p{M}\p{N}\s.'-]+/u", ' ', $clean) ?? '';
+        $clean = preg_replace('/\s+/u', ' ', trim($clean)) ?? '';
+
+        return mb_substr($clean !== '' ? $clean : 'Pengguna', 0, 120);
     }
 
     protected function forgetEditorConfigCache(): void

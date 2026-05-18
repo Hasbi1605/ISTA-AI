@@ -8,13 +8,29 @@ use App\Models\User;
 use App\Services\OnlyOffice\JwtSigner;
 use App\Services\OnlyOffice\MemoDocumentKey;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class OnlyOfficeCallbackTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_callback_route_has_light_throttle_middleware(): void
+    {
+        $route = Arr::first(app('router')->getRoutes(), fn ($route) => $route->getName() === 'onlyoffice.callback');
+
+        $this->assertNotNull($route);
+        $middlewares = $route->gatherMiddleware();
+
+        $hasThrottle = (bool) collect($middlewares)->first(
+            fn ($middleware) => Str::startsWith($middleware, 'throttle:')
+        );
+
+        $this->assertTrue($hasThrottle);
+    }
 
     public function test_callback_rejects_missing_token(): void
     {
