@@ -101,4 +101,24 @@ Route::middleware(['auth', 'verified'])
         Route::get('/callback', [GoogleDriveOAuthController::class, 'callback'])->name('callback');
     });
 
+Route::middleware(['auth', 'verified', 'admin'])
+    ->prefix('admin')
+    ->name('admin.')
+    ->group(function () {
+        Route::get('/', function () {
+            return response('Admin dashboard placeholder', 200)
+                ->header('Content-Type', 'text/plain; charset=UTF-8');
+        })->name('dashboard');
+    });
+
+Route::middleware(['auth', 'verified', 'super_admin'])
+    ->prefix('admin')
+    ->name('admin.')
+    ->group(function () {
+        Route::get('/ai-config', function () {
+            return response('Super admin AI configuration placeholder', 200)
+                ->header('Content-Type', 'text/plain; charset=UTF-8');
+        })->name('ai-config');
+    });
+
 require __DIR__.'/auth.php';
