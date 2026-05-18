@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use Illuminate\Container\Container;
+
 class TrustedProxyConfig
 {
     private const DEFAULT_TRUSTED_PROXIES = '127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16';
@@ -11,7 +13,12 @@ class TrustedProxyConfig
      */
     public static function fromConfig(): array
     {
-        return self::fromString(config('trustedproxy.proxies', self::DEFAULT_TRUSTED_PROXIES));
+        $container = Container::getInstance();
+        $value = $container?->bound('config')
+            ? $container->make('config')->get('trustedproxy.proxies', self::DEFAULT_TRUSTED_PROXIES)
+            : env('TRUSTED_PROXIES', self::DEFAULT_TRUSTED_PROXIES);
+
+        return self::fromString($value);
     }
 
     /**
