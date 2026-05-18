@@ -5,6 +5,7 @@ namespace App\Services\OnlyOffice;
 use App\Models\Memo;
 use App\Models\MemoVersion;
 use DateTimeInterface;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
@@ -152,9 +153,35 @@ class MemoDocumentKey
         ksort($parameters);
 
         $unsignedUrl = $this->onlyOfficeLaravelInternalUrl().URL::route($routeName, $parameters, false);
-        $signature = hash_hmac('sha256', $unsignedUrl, (string) config('app.key'));
+        $signature = hash_hmac('sha256', $unsignedUrl, $this->signedFileUrlKey());
 
         return $unsignedUrl.(str_contains($unsignedUrl, '?') ? '&' : '?').'signature='.$signature;
+    }
+
+    public function hasValidSignedFileSignature(Request $request): bool
+    {
+        $signature = (string) $request->query('signature', '');
+        $expires = $request->query('expires');
+
+        if ($signature === '' || ! is_numeric($expires) || (int) $expires < now()->getTimestamp()) {
+            return false;
+        }
+
+        $unsignedUrl = $request->fullUrlWithoutQuery('signature');
+        $expected = hash_hmac('sha256', $unsignedUrl, $this->signedFileUrlKey());
+
+        return hash_equals($expected, $signature);
+    }
+
+    protected function signedFileUrlKey(): string
+    {
+        $secret = trim((string) config('services.onlyoffice.signed_url_secret', ''));
+
+        if ($secret !== '') {
+            return $secret;
+        }
+
+        return hash('sha256', (string) config('app.key').'|onlyoffice-signed-file-url');
     }
 
     protected function onlyOfficeLaravelInternalUrl(): string

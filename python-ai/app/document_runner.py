@@ -6,6 +6,8 @@ from typing import Any, Dict, Tuple
 
 from app.env_utils import get_env_int
 
+DEFAULT_DOCUMENT_PROCESS_SUBPROCESS_TIMEOUT = 900
+
 
 def _parse_result_payload(stdout: str) -> Dict[str, Any]:
     lines = [line.strip() for line in stdout.splitlines() if line.strip()]
@@ -22,7 +24,7 @@ def _parse_result_payload(stdout: str) -> Dict[str, Any]:
 
 
 def run_document_process(file_path: str, filename: str, user_id: str, document_id: str = "") -> Tuple[bool, str]:
-    timeout_seconds = get_env_int("DOCUMENT_PROCESS_SUBPROCESS_TIMEOUT", 3600)
+    timeout_seconds = get_env_int("DOCUMENT_PROCESS_SUBPROCESS_TIMEOUT", DEFAULT_DOCUMENT_PROCESS_SUBPROCESS_TIMEOUT)
     app_dir = os.path.dirname(os.path.dirname(__file__))
 
     completed = subprocess.run(

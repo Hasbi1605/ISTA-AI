@@ -709,6 +709,34 @@ class MemoWorkspaceTest extends TestCase
         $this->assertSame($firstConfig['token'], $secondConfig['token']);
     }
 
+    public function test_editor_config_sanitizes_user_name_for_onlyoffice(): void
+    {
+        Storage::fake('local');
+        config([
+            'services.onlyoffice.jwt_secret' => 'workspace-secret',
+            'services.onlyoffice.laravel_internal_url' => 'http://laravel:8000',
+        ]);
+
+        $user = User::factory()->create([
+            'name' => '<img src=x onerror=alert(1)> Hasbi "Admin"',
+            'email_verified_at' => now(),
+        ]);
+        [$memo] = $this->memoWithVersion($user, 'Memo Nama User', 'memos/'.$user->id.'/memo-nama-user.docx');
+
+        $config = Livewire::actingAs($user)
+            ->test(MemoWorkspace::class)
+            ->call('loadMemo', $memo->id)
+            ->instance()
+            ->editorConfig();
+
+        $editorName = $config['editorConfig']['user']['name'];
+
+        $this->assertSame('img src x onerror alert 1 Hasbi Admin', $editorName);
+        $this->assertStringNotContainsString('<', $editorName);
+        $this->assertStringNotContainsString('>', $editorName);
+        $this->assertStringNotContainsString('"', $editorName);
+    }
+
     public function test_loading_another_memo_with_sync_force_saves_active_editor_first(): void
     {
         Storage::fake('local');

@@ -64,10 +64,11 @@ Untuk upgrade OnlyOffice:
 Signed URL file memo dikendalikan oleh:
 
 ```text
+ONLYOFFICE_SIGNED_URL_SECRET=isi_dengan_secret_acak_berbeda_dari_app_key
 ONLYOFFICE_SIGNED_URL_TTL_MINUTES=30
 ```
 
-Nilai 15-30 menit direkomendasikan untuk production. Jangan naikkan ke hitungan jam kecuali ada alasan operasional yang jelas.
+Gunakan `ONLYOFFICE_SIGNED_URL_SECRET` yang berbeda dari `APP_KEY` dan `ONLYOFFICE_JWT_SECRET` untuk key separation. Nilai TTL 15-30 menit direkomendasikan untuk production. Jangan naikkan ke hitungan jam kecuali ada alasan operasional yang jelas.
 
 ## Runtime Decision
 

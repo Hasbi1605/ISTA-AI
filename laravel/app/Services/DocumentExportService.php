@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Document;
+use App\Services\Documents\DocumentExportHtmlSanitizer;
 use App\Services\Documents\DocumentPreviewRenderer;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -36,6 +37,8 @@ class DocumentExportService
      */
     public function exportContent(string $contentHtml, string $targetFormat, ?string $fileName = null): array
     {
+        $contentHtml = app(DocumentExportHtmlSanitizer::class)->sanitize($contentHtml);
+
         $payload = [
             'content_html' => $contentHtml,
             'target_format' => $targetFormat,

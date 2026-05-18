@@ -122,6 +122,36 @@ class MemoPolicyTest extends TestCase
         $this->get($publicReplayUrl)->assertForbidden();
     }
 
+    public function test_signed_file_route_uses_onlyoffice_signed_url_secret_instead_of_app_key(): void
+    {
+        Storage::fake('local');
+        $appKey = 'base64:'.base64_encode(str_repeat('a', 32));
+        config([
+            'app.key' => $appKey,
+            'services.onlyoffice.laravel_internal_url' => 'http://laravel:8000',
+            'services.onlyoffice.signed_url_secret' => 'onlyoffice-signed-url-secret',
+        ]);
+
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        $memo = $this->createMemo($user);
+        Storage::disk('local')->put($memo->file_path, 'docx-bytes');
+
+        $url = app(MemoDocumentKey::class)->signedFileUrl($memo, null, 60);
+        $unsignedUrl = Str::beforeLast($url, '&signature=');
+        parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+
+        $this->assertSame(
+            hash_hmac('sha256', $unsignedUrl, 'onlyoffice-signed-url-secret'),
+            $query['signature']
+        );
+        $this->assertNotSame(
+            hash_hmac('sha256', $unsignedUrl, $appKey),
+            $query['signature']
+        );
+
+        $this->get($url)->assertOk();
+    }
+
     public function test_signed_file_route_accepts_legacy_relative_signature_only_from_internal_host(): void
     {
         Storage::fake('local');
