@@ -48,10 +48,11 @@ class OnlyOfficeCallbackController extends Controller
         }
 
         // ── Status 4: no users currently editing ────────────────────────────
-        // OnlyOffice may send this while another tab/session can still produce
-        // a later force-save callback with the same key. Keep the cached editor
-        // key until its natural TTL so concurrent sessions are not rejected.
+        // Close/no-change ends this editor session. Rotate the next editor key
+        // so a refreshed page does not reopen a stale Document Server cache.
         if ($status === 4) {
+            app(MemoDocumentKey::class)->invalidateEditorKey($memo, $version);
+
             return response()->json(['error' => 0]);
         }
 
@@ -189,6 +190,10 @@ class OnlyOfficeCallbackController extends Controller
 
                     if ($status === 6) {
                         app(MemoForceSaveService::class)->markSucceeded((string) ($callback['userdata'] ?? ''), $memo, $version);
+                    }
+
+                    if ($status === 2) {
+                        app(MemoDocumentKey::class)->invalidateEditorKey($memo, $version);
                     }
 
                 });

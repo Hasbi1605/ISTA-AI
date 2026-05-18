@@ -7,8 +7,10 @@ use App\Models\MemoVersion;
 use App\Services\Memo\MemoDocumentStructureExtractor;
 use App\Services\Memo\MemoGenerationService;
 use App\Services\Memo\MemoLifecycleService;
+use App\Services\OnlyOffice\ForceSaveException;
 use App\Services\OnlyOffice\JwtSigner;
 use App\Services\OnlyOffice\MemoDocumentKey;
+use App\Services\OnlyOffice\MemoForceSaveService;
 use App\Support\UserFacingError;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -16,6 +18,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
+use Throwable;
 
 class MemoWorkspace extends Component
 {
@@ -86,10 +89,16 @@ class MemoWorkspace extends Component
         }
     }
 
-    public function loadMemo(int $memoId): void
+    public function loadMemo(int $memoId, bool $syncActiveEditor = false): void
     {
         $this->rememberCurrentThread();
         $this->memoStatusMessage = null;
+
+        if ($syncActiveEditor && $this->activeMemoId && (int) $this->activeMemoId !== (int) $memoId) {
+            if (! $this->syncActiveMemoEditorBeforeLeaving()) {
+                return;
+            }
+        }
 
         $memo = Memo::with(['currentVersion', 'versions'])
             ->where('id', $memoId)
@@ -248,7 +257,7 @@ class MemoWorkspace extends Component
 
             $this->addSystemMessage("Revisi memo \"{$memo->title}\" berhasil disimpan sebagai Versi {$version->version_number}. Cek panel Dokumen untuk memastikan hasilnya sudah sesuai.");
             $this->dispatch('memo-document-ready', memoId: $memo->id);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             report($e);
             $this->addSystemMessage(UserFacingError::message($e, 'Maaf, revisi memo gagal diproses. Silakan coba lagi.'));
         } finally {
@@ -299,7 +308,7 @@ class MemoWorkspace extends Component
 
             $this->addSystemMessage("Memo \"{$memo->title}\" berhasil digenerate ulang dari konfigurasi sebagai Versi {$version->version_number}. History tetap berada pada memo yang sama.");
             $this->dispatch('memo-document-ready', memoId: $memo->id);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             report($e);
             $this->addSystemMessage(UserFacingError::message($e, 'Maaf, generate ulang memo gagal diproses. Silakan coba lagi.'));
         } finally {
@@ -343,7 +352,7 @@ class MemoWorkspace extends Component
 
             $this->addSystemMessage($message);
             $this->dispatch('memo-document-ready', memoId: $memo->id);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             report($e);
             $this->addSystemMessage(UserFacingError::message($e, 'Maaf, generate memo gagal diproses. Silakan coba lagi.'));
         } finally {
@@ -380,6 +389,12 @@ class MemoWorkspace extends Component
             return;
         }
 
+        $targetVersionId = (int) $versionId;
+
+        if ((int) $this->activeMemoVersionId !== $targetVersionId && ! $this->syncActiveMemoEditorBeforeLeaving()) {
+            return;
+        }
+
         $memo = Memo::where('id', $this->activeMemoId)
             ->where('user_id', Auth::id())
             ->first();
@@ -391,7 +406,7 @@ class MemoWorkspace extends Component
         }
 
         $version = MemoVersion::where('memo_id', $memo->id)
-            ->whereKey((int) $versionId)
+            ->whereKey($targetVersionId)
             ->first();
 
         if (! $version) {
@@ -406,6 +421,45 @@ class MemoWorkspace extends Component
         $this->showMemoConfiguration = false;
         $this->rememberCurrentThread();
         $this->dispatch('memo-document-ready', memoId: $memo->id);
+    }
+
+    protected function syncActiveMemoEditorBeforeLeaving(): bool
+    {
+        if (! $this->activeMemoId) {
+            return true;
+        }
+
+        $memo = Memo::with('currentVersion')
+            ->where('id', $this->activeMemoId)
+            ->where('user_id', Auth::id())
+            ->first();
+
+        if (! $memo) {
+            return true;
+        }
+
+        $version = $this->editorMemoVersion($memo);
+        $filePath = $version?->file_path ?: $memo->file_path;
+
+        if (! $filePath) {
+            return true;
+        }
+
+        try {
+            app(MemoForceSaveService::class)->forceSave($memo, $version);
+
+            return true;
+        } catch (ForceSaveException $e) {
+            $message = $e->getMessage();
+        } catch (Throwable $e) {
+            report($e);
+            $message = 'Perubahan editor belum tersimpan. Coba lagi sebentar sebelum pindah memo.';
+        }
+
+        $this->memoStatusMessage = $message;
+        $this->addSystemMessage($message.' Saya tahan perpindahan memo agar editan manual tidak hilang.');
+
+        return false;
     }
 
     public function deleteMemo(int $memoId): void

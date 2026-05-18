@@ -22,12 +22,13 @@ class MemoDocumentKey
         // the key from changing after a save callback updates updated_at,
         // which would cause subsequent callbacks to be rejected as stale.
         return Cache::remember($cacheKey, now()->addHours(24), function () use ($memo, $version) {
-            return $this->baseKey($memo, $version);
+            return $this->baseKey($memo, $version, $this->editorSessionSeed($memo, $version));
         });
     }
 
     public function invalidateEditorKey(Memo $memo, ?MemoVersion $version = null): void
     {
+        Cache::put($this->editorSessionSeedCacheKey($memo, $version), Str::random(12), now()->addHours(25));
         Cache::forget($this->editorCacheKey($memo, $version));
     }
 
@@ -161,14 +162,14 @@ class MemoDocumentKey
         return rtrim((string) config('services.onlyoffice.laravel_internal_url', config('app.url')), '/');
     }
 
-    protected function baseKey(Memo $memo, ?MemoVersion $version = null): string
+    protected function baseKey(Memo $memo, ?MemoVersion $version = null, string $sessionSeed = ''): string
     {
         $timestamp = $version?->updated_at?->timestamp
             ?? $memo->updated_at?->timestamp
             ?? now()->timestamp;
         $path = $version?->file_path ?: ($memo->file_path ?: '');
         $fileHash = $this->fileHash($path);
-        $pathHash = substr(sha1($path.'|'.$fileHash), 0, 12);
+        $pathHash = substr(sha1($path.'|'.$fileHash.'|'.$sessionSeed), 0, 12);
         $scope = $version ? 'v'.$version->id : 'current';
 
         return 'memo-'.$memo->id.'-'.$scope.'-'.$timestamp.'-'.$pathHash;
@@ -188,5 +189,15 @@ class MemoDocumentKey
     protected function editorCacheKey(Memo $memo, ?MemoVersion $version = null): string
     {
         return 'onlyoffice_doc_key:'.$memo->id.':'.($version?->id ?? 'base');
+    }
+
+    protected function editorSessionSeed(Memo $memo, ?MemoVersion $version = null): string
+    {
+        return (string) Cache::get($this->editorSessionSeedCacheKey($memo, $version), '');
+    }
+
+    protected function editorSessionSeedCacheKey(Memo $memo, ?MemoVersion $version = null): string
+    {
+        return 'onlyoffice_doc_key_seed:'.$memo->id.':'.($version?->id ?? 'base');
     }
 }

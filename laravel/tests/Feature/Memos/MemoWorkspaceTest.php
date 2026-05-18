@@ -6,6 +6,8 @@ use App\Livewire\Memos\MemoWorkspace;
 use App\Models\Memo;
 use App\Models\MemoVersion;
 use App\Models\User;
+use App\Services\OnlyOffice\JwtSigner;
+use App\Services\OnlyOffice\MemoForceSaveService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
@@ -217,7 +219,8 @@ class MemoWorkspaceTest extends TestCase
         $this->assertStringContainsString('isLoadingMemo(id)', $chatPageJs);
         $this->assertStringContainsString('loadMemo(id)', $chatPageJs);
         $this->assertStringContainsString('this.loadingMemoId = memoId', $chatPageJs);
-        $this->assertStringContainsString('return this.$wire.loadMemo(memoId)', $chatPageJs);
+        $this->assertStringContainsString('this.$wire.loadMemo(memoId, shouldSyncActiveEditor)', $chatPageJs);
+        $this->assertStringContainsString('waitForOnlyOfficeToSettle()', $chatPageJs);
         $this->assertStringContainsString('this.loadingMemoId = null', $chatPageJs);
     }
 
@@ -540,6 +543,7 @@ class MemoWorkspaceTest extends TestCase
         Storage::fake('local');
         config([
             'services.onlyoffice.jwt_secret' => 'workspace-secret',
+            'services.onlyoffice.internal_url' => 'http://onlyoffice',
             'services.onlyoffice.laravel_internal_url' => 'http://laravel:8000',
         ]);
         Http::fake([
@@ -547,6 +551,7 @@ class MemoWorkspaceTest extends TestCase
                 'X-Memo-Searchable-Text-B64' => base64_encode('Memo revisi dengan tembusan baru'),
                 'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             ]),
+            'http://onlyoffice/command*' => Http::response(['error' => 4], 200),
         ]);
 
         $user = User::factory()->create(['email_verified_at' => now()]);
@@ -702,6 +707,67 @@ class MemoWorkspaceTest extends TestCase
 
         $this->assertSame($firstQuery['oo_token'], $secondQuery['oo_token']);
         $this->assertSame($firstConfig['token'], $secondConfig['token']);
+    }
+
+    public function test_loading_another_memo_with_sync_force_saves_active_editor_first(): void
+    {
+        Storage::fake('local');
+        config([
+            'services.onlyoffice.jwt_secret' => 'workspace-secret',
+            'services.onlyoffice.internal_url' => 'http://onlyoffice',
+            'services.onlyoffice.force_save_wait_seconds' => 1,
+            'services.onlyoffice.force_save_poll_microseconds' => 1000,
+        ]);
+
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        [$firstMemo, $firstVersion] = $this->memoWithVersion($user, 'Memo Aktif', 'memos/'.$user->id.'/memo-aktif.docx');
+        [$secondMemo] = $this->memoWithVersion($user, 'Memo Tujuan', 'memos/'.$user->id.'/memo-tujuan.docx');
+        $commandPayload = null;
+
+        Http::fake(function ($request) use (&$commandPayload, $firstMemo, $firstVersion) {
+            if (str_starts_with($request->url(), 'http://onlyoffice/command')) {
+                $commandPayload = (new JwtSigner('workspace-secret'))->verify((string) $request->data()['token']);
+                app(MemoForceSaveService::class)->markSucceeded((string) $commandPayload['userdata'], $firstMemo, $firstVersion);
+
+                return Http::response(['error' => 0], 200);
+            }
+
+            return Http::response('unexpected request', 500);
+        });
+
+        Livewire::actingAs($user)
+            ->test(MemoWorkspace::class)
+            ->call('loadMemo', $firstMemo->id)
+            ->call('loadMemo', $secondMemo->id, true)
+            ->assertSet('activeMemoId', $secondMemo->id);
+
+        $this->assertIsArray($commandPayload);
+        $this->assertStringStartsWith('memo-'.$firstMemo->id.'-v'.$firstVersion->id.'-', $commandPayload['key']);
+        $this->assertStringStartsWith('memo-force-save:'.$firstMemo->id.':'.$firstVersion->id.':', $commandPayload['userdata']);
+    }
+
+    public function test_loading_another_memo_keeps_current_memo_when_force_save_fails(): void
+    {
+        Storage::fake('local');
+        config([
+            'services.onlyoffice.jwt_secret' => 'workspace-secret',
+            'services.onlyoffice.internal_url' => 'http://onlyoffice',
+        ]);
+
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        [$firstMemo] = $this->memoWithVersion($user, 'Memo Aktif Gagal', 'memos/'.$user->id.'/memo-aktif-gagal.docx');
+        [$secondMemo] = $this->memoWithVersion($user, 'Memo Tujuan Gagal', 'memos/'.$user->id.'/memo-tujuan-gagal.docx');
+
+        Http::fake([
+            'http://onlyoffice/command*' => Http::response(['error' => 7], 200),
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(MemoWorkspace::class)
+            ->call('loadMemo', $firstMemo->id)
+            ->call('loadMemo', $secondMemo->id, true)
+            ->assertSet('activeMemoId', $firstMemo->id)
+            ->assertSet('memoStatusMessage', 'OnlyOffice belum siap menyimpan dokumen. Kode error: 7');
     }
 
     public function test_generate_configuration_allows_blank_signatory_and_preserves_it_for_ai_service(): void
@@ -1247,5 +1313,34 @@ class MemoWorkspaceTest extends TestCase
             ->assertSee('Buat ulang dari konfigurasi', false)
             ->assertDontSee('Memo "Memo Panjang Format Folio Eksplisit" dimuat.', false)
             ->assertDontSee('Tulis revisi untuk memo ini', false);
+    }
+
+    /**
+     * @return array{0: Memo, 1: MemoVersion}
+     */
+    protected function memoWithVersion(User $user, string $title, string $path): array
+    {
+        Storage::disk('local')->put($path, $this->validMemoDocxBytes());
+
+        $memo = Memo::create([
+            'user_id' => $user->id,
+            'title' => $title,
+            'memo_type' => 'memo_internal',
+            'file_path' => $path,
+            'status' => Memo::STATUS_GENERATED,
+            'configuration' => [],
+            'searchable_text' => $title,
+        ]);
+        $version = $memo->versions()->create([
+            'version_number' => 1,
+            'label' => 'Versi 1',
+            'file_path' => $path,
+            'status' => Memo::STATUS_GENERATED,
+            'configuration' => [],
+            'searchable_text' => $title,
+        ]);
+        $memo->forceFill(['current_version_id' => $version->id])->save();
+
+        return [$memo, $version];
     }
 }

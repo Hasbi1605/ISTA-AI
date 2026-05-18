@@ -2036,11 +2036,20 @@ const registerChatPageData = (Alpine) => {
             const memoLoadToken = this.memoLoadToken + 1;
             this.memoLoadToken = memoLoadToken;
             this.loadingMemoId = memoId;
+            const shouldSyncActiveEditor = Number.isFinite(previousMemoId) && previousMemoId > 0;
 
-            return this.$wire.loadMemo(memoId)
+            return (shouldSyncActiveEditor ? this.waitForOnlyOfficeToSettle() : Promise.resolve())
+                .then(() => this.$wire.loadMemo(memoId, shouldSyncActiveEditor))
                 .then(() => {
                     if (this.memoLoadToken !== memoLoadToken) {
                         return { stale: true };
+                    }
+
+                    const loadedMemoId = Number(this.$wire.activeMemoId || 0);
+                    if (loadedMemoId !== memoId) {
+                        this.setActiveMemo(previousMemoId);
+
+                        return { stale: false, blocked: true };
                     }
 
                     this.setActiveMemo(memoId);
@@ -2063,6 +2072,37 @@ const registerChatPageData = (Alpine) => {
                         this.loadingMemoId = null;
                     }
                 });
+        },
+
+        async waitForOnlyOfficeToSettle() {
+            const minQuietMs = 900;
+            const maxWaitMs = 2500;
+            const startedAt = Date.now();
+
+            await this.sleep(1000);
+
+            while (Date.now() - startedAt < maxWaitMs) {
+                const state = this.latestOnlyOfficeState();
+                const lastChangeAt = Number(state?.lastChangeAt || 0);
+
+                if (!lastChangeAt || Date.now() - lastChangeAt >= minQuietMs) {
+                    return;
+                }
+
+                await this.sleep(Math.min(250, minQuietMs - (Date.now() - lastChangeAt)));
+            }
+        },
+
+        latestOnlyOfficeState() {
+            const states = Object.values(window.memoOnlyOfficeState || {});
+
+            return states
+                .filter((state) => !state?.destroyedAt || Number(state.destroyedAt) < Number(state.lastReadyAt || state.lastChangeAt || 0))
+                .sort((a, b) => Number(b?.lastChangeAt || b?.lastReadyAt || 0) - Number(a?.lastChangeAt || a?.lastReadyAt || 0))[0] || null;
+        },
+
+        sleep(ms) {
+            return new Promise((resolve) => window.setTimeout(resolve, Math.max(0, Number(ms) || 0)));
         },
     }));
 
@@ -2987,6 +3027,7 @@ const registerChatPageData = (Alpine) => {
         memoShimmerActive: false,
         memoSyncLoading: false,
         memoSyncError: '',
+        memoPageHideHandler: null,
 
         init() {
             const mediaQuery = window.matchMedia('(max-width: 1023px)');
@@ -3005,6 +3046,9 @@ const registerChatPageData = (Alpine) => {
             this.$watch('$wire.memoChatMessages', () => {
                 this.$nextTick(() => this.scrollMemoChatToBottom());
             });
+
+            this.memoPageHideHandler = () => this.forceSaveActiveMemoBeforeUnload(this.$wire);
+            window.addEventListener('pagehide', this.memoPageHideHandler);
         },
 
         collapseMemoSidebarForDocument() {
@@ -3108,6 +3152,53 @@ const registerChatPageData = (Alpine) => {
             if (!response.ok) {
                 const message = await this.errorMessage(response);
                 throw new Error(message || 'Perubahan editor belum tersimpan.');
+            }
+        },
+
+        forceSaveActiveMemoBeforeUnload($wire) {
+            const state = this.latestOnlyOfficeState();
+            const lastChangeAt = Number(state?.lastChangeAt || 0);
+            const memoId = Number($wire?.activeMemoId || 0);
+
+            if (!memoId || !lastChangeAt) {
+                return;
+            }
+
+            const baseUrl = this.$root?.dataset?.memoForceSaveBaseUrl || '/chat/memos';
+            const versionId = $wire.activeMemoVersionId || document.getElementById('memo-version-select')?.value || null;
+            const csrfToken = this.getCsrfToken();
+            const body = JSON.stringify({
+                _token: csrfToken,
+                version_id: versionId,
+            });
+            const url = `${baseUrl}/${memoId}/force-save`;
+
+            if (navigator.sendBeacon) {
+                try {
+                    navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }));
+
+                    return;
+                } catch (_) {
+                    // Fall back to keepalive fetch below.
+                }
+            }
+
+            try {
+                fetch(url, {
+                    method: 'POST',
+                    cache: 'no-store',
+                    credentials: 'same-origin',
+                    keepalive: true,
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body,
+                });
+            } catch (_) {
+                // Page unload is best-effort; explicit navigation/download paths still wait.
             }
         },
 

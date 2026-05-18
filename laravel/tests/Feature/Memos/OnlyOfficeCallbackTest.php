@@ -1023,7 +1023,7 @@ class OnlyOfficeCallbackTest extends TestCase
         Http::assertNothingSent();
     }
 
-    public function test_callback_status_2_keeps_active_editor_key_for_open_session(): void
+    public function test_callback_status_2_rotates_editor_key_for_next_session(): void
     {
         config([
             'services.onlyoffice.jwt_secret' => 'callback-secret',
@@ -1054,10 +1054,10 @@ class OnlyOfficeCallbackTest extends TestCase
 
         $nextKey = app(MemoDocumentKey::class)->forEditor($memo->refresh());
 
-        $this->assertSame($initialKey, $nextKey);
+        $this->assertNotSame($initialKey, $nextKey);
     }
 
-    public function test_callback_status_4_keeps_editor_key_after_session_closes(): void
+    public function test_callback_status_4_rotates_editor_key_after_session_closes(): void
     {
         config([
             'services.onlyoffice.jwt_secret' => 'callback-secret',
@@ -1080,14 +1080,12 @@ class OnlyOfficeCallbackTest extends TestCase
             'token' => $token,
         ])->assertOk()->assertJson(['error' => 0]);
 
-        $memo->forceFill(['updated_at' => now()->addMinute()])->save();
-
         $nextKey = app(MemoDocumentKey::class)->forEditor($memo->refresh());
 
-        $this->assertSame($initialKey, $nextKey);
+        $this->assertNotSame($initialKey, $nextKey);
     }
 
-    public function test_callback_status_6_after_status_4_accepts_existing_editor_key(): void
+    public function test_callback_status_6_after_status_4_rejects_closed_editor_key(): void
     {
         config([
             'services.onlyoffice.jwt_secret' => 'callback-secret',
@@ -1132,7 +1130,9 @@ class OnlyOfficeCallbackTest extends TestCase
             'key' => $initialKey,
             'url' => $url,
             'token' => $status6Token,
-        ])->assertOk()->assertJson(['error' => 0]);
+        ])->assertConflict();
+
+        Http::assertNothingSent();
     }
 
     public function test_callback_status_6_keeps_active_editor_key(): void
