@@ -2093,7 +2093,7 @@ const registerChatPageData = (Alpine) => {
             this.loadingMemoId = memoId;
             const shouldSyncActiveEditor = Number.isFinite(previousMemoId)
                 && previousMemoId > 0
-                && this.hasUnsavedOnlyOfficeChanges();
+                && this.hasOnlyOfficeChangesToSync();
 
             return (shouldSyncActiveEditor ? this.waitForOnlyOfficeToSettle() : Promise.resolve())
                 .then(() => this.$wire.loadMemo(memoId, shouldSyncActiveEditor))
@@ -2158,8 +2158,10 @@ const registerChatPageData = (Alpine) => {
                 .sort((a, b) => Number(b?.lastChangeAt || b?.lastReadyAt || 0) - Number(a?.lastChangeAt || a?.lastReadyAt || 0))[0] || null;
         },
 
-        hasUnsavedOnlyOfficeChanges() {
-            return Boolean(this.latestOnlyOfficeState()?.dirty);
+        hasOnlyOfficeChangesToSync() {
+            const state = this.latestOnlyOfficeState();
+
+            return Boolean(state?.dirty || Number(state?.lastChangeAt || 0) > 0);
         },
 
         sleep(ms) {
@@ -2935,7 +2937,7 @@ const registerChatPageData = (Alpine) => {
             try {
                 await this.waitForOnlyOfficeToSettle();
 
-                if (this.hasUnsavedOnlyOfficeChanges()) {
+                if (this.hasOnlyOfficeChangesToSync()) {
                     this.downloadStatus = 'Menyimpan perubahan editor...';
                     await this.forceSaveMemo(forceSaveUrl, versionId);
                 }
@@ -2995,8 +2997,10 @@ const registerChatPageData = (Alpine) => {
                 .sort((a, b) => Number(b?.lastChangeAt || b?.lastReadyAt || 0) - Number(a?.lastChangeAt || a?.lastReadyAt || 0))[0] || null;
         },
 
-        hasUnsavedOnlyOfficeChanges() {
-            return Boolean(this.latestOnlyOfficeState()?.dirty);
+        hasOnlyOfficeChangesToSync() {
+            const state = this.latestOnlyOfficeState();
+
+            return Boolean(state?.dirty || Number(state?.lastChangeAt || 0) > 0);
         },
 
         sleep(ms) {
@@ -3142,7 +3146,7 @@ const registerChatPageData = (Alpine) => {
         async switchMemoVersion($wire, versionId) {
             await this.waitForOnlyOfficeToSettle();
 
-            return $wire.switchMemoVersion(versionId, this.hasUnsavedOnlyOfficeChanges());
+            return $wire.switchMemoVersion(versionId, this.hasOnlyOfficeChangesToSync());
         },
 
         async submitMemoRevision($wire, textarea) {
@@ -3208,7 +3212,7 @@ const registerChatPageData = (Alpine) => {
 
             await this.waitForOnlyOfficeToSettle();
 
-            if (!this.hasUnsavedOnlyOfficeChanges()) {
+            if (!this.hasOnlyOfficeChangesToSync()) {
                 return;
             }
 
@@ -3239,7 +3243,7 @@ const registerChatPageData = (Alpine) => {
             const state = this.latestOnlyOfficeState();
             const memoId = Number($wire?.activeMemoId || 0);
 
-            if (!memoId || !state?.dirty) {
+            if (!memoId || !(state?.dirty || Number(state?.lastChangeAt || 0) > 0)) {
                 return;
             }
 
@@ -3308,8 +3312,10 @@ const registerChatPageData = (Alpine) => {
                 .sort((a, b) => Number(b?.lastChangeAt || b?.lastReadyAt || 0) - Number(a?.lastChangeAt || a?.lastReadyAt || 0))[0] || null;
         },
 
-        hasUnsavedOnlyOfficeChanges() {
-            return Boolean(this.latestOnlyOfficeState()?.dirty);
+        hasOnlyOfficeChangesToSync() {
+            const state = this.latestOnlyOfficeState();
+
+            return Boolean(state?.dirty || Number(state?.lastChangeAt || 0) > 0);
         },
 
         sleep(ms) {
