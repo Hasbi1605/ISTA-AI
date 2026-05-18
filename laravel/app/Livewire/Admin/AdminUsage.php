@@ -47,12 +47,10 @@ class AdminUsage extends Component
         // Normalize dates safely. Malformed query strings are dropped here so
         // the dashboard never throws a 500 on unparseable input. Default
         // window matches the service-level default range.
-        $startInput = $metrics->safeParseDate($this->startDate ?: null);
-        $endInput = $metrics->safeParseDate($this->endDate ?: null);
-
-        if ($startInput && $endInput && $startInput->greaterThan($endInput)) {
-            [$startInput, $endInput] = [$endInput, $startInput];
-        }
+        [$startInput, $endInput] = $metrics->safeDateRange(
+            $this->startDate ?: null,
+            $this->endDate ?: null,
+        );
 
         $distributionStart = $startInput
             ?? now()->subDays(AdminMetricsService::DEFAULT_RANGE_DAYS - 1)->startOfDay();

@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Admin;
 
+use App\Livewire\Admin\AdminUsage;
+use App\Livewire\Admin\AdminUsers;
 use App\Models\AIUsageEvent;
 use App\Models\Conversation;
 use App\Models\Document;
@@ -104,7 +106,7 @@ class AdminMonitoringDashboardTest extends TestCase
 
         $this->actingAs($admin);
 
-        Livewire::test(\App\Livewire\Admin\AdminUsers::class)
+        Livewire::test(AdminUsers::class)
             ->set('status', 'online')
             ->assertSee('Admin Aktif')
             ->assertDontSee('Idle Person');
@@ -125,10 +127,32 @@ class AdminMonitoringDashboardTest extends TestCase
 
         $this->actingAs($admin);
 
-        Livewire::test(\App\Livewire\Admin\AdminUsage::class)
+        Livewire::test(AdminUsage::class)
             ->set('feature', AIUsageEvent::FEATURE_CHAT)
             ->assertSee('req-chat', false)
             ->assertDontSee('req-rag', false);
+
+        Carbon::setTestNow();
+    }
+
+    public function test_admin_usage_end_date_filter_includes_the_full_selected_day(): void
+    {
+        $now = Carbon::parse('2026-05-20 12:00:00');
+        Carbon::setTestNow($now);
+
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $user = User::factory()->create(['role' => User::ROLE_USER]);
+
+        $this->makeEvent($user->id, AIUsageEvent::FEATURE_CHAT, AIUsageEvent::ACTION_COMPLETED, AIUsageEvent::STATUS_SUCCESS, Carbon::parse('2026-05-18 23:45:00'), 'req-end-day');
+        $this->makeEvent($user->id, AIUsageEvent::FEATURE_CHAT, AIUsageEvent::ACTION_COMPLETED, AIUsageEvent::STATUS_SUCCESS, Carbon::parse('2026-05-19 00:01:00'), 'req-next-day');
+
+        $this->actingAs($admin);
+
+        Livewire::test(AdminUsage::class)
+            ->set('startDate', '2026-05-18')
+            ->set('endDate', '2026-05-18')
+            ->assertSee('req-end-day', false)
+            ->assertDontSee('req-next-day', false);
 
         Carbon::setTestNow();
     }
@@ -285,7 +309,7 @@ class AdminMonitoringDashboardTest extends TestCase
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
         $this->actingAs($admin);
 
-        Livewire::test(\App\Livewire\Admin\AdminUsage::class)
+        Livewire::test(AdminUsage::class)
             ->set('startDate', 'banana')
             ->set('endDate', 'pineapple')
             ->assertOk()

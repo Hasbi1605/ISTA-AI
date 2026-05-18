@@ -139,8 +139,8 @@ class AdminMetricsService
         $rows = AIUsageEvent::query()
             ->selectRaw('DATE(created_at) as event_date')
             ->selectRaw('COUNT(*) as total')
-            ->selectRaw("SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as success", [AIUsageEvent::STATUS_SUCCESS])
-            ->selectRaw("SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as failed", [AIUsageEvent::STATUS_ERROR])
+            ->selectRaw('SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as success', [AIUsageEvent::STATUS_SUCCESS])
+            ->selectRaw('SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as failed', [AIUsageEvent::STATUS_ERROR])
             ->where('created_at', '>=', $start)
             ->groupBy('event_date')
             ->orderBy('event_date')
@@ -175,8 +175,8 @@ class AdminMetricsService
 
         return AIUsageEvent::query()
             ->selectRaw('feature, COUNT(*) as total')
-            ->selectRaw("SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as success", [AIUsageEvent::STATUS_SUCCESS])
-            ->selectRaw("SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as failed", [AIUsageEvent::STATUS_ERROR])
+            ->selectRaw('SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as success', [AIUsageEvent::STATUS_SUCCESS])
+            ->selectRaw('SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as failed', [AIUsageEvent::STATUS_ERROR])
             ->whereBetween('created_at', [$start, $end])
             ->groupBy('feature')
             ->orderByDesc('total')
@@ -428,12 +428,10 @@ class AdminMetricsService
             $query->where('request_id', $filters['request_id']);
         }
 
-        $start = $this->parseDate($filters['start_date'] ?? null);
-        $end = $this->parseDate($filters['end_date'] ?? null);
-
-        if ($start !== null && $end !== null && $start->greaterThan($end)) {
-            [$start, $end] = [$end, $start];
-        }
+        [$start, $end] = $this->safeDateRange(
+            $filters['start_date'] ?? null,
+            $filters['end_date'] ?? null,
+        );
 
         $maxStart = now()->subDays(self::MAX_RANGE_DAYS - 1)->startOfDay();
 
@@ -482,12 +480,41 @@ class AdminMetricsService
     }
 
     /**
-     * Parse a user-supplied date string safely. Returns null when the
-     * input is empty or malformed.
+     * Parse a user-supplied date string safely. Returns null when the input
+     * is empty or malformed.
      */
     public function safeParseDate(mixed $value): ?Carbon
     {
         return $this->parseDate($value);
+    }
+
+    /**
+     * Parse and normalize a user-supplied date range.
+     *
+     * Date inputs from the UI are day-only strings, so their start/end
+     * boundaries should include the whole selected day.
+     *
+     * @return array{0: ?Carbon, 1: ?Carbon}
+     */
+    public function safeDateRange(mixed $startValue, mixed $endValue): array
+    {
+        $start = $this->parseDate($startValue);
+        $end = $this->parseDate($endValue);
+
+        if ($start !== null && $end !== null && $start->greaterThan($end)) {
+            [$start, $end] = [$end, $start];
+            [$startValue, $endValue] = [$endValue, $startValue];
+        }
+
+        if ($start !== null) {
+            $start = $this->applyDateOnlyBoundary($start, $startValue, 'start');
+        }
+
+        if ($end !== null) {
+            $end = $this->applyDateOnlyBoundary($end, $endValue, 'end');
+        }
+
+        return [$start, $end];
     }
 
     private function countActiveUsersBetween(CarbonInterface $start, CarbonInterface $end): int
@@ -529,5 +556,16 @@ class AdminMetricsService
         } catch (\Throwable $e) {
             return null;
         }
+    }
+
+    private function applyDateOnlyBoundary(Carbon $date, mixed $rawValue, string $boundary): Carbon
+    {
+        if (! is_string($rawValue) || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', trim($rawValue))) {
+            return $date;
+        }
+
+        return $boundary === 'end'
+            ? $date->endOfDay()
+            : $date->startOfDay();
     }
 }

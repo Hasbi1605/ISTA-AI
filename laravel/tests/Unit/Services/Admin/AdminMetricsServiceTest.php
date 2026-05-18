@@ -22,7 +22,7 @@ class AdminMetricsServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->metrics = new AdminMetricsService();
+        $this->metrics = new AdminMetricsService;
     }
 
     public function test_overview_kpis_aggregate_users_events_documents_and_memos(): void
@@ -155,7 +155,7 @@ class AdminMetricsServiceTest extends TestCase
         $offline = new User(['last_seen_at' => $now->copy()->subHour()]);
         $offline->setRawAttributes(['last_seen_at' => $now->copy()->subHour()]);
 
-        $never = new User();
+        $never = new User;
 
         $this->assertSame('online', $this->metrics->presenceStatus($online, $now));
         $this->assertSame('idle', $this->metrics->presenceStatus($idle, $now));
@@ -201,6 +201,27 @@ class AdminMetricsServiceTest extends TestCase
         $errors = $this->metrics->recentErrors([]);
         $this->assertCount(1, $errors);
         $this->assertSame(AIUsageEvent::STATUS_ERROR, $errors->first()->status);
+
+        Carbon::setTestNow();
+    }
+
+    public function test_recent_events_end_date_filter_includes_the_full_selected_day(): void
+    {
+        $now = Carbon::parse('2026-05-20 12:00:00');
+        Carbon::setTestNow($now);
+
+        $user = User::factory()->create();
+
+        $this->makeEvent($user->id, AIUsageEvent::FEATURE_CHAT, AIUsageEvent::ACTION_COMPLETED, AIUsageEvent::STATUS_SUCCESS, Carbon::parse('2026-05-18 23:59:59'));
+        $this->makeEvent($user->id, AIUsageEvent::FEATURE_CHAT, AIUsageEvent::ACTION_COMPLETED, AIUsageEvent::STATUS_SUCCESS, Carbon::parse('2026-05-19 00:00:00'));
+
+        $rows = $this->metrics->recentEvents([
+            'start_date' => '2026-05-18',
+            'end_date' => '2026-05-18',
+        ]);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame('2026-05-18 23:59:59', $rows->first()->created_at->toDateTimeString());
 
         Carbon::setTestNow();
     }
