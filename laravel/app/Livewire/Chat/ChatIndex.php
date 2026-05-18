@@ -5,9 +5,11 @@ namespace App\Livewire\Chat;
 use App\Jobs\GenerateChatResponse;
 use App\Models\CloudStorageFile;
 use App\Models\Conversation;
+use App\Models\AIUsageEvent;
 use App\Models\Document;
 use App\Models\Message;
 use App\Models\User;
+use App\Services\Admin\AIUsageEventService;
 use App\Services\AIService;
 use App\Services\Chat\ChatDocumentStateService;
 use App\Services\ChatOrchestrationService;
@@ -448,6 +450,9 @@ class ChatIndex extends Component
     public function saveAnswerToGoogleDrive(int $messageId, string $targetFormat): array
     {
         $userId = Auth::id();
+        $usageEvents = app(AIUsageEventService::class);
+        $startedAt = microtime(true);
+        $requestId = $usageEvents->newRequestId();
 
         if ($userId === null) {
             return [
@@ -489,6 +494,20 @@ class ChatIndex extends Component
             $contentHtml = app(SafeAssistantMarkdown::class)->toHtml($message->content);
 
             if ($this->formatRequiresTable($targetFormat) && ! $this->contentHtmlContainsTable($contentHtml)) {
+                $usageEvents->failed(
+                    feature: AIUsageEvent::FEATURE_GOOGLE_DRIVE_EXPORT,
+                    userId: (int) $userId,
+                    metadata: [
+                        'message_id' => (int) $messageId,
+                        'target_format' => $targetFormat,
+                        'reason' => 'format_requires_table',
+                    ],
+                    requestId: $requestId,
+                    latencyMs: $usageEvents->latencyMsSince($startedAt),
+                    errorCode: 'format_requires_table',
+                    subject: $message,
+                );
+
                 return [
                     'ok' => false,
                     'message' => 'Format spreadsheet hanya tersedia untuk jawaban AI yang berisi tabel.',
@@ -536,6 +555,21 @@ class ChatIndex extends Component
                 Storage::disk('local')->delete($tempRelativePath);
             }
 
+            $usageEvents->completed(
+                feature: AIUsageEvent::FEATURE_GOOGLE_DRIVE_EXPORT,
+                userId: (int) $userId,
+                metadata: [
+                    'message_id' => (int) $messageId,
+                    'target_format' => $targetFormat,
+                    'provider' => 'google_drive',
+                    'mime_type' => $upload['mime_type'] ?? null,
+                    'size_bytes' => $upload['size_bytes'] ?? null,
+                ],
+                requestId: $requestId,
+                latencyMs: $usageEvents->latencyMsSince($startedAt),
+                subject: $message,
+            );
+
             return [
                 'ok' => true,
                 'file_name' => $upload['name'],
@@ -544,6 +578,20 @@ class ChatIndex extends Component
             ];
         } catch (\Throwable $e) {
             report($e);
+
+            $usageEvents->failed(
+                feature: AIUsageEvent::FEATURE_GOOGLE_DRIVE_EXPORT,
+                userId: (int) $userId,
+                metadata: [
+                    'message_id' => (int) $messageId,
+                    'target_format' => $targetFormat,
+                    'provider' => 'google_drive',
+                ],
+                requestId: $requestId,
+                latencyMs: $usageEvents->latencyMsSince($startedAt),
+                errorCode: 'exception',
+                subject: $message,
+            );
 
             return [
                 'ok' => false,
@@ -582,9 +630,10 @@ class ChatIndex extends Component
         }
     }
 
-    public function sendMessage(AIService $aiService, ?string $prompt = null, ?ChatOrchestrationService $orchestrator = null)
+    public function sendMessage(AIService $aiService, ?string $prompt = null, ?ChatOrchestrationService $orchestrator = null, ?AIUsageEventService $usageEvents = null)
     {
         $orchestrator = $orchestrator ?? app(ChatOrchestrationService::class);
+        $usageEvents = $usageEvents ?? app(AIUsageEventService::class);
 
         if ($prompt !== null) {
             $this->prompt = $prompt;
@@ -664,18 +713,52 @@ class ChatIndex extends Component
         $orchestrator->createStreamIntent($conversationIdForRequest);
         $this->streamingConversationId = $conversationIdForRequest;
 
+        $requestId = $usageEvents->newRequestId();
+        $hasDocumentContext = ! empty($conversationDocuments);
+        $feature = $this->resolveChatFeature($webSearchMode, $hasDocumentContext);
+
+        $usageEvents->started(
+            feature: $feature,
+            userId: (int) Auth::id(),
+            metadata: [
+                'conversation_id' => $conversationIdForRequest,
+                'message_id' => $userMessageArray['id'] ?? null,
+                'document_count' => count($conversationDocuments),
+                'has_documents' => $hasDocumentContext,
+                'web_search_mode' => $webSearchMode,
+                'history_message_count' => count($history),
+                'channel' => 'livewire',
+            ],
+            requestId: $requestId,
+        );
+
         GenerateChatResponse::dispatch(
             $conversationIdForRequest,
             (int) Auth::id(),
             $history,
             $conversationDocuments,
             $webSearchMode,
+            $requestId,
         );
 
         return [
             'conversationId' => $conversationIdForRequest,
             'messageId' => $userMessageArray['id'] ?? null,
+            'requestId' => $requestId,
         ];
+    }
+
+    private function resolveChatFeature(bool $webSearchMode, bool $hasDocumentContext): string
+    {
+        if ($hasDocumentContext) {
+            return AIUsageEvent::FEATURE_DOCUMENT_RAG;
+        }
+
+        if ($webSearchMode) {
+            return AIUsageEvent::FEATURE_WEB_SEARCH;
+        }
+
+        return AIUsageEvent::FEATURE_CHAT;
     }
 
     public function markStreamFailed(int $conversationId): void
