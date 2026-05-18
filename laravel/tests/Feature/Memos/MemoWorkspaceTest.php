@@ -219,6 +219,7 @@ class MemoWorkspaceTest extends TestCase
         $this->assertStringContainsString('isLoadingMemo(id)', $chatPageJs);
         $this->assertStringContainsString('loadMemo(id)', $chatPageJs);
         $this->assertStringContainsString('this.loadingMemoId = memoId', $chatPageJs);
+        $this->assertStringContainsString('&& this.hasUnsavedOnlyOfficeChanges()', $chatPageJs);
         $this->assertStringContainsString('this.$wire.loadMemo(memoId, shouldSyncActiveEditor)', $chatPageJs);
         $this->assertStringContainsString('waitForOnlyOfficeToSettle()', $chatPageJs);
         $this->assertStringContainsString('this.loadingMemoId = null', $chatPageJs);
@@ -1341,6 +1342,40 @@ class MemoWorkspaceTest extends TestCase
             ->assertSee('Buat ulang dari konfigurasi', false)
             ->assertDontSee('Memo "Memo Panjang Format Folio Eksplisit" dimuat.', false)
             ->assertDontSee('Tulis revisi untuk memo ini', false);
+    }
+
+    public function test_switch_memo_version_can_skip_editor_sync_when_no_unsaved_changes(): void
+    {
+        Storage::fake('local');
+        Http::fake([
+            '*' => fn () => throw new \RuntimeException('OnlyOffice force-save should not be called without unsaved editor changes.'),
+        ]);
+
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        [$memo, $versionOne] = $this->memoWithVersion($user, 'Memo Versi Tanpa Edit Manual', 'memos/'.$user->id.'/version-one.docx');
+        $versionTwoPath = 'memos/'.$user->id.'/version-two.docx';
+        Storage::disk('local')->put($versionTwoPath, $this->validMemoDocxBytes());
+        $versionTwo = $memo->versions()->create([
+            'version_number' => 2,
+            'label' => 'Versi 2',
+            'file_path' => $versionTwoPath,
+            'status' => Memo::STATUS_GENERATED,
+            'configuration' => [],
+            'searchable_text' => 'Memo Versi Tanpa Edit Manual v2',
+        ]);
+        $memo->forceFill([
+            'current_version_id' => $versionTwo->id,
+            'file_path' => $versionTwoPath,
+        ])->save();
+
+        Livewire::actingAs($user)
+            ->test(MemoWorkspace::class)
+            ->call('loadMemo', $memo->id)
+            ->assertSet('activeMemoVersionId', $versionTwo->id)
+            ->call('switchMemoVersion', $versionOne->id, false)
+            ->assertSet('activeMemoVersionId', $versionOne->id);
+
+        Http::assertNothingSent();
     }
 
     /**

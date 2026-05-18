@@ -75,7 +75,7 @@
                     <div class="mt-3 flex items-center gap-2 border-t border-stone-100 pt-3 dark:border-gray-800">
                         <label for="memo-version-select" class="shrink-0 text-[10.5px] font-bold uppercase tracking-wider text-stone-400 dark:text-gray-500">Versi memo</label>
                         <select id="memo-version-select"
-                                wire:change="switchMemoVersion($event.target.value)"
+                                x-on:change.stop.prevent="switchMemoVersion($wire, $event.target.value)"
                                 class="min-w-0 flex-1 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-[12px] font-semibold text-stone-700 shadow-sm outline-none focus:border-ista-primary focus:outline-none focus:ring-1 focus:ring-ista-primary focus-visible:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
                             @foreach ($activeMemoVersions as $version)
                                 <option value="{{ $version->id }}" @selected((int) $activeMemoVersionId === (int) $version->id)>

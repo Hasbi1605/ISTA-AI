@@ -383,7 +383,7 @@ class MemoWorkspace extends Component
         }
     }
 
-    public function switchMemoVersion(int|string $versionId): void
+    public function switchMemoVersion(int|string $versionId, bool $syncActiveEditor = true): void
     {
         if (! $this->activeMemoId || ! is_numeric($versionId)) {
             return;
@@ -391,7 +391,7 @@ class MemoWorkspace extends Component
 
         $targetVersionId = (int) $versionId;
 
-        if ((int) $this->activeMemoVersionId !== $targetVersionId && ! $this->syncActiveMemoEditorBeforeLeaving()) {
+        if ($syncActiveEditor && (int) $this->activeMemoVersionId !== $targetVersionId && ! $this->syncActiveMemoEditorBeforeLeaving()) {
             return;
         }
 

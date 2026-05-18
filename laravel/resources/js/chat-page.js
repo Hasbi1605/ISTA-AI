@@ -2091,7 +2091,9 @@ const registerChatPageData = (Alpine) => {
             const memoLoadToken = this.memoLoadToken + 1;
             this.memoLoadToken = memoLoadToken;
             this.loadingMemoId = memoId;
-            const shouldSyncActiveEditor = Number.isFinite(previousMemoId) && previousMemoId > 0;
+            const shouldSyncActiveEditor = Number.isFinite(previousMemoId)
+                && previousMemoId > 0
+                && this.hasUnsavedOnlyOfficeChanges();
 
             return (shouldSyncActiveEditor ? this.waitForOnlyOfficeToSettle() : Promise.resolve())
                 .then(() => this.$wire.loadMemo(memoId, shouldSyncActiveEditor))
@@ -2154,6 +2156,10 @@ const registerChatPageData = (Alpine) => {
             return states
                 .filter((state) => !state?.destroyedAt || Number(state.destroyedAt) < Number(state.lastReadyAt || state.lastChangeAt || 0))
                 .sort((a, b) => Number(b?.lastChangeAt || b?.lastReadyAt || 0) - Number(a?.lastChangeAt || a?.lastReadyAt || 0))[0] || null;
+        },
+
+        hasUnsavedOnlyOfficeChanges() {
+            return Boolean(this.latestOnlyOfficeState()?.dirty);
         },
 
         sleep(ms) {
@@ -2923,12 +2929,17 @@ const registerChatPageData = (Alpine) => {
             }
 
             this.downloadLoading = type;
-            this.downloadStatus = 'Menyimpan perubahan editor...';
+            this.downloadStatus = 'Menyiapkan unduhan...';
             this.downloadError = '';
 
             try {
                 await this.waitForOnlyOfficeToSettle();
-                await this.forceSaveMemo(forceSaveUrl, versionId);
+
+                if (this.hasUnsavedOnlyOfficeChanges()) {
+                    this.downloadStatus = 'Menyimpan perubahan editor...';
+                    await this.forceSaveMemo(forceSaveUrl, versionId);
+                }
+
                 this.downloadStatus = type === 'pdf' ? 'Menyiapkan PDF...' : 'Menyiapkan DOCX...';
 
                 const response = await fetch(this.versionedUrl(url, versionId), {
@@ -2982,6 +2993,10 @@ const registerChatPageData = (Alpine) => {
             return states
                 .filter((state) => !state?.destroyedAt || Number(state.destroyedAt) < Number(state.lastReadyAt || state.lastChangeAt || 0))
                 .sort((a, b) => Number(b?.lastChangeAt || b?.lastReadyAt || 0) - Number(a?.lastChangeAt || a?.lastReadyAt || 0))[0] || null;
+        },
+
+        hasUnsavedOnlyOfficeChanges() {
+            return Boolean(this.latestOnlyOfficeState()?.dirty);
         },
 
         sleep(ms) {
@@ -3124,6 +3139,12 @@ const registerChatPageData = (Alpine) => {
             this.showMemoSidebar = false;
         },
 
+        async switchMemoVersion($wire, versionId) {
+            await this.waitForOnlyOfficeToSettle();
+
+            return $wire.switchMemoVersion(versionId, this.hasUnsavedOnlyOfficeChanges());
+        },
+
         async submitMemoRevision($wire, textarea) {
             const message = (textarea?.value || '').trim();
 
@@ -3187,6 +3208,10 @@ const registerChatPageData = (Alpine) => {
 
             await this.waitForOnlyOfficeToSettle();
 
+            if (!this.hasUnsavedOnlyOfficeChanges()) {
+                return;
+            }
+
             const baseUrl = this.$root?.dataset?.memoForceSaveBaseUrl || '/chat/memos';
             const versionId = $wire.activeMemoVersionId || document.getElementById('memo-version-select')?.value || null;
             const response = await fetch(`${baseUrl}/${memoId}/force-save`, {
@@ -3212,10 +3237,9 @@ const registerChatPageData = (Alpine) => {
 
         forceSaveActiveMemoBeforeUnload($wire) {
             const state = this.latestOnlyOfficeState();
-            const lastChangeAt = Number(state?.lastChangeAt || 0);
             const memoId = Number($wire?.activeMemoId || 0);
 
-            if (!memoId || !lastChangeAt) {
+            if (!memoId || !state?.dirty) {
                 return;
             }
 
@@ -3282,6 +3306,10 @@ const registerChatPageData = (Alpine) => {
             return states
                 .filter((state) => !state?.destroyedAt || Number(state.destroyedAt) < Number(state.lastReadyAt || state.lastChangeAt || 0))
                 .sort((a, b) => Number(b?.lastChangeAt || b?.lastReadyAt || 0) - Number(a?.lastChangeAt || a?.lastReadyAt || 0))[0] || null;
+        },
+
+        hasUnsavedOnlyOfficeChanges() {
+            return Boolean(this.latestOnlyOfficeState()?.dirty);
         },
 
         sleep(ms) {
