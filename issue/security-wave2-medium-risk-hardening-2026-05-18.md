@@ -14,8 +14,10 @@ Validasi temuan security menunjukkan tiga hardening penting yang masih layak dik
 - Tambah konfigurasi secret/derived key untuk signed URL OnlyOffice.
 - Pastikan validasi signed URL tetap kompatibel dengan key baru dan test menutup perubahan.
 - Sanitasi `content_html` export dokumen dengan parser allowlist sebelum dikirim ke Python.
+- Letakkan sanitizer di boundary `DocumentExportService` agar semua jalur export, termasuk upload Google Drive dan export dokumen tersimpan, konsisten.
 - Pertahankan tag aman yang diperlukan untuk export jawaban AI seperti heading, paragraph, list, code/pre, blockquote, link aman, dan table.
 - Tambah konfigurasi `TRUSTED_PROXIES` dengan default private subnet internal yang aman untuk Docker/Caddy.
+- Dokumentasikan `TRUSTED_PROXIES` dan `ONLYOFFICE_SIGNED_URL_SECRET` di env example/deployment docs.
 - Test regresi untuk proxy header spoofing, signed URL key separation, dan sanitasi HTML export.
 
 ## Di Luar Scope
@@ -30,6 +32,8 @@ Validasi temuan security menunjukkan tiga hardening penting yang masih layak dik
 - `laravel/config/services.php`
 - `laravel/app/Services/OnlyOffice/MemoDocumentKey.php`
 - `laravel/app/Http/Controllers/Documents/DocumentExportController.php`
+- `laravel/app/Services/Documents/DocumentExportHtmlSanitizer.php`
+- `laravel/app/Services/DocumentExportService.php`
 - `laravel/tests/Feature/Memos/MemoPolicyTest.php`
 - `laravel/tests/Feature/Documents/DocumentExportTest.php`
 - Test baru untuk trusted proxies bila diperlukan.
@@ -44,13 +48,15 @@ Validasi temuan security menunjukkan tiga hardening penting yang masih layak dik
 2. Tambah config OnlyOffice `signed_url_secret`, lalu gunakan derived HMAC key khusus signed URL.
 3. Update signed URL test agar membuktikan key baru bukan `APP_KEY` langsung.
 4. Tambah sanitizer HTML export berbasis DOM parser allowlist.
-5. Tambah test payload HTML berisiko untuk export endpoint.
-6. Jalankan formatter dan test Laravel penuh.
+5. Tindak lanjuti review: pastikan unwrap tetap men-sanitasi child, parsing UTF-8 aman, link `http/https` sah tetap dipertahankan, dan sanitizer berada di service boundary.
+6. Tambah test payload HTML berisiko untuk export endpoint dan service boundary.
+7. Jalankan formatter dan test Laravel penuh.
 
 ## Rencana Test
 - Test trusted proxy memastikan spoofed `X-Forwarded-For` dari remote tak dipercaya ketika proxy list terbatas.
 - Test signed URL tetap valid dengan `ONLYOFFICE_SIGNED_URL_SECRET` dan gagal bila diverifikasi dengan `APP_KEY` langsung.
 - Test export endpoint menghapus script/iframe/event handler/style/resource eksternal tetapi menjaga table/list/text aman.
+- Test service export memastikan HTML dibersihkan sebelum dikirim ke Python meski tidak lewat HTTP controller.
 - Jalankan `vendor/bin/pint --test --dirty`.
 - Jalankan `php artisan test`.
 - Jalankan audit dependency Laravel bila tersedia.

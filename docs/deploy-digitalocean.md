@@ -78,8 +78,10 @@ Lalu isi `.env.droplet`:
 - `DB_PASSWORD` / `MYSQL_PASSWORD` / `MYSQL_ROOT_PASSWORD`
 - seluruh API key AI (`GITHUB_TOKEN`, `GROQ_API_KEY`, `GEMINI_API_KEY`, `LANGSEARCH_API_KEY`)
 - `ONLYOFFICE_JWT_SECRET` untuk JWT editor/callback
+- `ONLYOFFICE_SIGNED_URL_SECRET` untuk HMAC signed URL file memo, gunakan secret berbeda dari `APP_KEY`
 - `ONLYOFFICE_SIGNED_URL_TTL_MINUTES` untuk durasi signed URL memo, disarankan 15-30
 - `ONLYOFFICE_DOCUMENTSERVER_TAG` untuk pin versi OnlyOffice, jangan pakai `latest`
+- `TRUSTED_PROXIES` untuk sumber proxy internal yang dipercaya Laravel, default Docker/Caddy: `127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16`
 
 Contoh generator cepat:
 

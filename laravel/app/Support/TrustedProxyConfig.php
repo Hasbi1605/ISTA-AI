@@ -9,9 +9,9 @@ class TrustedProxyConfig
     /**
      * @return list<string>
      */
-    public static function fromEnv(): array
+    public static function fromConfig(): array
     {
-        return self::fromString(env('TRUSTED_PROXIES', self::DEFAULT_TRUSTED_PROXIES));
+        return self::fromString(config('trustedproxy.proxies', self::DEFAULT_TRUSTED_PROXIES));
     }
 
     /**
