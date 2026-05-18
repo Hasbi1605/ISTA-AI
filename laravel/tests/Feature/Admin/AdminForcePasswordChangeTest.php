@@ -166,4 +166,96 @@ class AdminForcePasswordChangeTest extends TestCase
 
         $this->assertGuest();
     }
+
+    public function test_inactive_admin_cannot_view_force_change_page(): void
+    {
+        $admin = User::factory()->create([
+            'role' => User::ROLE_ADMIN,
+            'is_active' => false,
+            'force_password_change' => true,
+            'password' => Hash::make('temp-1234'),
+        ]);
+
+        $this->actingAs($admin)
+            ->get('/admin/password/change')
+            ->assertRedirect(route('admin.login'));
+
+        // Session is invalidated by EnsureUserIsAdmin guard.
+        $this->assertGuest();
+    }
+
+    public function test_inactive_admin_cannot_submit_force_change_form(): void
+    {
+        $admin = User::factory()->create([
+            'role' => User::ROLE_ADMIN,
+            'is_active' => false,
+            'force_password_change' => true,
+            'password' => Hash::make('temp-1234'),
+        ]);
+
+        $this->actingAs($admin)
+            ->post('/admin/password/change', [
+                'current_password' => 'temp-1234',
+                'password' => 'BrandNew_PassW0rd!',
+                'password_confirmation' => 'BrandNew_PassW0rd!',
+            ])
+            ->assertRedirect(route('admin.login'));
+
+        $this->assertGuest();
+
+        $admin->refresh();
+        // Password and flag must remain unchanged.
+        $this->assertTrue(Hash::check('temp-1234', $admin->password));
+        $this->assertTrue((bool) $admin->force_password_change);
+    }
+
+    public function test_unverified_admin_cannot_view_force_change_page(): void
+    {
+        $admin = User::factory()->unverified()->create([
+            'role' => User::ROLE_ADMIN,
+            'is_active' => true,
+            'force_password_change' => true,
+            'password' => Hash::make('temp-1234'),
+        ]);
+
+        $this->actingAs($admin)
+            ->get('/admin/password/change')
+            ->assertRedirect(route('verification.notice'));
+    }
+
+    public function test_unverified_admin_cannot_submit_force_change_form(): void
+    {
+        $admin = User::factory()->unverified()->create([
+            'role' => User::ROLE_ADMIN,
+            'is_active' => true,
+            'force_password_change' => true,
+            'password' => Hash::make('temp-1234'),
+        ]);
+
+        $this->actingAs($admin)
+            ->post('/admin/password/change', [
+                'current_password' => 'temp-1234',
+                'password' => 'BrandNew_PassW0rd!',
+                'password_confirmation' => 'BrandNew_PassW0rd!',
+            ])
+            ->assertRedirect(route('verification.notice'));
+
+        $admin->refresh();
+        $this->assertTrue(Hash::check('temp-1234', $admin->password));
+        $this->assertTrue((bool) $admin->force_password_change);
+    }
+
+    public function test_regular_user_cannot_access_force_change_page_even_with_session(): void
+    {
+        $user = User::factory()->create([
+            'role' => User::ROLE_USER,
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($user)
+            ->get('/admin/password/change')
+            ->assertRedirect(route('admin.login'));
+
+        $this->assertGuest();
+    }
 }

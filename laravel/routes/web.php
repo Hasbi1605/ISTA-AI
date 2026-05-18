@@ -121,7 +121,15 @@ Route::middleware(['web'])
         });
 
         Route::middleware('auth')->group(function () {
+            // Logout must remain accessible for any authenticated user (including inactive
+            // admins whose session is still valid) so they can clear their session.
             Route::post('/logout', [AdminLoginController::class, 'logout'])->name('logout');
+        });
+
+        // Force password change endpoints require the same active-admin guard as the
+        // rest of /admin/*. We deliberately omit `admin.password_changed` here to avoid
+        // a redirect loop while the flag is still true.
+        Route::middleware(['auth', 'verified', 'admin'])->group(function () {
             Route::get('/password/change', [AdminPasswordChangeController::class, 'show'])->name('password.change');
             Route::post('/password/change', [AdminPasswordChangeController::class, 'update'])
                 ->middleware('throttle:10,1')
