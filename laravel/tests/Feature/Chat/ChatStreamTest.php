@@ -191,6 +191,47 @@ class ChatStreamTest extends TestCase
         $this->assertSame('Pertanyaan dari DB', $lastMsg['content']);
     }
 
+    public function test_stream_document_context_comes_from_latest_user_message_not_query_string(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::create([
+            'user_id' => $user->id,
+            'title' => 'Document context test',
+        ]);
+        $selectedDoc = Document::create([
+            'user_id' => $user->id,
+            'filename' => 'selected.pdf',
+            'original_name' => 'selected.pdf',
+            'file_path' => 'documents/'.$user->id.'/selected.pdf',
+            'mime_type' => 'application/pdf',
+            'file_size_bytes' => 100,
+            'status' => 'ready',
+        ]);
+        $tamperedDoc = Document::create([
+            'user_id' => $user->id,
+            'filename' => 'tampered.pdf',
+            'original_name' => 'tampered.pdf',
+            'file_path' => 'documents/'.$user->id.'/tampered.pdf',
+            'mime_type' => 'application/pdf',
+            'file_size_bytes' => 100,
+            'status' => 'ready',
+        ]);
+
+        Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'user',
+            'content' => 'Gunakan dokumen yang dipilih.',
+            'document_ids' => [$selectedDoc->id],
+        ]);
+
+        $method = new \ReflectionMethod(ChatStreamController::class, 'documentIdsForLatestUserMessage');
+        $method->setAccessible(true);
+
+        $documentIds = $method->invoke(app(ChatStreamController::class), $conversation->id, [$tamperedDoc->id]);
+
+        $this->assertSame([(int) $selectedDoc->id], $documentIds);
+    }
+
     // -------------------------------------------------------------------------
     // DB persistence
     // -------------------------------------------------------------------------

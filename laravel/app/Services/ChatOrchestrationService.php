@@ -47,15 +47,31 @@ class ChatOrchestrationService
         return $currentConversationId;
     }
 
-    public function saveUserMessage(int $conversationId, string $prompt): array
+    /**
+     * @param  array<int, int|string>  $documentIds
+     */
+    public function saveUserMessage(int $conversationId, string $prompt, array $documentIds = []): array
     {
         $userMessage = Message::create([
             'conversation_id' => $conversationId,
             'role' => 'user',
             'content' => $prompt,
+            'document_ids' => $this->normalizeDocumentIds($documentIds),
         ]);
 
         return $userMessage->toArray();
+    }
+
+    /**
+     * @param  array<int, int|string>  $documentIds
+     * @return list<int>
+     */
+    public function normalizeDocumentIds(array $documentIds): array
+    {
+        return array_values(array_unique(array_filter(
+            array_map(fn ($id) => is_numeric($id) ? (int) $id : null, $documentIds),
+            fn ($id) => $id !== null && $id > 0,
+        )));
     }
 
     /**

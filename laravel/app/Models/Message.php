@@ -9,11 +9,12 @@ class Message extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['conversation_id', 'role', 'content', 'is_error'];
+    protected $fillable = ['conversation_id', 'role', 'content', 'is_error', 'document_ids'];
 
     protected function casts(): array
     {
         return [
+            'document_ids' => 'array',
             'is_error' => 'boolean',
         ];
     }

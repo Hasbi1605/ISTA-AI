@@ -34,7 +34,8 @@ class ChatStreamController extends Controller
         //   - URL length limits (414) with long conversations
         //   - Chat content leaking into access logs / proxy logs
         //   - Arbitrary history injection from client
-        $documentIds = $this->parseDocumentIds($request->input('document_ids', '[]'));
+        $requestedDocumentIds = $this->parseDocumentIds($request->input('document_ids', '[]'));
+        $documentIds = $this->documentIdsForLatestUserMessage($conversationId, $requestedDocumentIds);
         $webSearchMode = filter_var($request->input('web_search_mode', false), FILTER_VALIDATE_BOOLEAN);
 
         $aiService = app(AIService::class);
@@ -281,5 +282,30 @@ class ChatStreamController extends Controller
         } catch (\Throwable) {
             return [];
         }
+    }
+
+    /**
+     * Prefer document IDs persisted with the latest user message so a tampered
+     * EventSource query string cannot silently swap the RAG context.
+     *
+     * @param  array<int, int>  $fallbackDocumentIds
+     * @return array<int, int>
+     */
+    private function documentIdsForLatestUserMessage(int $conversationId, array $fallbackDocumentIds): array
+    {
+        $message = Message::query()
+            ->where('conversation_id', $conversationId)
+            ->where('role', 'user')
+            ->orderByDesc('id')
+            ->first(['document_ids']);
+
+        if ($message === null || $message->document_ids === null) {
+            return $fallbackDocumentIds;
+        }
+
+        return array_values(array_filter(
+            array_map(fn ($id) => is_numeric($id) ? (int) $id : null, $message->document_ids),
+            fn ($id) => $id !== null && $id > 0,
+        ));
     }
 }

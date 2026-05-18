@@ -83,6 +83,8 @@ class ChatIndex extends Component
     // Maximum chats to show before "Show More"
     const MAX_VISIBLE_CHATS = 10;
 
+    private const HISTORY_LOAD_LIMIT = 100;
+
     public function mount($id = null)
     {
         $this->loadConversations();
@@ -119,6 +121,7 @@ class ChatIndex extends Component
             ->with('latestMessage')
             ->orderBy('updated_at', 'desc')
             ->orderBy('id', 'desc')
+            ->limit(self::HISTORY_LOAD_LIMIT)
             ->get();
         $this->pendingConversationIds = $this->conversations
             ->filter(fn (Conversation $conversation) => $this->conversationHasPendingResponse($conversation))
@@ -368,14 +371,12 @@ class ChatIndex extends Component
                     'required',
                     'file',
                     'mimes:'.implode(',', Document::attachmentFileExtensions()),
-                    'mimetypes:'.implode(',', Document::attachmentMimeTypes()),
                     'max:51200',
                 ],
             ], [
                 'chatAttachment.required' => 'Pilih file dokumen terlebih dahulu.',
                 'chatAttachment.file' => 'Lampiran chat harus berupa file dokumen.',
                 'chatAttachment.mimes' => 'Lampiran chat harus berupa file PDF, DOCX, XLSX, atau CSV.',
-                'chatAttachment.mimetypes' => 'Lampiran chat harus berupa file PDF, DOCX, XLSX, atau CSV.',
                 'chatAttachment.max' => 'Ukuran lampiran chat tidak boleh lebih dari 50 MB.',
             ], [
                 'chatAttachment' => 'lampiran chat',
@@ -488,6 +489,13 @@ class ChatIndex extends Component
                 'html_input' => 'strip',
                 'allow_unsafe_links' => false,
             ]);
+
+            if ($this->formatRequiresTable($targetFormat) && ! $this->contentHtmlContainsTable($contentHtml)) {
+                return [
+                    'ok' => false,
+                    'message' => 'Format spreadsheet hanya tersedia untuk jawaban AI yang berisi tabel.',
+                ];
+            }
 
             $exportService = app(DocumentExportService::class);
             $artifact = $exportService->exportContent(
@@ -607,7 +615,9 @@ class ChatIndex extends Component
         // DB transaction with a row lock on the conversation. This prevents two
         // concurrent requests for the same conversation from both passing the
         // pending check and both inserting a user message + dispatching a job.
-        $userMessageArray = DB::transaction(function () use ($conversationIdForRequest, $orchestrator) {
+        $conversationDocuments = $orchestrator->normalizeDocumentIds($this->conversationDocuments);
+
+        $userMessageArray = DB::transaction(function () use ($conversationIdForRequest, $orchestrator, $conversationDocuments) {
             $activeConversation = Conversation::query()
                 ->lockForUpdate()
                 ->find($conversationIdForRequest);
@@ -622,7 +632,7 @@ class ChatIndex extends Component
                 return null;
             }
 
-            return $orchestrator->saveUserMessage($conversationIdForRequest, $this->prompt);
+            return $orchestrator->saveUserMessage($conversationIdForRequest, $this->prompt, $conversationDocuments);
         });
 
         if ($userMessageArray === null) {
@@ -641,7 +651,6 @@ class ChatIndex extends Component
         $this->sources = [];
 
         $history = $orchestrator->buildHistory($this->messages);
-        $conversationDocuments = array_values(array_map('intval', $this->conversationDocuments));
         $webSearchMode = (bool) $this->webSearchMode;
 
         Conversation::query()
@@ -841,6 +850,16 @@ class ChatIndex extends Component
         return in_array($normalized, ['pdf', 'docx', 'xlsx', 'csv'], true)
             ? $normalized
             : null;
+    }
+
+    private function formatRequiresTable(string $targetFormat): bool
+    {
+        return in_array(strtolower(trim($targetFormat)), ['xlsx', 'csv'], true);
+    }
+
+    private function contentHtmlContainsTable(string $contentHtml): bool
+    {
+        return str_contains(Str::lower($contentHtml), '<table');
     }
 
     private function enforceRateLimit(string $action, int $maxAttempts, int $decaySeconds = 60, ?string $message = null): void

@@ -85,6 +85,34 @@ class GoogleDriveUploadTest extends TestCase
         ]);
     }
 
+    public function test_chat_answer_spreadsheet_upload_requires_table_content(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::create([
+            'user_id' => $user->id,
+            'title' => 'Drive answer upload',
+        ]);
+        $message = Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'assistant',
+            'content' => "Ini jawaban naratif tanpa tabel.\n\n- Satu\n- Dua",
+        ]);
+
+        $exportService = Mockery::mock(DocumentExportService::class);
+        $exportService->shouldNotReceive('exportContent');
+        $this->app->instance(DocumentExportService::class, $exportService);
+
+        Livewire::actingAs($user)
+            ->test(ChatIndex::class)
+            ->call('saveAnswerToGoogleDrive', $message->id, 'xlsx')
+            ->assertReturned([
+                'ok' => false,
+                'message' => 'Format spreadsheet hanya tersedia untuk jawaban AI yang berisi tabel.',
+            ]);
+
+        $this->assertDatabaseCount('cloud_storage_files', 0);
+    }
+
     public function test_document_viewer_can_upload_exported_file_to_google_drive(): void
     {
         Storage::fake('local');

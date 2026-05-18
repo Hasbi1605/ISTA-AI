@@ -1023,7 +1023,7 @@ class OnlyOfficeCallbackTest extends TestCase
         Http::assertNothingSent();
     }
 
-    public function test_callback_status_2_invalidates_editor_key_for_next_session(): void
+    public function test_callback_status_2_keeps_active_editor_key_for_open_session(): void
     {
         config([
             'services.onlyoffice.jwt_secret' => 'callback-secret',
@@ -1051,6 +1051,36 @@ class OnlyOfficeCallbackTest extends TestCase
             'url' => $url,
             'token' => $token,
         ])->assertOk()->assertJson(['error' => 0]);
+
+        $nextKey = app(MemoDocumentKey::class)->forEditor($memo->refresh());
+
+        $this->assertSame($initialKey, $nextKey);
+    }
+
+    public function test_callback_status_4_invalidates_editor_key_after_session_closes(): void
+    {
+        config([
+            'services.onlyoffice.jwt_secret' => 'callback-secret',
+            'services.onlyoffice.internal_url' => 'https://onlyoffice.test',
+        ]);
+        Storage::fake('local');
+
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        $memo = $this->createMemo($user);
+        $initialKey = $this->callbackKey($memo);
+        $token = (new JwtSigner('callback-secret'))->sign([
+            'status' => 4,
+            'key' => $initialKey,
+            'exp' => time() + 60,
+        ]);
+
+        $this->postJson(route('onlyoffice.callback', $memo), [
+            'status' => 4,
+            'key' => $initialKey,
+            'token' => $token,
+        ])->assertOk()->assertJson(['error' => 0]);
+
+        $memo->forceFill(['updated_at' => now()->addMinute()])->save();
 
         $nextKey = app(MemoDocumentKey::class)->forEditor($memo->refresh(), $memo->currentVersion?->refresh());
 

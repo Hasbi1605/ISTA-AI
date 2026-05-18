@@ -44,6 +44,30 @@ class DocumentUploadTest extends TestCase
         Queue::assertPushed(ProcessDocument::class, 1);
     }
 
+    public function test_pdf_upload_accepts_octet_stream_client_mime(): void
+    {
+        Queue::fake();
+        Storage::fake('local');
+
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->test(ChatIndex::class)
+            ->set('chatAttachment', UploadedFile::fake()->createWithContent(
+                'referensi.pdf',
+                "%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF"
+            ))
+            ->assertSet('attachmentUploadStatus', 'success');
+
+        $this->assertDatabaseHas('documents', [
+            'user_id' => $user->id,
+            'original_name' => 'referensi.pdf',
+            'status' => 'pending',
+        ]);
+
+        Queue::assertPushed(ProcessDocument::class, 1);
+    }
+
     public function test_user_cannot_upload_more_than_10_documents(): void
     {
         Queue::fake();

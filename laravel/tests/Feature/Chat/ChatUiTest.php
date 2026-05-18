@@ -1730,4 +1730,43 @@ class ChatUiTest extends TestCase
                 && $job->userId === (int) $user->id;
         });
     }
+
+    public function test_send_message_persists_selected_document_context_on_user_message(): void
+    {
+        Queue::fake();
+
+        $user = User::factory()->create();
+        $conversation = Conversation::create([
+            'user_id' => $user->id,
+            'title' => 'Document context conversation',
+        ]);
+        $document = Document::create([
+            'user_id' => $user->id,
+            'filename' => 'context.pdf',
+            'original_name' => 'context.pdf',
+            'file_path' => 'documents/'.$user->id.'/context.pdf',
+            'mime_type' => 'application/pdf',
+            'file_size_bytes' => 123,
+            'status' => 'ready',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ChatIndex::class)
+            ->set('currentConversationId', $conversation->id)
+            ->set('conversationDocuments', [$document->id])
+            ->set('prompt', 'Ringkas dokumen ini')
+            ->call('sendMessage');
+
+        $message = Message::query()
+            ->where('conversation_id', $conversation->id)
+            ->where('role', 'user')
+            ->firstOrFail();
+
+        $this->assertSame([(int) $document->id], $message->document_ids);
+
+        Queue::assertPushed(
+            GenerateChatResponse::class,
+            fn (GenerateChatResponse $job) => $job->conversationDocuments === [(int) $document->id]
+        );
+    }
 }

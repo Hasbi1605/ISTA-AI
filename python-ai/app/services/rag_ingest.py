@@ -24,6 +24,57 @@ from app.services.lightweight_text_splitter import LightweightRecursiveTextSplit
 logger = logging.getLogger(__name__)
 
 
+def _delete_chroma_ids_with_retry(
+    delete_callable,
+    ids: list[str],
+    description: str,
+    document_id: str | None,
+    attempts: int = 3,
+    delay_seconds: float = 0.2,
+) -> bool:
+    if not ids:
+        return True
+
+    last_error: Exception | None = None
+
+    for attempt in range(1, attempts + 1):
+        try:
+            delete_callable(ids=ids)
+            if attempt > 1:
+                logger.info(
+                    "Post-ingest cleanup: %s delete succeeded on retry %d for document_id=%s",
+                    description,
+                    attempt,
+                    document_id,
+                )
+
+            return True
+        except Exception as exc:
+            last_error = exc
+            if attempt >= attempts:
+                break
+
+            logger.warning(
+                "Post-ingest cleanup: %s delete attempt %d/%d failed for document_id=%s: %s",
+                description,
+                attempt,
+                attempts,
+                document_id,
+                exc,
+            )
+            time.sleep(delay_seconds)
+
+    logger.warning(
+        "Post-ingest cleanup: %s delete failed after %d attempts for document_id=%s: %s",
+        description,
+        attempts,
+        document_id,
+        last_error,
+    )
+
+    return False
+
+
 def process_document(
     file_path: str,
     filename: str,
@@ -476,16 +527,15 @@ def process_document(
         #   - If this cleanup fails, the old chunks remain as stale duplicates
         #     but retrieval continues to work (new chunks are preferred by score).
         if old_vector_ids:
-            try:
-                vectorstore.delete(ids=old_vector_ids)
+            if _delete_chroma_ids_with_retry(
+                vectorstore.delete,
+                old_vector_ids,
+                "stale vectors",
+                document_id,
+            ):
                 logger.info(
                     "✅ Post-ingest cleanup: deleted %d stale vectors for document_id=%s",
                     len(old_vector_ids), document_id,
-                )
-            except Exception as _cleanup_err:
-                logger.warning(
-                    "Post-ingest cleanup failed (stale chunks may remain): %s",
-                    _cleanup_err,
                 )
 
         if old_parent_ids:
@@ -501,11 +551,16 @@ def process_document(
                 new_p_ids_set: set[str] = set(p_ids) if p_ids else set()
                 stale_parent_ids = [pid for pid in old_parent_ids if pid not in new_p_ids_set]
                 if stale_parent_ids:
-                    _parent_vs._collection.delete(ids=stale_parent_ids)
-                    logger.info(
-                        "✅ Post-ingest cleanup: deleted %d stale parent chunks for document_id=%s",
-                        len(stale_parent_ids), document_id,
-                    )
+                    if _delete_chroma_ids_with_retry(
+                        _parent_vs._collection.delete,
+                        stale_parent_ids,
+                        "stale parent chunks",
+                        document_id,
+                    ):
+                        logger.info(
+                            "✅ Post-ingest cleanup: deleted %d stale parent chunks for document_id=%s",
+                            len(stale_parent_ids), document_id,
+                        )
                 else:
                     logger.info("Post-ingest parent cleanup: no stale IDs to delete (all IDs reused)")
             except Exception as _pcleanup_err:

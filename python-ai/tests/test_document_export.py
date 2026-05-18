@@ -61,6 +61,31 @@ def test_export_content_creates_pdf_docx_xlsx_and_csv():
     assert b"10" in csv_export.content
 
 
+def test_export_content_rejects_spreadsheet_without_tables():
+    html = "<article><p>Jawaban naratif tanpa tabel.</p></article>"
+
+    with pytest.raises(ValueError, match="Format spreadsheet"):
+        export_content(html, "xlsx", "jawaban-ai")
+
+    with pytest.raises(ValueError, match="Format spreadsheet"):
+        export_content(html, "csv", "jawaban-ai")
+
+
+def test_documents_export_route_rejects_spreadsheet_without_tables():
+    response = client.post(
+        "/api/documents/export",
+        headers=AUTH_HEADERS,
+        json={
+            "content_html": "<p>Jawaban naratif tanpa tabel.</p>",
+            "target_format": "xlsx",
+            "file_name": "jawaban-ai",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "Format spreadsheet" in response.text
+
+
 def test_documents_export_route_returns_binary_download():
     response = client.post(
         "/api/documents/export",
@@ -159,6 +184,18 @@ def test_documents_extract_tables_route_reads_upload():
     first_table = payload["tables"][0]
     assert first_table["header"] == ["Nama", "Nilai"]
     assert first_table["rows"][0] == ["A", "10"]
+
+
+def test_documents_extract_routes_reject_unsupported_extension():
+    for path in ("/api/documents/extract-tables", "/api/documents/extract-content"):
+        response = client.post(
+            path,
+            headers=AUTH_HEADERS,
+            files={"file": ("malware.exe", b"not a supported document", "application/octet-stream")},
+        )
+
+        assert response.status_code == 400
+        assert "tidak didukung" in response.text
 
 
 @pytest.mark.parametrize("filename", ["../berbahaya.pdf", "/etc/passwd"])
