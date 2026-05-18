@@ -6,6 +6,11 @@ use App\Http\Controllers\Documents\DocumentExportController;
 use App\Http\Controllers\Documents\DocumentPreviewController;
 use App\Http\Controllers\Memos\MemoFileController;
 use App\Http\Controllers\OnlyOfficeCallbackController;
+use App\Livewire\Admin\AdminDashboard;
+use App\Livewire\Admin\AdminDocuments;
+use App\Livewire\Admin\AdminErrors;
+use App\Livewire\Admin\AdminUsage;
+use App\Livewire\Admin\AdminUsers;
 use App\Livewire\Chat\ChatIndex;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -105,7 +110,11 @@ Route::middleware(['auth', 'verified', 'admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
-        Route::view('/', 'admin.overview')->name('dashboard');
+        Route::get('/', AdminDashboard::class)->name('dashboard');
+        Route::get('/users', AdminUsers::class)->name('users');
+        Route::get('/usage', AdminUsage::class)->name('usage');
+        Route::get('/errors', AdminErrors::class)->name('errors');
+        Route::get('/documents', AdminDocuments::class)->name('documents');
     });
 
 Route::middleware(['auth', 'verified', 'super_admin'])
