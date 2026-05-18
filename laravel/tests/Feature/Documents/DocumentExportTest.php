@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\DocumentExportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Mockery;
@@ -81,6 +82,93 @@ class DocumentExportTest extends TestCase
             'Format spreadsheet hanya tersedia untuk konten yang memiliki tabel.',
             (string) $response->getContent()
         );
+    }
+
+    public function test_export_route_sanitizes_html_with_parser_allowlist(): void
+    {
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        $capturedHtml = null;
+
+        $service = Mockery::mock(DocumentExportService::class);
+        $service->shouldReceive('exportContent')
+            ->once()
+            ->withArgs(function (string $contentHtml, string $targetFormat, string $fileName) use (&$capturedHtml) {
+                $capturedHtml = $contentHtml;
+
+                return $targetFormat === 'pdf' && $fileName === 'sanitized';
+            })
+            ->andReturn([
+                'body' => '%PDF-1.4 fake',
+                'content_type' => 'application/pdf',
+                'file_name' => 'sanitized.pdf',
+            ]);
+        $this->app->instance(DocumentExportService::class, $service);
+
+        $this->actingAs($user)->post(route('documents.export'), [
+            'content_html' => implode('', [
+                '<script>alert("x")</script>',
+                '<p onclick="alert(1)" style="background:url(https://evil.test/a.png)">Aman</p>',
+                '<iframe src="https://evil.test/embed"></iframe>',
+                '<img src="https://evil.test/leak.png" alt="leak">',
+                '<a href="javascript:alert(1)">link</a>',
+                '<a href="https://example.com/rujukan">rujukan</a>',
+                '<foo><script>alert("nested")</script><strong>tetap aman</strong></foo>',
+                '<p>Karakter Indonesia: surat izin kegiatan ñ é</p>',
+                '<table style="color:red"><tr><th colspan="2" onmouseover="alert(1)">Nama</th></tr><tr><td>Hasbi</td></tr></table>',
+            ]),
+            'target_format' => 'pdf',
+            'file_name' => 'sanitized',
+        ])->assertOk();
+
+        $this->assertIsString($capturedHtml);
+        $this->assertStringContainsString('<p>Aman</p>', $capturedHtml);
+        $this->assertStringContainsString('<strong>tetap aman</strong>', $capturedHtml);
+        $this->assertStringContainsString('<a href="https://example.com/rujukan">rujukan</a>', $capturedHtml);
+        $this->assertStringContainsString('Karakter Indonesia: surat izin kegiatan ñ é', $capturedHtml);
+        $this->assertStringContainsString('<table>', $capturedHtml);
+        $this->assertStringContainsString('<th colspan="2">Nama</th>', $capturedHtml);
+        $this->assertStringNotContainsString('<script', $capturedHtml);
+        $this->assertStringNotContainsString('<iframe', $capturedHtml);
+        $this->assertStringNotContainsString('<img', $capturedHtml);
+        $this->assertStringNotContainsString('onclick', $capturedHtml);
+        $this->assertStringNotContainsString('onmouseover', $capturedHtml);
+        $this->assertStringNotContainsString('style=', $capturedHtml);
+        $this->assertStringNotContainsString('javascript:', $capturedHtml);
+        $this->assertStringNotContainsString('https://evil.test', $capturedHtml);
+    }
+
+    public function test_export_service_sanitizes_content_before_forwarding_to_python(): void
+    {
+        config([
+            'services.ai_document_service.url' => 'http://document-service.test',
+            'services.ai_document_service.token' => 'document-token',
+        ]);
+
+        $forwardedHtml = null;
+
+        Http::fake(function ($request) use (&$forwardedHtml) {
+            $forwardedHtml = $request->data()['content_html'] ?? null;
+
+            return Http::response('%PDF-1.4 sanitized');
+        });
+
+        $service = app(DocumentExportService::class);
+        $artifact = $service->exportContent(implode('', [
+            '<article><p>Isi aman ñ é.</p>',
+            '<foo><script>alert("nested")</script><strong>Teks</strong></foo>',
+            '<a href="https://example.com/ref">Referensi</a>',
+            '<img src="https://evil.test/leak.png">',
+            '</article>',
+        ]), 'pdf', 'sanitized-service');
+
+        $this->assertSame('%PDF-1.4 sanitized', $artifact['body']);
+        $this->assertIsString($forwardedHtml);
+        $this->assertStringContainsString('Isi aman ñ é.', $forwardedHtml);
+        $this->assertStringContainsString('<strong>Teks</strong>', $forwardedHtml);
+        $this->assertStringContainsString('<a href="https://example.com/ref">Referensi</a>', $forwardedHtml);
+        $this->assertStringNotContainsString('<script', $forwardedHtml);
+        $this->assertStringNotContainsString('<img', $forwardedHtml);
+        $this->assertStringNotContainsString('https://evil.test', $forwardedHtml);
     }
 
     public function test_documents_export_route_has_throttle_middleware(): void
