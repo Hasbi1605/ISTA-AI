@@ -145,6 +145,180 @@
     .memo-config-error {
         @apply mt-1 text-[11px] font-semibold text-rose-600 dark:text-rose-400;
     }
+
+    /* ----- Admin Design System ----- */
+
+    .ista-display-sans {
+        font-family: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
+    }
+
+    .admin-shell {
+        background:
+            radial-gradient(circle at top left, rgba(245, 158, 11, 0.06) 0%, transparent 30%),
+            radial-gradient(circle at bottom right, rgba(139, 8, 54, 0.06) 0%, transparent 36%),
+            #fbfaf8;
+        @apply text-stone-800 dark:text-gray-100;
+    }
+
+    .dark .admin-shell {
+        background:
+            radial-gradient(circle at top left, rgba(245, 158, 11, 0.04) 0%, transparent 30%),
+            radial-gradient(circle at bottom right, rgba(139, 8, 54, 0.10) 0%, transparent 36%),
+            #0b1220;
+    }
+
+    .admin-sidebar {
+        @apply fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-stone-200/80 bg-white/95 backdrop-blur-xl transition-transform duration-200 dark:border-gray-800 dark:bg-gray-950/95 lg:static lg:z-auto lg:translate-x-0;
+    }
+
+    .admin-topbar {
+        @apply sticky top-0 z-20 flex w-full flex-wrap items-center justify-between gap-3 border-b border-stone-200/80 bg-white/85 px-4 py-3.5 backdrop-blur-xl dark:border-gray-800 dark:bg-gray-900/80 sm:px-6;
+    }
+
+    .admin-main {
+        @apply mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8;
+    }
+
+    .admin-nav-link {
+        @apply flex items-center gap-3 rounded-lg px-3 py-2 text-stone-600 transition hover:bg-stone-100 hover:text-ista-primary dark:text-gray-300 dark:hover:bg-gray-900 dark:hover:text-amber-300;
+    }
+
+    .admin-nav-link__icon {
+        @apply flex h-8 w-8 flex-none items-center justify-center rounded-md border border-stone-200 bg-white text-stone-500 transition group-hover:border-ista-primary/30 group-hover:text-ista-primary dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:group-hover:border-ista-primary/40 dark:group-hover:text-amber-300;
+    }
+
+    .admin-nav-link--active {
+        @apply bg-ista-primary/[0.08] text-ista-primary shadow-[inset_3px_0_0_0_theme(colors.ista-primary)] dark:bg-ista-primary/15 dark:text-amber-300;
+    }
+
+    .admin-nav-link--active .admin-nav-link__icon {
+        @apply border-ista-primary/30 bg-ista-primary/10 text-ista-primary dark:border-ista-primary/40 dark:bg-ista-primary/20 dark:text-amber-300;
+    }
+
+    .admin-section {
+        @apply rounded-2xl border border-stone-200/80 bg-white shadow-[0_1px_2px_rgba(28,25,23,0.04)] transition-colors dark:border-gray-800 dark:bg-gray-900/80;
+    }
+
+    .admin-section__header {
+        @apply flex flex-wrap items-start justify-between gap-3 border-b border-stone-100 px-5 py-4 dark:border-gray-800;
+    }
+
+    .admin-section__body {
+        @apply px-5 py-4;
+    }
+
+    .admin-section__footer {
+        @apply border-t border-stone-100 px-5 py-3 text-xs text-stone-500 dark:border-gray-800 dark:text-gray-400;
+    }
+
+    .admin-kpi {
+        @apply flex flex-col rounded-2xl border border-stone-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(28,25,23,0.04)] transition-colors dark:border-gray-800 dark:bg-gray-900/80;
+    }
+
+    .admin-kpi__icon {
+        @apply flex h-9 w-9 items-center justify-center rounded-lg border border-stone-200 bg-stone-50 text-stone-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400;
+    }
+
+    .admin-kpi--primary { @apply border-ista-primary/20 bg-gradient-to-br from-ista-primary/[0.06] to-transparent dark:border-ista-primary/30; }
+    .admin-kpi--gold { @apply border-amber-200/70 bg-gradient-to-br from-amber-100/40 to-transparent dark:border-amber-500/20; }
+    .admin-kpi--success { @apply border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-transparent dark:border-emerald-500/20; }
+    .admin-kpi--warning { @apply border-amber-200/70 bg-gradient-to-br from-amber-50 to-transparent dark:border-amber-500/20; }
+    .admin-kpi--danger { @apply border-rose-200/70 bg-gradient-to-br from-rose-50 to-transparent dark:border-rose-500/20; }
+
+    .admin-table-wrapper {
+        @apply overflow-x-auto rounded-xl border border-stone-200/80 bg-white dark:border-gray-800 dark:bg-gray-900/80;
+    }
+
+    .admin-table {
+        @apply w-full border-collapse text-sm text-stone-700 dark:text-gray-200;
+    }
+
+    .admin-table__th {
+        @apply border-b border-stone-200 bg-stone-50/60 px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-[0.08em] text-stone-500 dark:border-gray-800 dark:bg-gray-900/80 dark:text-gray-400;
+    }
+
+    .admin-table__th[data-align="right"], .admin-table__td[data-align="right"] { text-align: right; }
+    .admin-table__th[data-align="center"], .admin-table__td[data-align="center"] { text-align: center; }
+
+    .admin-table__td {
+        @apply border-b border-stone-100 px-4 py-3 align-middle dark:border-gray-800;
+    }
+
+    .admin-table tbody tr:last-child .admin-table__td {
+        @apply border-b-0;
+    }
+
+    .admin-table__empty {
+        @apply px-4 py-6 text-center text-xs font-medium text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-badge {
+        @apply inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold;
+    }
+
+    .admin-badge--neutral { @apply border-stone-200 bg-stone-50 text-stone-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300; }
+    .admin-badge--success { @apply border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300; }
+    .admin-badge--warning { @apply border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300; }
+    .admin-badge--danger { @apply border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300; }
+    .admin-badge--info { @apply border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-300; }
+    .admin-badge--gold { @apply border-amber-300 bg-amber-100/70 text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-300; }
+    .admin-badge--primary { @apply border-ista-primary/30 bg-ista-primary/10 text-ista-primary dark:border-ista-primary/40 dark:bg-ista-primary/20 dark:text-amber-300; }
+
+    .admin-empty-state {
+        @apply flex flex-col items-center justify-center rounded-xl border border-dashed border-stone-200 bg-stone-50/40 px-6 py-10 text-center dark:border-gray-800 dark:bg-gray-900/40;
+    }
+
+    .admin-empty-state__icon {
+        @apply mb-3 flex h-10 w-10 items-center justify-center rounded-full border border-stone-200 bg-white text-stone-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400;
+    }
+
+    .admin-loading {
+        @apply flex flex-col gap-2;
+    }
+
+    .admin-loading__bar {
+        @apply h-3 w-full overflow-hidden rounded bg-stone-100 dark:bg-gray-800;
+    }
+
+    .admin-loading__bar > span {
+        @apply block h-full w-1/2 animate-pulse rounded bg-gradient-to-r from-stone-200 via-stone-100 to-stone-200 dark:from-gray-700 dark:via-gray-800 dark:to-gray-700;
+    }
+
+    .admin-filter {
+        @apply flex flex-col gap-1.5;
+    }
+
+    .admin-filter__label {
+        @apply text-[11px] font-bold uppercase tracking-[0.08em] text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-filter__control {
+        @apply h-10 rounded-lg border border-stone-200 bg-white px-3 text-sm text-stone-800 transition focus:border-ista-primary focus:outline-none focus:ring-2 focus:ring-ista-primary/15 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100;
+    }
+
+    .admin-tabs {
+        @apply border-b border-stone-200 dark:border-gray-800;
+    }
+
+    .admin-tabs__list {
+        @apply flex flex-wrap items-center gap-x-2 gap-y-1;
+    }
+
+    .admin-tabs__tab {
+        @apply -mb-px inline-flex items-center gap-2 border-b-2 border-transparent px-3 py-2 text-sm font-medium text-stone-500 transition hover:text-ista-primary dark:text-gray-400 dark:hover:text-amber-300;
+    }
+
+    .admin-tabs__tab--active {
+        @apply border-ista-primary text-ista-primary dark:border-amber-300 dark:text-amber-300;
+    }
+
+    .admin-tabs__count {
+        @apply rounded-full border border-stone-200 bg-stone-50 px-2 py-0.5 text-[10.5px] font-semibold text-stone-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300;
+    }
+
+    .admin-page-title {
+        @apply ista-brand-title text-2xl text-stone-900 not-italic dark:text-gray-100;
+    }
 }
 
 /* Loading label: fade-through magic saat fase berganti.

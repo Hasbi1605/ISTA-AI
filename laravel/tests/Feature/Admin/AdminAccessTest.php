@@ -37,7 +37,8 @@ class AdminAccessTest extends TestCase
         $response = $this->actingAs($admin)->get('/admin');
 
         $response->assertStatus(200);
-        $response->assertSeeText('Admin dashboard placeholder');
+        $response->assertSee('Ringkasan Operasional', false);
+        $response->assertSee('Dashboard Admin', false);
     }
 
     public function test_super_admin_can_access_admin_dashboard(): void
@@ -49,6 +50,7 @@ class AdminAccessTest extends TestCase
         $response = $this->actingAs($superAdmin)->get('/admin');
 
         $response->assertStatus(200);
+        $response->assertSee('Ringkasan Operasional', false);
     }
 
     public function test_admin_is_forbidden_from_super_admin_only_routes(): void
@@ -71,7 +73,8 @@ class AdminAccessTest extends TestCase
         $response = $this->actingAs($superAdmin)->get('/admin/ai-config');
 
         $response->assertStatus(200);
-        $response->assertSeeText('Super admin AI configuration placeholder');
+        $response->assertSee('AI Configuration', false);
+        $response->assertSee('Akses terbatas', false);
     }
 
     public function test_unverified_user_is_redirected_for_admin_routes(): void
