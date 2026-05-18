@@ -466,6 +466,7 @@ const registerChatPageData = (Alpine) => {
         isSwitchingConversation: false,
         isDraggingFile: false,
         dragDepth: 0,
+        dragResetTimer: null,
         dropError: '',
 
         init() {
@@ -504,39 +505,44 @@ const registerChatPageData = (Alpine) => {
         },
 
         onDragEnter(event) {
-            if (!this.hasFiles(event)) {
+            if (!this.prepareFileDrag(event)) {
                 return;
             }
 
             this.dragDepth += 1;
             this.isDraggingFile = true;
+            this.scheduleDragReset();
         },
 
         onDragOver(event) {
-            if (!this.hasFiles(event)) {
+            if (!this.prepareFileDrag(event)) {
                 return;
             }
 
             this.isDraggingFile = true;
+            this.scheduleDragReset();
         },
 
         onDragLeave(event) {
-            if (!this.hasFiles(event)) {
+            if (!this.isDraggingFile && !this.hasFiles(event)) {
                 return;
             }
 
+            event.preventDefault();
             this.dragDepth = Math.max(this.dragDepth - 1, 0);
 
-            if (this.dragDepth === 0) {
-                this.isDraggingFile = false;
+            if (this.dragDepth === 0 || this.isLeavingWindow(event)) {
+                this.resetDraggingFile();
             }
         },
 
         onDropFile(event) {
-            this.dragDepth = 0;
-            this.isDraggingFile = false;
+            if (this.hasFiles(event)) {
+                event.preventDefault();
+            }
 
             const files = event.dataTransfer?.files;
+            this.resetDraggingFile();
 
             if (!files || files.length === 0) {
                 return;
@@ -559,8 +565,43 @@ const registerChatPageData = (Alpine) => {
             this.showRightSidebar = true;
         },
 
+        prepareFileDrag(event) {
+            if (!this.hasFiles(event)) {
+                return false;
+            }
+
+            event.preventDefault();
+
+            if (event.dataTransfer) {
+                event.dataTransfer.dropEffect = 'copy';
+            }
+
+            return true;
+        },
+
         hasFiles(event) {
             return Array.from(event.dataTransfer?.types || []).includes('Files');
+        },
+
+        isLeavingWindow(event) {
+            return event.clientX <= 0
+                || event.clientY <= 0
+                || event.clientX >= window.innerWidth
+                || event.clientY >= window.innerHeight;
+        },
+
+        scheduleDragReset() {
+            window.clearTimeout(this.dragResetTimer);
+            this.dragResetTimer = window.setTimeout(() => {
+                this.resetDraggingFile();
+            }, 1200);
+        },
+
+        resetDraggingFile() {
+            window.clearTimeout(this.dragResetTimer);
+            this.dragResetTimer = null;
+            this.dragDepth = 0;
+            this.isDraggingFile = false;
         },
 
         showDropError(message) {
