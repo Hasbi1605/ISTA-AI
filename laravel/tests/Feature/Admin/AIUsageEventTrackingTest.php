@@ -5,6 +5,7 @@ namespace Tests\Feature\Admin;
 use App\Jobs\GenerateChatResponse;
 use App\Jobs\ProcessDocument;
 use App\Jobs\RenderDocumentPreview;
+use App\Http\Controllers\Chat\ChatStreamController;
 use App\Livewire\Chat\ChatIndex;
 use App\Models\AIUsageEvent;
 use App\Models\Conversation;
@@ -28,6 +29,256 @@ use Tests\TestCase;
 class AIUsageEventTrackingTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_chat_send_message_returns_request_id_used_for_started_event(): void
+    {
+        Queue::fake();
+
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->test(ChatIndex::class)
+            ->set('prompt', 'Halo ISTA')
+            ->call('sendMessage');
+
+        Queue::assertPushed(GenerateChatResponse::class, function ($job) use ($user) {
+            // The job receives the same request id that the started event uses.
+            $event = AIUsageEvent::query()
+                ->where('user_id', $user->id)
+                ->where('action', AIUsageEvent::ACTION_STARTED)
+                ->first();
+
+            return $event !== null
+                && $job->requestId !== null
+                && $job->requestId === $event->request_id;
+        });
+    }
+
+    public function test_stream_completed_event_uses_client_request_id(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::create([
+            'user_id' => $user->id,
+            'title' => 'Stream test',
+        ]);
+        Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'user',
+            'content' => 'Halo stream',
+        ]);
+
+        $this->app->bind(AIService::class, fn () => new class extends AIService
+        {
+            public function sendChat(
+                array $messages,
+                ?array $document_filenames = null,
+                ?string $user_id = null,
+                bool $force_web_search = false,
+                ?string $source_policy = null,
+                bool $allow_auto_realtime_web = true,
+                ?array $document_ids = null,
+                ?string $request_id = null,
+            ): \Generator {
+                yield 'OK';
+            }
+        });
+
+        // Pre-record the started event so we can confirm both events share id.
+        $sharedRequestId = 'req-shared-stream-1';
+        app(\App\Services\Admin\AIUsageEventService::class)->started(
+            feature: AIUsageEvent::FEATURE_CHAT,
+            userId: (int) $user->id,
+            metadata: [
+                'conversation_id' => $conversation->id,
+                'channel' => 'livewire',
+            ],
+            requestId: $sharedRequestId,
+        );
+
+        $this->actingAs($user);
+
+        $orchestrator = app(ChatOrchestrationService::class);
+        $controller = app(ChatStreamController::class);
+
+        ob_start();
+        $controller->executeStream(
+            app(AIService::class),
+            $orchestrator,
+            [['role' => 'user', 'content' => 'Halo stream']],
+            null,
+            [],
+            $orchestrator->getSourcePolicy(null),
+            $orchestrator->shouldAllowAutoRealtimeWeb(null),
+            false,
+            $conversation->id,
+            $conversation,
+            $user,
+            null,
+            null,
+            $sharedRequestId,
+        );
+        ob_get_clean();
+
+        $events = AIUsageEvent::query()
+            ->where('request_id', $sharedRequestId)
+            ->orderBy('id')
+            ->get();
+
+        $this->assertCount(2, $events);
+        $this->assertSame(AIUsageEvent::ACTION_STARTED, $events[0]->action);
+        $this->assertSame(AIUsageEvent::ACTION_COMPLETED, $events[1]->action);
+        $this->assertSame('stream', $events[1]->metadata['channel'] ?? null);
+        $this->assertSame((int) $conversation->id, (int) ($events[1]->metadata['conversation_id'] ?? 0));
+    }
+
+    public function test_stream_failed_event_uses_client_request_id_on_error_sentinel(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::create([
+            'user_id' => $user->id,
+            'title' => 'Stream failure test',
+        ]);
+        Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'user',
+            'content' => 'Halo error',
+        ]);
+
+        $this->app->bind(AIService::class, fn () => new class extends AIService
+        {
+            public function sendChat(
+                array $messages,
+                ?array $document_filenames = null,
+                ?string $user_id = null,
+                bool $force_web_search = false,
+                ?string $source_policy = null,
+                bool $allow_auto_realtime_web = true,
+                ?array $document_ids = null,
+                ?string $request_id = null,
+            ): \Generator {
+                yield AIService::ERROR_SENTINEL.'AI tidak tersedia';
+            }
+        });
+
+        $sharedRequestId = 'req-shared-stream-fail';
+        app(\App\Services\Admin\AIUsageEventService::class)->started(
+            feature: AIUsageEvent::FEATURE_CHAT,
+            userId: (int) $user->id,
+            metadata: [
+                'conversation_id' => $conversation->id,
+                'channel' => 'livewire',
+            ],
+            requestId: $sharedRequestId,
+        );
+
+        $this->actingAs($user);
+
+        $orchestrator = app(ChatOrchestrationService::class);
+        $controller = app(ChatStreamController::class);
+
+        ob_start();
+        $controller->executeStream(
+            app(AIService::class),
+            $orchestrator,
+            [['role' => 'user', 'content' => 'Halo error']],
+            null,
+            [],
+            $orchestrator->getSourcePolicy(null),
+            $orchestrator->shouldAllowAutoRealtimeWeb(null),
+            false,
+            $conversation->id,
+            $conversation,
+            $user,
+            null,
+            null,
+            $sharedRequestId,
+        );
+        ob_get_clean();
+
+        $events = AIUsageEvent::query()
+            ->where('request_id', $sharedRequestId)
+            ->orderBy('id')
+            ->get();
+
+        $this->assertCount(2, $events);
+        $this->assertSame(AIUsageEvent::ACTION_FAILED, $events[1]->action);
+        $this->assertSame('error_sentinel', $events[1]->error_code);
+        $this->assertSame('stream', $events[1]->metadata['channel'] ?? null);
+    }
+
+    public function test_stream_controller_rejects_malformed_request_id_query_param(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::create([
+            'user_id' => $user->id,
+            'title' => 'HTTP stream invalid id test',
+        ]);
+        Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'user',
+            'content' => 'Halo HTTP stream invalid',
+        ]);
+
+        $this->app->bind(AIService::class, fn () => new class extends AIService
+        {
+            public function sendChat(
+                array $messages,
+                ?array $document_filenames = null,
+                ?string $user_id = null,
+                bool $force_web_search = false,
+                ?string $source_policy = null,
+                bool $allow_auto_realtime_web = true,
+                ?array $document_ids = null,
+                ?string $request_id = null,
+            ): \Generator {
+                yield 'Done';
+            }
+        });
+
+        $maliciousRequestId = "../etc/passwd ' OR 1=1";
+        $reflection = new \ReflectionClass(ChatStreamController::class);
+        $method = $reflection->getMethod('normalizeRequestId');
+        $method->setAccessible(true);
+        $controller = app(ChatStreamController::class);
+
+        $this->assertNull($method->invoke($controller, $maliciousRequestId));
+        $this->assertNull($method->invoke($controller, ''));
+        $this->assertNull($method->invoke($controller, str_repeat('a', 65)));
+        $this->assertSame('valid_id-123', $method->invoke($controller, ' valid_id-123 '));
+
+        $this->actingAs($user);
+        $orchestrator = app(ChatOrchestrationService::class);
+
+        // Even when executeStream receives a null clientRequestId, it must
+        // still record completed/failed events using a fresh request id.
+        ob_start();
+        $controller->executeStream(
+            app(AIService::class),
+            $orchestrator,
+            [['role' => 'user', 'content' => 'Halo error']],
+            null,
+            [],
+            $orchestrator->getSourcePolicy(null),
+            $orchestrator->shouldAllowAutoRealtimeWeb(null),
+            false,
+            $conversation->id,
+            $conversation,
+            $user,
+            null,
+            null,
+            null,
+        );
+        ob_get_clean();
+
+        $completed = AIUsageEvent::query()
+            ->where('user_id', $user->id)
+            ->where('action', AIUsageEvent::ACTION_COMPLETED)
+            ->latest('id')
+            ->first();
+
+        $this->assertNotNull($completed);
+        $this->assertNotEmpty($completed->request_id);
+    }
 
     public function test_chat_send_message_records_started_event_with_chat_feature(): void
     {
