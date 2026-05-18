@@ -83,6 +83,53 @@ class DocumentExportTest extends TestCase
         );
     }
 
+    public function test_export_route_sanitizes_html_with_parser_allowlist(): void
+    {
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        $capturedHtml = null;
+
+        $service = Mockery::mock(DocumentExportService::class);
+        $service->shouldReceive('exportContent')
+            ->once()
+            ->withArgs(function (string $contentHtml, string $targetFormat, string $fileName) use (&$capturedHtml) {
+                $capturedHtml = $contentHtml;
+
+                return $targetFormat === 'pdf' && $fileName === 'sanitized';
+            })
+            ->andReturn([
+                'body' => '%PDF-1.4 fake',
+                'content_type' => 'application/pdf',
+                'file_name' => 'sanitized.pdf',
+            ]);
+        $this->app->instance(DocumentExportService::class, $service);
+
+        $this->actingAs($user)->post(route('documents.export'), [
+            'content_html' => implode('', [
+                '<script>alert("x")</script>',
+                '<p onclick="alert(1)" style="background:url(https://evil.test/a.png)">Aman</p>',
+                '<iframe src="https://evil.test/embed"></iframe>',
+                '<img src="https://evil.test/leak.png" alt="leak">',
+                '<a href="javascript:alert(1)">link</a>',
+                '<table style="color:red"><tr><th colspan="2" onmouseover="alert(1)">Nama</th></tr><tr><td>Hasbi</td></tr></table>',
+            ]),
+            'target_format' => 'pdf',
+            'file_name' => 'sanitized',
+        ])->assertOk();
+
+        $this->assertIsString($capturedHtml);
+        $this->assertStringContainsString('<p>Aman</p>', $capturedHtml);
+        $this->assertStringContainsString('<table>', $capturedHtml);
+        $this->assertStringContainsString('<th colspan="2">Nama</th>', $capturedHtml);
+        $this->assertStringNotContainsString('<script', $capturedHtml);
+        $this->assertStringNotContainsString('<iframe', $capturedHtml);
+        $this->assertStringNotContainsString('<img', $capturedHtml);
+        $this->assertStringNotContainsString('onclick', $capturedHtml);
+        $this->assertStringNotContainsString('onmouseover', $capturedHtml);
+        $this->assertStringNotContainsString('style=', $capturedHtml);
+        $this->assertStringNotContainsString('javascript:', $capturedHtml);
+        $this->assertStringNotContainsString('https://evil.test', $capturedHtml);
+    }
+
     public function test_documents_export_route_has_throttle_middleware(): void
     {
         $route = Arr::first(app('router')->getRoutes(), fn ($route) => $route->getName() === 'documents.export');

@@ -156,6 +156,10 @@ class MemoFileController extends Controller
 
     protected function hasValidSignedFileSignature(Request $request): bool
     {
+        if (app(MemoDocumentKey::class)->hasValidSignedFileSignature($request)) {
+            return true;
+        }
+
         if ($request->hasValidSignature()) {
             return true;
         }
