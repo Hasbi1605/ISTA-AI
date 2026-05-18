@@ -30,7 +30,7 @@ class SafeAssistantMarkdown
 
         try {
             $document->loadHTML(
-                '<!DOCTYPE html><html><body><div>'.$html.'</div></body></html>',
+                '<?xml encoding="UTF-8"><!DOCTYPE html><html><body><div>'.$html.'</div></body></html>',
                 LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD
             );
         } finally {

