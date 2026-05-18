@@ -13,7 +13,6 @@ use App\Support\UserFacingError;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -484,12 +483,7 @@ class MemoWorkspace extends Component
         $signer = app(JwtSigner::class);
         $laravelInternalUrl = rtrim((string) config('services.onlyoffice.laravel_internal_url', config('app.url')), '/');
         $ttlMinutes = max(1, (int) config('services.onlyoffice.signed_url_ttl_minutes', 30));
-        $ooToken = app(MemoDocumentKey::class)->generateFileToken($memo, $versionId, $ttlMinutes);
-        $documentPath = URL::temporarySignedRoute('memos.file.signed', now()->addMinutes($ttlMinutes), array_filter([
-            'memo' => $memo,
-            'version_id' => $versionId,
-            'oo_token' => $ooToken,
-        ], fn ($value) => filled($value)), false);
+        $documentUrl = app(MemoDocumentKey::class)->signedFileUrl($memo, $versionId, $ttlMinutes);
         $callbackPath = route('onlyoffice.callback', array_filter([
             'memo' => $memo,
             'version_id' => $versionId,
@@ -501,7 +495,7 @@ class MemoWorkspace extends Component
                 'fileType' => 'docx',
                 'key' => $documentKey,
                 'title' => $memo->title.'.docx',
-                'url' => $laravelInternalUrl.$documentPath,
+                'url' => $documentUrl,
             ],
             'documentType' => 'word',
             'editorConfig' => [

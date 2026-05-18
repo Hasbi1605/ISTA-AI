@@ -7,8 +7,8 @@ use App\Models\Memo;
 use App\Models\MemoVersion;
 use App\Services\OnlyOffice\DocumentConverter;
 use App\Services\OnlyOffice\ForceSaveException;
-use App\Services\OnlyOffice\MemoForceSaveService;
 use App\Services\OnlyOffice\MemoDocumentKey;
+use App\Services\OnlyOffice\MemoForceSaveService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -19,7 +19,8 @@ class MemoFileController extends Controller
 {
     public function signed(Request $request, Memo $memo): BinaryFileResponse
     {
-        abort_unless($request->hasValidSignature(false), Response::HTTP_FORBIDDEN);
+        abort_unless($this->hasValidSignedFileSignature($request), Response::HTTP_FORBIDDEN);
+        $this->authorizeSignedFileRequest($request, $memo);
 
         // Require a valid memo-bound session token (oo_token) generated at editor-open
         // time. The token is random, TTL-limited, and stored in cache — not derivable
@@ -151,5 +152,65 @@ class MemoFileController extends Controller
 
         abort_if($user === null, Response::HTTP_UNAUTHORIZED);
         abort_if($user->cannot('view', $memo), Response::HTTP_FORBIDDEN);
+    }
+
+    protected function hasValidSignedFileSignature(Request $request): bool
+    {
+        if ($request->hasValidSignature()) {
+            return true;
+        }
+
+        // Backward-compatible rollout path: existing editor configs generated
+        // before this hardening used relative signatures. Keep accepting them
+        // only when the request is hitting Laravel through the trusted internal
+        // OnlyOffice origin; public-host anonymous replays stay blocked.
+        return $this->isTrustedOnlyOfficeFileRequest($request)
+            && $request->hasValidSignature(false);
+    }
+
+    protected function authorizeSignedFileRequest(Request $request, Memo $memo): void
+    {
+        $user = $request->user();
+
+        if ($user !== null) {
+            abort_if($user->cannot('view', $memo), Response::HTTP_FORBIDDEN);
+
+            return;
+        }
+
+        abort_unless($this->isTrustedOnlyOfficeFileRequest($request), Response::HTTP_FORBIDDEN);
+    }
+
+    protected function isTrustedOnlyOfficeFileRequest(Request $request): bool
+    {
+        $trusted = $this->trustedOnlyOfficeLaravelInternalOrigin();
+
+        if ($trusted === null) {
+            return false;
+        }
+
+        return strtolower($request->getHost()) === $trusted['host']
+            && (int) $request->getPort() === $trusted['port'];
+    }
+
+    /**
+     * @return array{host: string, port: int}|null
+     */
+    protected function trustedOnlyOfficeLaravelInternalOrigin(): ?array
+    {
+        $internalUrl = (string) config('services.onlyoffice.laravel_internal_url', '');
+        $parts = parse_url($internalUrl);
+
+        if (! is_array($parts) || empty($parts['host'])) {
+            return null;
+        }
+
+        $scheme = strtolower((string) ($parts['scheme'] ?? 'http'));
+        $defaultPort = $scheme === 'https' ? 443 : 80;
+
+        return [
+            'host' => strtolower((string) $parts['host']),
+            'port' => (int) ($parts['port'] ?? $defaultPort),
+        ];
     }
 }

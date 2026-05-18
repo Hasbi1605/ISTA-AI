@@ -4,9 +4,12 @@ namespace App\Services\OnlyOffice;
 
 use App\Models\Memo;
 use App\Models\MemoVersion;
-use Illuminate\Support\Str;
+use DateTimeInterface;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
+use InvalidArgumentException;
 
 class MemoDocumentKey
 {
@@ -33,6 +36,23 @@ class MemoDocumentKey
         return $this->baseKey($memo, $version).'-pdf';
     }
 
+    public function signedFileUrl(Memo $memo, ?int $versionId, int $ttlMinutes): string
+    {
+        $ooToken = $this->generateFileToken($memo, $versionId, $ttlMinutes);
+
+        $parameters = array_filter([
+            'memo' => $memo,
+            'version_id' => $versionId,
+            'oo_token' => $ooToken,
+        ], fn ($value) => filled($value));
+
+        return $this->temporarySignedInternalRoute(
+            'memos.file.signed',
+            now()->addMinutes($ttlMinutes),
+            $parameters,
+        );
+    }
+
     /**
      * Generate a short-lived, memo-bound token for the signed file URL.
      * The token becomes single-use after the first validation: it transitions
@@ -44,7 +64,13 @@ class MemoDocumentKey
         $token = Str::random(40);
         Cache::put(
             'oo_file_token:'.$token,
-            ['memo_id' => $memo->id, 'version_id' => $versionId, 'used' => false],
+            [
+                'memo_id' => $memo->id,
+                'version_id' => $versionId,
+                'user_id' => $memo->user_id,
+                'purpose' => 'onlyoffice_file',
+                'used' => false,
+            ],
             now()->addMinutes($ttlMinutes + 5)
         );
 
@@ -74,6 +100,14 @@ class MemoDocumentKey
             return false;
         }
 
+        if (isset($data['user_id']) && (int) $data['user_id'] !== (int) $memo->user_id) {
+            return false;
+        }
+
+        if (isset($data['purpose']) && $data['purpose'] !== 'onlyoffice_file') {
+            return false;
+        }
+
         if ($this->normalizeVersionId($data['version_id'] ?? null) !== $versionId) {
             return false;
         }
@@ -95,6 +129,36 @@ class MemoDocumentKey
         }
 
         return (int) $versionId;
+    }
+
+    /**
+     * Generate an absolute signed URL for the Docker/internal Laravel origin.
+     *
+     * Laravel's relative signatures allow host rewriting, which is useful for
+     * proxies but too permissive for bearer file URLs. OnlyOffice should fetch
+     * these files through ONLYOFFICE_LARAVEL_INTERNAL_URL, so we sign that exact
+     * origin and let the controller reject public-host anonymous replays.
+     *
+     * @param  array<string, mixed>  $parameters
+     */
+    protected function temporarySignedInternalRoute(string $routeName, DateTimeInterface $expiration, array $parameters): string
+    {
+        if (array_key_exists('signature', $parameters) || array_key_exists('expires', $parameters)) {
+            throw new InvalidArgumentException('Signature and expires are reserved signed route parameters.');
+        }
+
+        $parameters['expires'] = $expiration->getTimestamp();
+        ksort($parameters);
+
+        $unsignedUrl = $this->onlyOfficeLaravelInternalUrl().URL::route($routeName, $parameters, false);
+        $signature = hash_hmac('sha256', $unsignedUrl, (string) config('app.key'));
+
+        return $unsignedUrl.(str_contains($unsignedUrl, '?') ? '&' : '?').'signature='.$signature;
+    }
+
+    protected function onlyOfficeLaravelInternalUrl(): string
+    {
+        return rtrim((string) config('services.onlyoffice.laravel_internal_url', config('app.url')), '/');
     }
 
     protected function baseKey(Memo $memo, ?MemoVersion $version = null): string

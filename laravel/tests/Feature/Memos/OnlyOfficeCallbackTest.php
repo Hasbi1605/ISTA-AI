@@ -1057,7 +1057,7 @@ class OnlyOfficeCallbackTest extends TestCase
         $this->assertSame($initialKey, $nextKey);
     }
 
-    public function test_callback_status_4_invalidates_editor_key_after_session_closes(): void
+    public function test_callback_status_4_keeps_editor_key_after_session_closes(): void
     {
         config([
             'services.onlyoffice.jwt_secret' => 'callback-secret',
@@ -1082,9 +1082,57 @@ class OnlyOfficeCallbackTest extends TestCase
 
         $memo->forceFill(['updated_at' => now()->addMinute()])->save();
 
-        $nextKey = app(MemoDocumentKey::class)->forEditor($memo->refresh(), $memo->currentVersion?->refresh());
+        $nextKey = app(MemoDocumentKey::class)->forEditor($memo->refresh());
 
-        $this->assertNotSame($initialKey, $nextKey);
+        $this->assertSame($initialKey, $nextKey);
+    }
+
+    public function test_callback_status_6_after_status_4_accepts_existing_editor_key(): void
+    {
+        config([
+            'services.onlyoffice.jwt_secret' => 'callback-secret',
+            'services.onlyoffice.internal_url' => 'https://onlyoffice.test',
+        ]);
+        Storage::fake('local');
+        Http::fake([
+            'https://onlyoffice.test/force-save-after-close.docx' => Http::response($this->validMemoDocxBytes(), 200),
+        ]);
+
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        $memo = $this->createMemo($user);
+        $initialKey = $this->callbackKey($memo);
+
+        // Simulate another save/update while this editor key is still cached.
+        // If status 4 deletes the cache entry, the next validation would
+        // regenerate a different key from this updated timestamp.
+        $memo->forceFill(['updated_at' => now()->addMinute()])->save();
+
+        $status4Token = (new JwtSigner('callback-secret'))->sign([
+            'status' => 4,
+            'key' => $initialKey,
+            'exp' => time() + 60,
+        ]);
+
+        $this->postJson(route('onlyoffice.callback', $memo), [
+            'status' => 4,
+            'key' => $initialKey,
+            'token' => $status4Token,
+        ])->assertOk()->assertJson(['error' => 0]);
+
+        $url = 'https://onlyoffice.test/force-save-after-close.docx';
+        $status6Token = (new JwtSigner('callback-secret'))->sign([
+            'status' => 6,
+            'key' => $initialKey,
+            'url' => $url,
+            'exp' => time() + 60,
+        ]);
+
+        $this->postJson(route('onlyoffice.callback', $memo), [
+            'status' => 6,
+            'key' => $initialKey,
+            'url' => $url,
+            'token' => $status6Token,
+        ])->assertOk()->assertJson(['error' => 0]);
     }
 
     public function test_callback_status_6_keeps_active_editor_key(): void

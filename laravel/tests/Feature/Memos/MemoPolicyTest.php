@@ -6,6 +6,7 @@ use App\Models\Memo;
 use App\Models\MemoVersion;
 use App\Models\User;
 use App\Services\OnlyOffice\JwtSigner;
+use App\Services\OnlyOffice\MemoDocumentKey;
 use App\Services\OnlyOffice\MemoForceSaveService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as HttpRequest;
@@ -101,9 +102,31 @@ class MemoPolicyTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_signed_file_route_accepts_relative_signature_for_onlyoffice(): void
+    public function test_signed_file_route_accepts_internal_absolute_signature_for_onlyoffice(): void
     {
         Storage::fake('local');
+        config(['services.onlyoffice.laravel_internal_url' => 'http://laravel:8000']);
+
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        $memo = $this->createMemo($user);
+        Storage::disk('local')->put($memo->file_path, 'docx-bytes');
+
+        $url = app(MemoDocumentKey::class)->signedFileUrl($memo, null, 60);
+
+        $this->get($url)
+            ->assertOk()
+            ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+
+        $publicReplayUrl = str_replace('http://laravel:8000', 'http://localhost', $url);
+
+        $this->get($publicReplayUrl)->assertForbidden();
+    }
+
+    public function test_signed_file_route_accepts_legacy_relative_signature_only_from_internal_host(): void
+    {
+        Storage::fake('local');
+        config(['services.onlyoffice.laravel_internal_url' => 'http://laravel:8000']);
+
         $user = User::factory()->create(['email_verified_at' => now()]);
         $memo = $this->createMemo($user);
         Storage::disk('local')->put($memo->file_path, 'docx-bytes');
@@ -116,14 +139,36 @@ class MemoPolicyTest extends TestCase
             'oo_token' => $ooToken,
         ], false);
 
-        $this->get($path)
+        $this->get('http://laravel:8000'.$path)
             ->assertOk()
             ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    }
+
+    public function test_signed_file_route_rejects_public_host_replay_of_legacy_relative_signature(): void
+    {
+        Storage::fake('local');
+        config(['services.onlyoffice.laravel_internal_url' => 'http://laravel:8000']);
+
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        $memo = $this->createMemo($user);
+        Storage::disk('local')->put($memo->file_path, 'docx-bytes');
+
+        $ooToken = Str::random(40);
+        Cache::put('oo_file_token:'.$ooToken, ['memo_id' => $memo->id, 'version_id' => null], now()->addHour());
+
+        $path = URL::temporarySignedRoute('memos.file.signed', now()->addHour(), [
+            'memo' => $memo,
+            'oo_token' => $ooToken,
+        ], false);
+
+        $this->get($path)->assertForbidden();
     }
 
     public function test_signed_file_route_can_stream_selected_memo_version(): void
     {
         Storage::fake('local');
+        config(['services.onlyoffice.laravel_internal_url' => 'http://laravel:8000']);
+
         $user = User::factory()->create(['email_verified_at' => now()]);
         $memo = $this->createMemo($user);
         [$firstVersion, $secondVersion] = $this->createMemoVersions($memo);
@@ -135,16 +180,9 @@ class MemoPolicyTest extends TestCase
             'current_version_id' => $firstVersion->id,
         ])->save();
 
-        $ooToken = Str::random(40);
-        Cache::put('oo_file_token:'.$ooToken, ['memo_id' => $memo->id, 'version_id' => $secondVersion->id], now()->addHour());
+        $url = app(MemoDocumentKey::class)->signedFileUrl($memo, $secondVersion->id, 60);
 
-        $path = URL::temporarySignedRoute('memos.file.signed', now()->addHour(), [
-            'memo' => $memo,
-            'version_id' => $secondVersion->id,
-            'oo_token' => $ooToken,
-        ], false);
-
-        $response = $this->get($path)
+        $response = $this->get($url)
             ->assertOk()
             ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
 
@@ -153,6 +191,8 @@ class MemoPolicyTest extends TestCase
 
     public function test_signed_file_route_rejects_token_for_different_memo_version(): void
     {
+        config(['services.onlyoffice.laravel_internal_url' => 'http://laravel:8000']);
+
         $user = User::factory()->create(['email_verified_at' => now()]);
         $memo = $this->createMemo($user);
         [$firstVersion, $secondVersion] = $this->createMemoVersions($memo);
@@ -169,7 +209,7 @@ class MemoPolicyTest extends TestCase
             'oo_token' => $ooToken,
         ], false);
 
-        $this->get($path)->assertForbidden();
+        $this->get('http://laravel:8000'.$path)->assertForbidden();
     }
 
     public function test_export_pdf_converts_stored_memo_docx_through_onlyoffice(): void

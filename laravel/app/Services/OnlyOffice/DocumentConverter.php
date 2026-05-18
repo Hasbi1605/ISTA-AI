@@ -5,7 +5,6 @@ namespace App\Services\OnlyOffice;
 use App\Models\Memo;
 use App\Models\MemoVersion;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\URL;
 use RuntimeException;
 
 class DocumentConverter
@@ -78,21 +77,9 @@ class DocumentConverter
 
     protected function memoDocumentUrl(Memo $memo, ?MemoVersion $version = null): string
     {
-        $laravelInternalUrl = rtrim((string) config('services.onlyoffice.laravel_internal_url', config('app.url')), '/');
         $ttlMinutes = max(1, (int) config('services.onlyoffice.signed_url_ttl_minutes', 30));
-        $routeParameters = ['memo' => $memo];
 
-        if ($version) {
-            $routeParameters['version_id'] = $version->id;
-        }
-
-        $ooToken = app(MemoDocumentKey::class)->generateFileToken($memo, $routeParameters['version_id'] ?? null, $ttlMinutes);
-        $routeParameters['oo_token'] = $ooToken;
-        unset($routeParameters['viewer_user_id']);
-
-        $documentPath = URL::temporarySignedRoute('memos.file.signed', now()->addMinutes($ttlMinutes), $routeParameters, false);
-
-        return $laravelInternalUrl.$documentPath;
+        return app(MemoDocumentKey::class)->signedFileUrl($memo, $version?->id, $ttlMinutes);
     }
 
     protected function conversionKey(Memo $memo, ?MemoVersion $version = null): string
