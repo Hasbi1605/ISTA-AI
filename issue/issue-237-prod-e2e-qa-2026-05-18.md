@@ -59,3 +59,17 @@ Rencana fix:
 - Tambahkan guard frontend agar force-save hanya dijalankan ketika `window.memoOnlyOfficeState` menandai dokumen sebagai `dirty`.
 - Terapkan guard yang sama pada download/export, submit konfigurasi, revisi prompt, before-unload, dan perpindahan memo via JS.
 - Ulangi QA download DOCX/PDF dan alur memo setelah deploy.
+
+### Bug lanjutan: edit manual OnlyOffice bisa kembali `dirty=false` sebelum tersinkron ke Laravel
+
+Status: valid, perlu hotfix tambahan.
+
+Bukti:
+- Browser QA berhasil mengetik token `QA_MANUAL_*` di editor OnlyOffice.
+- `window.memoOnlyOfficeState` menunjukkan `lastChangeAt` terisi, tetapi `dirty=false` karena OnlyOffice menampilkan status internal `Semua perubahan tersimpan`.
+- Jika guard hanya melihat `dirty=true`, tombol download melewati force-save dan mengambil file Laravel versi lama.
+
+Rencana fix:
+- Ubah guard frontend menjadi sinkron jika state editor `dirty=true` atau `lastChangeAt > 0`.
+- Tetap skip force-save untuk editor yang belum pernah berubah (`lastChangeAt=0`), agar bug `error 1` pada force-save kosong tidak kembali.
+- Ulangi QA manual edit + download/export untuk memastikan force-save berjalan dan file tersinkron.

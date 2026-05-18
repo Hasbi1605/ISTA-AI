@@ -219,7 +219,8 @@ class MemoWorkspaceTest extends TestCase
         $this->assertStringContainsString('isLoadingMemo(id)', $chatPageJs);
         $this->assertStringContainsString('loadMemo(id)', $chatPageJs);
         $this->assertStringContainsString('this.loadingMemoId = memoId', $chatPageJs);
-        $this->assertStringContainsString('&& this.hasUnsavedOnlyOfficeChanges()', $chatPageJs);
+        $this->assertStringContainsString('&& this.hasOnlyOfficeChangesToSync()', $chatPageJs);
+        $this->assertStringContainsString('Number(state?.lastChangeAt || 0) > 0', $chatPageJs);
         $this->assertStringContainsString('this.$wire.loadMemo(memoId, shouldSyncActiveEditor)', $chatPageJs);
         $this->assertStringContainsString('waitForOnlyOfficeToSettle()', $chatPageJs);
         $this->assertStringContainsString('this.loadingMemoId = null', $chatPageJs);
