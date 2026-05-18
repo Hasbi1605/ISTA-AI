@@ -14,6 +14,7 @@ use App\Services\ChatOrchestrationService;
 use App\Services\CloudStorage\GoogleDriveService;
 use App\Services\DocumentExportService;
 use App\Services\DocumentLifecycleService;
+use App\Support\SafeAssistantMarkdown;
 use App\Support\UserFacingError;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -485,10 +486,7 @@ class ChatIndex extends Component
         }
 
         try {
-            $contentHtml = (string) Str::of($message->content)->markdown([
-                'html_input' => 'strip',
-                'allow_unsafe_links' => false,
-            ]);
+            $contentHtml = app(SafeAssistantMarkdown::class)->toHtml($message->content);
 
             if ($this->formatRequiresTable($targetFormat) && ! $this->contentHtmlContainsTable($contentHtml)) {
                 return [
