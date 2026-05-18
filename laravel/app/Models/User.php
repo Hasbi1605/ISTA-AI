@@ -16,6 +16,18 @@ class User extends Authenticatable implements MustVerifyEmail
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
+    public const ROLE_USER = 'user';
+
+    public const ROLE_ADMIN = 'admin';
+
+    public const ROLE_SUPER_ADMIN = 'super_admin';
+
+    public const ROLES = [
+        self::ROLE_USER,
+        self::ROLE_ADMIN,
+        self::ROLE_SUPER_ADMIN,
+    ];
+
     /**
      * The attributes that are mass assignable.
      *
@@ -27,6 +39,9 @@ class User extends Authenticatable implements MustVerifyEmail
         'password',
         'verification_code',
         'verification_code_expires_at',
+        'role',
+        'last_seen_at',
+        'last_active_feature',
     ];
 
     /**
@@ -44,7 +59,32 @@ class User extends Authenticatable implements MustVerifyEmail
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'last_seen_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Determine whether the user has the admin role.
+     */
+    public function isAdmin(): bool
+    {
+        return $this->role === self::ROLE_ADMIN;
+    }
+
+    /**
+     * Determine whether the user has the super admin role.
+     */
+    public function isSuperAdmin(): bool
+    {
+        return $this->role === self::ROLE_SUPER_ADMIN;
+    }
+
+    /**
+     * Admin or super admin can access general admin routes.
+     */
+    public function canAccessAdmin(): bool
+    {
+        return $this->isAdmin() || $this->isSuperAdmin();
     }
 
     /**

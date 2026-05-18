@@ -1,6 +1,9 @@
 <?php
 
 use App\Http\Middleware\AddSecurityHeaders;
+use App\Http\Middleware\EnsureUserIsAdmin;
+use App\Http\Middleware\EnsureUserIsSuperAdmin;
+use App\Http\Middleware\UpdateUserPresence;
 use App\Support\TrustedProxyConfig;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -25,6 +28,14 @@ return Application::configure(basePath: dirname(__DIR__))
             'onlyoffice/callback/*',
         ]);
         $middleware->append(AddSecurityHeaders::class);
+
+        $middleware->alias([
+            'admin' => EnsureUserIsAdmin::class,
+            'super_admin' => EnsureUserIsSuperAdmin::class,
+            'presence' => UpdateUserPresence::class,
+        ]);
+
+        $middleware->appendToGroup('web', UpdateUserPresence::class);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         $exceptions->reportable(function (Throwable $e) {
