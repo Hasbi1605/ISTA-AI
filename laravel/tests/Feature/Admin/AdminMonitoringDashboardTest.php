@@ -214,18 +214,18 @@ class AdminMonitoringDashboardTest extends TestCase
     {
         $user = User::factory()->create(['role' => User::ROLE_USER]);
 
-        $this->actingAs($user)->get('/admin/users')->assertStatus(403);
-        $this->actingAs($user)->get('/admin/usage')->assertStatus(403);
-        $this->actingAs($user)->get('/admin/errors')->assertStatus(403);
-        $this->actingAs($user)->get('/admin/documents')->assertStatus(403);
+        $this->actingAs($user)->get('/admin/users')->assertRedirect(route('admin.login'));
+        $this->actingAs($user)->get('/admin/usage')->assertRedirect(route('admin.login'));
+        $this->actingAs($user)->get('/admin/errors')->assertRedirect(route('admin.login'));
+        $this->actingAs($user)->get('/admin/documents')->assertRedirect(route('admin.login'));
     }
 
-    public function test_guest_is_redirected_to_login_for_monitoring_pages(): void
+    public function test_guest_is_redirected_to_admin_login_for_monitoring_pages(): void
     {
-        $this->get('/admin/users')->assertRedirect(route('login'));
-        $this->get('/admin/usage')->assertRedirect(route('login'));
-        $this->get('/admin/errors')->assertRedirect(route('login'));
-        $this->get('/admin/documents')->assertRedirect(route('login'));
+        $this->get('/admin/users')->assertRedirect(route('admin.login'));
+        $this->get('/admin/usage')->assertRedirect(route('admin.login'));
+        $this->get('/admin/errors')->assertRedirect(route('admin.login'));
+        $this->get('/admin/documents')->assertRedirect(route('admin.login'));
     }
 
     public function test_admin_pages_do_not_leak_message_content(): void

@@ -4,12 +4,13 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
 
 class EnsureUserIsAdmin
 {
     /**
-     * Allow only authenticated admin or super admin users.
+     * Allow only authenticated, active admin or super admin users.
      *
      * @param  Closure(Request): Response  $next
      */
@@ -18,11 +19,26 @@ class EnsureUserIsAdmin
         $user = $request->user();
 
         if (! $user) {
-            return redirect()->guest(route('login'));
+            return redirect()->guest(route('admin.login'));
         }
 
-        if (! method_exists($user, 'canAccessAdmin') || ! $user->canAccessAdmin()) {
-            abort(403, 'Halaman ini hanya untuk admin.');
+        if (! method_exists($user, 'isAdminFamily') || ! $user->isAdminFamily()) {
+            // Authenticated but not admin role - log out and send to admin login
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return redirect()->route('admin.login')
+                ->withErrors(['email' => 'Akun tidak memiliki akses ke admin.']);
+        }
+
+        if (method_exists($user, 'isActive') && ! $user->isActive()) {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return redirect()->route('admin.login')
+                ->withErrors(['email' => 'Akun admin sedang dinonaktifkan.']);
         }
 
         return $next($request);

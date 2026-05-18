@@ -35,6 +35,14 @@ return Application::configure(basePath: dirname(__DIR__))
             'presence' => UpdateUserPresence::class,
         ]);
 
+        $middleware->redirectGuestsTo(function (Request $request) {
+            if ($request->is('admin') || $request->is('admin/*')) {
+                return route('admin.login');
+            }
+
+            return route('login');
+        });
+
         $middleware->appendToGroup('web', UpdateUserPresence::class);
     })
     ->withExceptions(function (Exceptions $exceptions) {

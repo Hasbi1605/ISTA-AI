@@ -1,11 +1,13 @@
 <?php
 
+use App\Http\Controllers\Admin\AdminLoginController;
 use App\Http\Controllers\Chat\ChatStreamController;
 use App\Http\Controllers\CloudStorage\GoogleDriveOAuthController;
 use App\Http\Controllers\Documents\DocumentExportController;
 use App\Http\Controllers\Documents\DocumentPreviewController;
 use App\Http\Controllers\Memos\MemoFileController;
 use App\Http\Controllers\OnlyOfficeCallbackController;
+use App\Livewire\Admin\AdminAccounts;
 use App\Livewire\Admin\AdminDashboard;
 use App\Livewire\Admin\AdminDocuments;
 use App\Livewire\Admin\AdminErrors;
@@ -106,6 +108,22 @@ Route::middleware(['auth', 'verified'])
         Route::get('/callback', [GoogleDriveOAuthController::class, 'callback'])->name('callback');
     });
 
+Route::middleware(['web'])
+    ->prefix('admin')
+    ->name('admin.')
+    ->group(function () {
+        Route::middleware('guest')->group(function () {
+            Route::get('/login', [AdminLoginController::class, 'showLoginForm'])->name('login');
+            Route::post('/login', [AdminLoginController::class, 'login'])
+                ->middleware('throttle:10,1')
+                ->name('login.attempt');
+        });
+
+        Route::middleware('auth')->group(function () {
+            Route::post('/logout', [AdminLoginController::class, 'logout'])->name('logout');
+        });
+    });
+
 Route::middleware(['auth', 'verified', 'admin'])
     ->prefix('admin')
     ->name('admin.')
@@ -122,6 +140,7 @@ Route::middleware(['auth', 'verified', 'super_admin'])
     ->name('admin.')
     ->group(function () {
         Route::view('/ai-config', 'admin.ai-config')->name('ai-config');
+        Route::get('/accounts', AdminAccounts::class)->name('accounts');
     });
 
 require __DIR__.'/auth.php';
