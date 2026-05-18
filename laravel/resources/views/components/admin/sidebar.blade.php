@@ -8,6 +8,34 @@
             'icon' => 'M3 12l9-9 9 9M5 10v10a1 1 0 001 1h4a1 1 0 001-1v-5h2v5a1 1 0 001 1h4a1 1 0 001-1V10',
             'visible' => true,
         ],
+        [
+            'label' => 'Users',
+            'description' => 'Presence & aktivitas',
+            'route' => 'admin.users',
+            'icon' => 'M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-5.13a4 4 0 11-8 0 4 4 0 018 0zm6 0a4 4 0 11-8 0 4 4 0 018 0z',
+            'visible' => true,
+        ],
+        [
+            'label' => 'Usage',
+            'description' => 'Event AI per fitur',
+            'route' => 'admin.usage',
+            'icon' => 'M9 19V6l12-3v13M9 19c0 1.657-1.343 3-3 3s-3-1.343-3-3 1.343-3 3-3 3 1.343 3 3zm12-3c0 1.657-1.343 3-3 3s-3-1.343-3-3 1.343-3 3-3 3 1.343 3 3z',
+            'visible' => true,
+        ],
+        [
+            'label' => 'Errors',
+            'description' => 'Event gagal & blocked',
+            'route' => 'admin.errors',
+            'icon' => 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 17c-.77 1.333.192 3 1.732 3z',
+            'visible' => true,
+        ],
+        [
+            'label' => 'Documents',
+            'description' => 'Status dokumen user',
+            'route' => 'admin.documents',
+            'icon' => 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+            'visible' => true,
+        ],
     ];
 
     if ($user && method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin()) {
