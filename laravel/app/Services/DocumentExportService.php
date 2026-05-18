@@ -74,7 +74,7 @@ class DocumentExportService
         $baseFileName = $this->documentBaseName($document, $fileName);
 
         if (in_array($targetFormat, ['xlsx', 'csv'], true)) {
-            $tables = $this->extractTables($document);
+            $tables = $this->tablesFromExtractionPayload($this->extractTables($document));
 
             if ($tables === []) {
                 throw new RuntimeException('Tidak ada tabel yang bisa diekspor.');
@@ -204,6 +204,20 @@ class DocumentExportService
         }
 
         return '<article><h1>'.$documentTitle.'</h1>'.implode('', $sections).'</article>';
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    protected function tablesFromExtractionPayload(array $payload): array
+    {
+        $tables = array_is_list($payload) ? $payload : ($payload['tables'] ?? []);
+
+        if (! is_array($tables)) {
+            return [];
+        }
+
+        return array_values(array_filter($tables, fn ($table) => is_array($table)));
     }
 
     protected function resolveDocumentPath(Document $document): ?string

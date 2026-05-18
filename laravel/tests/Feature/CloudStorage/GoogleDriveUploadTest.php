@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Services\CloudStorage\GoogleDriveService;
 use App\Services\DocumentExportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Mockery;
@@ -168,6 +169,87 @@ class GoogleDriveUploadTest extends TestCase
             'external_id' => 'drive-upload-id',
             'name' => 'surat-keluar.pdf',
             'mime_type' => 'application/pdf',
+            'folder_external_id' => 'folder-upload-id',
+        ]);
+    }
+
+    public function test_document_viewer_can_upload_spreadsheet_export_with_real_table_payload_to_google_drive(): void
+    {
+        Storage::fake('local');
+        config([
+            'services.ai_document_service.url' => 'http://document-service.test',
+            'services.ai_document_service.token' => 'document-token',
+        ]);
+
+        $user = User::factory()->create();
+        $document = $this->createDocument($user);
+
+        Storage::disk('local')->put($document->file_path, '%PDF-1.4 fake table document');
+
+        Http::fake(function ($request) {
+            if ($request->url() === 'http://document-service.test/api/documents/extract-tables') {
+                return Http::response([
+                    'status' => 'success',
+                    'filename' => 'surat-keluar.pdf',
+                    'tables' => [
+                        [
+                            'header' => ['Nama', 'Nilai'],
+                            'rows' => [
+                                ['A', '10'],
+                            ],
+                        ],
+                    ],
+                ]);
+            }
+
+            if ($request->url() === 'http://document-service.test/api/documents/export') {
+                return Http::response('xlsx artifact');
+            }
+
+            return Http::response('', 404);
+        });
+
+        $googleDriveService = Mockery::mock(GoogleDriveService::class);
+        $googleDriveService->shouldReceive('canUploadWithConfiguredAccount')
+            ->byDefault()
+            ->andReturn(true);
+        $googleDriveService->shouldReceive('uploadFromPath')
+            ->once()
+            ->with(Mockery::on(function (string $path): bool {
+                return is_file($path) && file_get_contents($path) === 'xlsx artifact';
+            }), 'surat-keluar.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', null)
+            ->andReturn([
+                'external_id' => 'drive-upload-xlsx-id',
+                'name' => 'surat-keluar.xlsx',
+                'mime_type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'web_view_link' => 'https://drive.google.com/file/d/drive-upload-xlsx-id/view',
+                'folder_external_id' => 'folder-upload-id',
+                'size_bytes' => 2048,
+            ]);
+
+        $this->app->instance(GoogleDriveService::class, $googleDriveService);
+
+        Livewire::actingAs($user)
+            ->test(DocumentViewer::class)
+            ->call('open', $document->id)
+            ->call('saveToGoogleDrive', 'xlsx')
+            ->assertSee('Tersimpan ke Google Drive', false);
+
+        Http::assertSent(fn ($request): bool => $request->url() === 'http://document-service.test/api/documents/export'
+            && $request['target_format'] === 'xlsx'
+            && str_contains((string) $request['content_html'], 'Nama')
+            && str_contains((string) $request['content_html'], 'A')
+            && str_contains((string) $request['content_html'], '10'));
+
+        $this->assertDatabaseHas('cloud_storage_files', [
+            'user_id' => $user->id,
+            'provider' => 'google_drive',
+            'direction' => CloudStorageFile::DIRECTION_EXPORT,
+            'local_type' => Document::class,
+            'local_id' => $document->id,
+            'external_id' => 'drive-upload-xlsx-id',
+            'name' => 'surat-keluar.xlsx',
+            'mime_type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'folder_external_id' => 'folder-upload-id',
         ]);
     }

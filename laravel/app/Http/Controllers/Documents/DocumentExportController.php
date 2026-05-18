@@ -25,6 +25,14 @@ class DocumentExportController extends Controller
         $contentHtml = preg_replace('/\bon\w+\s*=\s*(?:"[^"]*"|\'[^\']*\'|[^\s>\/]*)/i', '', $contentHtml ?? '');
         $contentHtml = preg_replace('/<iframe\b[^>]*>.*?<\/iframe>/is', '', $contentHtml ?? '');
 
+        if ($this->formatRequiresTable($data['target_format']) && ! $this->containsHtmlTable($contentHtml ?? '')) {
+            return response('Format spreadsheet hanya tersedia untuk konten yang memiliki tabel.', Response::HTTP_UNPROCESSABLE_ENTITY, [
+                'Content-Type' => 'text/plain; charset=UTF-8',
+                'X-Content-Type-Options' => 'nosniff',
+                'Cache-Control' => 'no-store',
+            ]);
+        }
+
         $artifact = $exportService->exportContent(
             $contentHtml ?? '',
             $data['target_format'],
@@ -68,5 +76,15 @@ class DocumentExportController extends Controller
         if ($user->cannot('view', $document)) {
             abort(Response::HTTP_FORBIDDEN);
         }
+    }
+
+    private function formatRequiresTable(string $targetFormat): bool
+    {
+        return in_array(strtolower(trim($targetFormat)), ['xlsx', 'csv'], true);
+    }
+
+    private function containsHtmlTable(string $contentHtml): bool
+    {
+        return preg_match('/<table\b/i', $contentHtml) === 1;
     }
 }

@@ -7,8 +7,8 @@ use App\Models\User;
 use App\Services\DocumentExportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Mockery;
 use Tests\TestCase;
 
@@ -60,6 +60,27 @@ class DocumentExportTest extends TestCase
         ]);
 
         $response->assertSessionHasErrors(['content_html']);
+    }
+
+    public function test_export_route_rejects_spreadsheet_without_table_and_does_not_call_service(): void
+    {
+        $user = User::factory()->create(['email_verified_at' => now()]);
+
+        $service = Mockery::mock(DocumentExportService::class);
+        $service->shouldNotReceive('exportContent');
+        $this->app->instance(DocumentExportService::class, $service);
+
+        $response = $this->actingAs($user)->post(route('documents.export'), [
+            'content_html' => '<article><p>Jawaban naratif tanpa tabel.</p></article>',
+            'target_format' => 'xlsx',
+            'file_name' => 'jawaban-ai',
+        ]);
+
+        $response->assertStatus(422);
+        $this->assertStringContainsString(
+            'Format spreadsheet hanya tersedia untuk konten yang memiliki tabel.',
+            (string) $response->getContent()
+        );
     }
 
     public function test_documents_export_route_has_throttle_middleware(): void

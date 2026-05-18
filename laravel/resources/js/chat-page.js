@@ -2286,14 +2286,33 @@ const registerChatPageData = (Alpine) => {
             return `${this.resolvedExportFileName()}.${format}`;
         },
 
+        formatRequiresTable(format) {
+            return ['xlsx', 'csv'].includes(String(format || '').toLowerCase());
+        },
+
+        htmlContainsTable(html) {
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = String(html || '');
+
+            return wrapper.querySelector('table') !== null;
+        },
+
         async exportAs(format) {
             if (!this.exportUrl || this.exportLoading) {
                 return;
             }
 
             this.exportMenuOpen = false;
-            this.exportLoading = true;
             this.exportError = '';
+            const contentHtml = this.resolvedHtml();
+
+            if (this.formatRequiresTable(format) && !this.htmlContainsTable(contentHtml)) {
+                this.exportError = 'Format spreadsheet hanya tersedia untuk jawaban AI yang berisi tabel.';
+
+                return;
+            }
+
+            this.exportLoading = true;
 
             try {
                 const response = await fetch(this.exportUrl, {
@@ -2304,7 +2323,7 @@ const registerChatPageData = (Alpine) => {
                         'X-CSRF-TOKEN': this.getCsrfToken(),
                     },
                     body: JSON.stringify({
-                        content_html: this.resolvedHtml(),
+                        content_html: contentHtml,
                         target_format: format,
                         file_name: this.resolvedExportFileName(),
                     }),
@@ -2320,7 +2339,10 @@ const registerChatPageData = (Alpine) => {
                 this.downloadBlob(blob, fileName);
             } catch (error) {
                 console.error('Gagal mengekspor jawaban AI', error);
-                this.exportError = 'Ekspor gagal. Coba lagi.';
+                const message = String(error?.message || '');
+                this.exportError = message.includes('Format spreadsheet')
+                    ? message
+                    : 'Ekspor gagal. Coba lagi.';
             } finally {
                 this.exportLoading = false;
             }
