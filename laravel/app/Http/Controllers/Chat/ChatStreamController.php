@@ -39,6 +39,7 @@ class ChatStreamController extends Controller
         $requestedDocumentIds = $this->parseDocumentIds($request->input('document_ids', '[]'));
         $documentIds = $this->documentIdsForLatestUserMessage($conversationId, $requestedDocumentIds);
         $webSearchMode = filter_var($request->input('web_search_mode', false), FILTER_VALIDATE_BOOLEAN);
+        $clientRequestId = $this->normalizeRequestId($request->input('request_id'));
 
         $aiService = app(AIService::class);
         $orchestrator = app(ChatOrchestrationService::class);
@@ -77,6 +78,7 @@ class ChatStreamController extends Controller
             $conversationId,
             $conversation,
             $user,
+            $clientRequestId,
         ) {
             // Disable output buffering so chunks reach the browser immediately
             @ini_set('output_buffering', 'off');
@@ -102,6 +104,7 @@ class ChatStreamController extends Controller
                 $user,
                 $documentContextError,
                 $documentContextWarning,
+                $clientRequestId,
             );
         }, 200, [
             'Content-Type' => 'text/event-stream',
@@ -129,12 +132,13 @@ class ChatStreamController extends Controller
         User $user,
         ?string $documentContextError = null,
         ?string $documentContextWarning = null,
+        ?string $clientRequestId = null,
     ): void {
         $usageEvents = app(AIUsageEventService::class);
         $streamStartedAt = microtime(true);
         $hasDocumentContext = ! empty($resolvedDocumentIds) || ! empty($documentFilenames);
         $feature = $this->resolveChatFeature($webSearchMode, $hasDocumentContext);
-        $requestId = $usageEvents->newRequestId();
+        $requestId = $clientRequestId ?? $usageEvents->newRequestId();
 
         $streamClaimKey = $orchestrator->acquireStreamRunner($conversationId);
         if ($streamClaimKey === null) {
@@ -373,6 +377,31 @@ class ChatStreamController extends Controller
         }
         echo "\n";
         flush();
+    }
+
+    /**
+     * Validate the optional client-supplied request id so that stream lifecycle
+     * events can be correlated with the `started` event recorded by Livewire.
+     * Falls back to null when the value is missing or malformed; the caller
+     * generates a fresh UUID in that case so logging keeps working.
+     */
+    private function normalizeRequestId(mixed $raw): ?string
+    {
+        if (! is_string($raw)) {
+            return null;
+        }
+
+        $trimmed = trim($raw);
+
+        if ($trimmed === '') {
+            return null;
+        }
+
+        if (! preg_match('/^[A-Za-z0-9_-]{1,64}$/', $trimmed)) {
+            return null;
+        }
+
+        return $trimmed;
     }
 
     /**

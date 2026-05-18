@@ -844,8 +844,9 @@ const registerChatPageData = (Alpine) => {
                 const documentIds = detail.documentIds || [];
                 const webSearchMode = Boolean(detail.webSearchMode);
                 const loadingContext = detail.loadingContext || 'general';
+                const requestId = typeof detail.requestId === 'string' ? detail.requestId : '';
                 if (conversationId > 0) {
-                    this.openChatStream(conversationId, documentIds, webSearchMode, loadingContext);
+                    this.openChatStream(conversationId, documentIds, webSearchMode, loadingContext, requestId);
                 }
             };
             window.addEventListener('chat-open-stream', this._chatStreamHandler);
@@ -902,7 +903,7 @@ const registerChatPageData = (Alpine) => {
             return true;
         },
 
-        openChatStream(conversationId, documentIds, webSearchMode, loadingContext) {
+        openChatStream(conversationId, documentIds, webSearchMode, loadingContext, requestId) {
             this.closeChatStream(conversationId);
 
             // History tidak dikirim via query string — server reconstruct dari DB
@@ -911,6 +912,10 @@ const registerChatPageData = (Alpine) => {
                 document_ids: JSON.stringify(documentIds),
                 web_search_mode: webSearchMode ? '1' : '0',
             });
+
+            if (typeof requestId === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(requestId)) {
+                params.append('request_id', requestId);
+            }
 
             const url = `/chat/stream/${conversationId}?${params.toString()}`;
             const es = new EventSource(url);
@@ -2780,6 +2785,7 @@ const registerChatPageData = (Alpine) => {
                                 documentIds: normalizedDocs,
                                 webSearchMode: Boolean(this.webSearchMode),
                                 loadingContext,
+                                requestId: typeof response?.requestId === 'string' ? response.requestId : '',
                             },
                         }));
                     }
