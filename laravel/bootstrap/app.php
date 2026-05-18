@@ -25,10 +25,11 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions) {
         $exceptions->reportable(function (Throwable $e) {
-            Log::error('Global Exception Caught: '.$e->getMessage(), [
+            Log::error('Global Exception Caught', [
                 'exception_class' => get_class($e),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
+                'message_hash' => hash('sha256', $e->getMessage()),
             ]);
         });
 

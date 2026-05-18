@@ -43,6 +43,7 @@ Route::get('chat/stream/{conversationId}', [ChatStreamController::class, 'stream
     ->name('chat.stream');
 
 Route::post('onlyoffice/callback/{memo}', OnlyOfficeCallbackController::class)
+    ->middleware('throttle:120,1')
     ->name('onlyoffice.callback');
 
 Route::get('chat/memos/{memo}/signed-file', [MemoFileController::class, 'signed'])

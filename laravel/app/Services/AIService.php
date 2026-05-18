@@ -5,6 +5,7 @@ namespace App\Services;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class AIService
 {
@@ -16,11 +17,17 @@ class AIService
     public const ERROR_SENTINEL = '[ISTA_AI_ERROR]';
 
     protected $client;
+
     protected $baseUrl;
+
     protected $documentBaseUrl;
+
     protected $token;
+
     protected $documentToken;
+
     protected $maxRetries;
+
     protected $retryDelayMs;
 
     public function __construct()
@@ -48,10 +55,9 @@ class AIService
     /**
      * Send a list of messages to the Python AI service and stream the response.
      *
-     * @param array $messages
-     * @param array|null $document_filenames Optional document filenames for RAG mode
-     * @param string|null $user_id User ID for authorization in RAG mode
-     * @param array|null $document_ids Optional document IDs for stable Chroma filtering
+     * @param  array|null  $document_filenames  Optional document filenames for RAG mode
+     * @param  string|null  $user_id  User ID for authorization in RAG mode
+     * @param  array|null  $document_ids  Optional document IDs for stable Chroma filtering
      * @return \Generator
      */
     public function sendChat(
@@ -89,7 +95,7 @@ class AIService
         for ($attempt = 1; $attempt <= $this->maxRetries; $attempt++) {
             try {
                 $headers = [
-                    'Authorization' => 'Bearer ' . $this->token,
+                    'Authorization' => 'Bearer '.$this->token,
                     'Accept' => 'text/event-stream',
                     'Content-Type' => 'application/json',
                 ];
@@ -98,7 +104,7 @@ class AIService
                     $headers['X-Request-ID'] = $request_id;
                 }
 
-                $response = $this->client->post($this->baseUrl . '/api/chat', [
+                $response = $this->client->post($this->baseUrl.'/api/chat', [
                     'headers' => $headers,
                     'json' => $payload,
                     'stream' => true,
@@ -106,7 +112,7 @@ class AIService
 
                 $body = $response->getBody();
 
-                while (!$body->eof()) {
+                while (! $body->eof()) {
                     yield $body->read(1024);
                 }
 
@@ -120,18 +126,19 @@ class AIService
                     'max_retries' => $this->maxRetries,
                     'base_url' => $this->baseUrl,
                     'status' => $response?->getStatusCode(),
-                    'message' => $e->getMessage(),
-                    'response_excerpt' => $responseBody ? mb_substr($responseBody, 0, 500) : null,
+                    'message' => $this->sanitizeLogMessage($e->getMessage()),
+                    'response_body_bytes' => is_string($responseBody) ? strlen($responseBody) : null,
                 ]);
 
                 if ($attempt >= $this->maxRetries) {
                     Log::error('AI Service Error: max retries reached', [
                         'base_url' => $this->baseUrl,
                         'status' => $response?->getStatusCode(),
-                        'message' => $e->getMessage(),
-                        'response_excerpt' => $responseBody ? mb_substr($responseBody, 0, 500) : null,
+                        'message' => $this->sanitizeLogMessage($e->getMessage()),
+                        'response_body_bytes' => is_string($responseBody) ? strlen($responseBody) : null,
                     ]);
-                    yield self::ERROR_SENTINEL."❌ Kesalahan sistem saat menghubungi otak AI. Silakan coba lagi nanti.";
+                    yield self::ERROR_SENTINEL.'❌ Kesalahan sistem saat menghubungi otak AI. Silakan coba lagi nanti.';
+
                     return;
                 }
 
@@ -140,9 +147,10 @@ class AIService
                 }
             } catch (\Throwable $e) {
                 Log::error('Unexpected AI Service Error', [
-                    'message' => $e->getMessage(),
+                    'message' => $this->sanitizeLogMessage($e->getMessage()),
                 ]);
-                yield self::ERROR_SENTINEL."❌ Kesalahan sistem saat menghubungi otak AI. Silakan coba lagi nanti.";
+                yield self::ERROR_SENTINEL.'❌ Kesalahan sistem saat menghubungi otak AI. Silakan coba lagi nanti.';
+
                 return;
             }
         }
@@ -151,9 +159,7 @@ class AIService
     /**
      * Summarize a document.
      *
-     * @param string $filename
-     * @param string|null $user_id User ID for authorization
-     * @return array
+     * @param  string|null  $user_id  User ID for authorization
      */
     public function summarizeDocument(string $filename, ?string $user_id = null, string $documentId = ''): array
     {
@@ -167,9 +173,9 @@ class AIService
                 $payload['document_id'] = $documentId;
             }
 
-            $response = $this->client->post($this->documentBaseUrl . '/api/documents/summarize', [
+            $response = $this->client->post($this->documentBaseUrl.'/api/documents/summarize', [
                 'headers' => [
-                    'Authorization' => 'Bearer ' . $this->documentToken,
+                    'Authorization' => 'Bearer '.$this->documentToken,
                     'Accept' => 'application/json',
                     'Content-Type' => 'application/json',
                 ],
@@ -178,10 +184,13 @@ class AIService
 
             return json_decode($response->getBody()->getContents(), true);
         } catch (RequestException $e) {
-            Log::error('AI Service Summarize Error: ' . $e->getMessage());
+            Log::error('AI Service Summarize Error', [
+                'message' => $this->sanitizeLogMessage($e->getMessage()),
+            ]);
+
             return [
                 'status' => 'error',
-                'message' => 'Gagal merangkum dokumen: ' . $e->getMessage()
+                'message' => 'Gagal merangkum dokumen. Silakan coba lagi nanti.',
             ];
         }
     }
@@ -207,12 +216,33 @@ class AIService
     private function normalizeIntConfig(mixed $value, int $default): int
     {
         $normalized = $this->normalizeStringConfig($value, (string) $default);
+
         return is_numeric($normalized) ? (int) $normalized : $default;
     }
 
     private function normalizeFloatConfig(mixed $value, float $default): float
     {
         $normalized = $this->normalizeStringConfig($value, (string) $default);
+
         return is_numeric($normalized) ? (float) $normalized : $default;
+    }
+
+    private function sanitizeLogMessage(?string $message): ?string
+    {
+        if ($message === null || $message === '') {
+            return $message;
+        }
+
+        $patterns = [
+            '/Bearer\s+[A-Za-z0-9._~+\-\/]+=*/i' => 'Bearer [REDACTED]',
+            '/github_pat_[A-Za-z0-9_]+/i' => 'github_pat_[REDACTED]',
+            '/GOCSPX-[A-Za-z0-9_-]+/i' => 'GOCSPX-[REDACTED]',
+            '/\b(re|sk|ghp|gho|ghu|ghs)_[A-Za-z0-9_]{12,}\b/i' => '[REDACTED_TOKEN]',
+            '/\b(token|secret|password|api[_-]?key)(["\']?\s*[:=]\s*["\']?)[^"\'\s,}]+/i' => '$1$2[REDACTED]',
+        ];
+
+        $redacted = preg_replace(array_keys($patterns), array_values($patterns), $message) ?? $message;
+
+        return Str::limit($redacted, 500);
     }
 }

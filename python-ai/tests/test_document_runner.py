@@ -6,7 +6,11 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from app.document_runner import _parse_result_payload, run_document_process
+from app.document_runner import (
+    DEFAULT_DOCUMENT_PROCESS_SUBPROCESS_TIMEOUT,
+    _parse_result_payload,
+    run_document_process,
+)
 
 
 def test_parse_result_payload_uses_last_valid_json_line():
@@ -20,7 +24,10 @@ def test_parse_result_payload_uses_last_valid_json_line():
 
 
 def test_run_document_process_returns_success_payload(monkeypatch):
+    captured = {}
+
     def fake_run(*args, **kwargs):
+        captured["timeout"] = kwargs.get("timeout")
         return subprocess.CompletedProcess(
             args=args[0],
             returncode=0,
@@ -34,6 +41,29 @@ def test_run_document_process_returns_success_payload(monkeypatch):
 
     assert success is True
     assert message == "processed"
+    assert captured["timeout"] == DEFAULT_DOCUMENT_PROCESS_SUBPROCESS_TIMEOUT
+
+
+def test_run_document_process_honors_timeout_env_override(monkeypatch):
+    captured = {}
+
+    def fake_run(*args, **kwargs):
+        captured["timeout"] = kwargs.get("timeout")
+        return subprocess.CompletedProcess(
+            args=args[0],
+            returncode=0,
+            stdout="{\"success\": true, \"message\": \"processed\"}\n",
+            stderr="",
+        )
+
+    monkeypatch.setenv("DOCUMENT_PROCESS_SUBPROCESS_TIMEOUT", "1200")
+    monkeypatch.setattr("app.document_runner.subprocess.run", fake_run)
+
+    success, message = run_document_process("/tmp/doc.pdf", "doc.pdf", "42")
+
+    assert success is True
+    assert message == "processed"
+    assert captured["timeout"] == 1200
 
 
 def test_run_document_process_falls_back_to_stderr_when_payload_missing(monkeypatch):
