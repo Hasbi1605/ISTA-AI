@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AdminLoginController;
+use App\Http\Controllers\Admin\AdminPasswordChangeController;
 use App\Http\Controllers\Chat\ChatStreamController;
 use App\Http\Controllers\CloudStorage\GoogleDriveOAuthController;
 use App\Http\Controllers\Documents\DocumentExportController;
@@ -121,10 +122,14 @@ Route::middleware(['web'])
 
         Route::middleware('auth')->group(function () {
             Route::post('/logout', [AdminLoginController::class, 'logout'])->name('logout');
+            Route::get('/password/change', [AdminPasswordChangeController::class, 'show'])->name('password.change');
+            Route::post('/password/change', [AdminPasswordChangeController::class, 'update'])
+                ->middleware('throttle:10,1')
+                ->name('password.update');
         });
     });
 
-Route::middleware(['auth', 'verified', 'admin'])
+Route::middleware(['auth', 'verified', 'admin', 'admin.password_changed'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
@@ -135,7 +140,7 @@ Route::middleware(['auth', 'verified', 'admin'])
         Route::get('/documents', AdminDocuments::class)->name('documents');
     });
 
-Route::middleware(['auth', 'verified', 'super_admin'])
+Route::middleware(['auth', 'verified', 'super_admin', 'admin.password_changed'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {

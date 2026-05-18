@@ -141,10 +141,7 @@ class AdminAccounts extends Component
 
     public function startEdit(int $userId): void
     {
-        $user = User::query()->findOrFail($userId);
-        if (! $user->isAdminFamily()) {
-            abort(404);
-        }
+        $user = $this->resolveAdminTarget($userId);
 
         $this->editingUserId = $user->id;
         $this->editName = $user->name;
@@ -177,7 +174,7 @@ class AdminAccounts extends Component
             'editRole' => 'role',
         ]);
 
-        $target = User::query()->findOrFail($this->editingUserId);
+        $target = $this->resolveAdminTarget($this->editingUserId);
 
         try {
             $service->update(
@@ -203,7 +200,7 @@ class AdminAccounts extends Component
 
     public function activate(int $userId, AdminAccountManagementService $service): void
     {
-        $target = User::query()->findOrFail($userId);
+        $target = $this->resolveAdminTarget($userId);
 
         $service->activate(auth()->user(), $target, request());
 
@@ -212,6 +209,9 @@ class AdminAccounts extends Component
 
     public function startDeactivate(int $userId): void
     {
+        // Verify target is admin-family before opening modal.
+        $this->resolveAdminTarget($userId);
+
         $this->deactivatingUserId = $userId;
         $this->deactivateReason = '';
         $this->resetErrorBag();
@@ -229,7 +229,7 @@ class AdminAccounts extends Component
             return;
         }
 
-        $target = User::query()->findOrFail($this->deactivatingUserId);
+        $target = $this->resolveAdminTarget($this->deactivatingUserId);
 
         try {
             $service->deactivate(
@@ -251,11 +251,7 @@ class AdminAccounts extends Component
 
     public function startResetPassword(int $userId, AdminAccountManagementService $service): void
     {
-        $target = User::query()->findOrFail($userId);
-
-        if (! $target->isAdminFamily()) {
-            abort(404);
-        }
+        $target = $this->resolveAdminTarget($userId);
 
         $temporary = $service->generateTemporaryPassword();
         $service->resetPassword(auth()->user(), $target, $temporary, request());
@@ -329,5 +325,21 @@ class AdminAccounts extends Component
                 $this->addError($target, $message);
             }
         }
+    }
+
+    /**
+     * Resolve the requested user as an admin-family target.
+     * Returns 404 if the user does not exist or is a regular user, so that
+     * Livewire requests cannot be manipulated to operate on non-admin users.
+     */
+    private function resolveAdminTarget(int $userId): User
+    {
+        $user = User::query()->find($userId);
+
+        if (! $user || ! $user->isAdminFamily()) {
+            abort(404, 'Akun target bukan akun admin.');
+        }
+
+        return $user;
     }
 }

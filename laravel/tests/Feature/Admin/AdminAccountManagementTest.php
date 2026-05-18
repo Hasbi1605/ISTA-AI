@@ -273,4 +273,139 @@ class AdminAccountManagementTest extends TestCase
         $this->assertArrayNotHasKey('password', (array) ($audit->before_snapshot ?? []));
         $this->assertArrayNotHasKey('password', (array) ($audit->metadata ?? []));
     }
+
+    public function test_service_refuses_update_on_non_admin_target(): void
+    {
+        $service = app(AdminAccountManagementService::class);
+        $superAdmin = User::factory()->create([
+            'role' => User::ROLE_SUPER_ADMIN,
+            'is_active' => true,
+        ]);
+        $regular = User::factory()->create(['role' => User::ROLE_USER]);
+
+        $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+
+        $service->update($superAdmin, $regular, [
+            'name' => 'Hacked',
+            'email' => $regular->email,
+            'role' => User::ROLE_ADMIN,
+        ]);
+    }
+
+    public function test_service_refuses_activate_on_non_admin_target(): void
+    {
+        $service = app(AdminAccountManagementService::class);
+        $superAdmin = User::factory()->create([
+            'role' => User::ROLE_SUPER_ADMIN,
+            'is_active' => true,
+        ]);
+        $regular = User::factory()->create([
+            'role' => User::ROLE_USER,
+            'is_active' => false,
+        ]);
+
+        $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+
+        $service->activate($superAdmin, $regular);
+    }
+
+    public function test_service_refuses_deactivate_on_non_admin_target(): void
+    {
+        $service = app(AdminAccountManagementService::class);
+        $superAdmin = User::factory()->create([
+            'role' => User::ROLE_SUPER_ADMIN,
+            'is_active' => true,
+        ]);
+        $regular = User::factory()->create([
+            'role' => User::ROLE_USER,
+            'is_active' => true,
+        ]);
+
+        $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+
+        $service->deactivate($superAdmin, $regular);
+    }
+
+    public function test_service_refuses_reset_password_on_non_admin_target(): void
+    {
+        $service = app(AdminAccountManagementService::class);
+        $superAdmin = User::factory()->create([
+            'role' => User::ROLE_SUPER_ADMIN,
+            'is_active' => true,
+        ]);
+        $regular = User::factory()->create(['role' => User::ROLE_USER]);
+
+        $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+
+        $service->resetPassword($superAdmin, $regular, 'temp-pass-1234');
+    }
+
+    public function test_livewire_refuses_to_edit_non_admin_target_id(): void
+    {
+        $superAdmin = User::factory()->create([
+            'role' => User::ROLE_SUPER_ADMIN,
+            'is_active' => true,
+        ]);
+        $regular = User::factory()->create(['role' => User::ROLE_USER]);
+
+        \Livewire\Livewire::actingAs($superAdmin)
+            ->test(\App\Livewire\Admin\AdminAccounts::class)
+            ->call('startEdit', $regular->id)
+            ->assertStatus(404);
+    }
+
+    public function test_livewire_refuses_to_activate_non_admin_target_id(): void
+    {
+        $superAdmin = User::factory()->create([
+            'role' => User::ROLE_SUPER_ADMIN,
+            'is_active' => true,
+        ]);
+        $regular = User::factory()->create([
+            'role' => User::ROLE_USER,
+            'is_active' => false,
+        ]);
+
+        \Livewire\Livewire::actingAs($superAdmin)
+            ->test(\App\Livewire\Admin\AdminAccounts::class)
+            ->call('activate', $regular->id)
+            ->assertStatus(404);
+
+        $regular->refresh();
+        $this->assertFalse((bool) $regular->is_active);
+    }
+
+    public function test_livewire_refuses_to_deactivate_non_admin_target_id(): void
+    {
+        $superAdmin = User::factory()->create([
+            'role' => User::ROLE_SUPER_ADMIN,
+            'is_active' => true,
+        ]);
+        $regular = User::factory()->create([
+            'role' => User::ROLE_USER,
+            'is_active' => true,
+        ]);
+
+        \Livewire\Livewire::actingAs($superAdmin)
+            ->test(\App\Livewire\Admin\AdminAccounts::class)
+            ->call('startDeactivate', $regular->id)
+            ->assertStatus(404);
+    }
+
+    public function test_livewire_refuses_to_reset_password_non_admin_target_id(): void
+    {
+        $superAdmin = User::factory()->create([
+            'role' => User::ROLE_SUPER_ADMIN,
+            'is_active' => true,
+        ]);
+        $regular = User::factory()->create(['role' => User::ROLE_USER]);
+        $originalPasswordHash = $regular->password;
+
+        \Livewire\Livewire::actingAs($superAdmin)
+            ->test(\App\Livewire\Admin\AdminAccounts::class)
+            ->call('startResetPassword', $regular->id)
+            ->assertStatus(404);
+
+        $regular->refresh();
+        $this->assertEquals($originalPasswordHash, $regular->password);
+    }
 }

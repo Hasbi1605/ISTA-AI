@@ -81,6 +81,7 @@ class AdminAccountManagementService
     public function update(User $actor, User $target, array $data, ?Request $request = null): User
     {
         $this->guardActorIsSuperAdmin($actor);
+        $this->guardTargetIsAdminFamily($target);
 
         return DB::transaction(function () use ($actor, $target, $data, $request) {
             $before = $this->audit->snapshot($target);
@@ -158,6 +159,7 @@ class AdminAccountManagementService
     public function activate(User $actor, User $target, ?Request $request = null): User
     {
         $this->guardActorIsSuperAdmin($actor);
+        $this->guardTargetIsAdminFamily($target);
 
         if ($target->is_active) {
             return $target;
@@ -190,6 +192,7 @@ class AdminAccountManagementService
     public function deactivate(User $actor, User $target, ?string $reason = null, ?Request $request = null): User
     {
         $this->guardActorIsSuperAdmin($actor);
+        $this->guardTargetIsAdminFamily($target);
 
         if ($target->isAdminFamily() && $target->id === $actor->id) {
             throw ValidationException::withMessages([
@@ -233,6 +236,7 @@ class AdminAccountManagementService
     public function resetPassword(User $actor, User $target, string $temporaryPassword, ?Request $request = null): User
     {
         $this->guardActorIsSuperAdmin($actor);
+        $this->guardTargetIsAdminFamily($target);
 
         if (strlen($temporaryPassword) < 8) {
             throw ValidationException::withMessages([
@@ -293,6 +297,21 @@ class AdminAccountManagementService
                 'role' => $actor->role,
             ]);
             abort(403, 'Hanya super admin aktif yang dapat mengelola akun admin.');
+        }
+    }
+
+    /**
+     * Refuse operations whose target is not part of the admin family.
+     * Account management routes must never alter regular users.
+     */
+    private function guardTargetIsAdminFamily(User $target): void
+    {
+        if (! $target->isAdminFamily()) {
+            Log::warning('Account management attempted on non-admin target', [
+                'target_id' => $target->id,
+                'role' => $target->role,
+            ]);
+            abort(404, 'Akun target bukan akun admin.');
         }
     }
 
