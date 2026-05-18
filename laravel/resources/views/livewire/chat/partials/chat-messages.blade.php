@@ -1,6 +1,7 @@
 @php
     $assistantAnswerBubbleClass = 'rounded-2xl rounded-bl-sm bg-white/80 backdrop-blur-sm dark:bg-gray-800 border border-stone-200/60 dark:border-gray-800 px-4 py-3 text-[14.5px] leading-relaxed text-stone-700 dark:text-gray-100 prose prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-li:my-0 prose-li:marker:text-stone-800 prose-a:text-sky-700 prose-a:decoration-sky-600/80 hover:prose-a:text-sky-800 dark:prose-headings:text-white dark:prose-p:text-gray-100 dark:prose-strong:text-white dark:prose-ul:text-gray-100 dark:prose-ol:text-gray-100 dark:prose-li:text-gray-100 dark:prose-li:marker:text-white dark:prose-a:text-sky-300 dark:prose-a:decoration-sky-300/90 dark:hover:prose-a:text-sky-200 pb-1';
     $assistantErrorBubbleClass = 'rounded-2xl rounded-bl-sm bg-rose-50/95 backdrop-blur-sm dark:bg-rose-950/30 border border-rose-200/80 dark:border-rose-500/30 px-4 py-3 text-[14.5px] leading-relaxed text-rose-900 dark:text-rose-100 prose prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-li:my-0 prose-li:marker:text-rose-700 prose-a:text-rose-700 prose-a:decoration-rose-500/80 hover:prose-a:text-rose-900 dark:prose-headings:text-rose-100 dark:prose-p:text-rose-100 dark:prose-strong:text-rose-50 dark:prose-ul:text-rose-100 dark:prose-ol:text-rose-100 dark:prose-li:text-rose-100 dark:prose-li:marker:text-rose-100 dark:prose-a:text-rose-200 dark:prose-a:decoration-rose-200/90 dark:hover:prose-a:text-white pb-1';
+    $safeAssistantMarkdown = app(\App\Support\SafeAssistantMarkdown::class);
 @endphp
 
 <div x-data="chatMessages"
@@ -64,10 +65,7 @@
 
                     @if($message['role'] == 'assistant')
                         @php
-                            $assistantHtml = str($message['content'])->markdown([
-                                'html_input' => 'strip',
-                                'allow_unsafe_links' => false,
-                            ]);
+                            $assistantHtml = $safeAssistantMarkdown->toHtml((string) $message['content']);
                             $exportFileName = 'ista-ai-jawaban-' . $message['id'];
                             $assistantBubbleClass = $isAssistantError
                                 ? $assistantErrorBubbleClass

