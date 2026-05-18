@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Chat;
 
 use App\Http\Controllers\Controller;
+use App\Models\AIUsageEvent;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\User;
+use App\Services\Admin\AIUsageEventService;
 use App\Services\AIService;
 use App\Services\ChatOrchestrationService;
 use Illuminate\Http\Request;
@@ -37,6 +39,7 @@ class ChatStreamController extends Controller
         $requestedDocumentIds = $this->parseDocumentIds($request->input('document_ids', '[]'));
         $documentIds = $this->documentIdsForLatestUserMessage($conversationId, $requestedDocumentIds);
         $webSearchMode = filter_var($request->input('web_search_mode', false), FILTER_VALIDATE_BOOLEAN);
+        $clientRequestId = $this->normalizeRequestId($request->input('request_id'));
 
         $aiService = app(AIService::class);
         $orchestrator = app(ChatOrchestrationService::class);
@@ -75,6 +78,7 @@ class ChatStreamController extends Controller
             $conversationId,
             $conversation,
             $user,
+            $clientRequestId,
         ) {
             // Disable output buffering so chunks reach the browser immediately
             @ini_set('output_buffering', 'off');
@@ -100,6 +104,7 @@ class ChatStreamController extends Controller
                 $user,
                 $documentContextError,
                 $documentContextWarning,
+                $clientRequestId,
             );
         }, 200, [
             'Content-Type' => 'text/event-stream',
@@ -127,7 +132,14 @@ class ChatStreamController extends Controller
         User $user,
         ?string $documentContextError = null,
         ?string $documentContextWarning = null,
+        ?string $clientRequestId = null,
     ): void {
+        $usageEvents = app(AIUsageEventService::class);
+        $streamStartedAt = microtime(true);
+        $hasDocumentContext = ! empty($resolvedDocumentIds) || ! empty($documentFilenames);
+        $feature = $this->resolveChatFeature($webSearchMode, $hasDocumentContext);
+        $requestId = $clientRequestId ?? $usageEvents->newRequestId();
+
         $streamClaimKey = $orchestrator->acquireStreamRunner($conversationId);
         if ($streamClaimKey === null) {
             // Runner lain (job/stream lain) sudah claim latest user message.
@@ -151,6 +163,22 @@ class ChatStreamController extends Controller
                 if ($saved !== null) {
                     $conversation->touch();
                 }
+
+                $usageEvents->failed(
+                    feature: $feature,
+                    userId: (int) $user->id,
+                    metadata: [
+                        'conversation_id' => $conversationId,
+                        'channel' => 'stream',
+                        'web_search_mode' => $webSearchMode,
+                        'has_documents' => $hasDocumentContext,
+                        'document_count' => count($resolvedDocumentIds),
+                        'reason' => 'document_context_unavailable',
+                    ],
+                    requestId: $requestId,
+                    latencyMs: $usageEvents->latencyMsSince($streamStartedAt),
+                    errorCode: 'document_context_unavailable',
+                );
 
                 $this->sendSseEvent('error', $documentContextError);
                 $this->sendSseEvent('done', '1');
@@ -221,6 +249,23 @@ class ChatStreamController extends Controller
                     'user_id' => $user->id,
                     'message' => $e->getMessage(),
                 ]);
+
+                $usageEvents->failed(
+                    feature: $feature,
+                    userId: (int) $user->id,
+                    metadata: [
+                        'conversation_id' => $conversationId,
+                        'channel' => 'stream',
+                        'web_search_mode' => $webSearchMode,
+                        'has_documents' => $hasDocumentContext,
+                        'document_count' => count($resolvedDocumentIds),
+                        'reason' => 'stream_exception',
+                    ],
+                    requestId: $requestId,
+                    latencyMs: $usageEvents->latencyMsSince($streamStartedAt),
+                    errorCode: 'stream_exception',
+                );
+
                 $this->sendSseEvent('error', 'Maaf, terjadi kesalahan saat streaming jawaban.');
                 $this->sendSseEvent('done', '1');
 
@@ -234,6 +279,22 @@ class ChatStreamController extends Controller
 
                 $orchestrator->saveErrorMessage($conversationId, $errorContent, $user->id);
                 $conversation->touch();
+
+                $usageEvents->failed(
+                    feature: $feature,
+                    userId: (int) $user->id,
+                    metadata: [
+                        'conversation_id' => $conversationId,
+                        'channel' => 'stream',
+                        'web_search_mode' => $webSearchMode,
+                        'has_documents' => $hasDocumentContext,
+                        'document_count' => count($resolvedDocumentIds),
+                        'reason' => 'error_sentinel',
+                    ],
+                    requestId: $requestId,
+                    latencyMs: $usageEvents->latencyMsSince($streamStartedAt),
+                    errorCode: 'error_sentinel',
+                );
 
                 $this->sendSseEvent('error', $errorContent);
                 $this->sendSseEvent('done', '1');
@@ -261,12 +322,44 @@ class ChatStreamController extends Controller
                 $conversation->touch();
                 $this->sendSseEvent('message-id', (string) $saved->id);
                 $this->sendSseEvent('message-created-at', $saved->created_at?->timezone('Asia/Jakarta')->toIso8601String() ?? now('Asia/Jakarta')->toIso8601String());
+
+                $usageEvents->completed(
+                    feature: $feature,
+                    userId: (int) $user->id,
+                    metadata: [
+                        'conversation_id' => $conversationId,
+                        'message_id' => (int) $saved->id,
+                        'channel' => 'stream',
+                        'web_search_mode' => $webSearchMode,
+                        'has_documents' => $hasDocumentContext,
+                        'document_count' => count($resolvedDocumentIds),
+                        'sources_count' => count($sources),
+                        'has_sources' => ! empty($sources),
+                        'response_length' => strlen($cleanContent),
+                    ],
+                    requestId: $requestId,
+                    latencyMs: $usageEvents->latencyMsSince($streamStartedAt),
+                    subject: $saved,
+                );
             }
 
             $this->sendSseEvent('done', '1');
         } finally {
             $orchestrator->releaseStreamClaim($streamClaimKey);
         }
+    }
+
+    private function resolveChatFeature(bool $webSearchMode, bool $hasDocumentContext): string
+    {
+        if ($hasDocumentContext) {
+            return AIUsageEvent::FEATURE_DOCUMENT_RAG;
+        }
+
+        if ($webSearchMode) {
+            return AIUsageEvent::FEATURE_WEB_SEARCH;
+        }
+
+        return AIUsageEvent::FEATURE_CHAT;
     }
 
     /**
@@ -284,6 +377,31 @@ class ChatStreamController extends Controller
         }
         echo "\n";
         flush();
+    }
+
+    /**
+     * Validate the optional client-supplied request id so that stream lifecycle
+     * events can be correlated with the `started` event recorded by Livewire.
+     * Falls back to null when the value is missing or malformed; the caller
+     * generates a fresh UUID in that case so logging keeps working.
+     */
+    private function normalizeRequestId(mixed $raw): ?string
+    {
+        if (! is_string($raw)) {
+            return null;
+        }
+
+        $trimmed = trim($raw);
+
+        if ($trimmed === '') {
+            return null;
+        }
+
+        if (! preg_match('/^[A-Za-z0-9_-]{1,64}$/', $trimmed)) {
+            return null;
+        }
+
+        return $trimmed;
     }
 
     /**

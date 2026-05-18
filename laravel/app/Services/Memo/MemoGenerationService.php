@@ -2,9 +2,11 @@
 
 namespace App\Services\Memo;
 
+use App\Models\AIUsageEvent;
 use App\Models\Memo;
 use App\Models\MemoVersion;
 use App\Models\User;
+use App\Services\Admin\AIUsageEventService;
 use App\Services\OnlyOffice\DocxValidator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -36,13 +38,37 @@ class MemoGenerationService
      */
     public function generate(User $user, string $memoType, string $title, string $context, array $sourceDocumentIds = [], array $configuration = []): Memo
     {
+        $usageEvents = app(AIUsageEventService::class);
+        $startedAt = microtime(true);
+        $requestId = $usageEvents->newRequestId();
         $configuration = $this->normalizeConfiguration($configuration);
-        $draft = $this->requestDraft($memoType, $title, $context, $configuration);
+        $sourceDocumentCount = count(array_unique(array_map('intval', $sourceDocumentIds)));
+
+        try {
+            $draft = $this->requestDraft($memoType, $title, $context, $configuration);
+        } catch (Throwable $e) {
+            $usageEvents->failed(
+                feature: AIUsageEvent::FEATURE_MEMO_GENERATION,
+                userId: (int) $user->id,
+                metadata: [
+                    'memo_type' => $memoType,
+                    'document_count' => $sourceDocumentCount,
+                    'has_documents' => $sourceDocumentCount > 0,
+                    'reason' => 'draft_request_failed',
+                ],
+                requestId: $requestId,
+                latencyMs: $usageEvents->latencyMsSince($startedAt),
+                errorCode: 'draft_request_failed',
+            );
+
+            throw $e;
+        }
+
         $configuration = $this->applyResolvedPageSize($configuration, $draft['page_size']);
         $path = null;
 
         try {
-            return DB::transaction(function () use ($user, $memoType, $title, $sourceDocumentIds, $configuration, $draft, &$path) {
+            $memo = DB::transaction(function () use ($user, $memoType, $title, $sourceDocumentIds, $configuration, $draft, &$path) {
                 $memo = Memo::create([
                     'user_id' => $user->id,
                     'title' => $title,
@@ -63,24 +89,81 @@ class MemoGenerationService
         } catch (Throwable $e) {
             $this->deleteStoredDraft($path);
 
+            $usageEvents->failed(
+                feature: AIUsageEvent::FEATURE_MEMO_GENERATION,
+                userId: (int) $user->id,
+                metadata: [
+                    'memo_type' => $memoType,
+                    'document_count' => $sourceDocumentCount,
+                    'has_documents' => $sourceDocumentCount > 0,
+                    'page_size' => $configuration['page_size'] ?? null,
+                    'reason' => 'persist_failed',
+                ],
+                requestId: $requestId,
+                latencyMs: $usageEvents->latencyMsSince($startedAt),
+                errorCode: 'persist_failed',
+            );
+
             throw $e;
         }
+
+        $usageEvents->completed(
+            feature: AIUsageEvent::FEATURE_MEMO_GENERATION,
+            userId: (int) $user->id,
+            metadata: [
+                'memo_id' => (int) $memo->id,
+                'memo_type' => $memoType,
+                'memo_version' => 1,
+                'document_count' => $sourceDocumentCount,
+                'has_documents' => $sourceDocumentCount > 0,
+                'page_size' => $configuration['page_size'] ?? null,
+            ],
+            requestId: $requestId,
+            latencyMs: $usageEvents->latencyMsSince($startedAt),
+            subject: $memo,
+        );
+
+        return $memo;
     }
 
     public function generateRevision(Memo $memo, string $context, array $configuration = [], ?string $revisionInstruction = null): MemoVersion
     {
+        $usageEvents = app(AIUsageEventService::class);
+        $startedAt = microtime(true);
+        $requestId = $usageEvents->newRequestId();
+
         if ($revisionInstruction !== null && trim($revisionInstruction) !== '') {
             $configuration['revision_instruction'] = $revisionInstruction;
         }
 
         $configuration = $this->normalizeConfiguration($configuration);
         $title = (string) ($configuration['subject'] ?? $memo->title);
-        $draft = $this->requestDraft($memo->memo_type, $title, $context, $configuration);
+
+        try {
+            $draft = $this->requestDraft($memo->memo_type, $title, $context, $configuration);
+        } catch (Throwable $e) {
+            $usageEvents->failed(
+                feature: AIUsageEvent::FEATURE_MEMO_REVISION,
+                userId: (int) $memo->user_id,
+                metadata: [
+                    'memo_id' => (int) $memo->id,
+                    'memo_type' => (string) $memo->memo_type,
+                    'reason' => 'draft_request_failed',
+                ],
+                requestId: $requestId,
+                latencyMs: $usageEvents->latencyMsSince($startedAt),
+                errorCode: 'draft_request_failed',
+                subject: $memo,
+            );
+
+            throw $e;
+        }
+
         $configuration = $this->applyResolvedPageSize($configuration, $draft['page_size']);
         $path = null;
 
         try {
-            return DB::transaction(function () use ($memo, $draft, $configuration, &$path) {
+            $version = DB::transaction(function () use ($memo, $draft, $configuration, &$path) {
                 $lockedMemo = Memo::lockForUpdate()->findOrFail($memo->id);
                 $versionNumber = ((int) $lockedMemo->versions()->max('version_number')) + 1;
                 $path = $this->storeDraft($lockedMemo, $draft['content'], $versionNumber);
@@ -101,12 +184,46 @@ class MemoGenerationService
         } catch (Throwable $e) {
             $this->deleteStoredDraft($path);
 
+            $usageEvents->failed(
+                feature: AIUsageEvent::FEATURE_MEMO_REVISION,
+                userId: (int) $memo->user_id,
+                metadata: [
+                    'memo_id' => (int) $memo->id,
+                    'memo_type' => (string) $memo->memo_type,
+                    'reason' => 'persist_failed',
+                ],
+                requestId: $requestId,
+                latencyMs: $usageEvents->latencyMsSince($startedAt),
+                errorCode: 'persist_failed',
+                subject: $memo,
+            );
+
             throw $e;
         }
+
+        $usageEvents->completed(
+            feature: AIUsageEvent::FEATURE_MEMO_REVISION,
+            userId: (int) $memo->user_id,
+            metadata: [
+                'memo_id' => (int) $memo->id,
+                'memo_type' => (string) $memo->memo_type,
+                'memo_version' => (int) $version->version_number,
+                'page_size' => $configuration['page_size'] ?? null,
+            ],
+            requestId: $requestId,
+            latencyMs: $usageEvents->latencyMsSince($startedAt),
+            subject: $memo,
+        );
+
+        return $version;
     }
 
     public function generateRevisionFromBody(Memo $memo, string $body, array $configuration = [], ?string $revisionInstruction = null): MemoVersion
     {
+        $usageEvents = app(AIUsageEventService::class);
+        $startedAt = microtime(true);
+        $requestId = $usageEvents->newRequestId();
+
         if ($revisionInstruction !== null && trim($revisionInstruction) !== '') {
             $configuration['revision_instruction'] = $revisionInstruction;
         }
@@ -116,12 +233,33 @@ class MemoGenerationService
         $requestConfiguration = array_merge($storedConfiguration, [
             'body_override' => trim($body),
         ]);
-        $draft = $this->requestDraft($memo->memo_type, $title, $body, $requestConfiguration);
+
+        try {
+            $draft = $this->requestDraft($memo->memo_type, $title, $body, $requestConfiguration);
+        } catch (Throwable $e) {
+            $usageEvents->failed(
+                feature: AIUsageEvent::FEATURE_MEMO_REVISION,
+                userId: (int) $memo->user_id,
+                metadata: [
+                    'memo_id' => (int) $memo->id,
+                    'memo_type' => (string) $memo->memo_type,
+                    'reason' => 'draft_request_failed',
+                    'origin' => 'body_override',
+                ],
+                requestId: $requestId,
+                latencyMs: $usageEvents->latencyMsSince($startedAt),
+                errorCode: 'draft_request_failed',
+                subject: $memo,
+            );
+
+            throw $e;
+        }
+
         $storedConfiguration = $this->applyResolvedPageSize($storedConfiguration, $draft['page_size']);
         $path = null;
 
         try {
-            return DB::transaction(function () use ($memo, $draft, $storedConfiguration, &$path) {
+            $version = DB::transaction(function () use ($memo, $draft, $storedConfiguration, &$path) {
                 $lockedMemo = Memo::lockForUpdate()->findOrFail($memo->id);
                 $versionNumber = ((int) $lockedMemo->versions()->max('version_number')) + 1;
                 $path = $this->storeDraft($lockedMemo, $draft['content'], $versionNumber);
@@ -142,8 +280,40 @@ class MemoGenerationService
         } catch (Throwable $e) {
             $this->deleteStoredDraft($path);
 
+            $usageEvents->failed(
+                feature: AIUsageEvent::FEATURE_MEMO_REVISION,
+                userId: (int) $memo->user_id,
+                metadata: [
+                    'memo_id' => (int) $memo->id,
+                    'memo_type' => (string) $memo->memo_type,
+                    'reason' => 'persist_failed',
+                    'origin' => 'body_override',
+                ],
+                requestId: $requestId,
+                latencyMs: $usageEvents->latencyMsSince($startedAt),
+                errorCode: 'persist_failed',
+                subject: $memo,
+            );
+
             throw $e;
         }
+
+        $usageEvents->completed(
+            feature: AIUsageEvent::FEATURE_MEMO_REVISION,
+            userId: (int) $memo->user_id,
+            metadata: [
+                'memo_id' => (int) $memo->id,
+                'memo_type' => (string) $memo->memo_type,
+                'memo_version' => (int) $version->version_number,
+                'page_size' => $storedConfiguration['page_size'] ?? null,
+                'origin' => 'body_override',
+            ],
+            requestId: $requestId,
+            latencyMs: $usageEvents->latencyMsSince($startedAt),
+            subject: $memo,
+        );
+
+        return $version;
     }
 
     public function activateVersion(Memo $memo, MemoVersion $version, bool $touch = true): Memo
