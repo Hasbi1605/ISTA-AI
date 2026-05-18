@@ -2,8 +2,10 @@
 
 namespace App\Jobs;
 
+use App\Models\AIUsageEvent;
 use App\Models\Conversation;
 use App\Models\Message;
+use App\Services\Admin\AIUsageEventService;
 use App\Services\AIService;
 use App\Services\ChatOrchestrationService;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -38,13 +40,18 @@ class GenerateChatResponse implements ShouldQueue
         $this->onQueue('default');
     }
 
-    public function handle(AIService $aiService, ChatOrchestrationService $orchestrator): void
+    public function handle(AIService $aiService, ChatOrchestrationService $orchestrator, ?AIUsageEventService $usageEvents = null): void
     {
+        $usageEvents = $usageEvents ?? app(AIUsageEventService::class);
+
         Auth::loginUsingId($this->userId);
         set_time_limit($this->timeout);
 
         $requestId = $this->requestId ?? (string) Str::uuid();
         $jobStartMs = microtime(true) * 1000;
+        $jobStartedAt = microtime(true);
+        $hasDocumentContext = ! empty($this->conversationDocuments);
+        $feature = $this->resolveChatFeature($this->webSearchMode, $hasDocumentContext);
 
         $this->logLatency('job_start', 0, $requestId, [
             'conversation_id' => $this->conversationId,
@@ -90,6 +97,22 @@ class GenerateChatResponse implements ShouldQueue
                     ->where('user_id', $this->userId)
                     ->touch();
             }
+
+            $usageEvents->failed(
+                feature: $feature,
+                userId: $this->userId,
+                metadata: [
+                    'conversation_id' => $this->conversationId,
+                    'channel' => 'job_fallback',
+                    'web_search_mode' => $this->webSearchMode,
+                    'has_documents' => $hasDocumentContext,
+                    'document_count' => count($documentIds),
+                    'reason' => 'document_context_unavailable',
+                ],
+                requestId: $requestId,
+                latencyMs: $usageEvents->latencyMsSince($jobStartedAt),
+                errorCode: 'document_context_unavailable',
+            );
 
             $this->logLatency('job_total', microtime(true) * 1000 - $jobStartMs, $requestId, [
                 'conversation_id' => $this->conversationId,
@@ -151,6 +174,22 @@ class GenerateChatResponse implements ShouldQueue
                     ->touch();
             }
 
+            $usageEvents->failed(
+                feature: $feature,
+                userId: $this->userId,
+                metadata: [
+                    'conversation_id' => $this->conversationId,
+                    'channel' => 'job_fallback',
+                    'web_search_mode' => $this->webSearchMode,
+                    'has_documents' => $hasDocumentContext,
+                    'document_count' => count($documentIds),
+                    'reason' => 'error_sentinel',
+                ],
+                requestId: $requestId,
+                latencyMs: $usageEvents->latencyMsSince($jobStartedAt),
+                errorCode: 'error_sentinel',
+            );
+
             $this->logLatency('job_total', microtime(true) * 1000 - $jobStartMs, $requestId, [
                 'conversation_id' => $this->conversationId,
                 'outcome' => 'error_sentinel',
@@ -181,6 +220,25 @@ class GenerateChatResponse implements ShouldQueue
                 ->whereKey($this->conversationId)
                 ->where('user_id', $this->userId)
                 ->touch();
+
+            $usageEvents->completed(
+                feature: $feature,
+                userId: $this->userId,
+                metadata: [
+                    'conversation_id' => $this->conversationId,
+                    'message_id' => (int) $saved->id,
+                    'channel' => 'job_fallback',
+                    'web_search_mode' => $this->webSearchMode,
+                    'has_documents' => $hasDocumentContext,
+                    'document_count' => count($documentIds),
+                    'sources_count' => count($sources),
+                    'has_sources' => ! empty($sources),
+                    'response_length' => strlen($cleanContent),
+                ],
+                requestId: $requestId,
+                latencyMs: $usageEvents->latencyMsSince($jobStartedAt),
+                subject: $saved,
+            );
         }
 
         $this->logLatency('job_total', microtime(true) * 1000 - $jobStartMs, $requestId, [
@@ -193,12 +251,32 @@ class GenerateChatResponse implements ShouldQueue
     {
         Auth::loginUsingId($this->userId);
         $orchestrator = app(ChatOrchestrationService::class);
+        $usageEvents = app(AIUsageEventService::class);
 
         Log::error('Background chat response failed', [
             'conversation_id' => $this->conversationId,
             'user_id' => $this->userId,
             'message' => $exception?->getMessage(),
         ]);
+
+        $hasDocumentContext = ! empty($this->conversationDocuments);
+        $feature = $this->resolveChatFeature($this->webSearchMode, $hasDocumentContext);
+
+        $usageEvents->failed(
+            feature: $feature,
+            userId: $this->userId,
+            metadata: [
+                'conversation_id' => $this->conversationId,
+                'channel' => 'job_fallback',
+                'web_search_mode' => $this->webSearchMode,
+                'has_documents' => $hasDocumentContext,
+                'document_count' => count($this->conversationDocuments),
+                'reason' => 'job_failed',
+                'job_attempts' => method_exists($this, 'attempts') ? $this->attempts() : null,
+            ],
+            requestId: $this->requestId,
+            errorCode: 'job_failed',
+        );
 
         if (! $this->conversationStillExists()) {
             return;
@@ -216,6 +294,19 @@ class GenerateChatResponse implements ShouldQueue
                 ->where('user_id', $this->userId)
                 ->touch();
         }
+    }
+
+    private function resolveChatFeature(bool $webSearchMode, bool $hasDocumentContext): string
+    {
+        if ($hasDocumentContext) {
+            return AIUsageEvent::FEATURE_DOCUMENT_RAG;
+        }
+
+        if ($webSearchMode) {
+            return AIUsageEvent::FEATURE_WEB_SEARCH;
+        }
+
+        return AIUsageEvent::FEATURE_CHAT;
     }
 
     private function conversationStillExists(): bool

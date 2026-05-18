@@ -4,9 +4,11 @@ namespace App\Services;
 
 use App\Jobs\ProcessDocument;
 use App\Jobs\RenderDocumentPreview;
+use App\Models\AIUsageEvent;
 use App\Models\CloudStorageFile;
 use App\Models\Document;
 use App\Models\User;
+use App\Services\Admin\AIUsageEventService;
 use App\Services\CloudStorage\GoogleDriveService;
 use App\Services\Documents\DocumentPreviewRenderer;
 use Illuminate\Http\UploadedFile;
@@ -32,10 +34,28 @@ class DocumentLifecycleService
      */
     public function uploadDocument(UploadedFile $file, int $userId, array $sourceAttributes = []): Document
     {
+        $usageEvents = app(AIUsageEventService::class);
+        $startedAt = microtime(true);
+        $requestId = $usageEvents->newRequestId();
         $originalName = $file->getClientOriginalName();
         $detectedMimeType = (string) $file->getMimeType();
+        $extension = strtolower((string) $file->getClientOriginalExtension());
 
         if (! in_array($detectedMimeType, Document::attachmentMimeTypes(), true)) {
+            $usageEvents->failed(
+                feature: AIUsageEvent::FEATURE_DOCUMENT_UPLOAD,
+                userId: $userId,
+                metadata: [
+                    'document_extension' => $extension,
+                    'mime_type' => $detectedMimeType,
+                    'reason' => 'invalid_mime_type',
+                    'origin' => 'local',
+                ],
+                requestId: $requestId,
+                latencyMs: $usageEvents->latencyMsSince($startedAt),
+                errorCode: 'invalid_mime_type',
+            );
+
             throw ValidationException::withMessages([
                 'file' => 'Tipe MIME file tidak valid. Gunakan PDF, DOCX, XLSX, atau CSV.',
             ]);
@@ -44,20 +64,71 @@ class DocumentLifecycleService
         $fileSizeBytes = $file->getSize();
 
         if ($fileSizeBytes !== null && $fileSizeBytes > self::MAX_DOCUMENT_SIZE_BYTES) {
+            $usageEvents->failed(
+                feature: AIUsageEvent::FEATURE_DOCUMENT_UPLOAD,
+                userId: $userId,
+                metadata: [
+                    'document_extension' => $extension,
+                    'mime_type' => $detectedMimeType,
+                    'file_size_bytes' => $fileSizeBytes,
+                    'reason' => 'file_too_large',
+                    'origin' => 'local',
+                ],
+                requestId: $requestId,
+                latencyMs: $usageEvents->latencyMsSince($startedAt),
+                errorCode: 'file_too_large',
+            );
+
             throw ValidationException::withMessages([
                 'file' => 'Ukuran file melebihi batas 50 MB.',
             ]);
         }
 
-        $document = $this->storeUploadedDocumentRecord(
-            file: $file,
-            userId: $userId,
-            sourceAttributes: $sourceAttributes,
-            originalName: $originalName,
-            detectedMimeType: $detectedMimeType,
-            fileSizeBytes: $fileSizeBytes,
-            wrapInTransaction: true,
-        );
+        try {
+            $document = $this->storeUploadedDocumentRecord(
+                file: $file,
+                userId: $userId,
+                sourceAttributes: $sourceAttributes,
+                originalName: $originalName,
+                detectedMimeType: $detectedMimeType,
+                fileSizeBytes: $fileSizeBytes,
+                wrapInTransaction: true,
+            );
+        } catch (ValidationException $e) {
+            $usageEvents->failed(
+                feature: AIUsageEvent::FEATURE_DOCUMENT_UPLOAD,
+                userId: $userId,
+                metadata: [
+                    'document_extension' => $extension,
+                    'mime_type' => $detectedMimeType,
+                    'file_size_bytes' => $fileSizeBytes,
+                    'reason' => 'validation_failed',
+                    'origin' => 'local',
+                ],
+                requestId: $requestId,
+                latencyMs: $usageEvents->latencyMsSince($startedAt),
+                errorCode: 'validation_failed',
+            );
+
+            throw $e;
+        } catch (\Throwable $e) {
+            $usageEvents->failed(
+                feature: AIUsageEvent::FEATURE_DOCUMENT_UPLOAD,
+                userId: $userId,
+                metadata: [
+                    'document_extension' => $extension,
+                    'mime_type' => $detectedMimeType,
+                    'file_size_bytes' => $fileSizeBytes,
+                    'reason' => 'storage_failed',
+                    'origin' => 'local',
+                ],
+                requestId: $requestId,
+                latencyMs: $usageEvents->latencyMsSince($startedAt),
+                errorCode: 'storage_failed',
+            );
+
+            throw $e;
+        }
 
         try {
             $this->dispatchPreviewRendering($document);
@@ -65,6 +136,21 @@ class DocumentLifecycleService
             logger()->warning("Preview dispatch failed for document {$document->id}, proceeding: ".$e->getMessage());
         }
         $this->dispatchProcessing($document);
+
+        $usageEvents->completed(
+            feature: AIUsageEvent::FEATURE_DOCUMENT_UPLOAD,
+            userId: $userId,
+            metadata: [
+                'document_id' => (int) $document->id,
+                'document_extension' => $extension,
+                'mime_type' => $detectedMimeType,
+                'file_size_bytes' => $fileSizeBytes,
+                'origin' => 'local',
+            ],
+            requestId: $requestId,
+            latencyMs: $usageEvents->latencyMsSince($startedAt),
+            subject: $document,
+        );
 
         return $document;
     }
@@ -74,7 +160,23 @@ class DocumentLifecycleService
      */
     public function ingestFromCloud(User $user, string $provider, string $externalId): Document
     {
+        $usageEvents = app(AIUsageEventService::class);
+        $startedAt = microtime(true);
+        $requestId = $usageEvents->newRequestId();
+
         if ($provider !== 'google_drive') {
+            $usageEvents->failed(
+                feature: AIUsageEvent::FEATURE_GOOGLE_DRIVE_IMPORT,
+                userId: (int) $user->id,
+                metadata: [
+                    'provider' => $provider,
+                    'reason' => 'unsupported_provider',
+                ],
+                requestId: $requestId,
+                latencyMs: $usageEvents->latencyMsSince($startedAt),
+                errorCode: 'unsupported_provider',
+            );
+
             throw new InvalidArgumentException('Provider cloud storage tidak didukung.');
         }
 
@@ -85,6 +187,19 @@ class DocumentLifecycleService
             ->first();
 
         if ($existingDocument !== null) {
+            $usageEvents->failed(
+                feature: AIUsageEvent::FEATURE_GOOGLE_DRIVE_IMPORT,
+                userId: (int) $user->id,
+                metadata: [
+                    'provider' => $provider,
+                    'reason' => 'already_imported',
+                ],
+                requestId: $requestId,
+                latencyMs: $usageEvents->latencyMsSince($startedAt),
+                errorCode: 'already_imported',
+                subject: $existingDocument,
+            );
+
             throw ValidationException::withMessages([
                 'file' => 'File Drive ini sudah pernah diproses di akun Anda.',
             ]);
@@ -92,22 +207,67 @@ class DocumentLifecycleService
 
         /** @var GoogleDriveService $driveService */
         $driveService = app(GoogleDriveService::class);
-        $download = $driveService->downloadToTemp($externalId);
+
+        try {
+            $download = $driveService->downloadToTemp($externalId);
+        } catch (\Throwable $e) {
+            $usageEvents->failed(
+                feature: AIUsageEvent::FEATURE_GOOGLE_DRIVE_IMPORT,
+                userId: (int) $user->id,
+                metadata: [
+                    'provider' => $provider,
+                    'reason' => 'drive_download_failed',
+                ],
+                requestId: $requestId,
+                latencyMs: $usageEvents->latencyMsSince($startedAt),
+                errorCode: 'drive_download_failed',
+            );
+
+            throw $e;
+        }
+
         $tempPath = $download['path'] ?? null;
 
         if (! is_string($tempPath) || $tempPath === '' || ! is_file($tempPath)) {
+            $usageEvents->failed(
+                feature: AIUsageEvent::FEATURE_GOOGLE_DRIVE_IMPORT,
+                userId: (int) $user->id,
+                metadata: [
+                    'provider' => $provider,
+                    'reason' => 'drive_temp_unavailable',
+                ],
+                requestId: $requestId,
+                latencyMs: $usageEvents->latencyMsSince($startedAt),
+                errorCode: 'drive_temp_unavailable',
+            );
+
             throw new \RuntimeException('Gagal menyiapkan file sementara dari Google Drive.');
         }
 
         $originalName = (string) ($download['original_name'] ?? basename($tempPath));
         $mimeType = (string) ($download['mime_type'] ?? 'application/octet-stream');
         $sourceSyncedAt = now();
+        $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION) ?: '');
 
         // Validate MIME type against the same allowlist used for manual uploads.
         // GoogleDriveService::downloadToTemp() already enforces size and rejects
         // native Google Docs formats; this adds the MIME-type gate so Drive imports
         // cannot bypass Document::attachmentMimeTypes() checks.
         if (! in_array($mimeType, Document::attachmentMimeTypes(), true)) {
+            $usageEvents->failed(
+                feature: AIUsageEvent::FEATURE_GOOGLE_DRIVE_IMPORT,
+                userId: (int) $user->id,
+                metadata: [
+                    'provider' => $provider,
+                    'mime_type' => $mimeType,
+                    'document_extension' => $extension,
+                    'reason' => 'invalid_mime_type',
+                ],
+                requestId: $requestId,
+                latencyMs: $usageEvents->latencyMsSince($startedAt),
+                errorCode: 'invalid_mime_type',
+            );
+
             throw ValidationException::withMessages([
                 'file' => 'Tipe file dari Google Drive tidak didukung. Gunakan PDF, DOCX, XLSX, atau CSV.',
             ]);
@@ -166,7 +326,38 @@ class DocumentLifecycleService
             }
             $this->dispatchProcessing($document);
 
+            $usageEvents->completed(
+                feature: AIUsageEvent::FEATURE_GOOGLE_DRIVE_IMPORT,
+                userId: (int) $user->id,
+                metadata: [
+                    'document_id' => (int) $document->id,
+                    'document_extension' => $extension,
+                    'mime_type' => $mimeType,
+                    'provider' => $provider,
+                    'size_bytes' => $download['size_bytes'] ?? null,
+                ],
+                requestId: $requestId,
+                latencyMs: $usageEvents->latencyMsSince($startedAt),
+                subject: $document,
+            );
+
             return $document;
+        } catch (\Throwable $e) {
+            $usageEvents->failed(
+                feature: AIUsageEvent::FEATURE_GOOGLE_DRIVE_IMPORT,
+                userId: (int) $user->id,
+                metadata: [
+                    'provider' => $provider,
+                    'mime_type' => $mimeType,
+                    'document_extension' => $extension,
+                    'reason' => 'ingest_failed',
+                ],
+                requestId: $requestId,
+                latencyMs: $usageEvents->latencyMsSince($startedAt),
+                errorCode: 'ingest_failed',
+            );
+
+            throw $e;
         } finally {
             if (is_file($tempPath)) {
                 @unlink($tempPath);

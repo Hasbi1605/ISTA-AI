@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Chat;
 
 use App\Http\Controllers\Controller;
+use App\Models\AIUsageEvent;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\User;
+use App\Services\Admin\AIUsageEventService;
 use App\Services\AIService;
 use App\Services\ChatOrchestrationService;
 use Illuminate\Http\Request;
@@ -128,6 +130,12 @@ class ChatStreamController extends Controller
         ?string $documentContextError = null,
         ?string $documentContextWarning = null,
     ): void {
+        $usageEvents = app(AIUsageEventService::class);
+        $streamStartedAt = microtime(true);
+        $hasDocumentContext = ! empty($resolvedDocumentIds) || ! empty($documentFilenames);
+        $feature = $this->resolveChatFeature($webSearchMode, $hasDocumentContext);
+        $requestId = $usageEvents->newRequestId();
+
         $streamClaimKey = $orchestrator->acquireStreamRunner($conversationId);
         if ($streamClaimKey === null) {
             // Runner lain (job/stream lain) sudah claim latest user message.
@@ -151,6 +159,22 @@ class ChatStreamController extends Controller
                 if ($saved !== null) {
                     $conversation->touch();
                 }
+
+                $usageEvents->failed(
+                    feature: $feature,
+                    userId: (int) $user->id,
+                    metadata: [
+                        'conversation_id' => $conversationId,
+                        'channel' => 'stream',
+                        'web_search_mode' => $webSearchMode,
+                        'has_documents' => $hasDocumentContext,
+                        'document_count' => count($resolvedDocumentIds),
+                        'reason' => 'document_context_unavailable',
+                    ],
+                    requestId: $requestId,
+                    latencyMs: $usageEvents->latencyMsSince($streamStartedAt),
+                    errorCode: 'document_context_unavailable',
+                );
 
                 $this->sendSseEvent('error', $documentContextError);
                 $this->sendSseEvent('done', '1');
@@ -221,6 +245,23 @@ class ChatStreamController extends Controller
                     'user_id' => $user->id,
                     'message' => $e->getMessage(),
                 ]);
+
+                $usageEvents->failed(
+                    feature: $feature,
+                    userId: (int) $user->id,
+                    metadata: [
+                        'conversation_id' => $conversationId,
+                        'channel' => 'stream',
+                        'web_search_mode' => $webSearchMode,
+                        'has_documents' => $hasDocumentContext,
+                        'document_count' => count($resolvedDocumentIds),
+                        'reason' => 'stream_exception',
+                    ],
+                    requestId: $requestId,
+                    latencyMs: $usageEvents->latencyMsSince($streamStartedAt),
+                    errorCode: 'stream_exception',
+                );
+
                 $this->sendSseEvent('error', 'Maaf, terjadi kesalahan saat streaming jawaban.');
                 $this->sendSseEvent('done', '1');
 
@@ -234,6 +275,22 @@ class ChatStreamController extends Controller
 
                 $orchestrator->saveErrorMessage($conversationId, $errorContent, $user->id);
                 $conversation->touch();
+
+                $usageEvents->failed(
+                    feature: $feature,
+                    userId: (int) $user->id,
+                    metadata: [
+                        'conversation_id' => $conversationId,
+                        'channel' => 'stream',
+                        'web_search_mode' => $webSearchMode,
+                        'has_documents' => $hasDocumentContext,
+                        'document_count' => count($resolvedDocumentIds),
+                        'reason' => 'error_sentinel',
+                    ],
+                    requestId: $requestId,
+                    latencyMs: $usageEvents->latencyMsSince($streamStartedAt),
+                    errorCode: 'error_sentinel',
+                );
 
                 $this->sendSseEvent('error', $errorContent);
                 $this->sendSseEvent('done', '1');
@@ -261,12 +318,44 @@ class ChatStreamController extends Controller
                 $conversation->touch();
                 $this->sendSseEvent('message-id', (string) $saved->id);
                 $this->sendSseEvent('message-created-at', $saved->created_at?->timezone('Asia/Jakarta')->toIso8601String() ?? now('Asia/Jakarta')->toIso8601String());
+
+                $usageEvents->completed(
+                    feature: $feature,
+                    userId: (int) $user->id,
+                    metadata: [
+                        'conversation_id' => $conversationId,
+                        'message_id' => (int) $saved->id,
+                        'channel' => 'stream',
+                        'web_search_mode' => $webSearchMode,
+                        'has_documents' => $hasDocumentContext,
+                        'document_count' => count($resolvedDocumentIds),
+                        'sources_count' => count($sources),
+                        'has_sources' => ! empty($sources),
+                        'response_length' => strlen($cleanContent),
+                    ],
+                    requestId: $requestId,
+                    latencyMs: $usageEvents->latencyMsSince($streamStartedAt),
+                    subject: $saved,
+                );
             }
 
             $this->sendSseEvent('done', '1');
         } finally {
             $orchestrator->releaseStreamClaim($streamClaimKey);
         }
+    }
+
+    private function resolveChatFeature(bool $webSearchMode, bool $hasDocumentContext): string
+    {
+        if ($hasDocumentContext) {
+            return AIUsageEvent::FEATURE_DOCUMENT_RAG;
+        }
+
+        if ($webSearchMode) {
+            return AIUsageEvent::FEATURE_WEB_SEARCH;
+        }
+
+        return AIUsageEvent::FEATURE_CHAT;
     }
 
     /**
