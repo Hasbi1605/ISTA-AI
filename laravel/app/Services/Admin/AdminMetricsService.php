@@ -481,6 +481,15 @@ class AdminMetricsService
         return 'offline';
     }
 
+    /**
+     * Parse a user-supplied date string safely. Returns null when the
+     * input is empty or malformed.
+     */
+    public function safeParseDate(mixed $value): ?Carbon
+    {
+        return $this->parseDate($value);
+    }
+
     private function countActiveUsersBetween(CarbonInterface $start, CarbonInterface $end): int
     {
         return User::query()

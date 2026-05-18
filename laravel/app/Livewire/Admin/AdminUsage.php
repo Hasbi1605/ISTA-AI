@@ -43,10 +43,22 @@ class AdminUsage extends Component
         ];
 
         $events = $metrics->recentEvents($filters, AdminMetricsService::RECENT_ROWS_LIMIT);
-        $distribution = $metrics->featureDistribution(
-            $this->startDate ? \Illuminate\Support\Carbon::parse($this->startDate) : now()->subDays(AdminMetricsService::DEFAULT_RANGE_DAYS - 1)->startOfDay(),
-            $this->endDate ? \Illuminate\Support\Carbon::parse($this->endDate) : now(),
-        );
+
+        // Normalize dates safely. Malformed query strings are dropped here so
+        // the dashboard never throws a 500 on unparseable input. Default
+        // window matches the service-level default range.
+        $startInput = $metrics->safeParseDate($this->startDate ?: null);
+        $endInput = $metrics->safeParseDate($this->endDate ?: null);
+
+        if ($startInput && $endInput && $startInput->greaterThan($endInput)) {
+            [$startInput, $endInput] = [$endInput, $startInput];
+        }
+
+        $distributionStart = $startInput
+            ?? now()->subDays(AdminMetricsService::DEFAULT_RANGE_DAYS - 1)->startOfDay();
+        $distributionEnd = $endInput ?? now();
+
+        $distribution = $metrics->featureDistribution($distributionStart, $distributionEnd);
 
         $totals = [
             'total' => $events->count(),

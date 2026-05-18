@@ -263,6 +263,35 @@ class AdminMonitoringDashboardTest extends TestCase
         $response->assertSee(route('admin.documents'), false);
     }
 
+    public function test_admin_usage_handles_malformed_date_query_strings_gracefully(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+
+        // Malformed start/end dates from the query string must not raise
+        // a 500. The page should render normally and ignore the invalid
+        // values rather than passing them into Carbon::parse().
+        $response = $this->actingAs($admin)->get('/admin/usage?startDate=not-a-date&endDate=also-bad');
+        $response->assertOk();
+        $response->assertSee('AI Usage Events', false);
+
+        // Empty values must also be tolerated.
+        $response = $this->actingAs($admin)->get('/admin/usage?startDate=&endDate=');
+        $response->assertOk();
+        $response->assertSee('AI Usage Events', false);
+    }
+
+    public function test_admin_usage_livewire_component_handles_invalid_date_input(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $this->actingAs($admin);
+
+        Livewire::test(\App\Livewire\Admin\AdminUsage::class)
+            ->set('startDate', 'banana')
+            ->set('endDate', 'pineapple')
+            ->assertOk()
+            ->assertSee('AI Usage Events');
+    }
+
     private function makeEvent(int $userId, string $feature, string $action, string $status, Carbon $createdAt, ?string $requestId = null, ?int $latencyMs = null, ?string $errorCode = null): AIUsageEvent
     {
         $event = new AIUsageEvent([
