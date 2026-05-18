@@ -33,7 +33,16 @@ class PasswordResetTest extends TestCase
             ->set('email', $user->email)
             ->call('sendPasswordResetLink');
 
-        Notification::assertSentTo($user, CustomResetPassword::class);
+        Notification::assertSentTo($user, CustomResetPassword::class, function (CustomResetPassword $notification) use ($user) {
+            $mail = $notification->toMail($user);
+            $url = (string) ($mail->viewData['url'] ?? '');
+
+            $this->assertStringStartsWith(url('/reset-password/'), $url);
+            $this->assertStringNotContainsString('email=', $url);
+            $this->assertStringNotContainsString(rawurlencode($user->email), $url);
+
+            return true;
+        });
     }
 
     public function test_reset_password_screen_can_be_rendered(): void

@@ -23,12 +23,14 @@ class PendingRegistrationWorkflowService
 {
     public function __construct(
         private readonly PendingRegistrationService $pendingRegistrationService,
-    ) {
-    }
+    ) {}
 
     public function startRegistration(string $name, string $email, string $password, ?string $ipAddress = null): string
     {
         $normalizedEmail = Str::lower($email);
+        $ipAddress = (string) ($ipAddress ?? request()->ip());
+
+        $this->ensureRegistrationStartIsAllowed($normalizedEmail, $ipAddress);
 
         $existingUser = User::where('email', $normalizedEmail)->first();
         if ($existingUser && is_null($existingUser->email_verified_at)) {
@@ -49,6 +51,30 @@ class PendingRegistrationWorkflowService
         Mail::to($normalizedEmail)->send(new VerificationCodeMail($plainCode));
 
         return $pendingToken;
+    }
+
+    private function ensureRegistrationStartIsAllowed(string $email, string $ipAddress): void
+    {
+        $keys = [
+            $this->pendingRegistrationService->startRateLimitIpKey($ipAddress),
+            $this->pendingRegistrationService->startRateLimitEmailKey($email),
+        ];
+
+        $maxAttempts = $this->pendingRegistrationService->startMaxAttempts();
+
+        foreach ($keys as $key) {
+            if (RateLimiter::tooManyAttempts($key, $maxAttempts)) {
+                $seconds = RateLimiter::availableIn($key);
+
+                throw ValidationException::withMessages([
+                    'register_email' => 'Terlalu banyak permintaan pendaftaran. Coba lagi dalam '.ceil($seconds / 60).' menit.',
+                ]);
+            }
+        }
+
+        foreach ($keys as $key) {
+            RateLimiter::hit($key, $this->pendingRegistrationService->startDecaySeconds());
+        }
     }
 
     public function resendOtp(?string $pendingToken, ?string $ipAddress = null): void
