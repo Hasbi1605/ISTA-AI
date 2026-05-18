@@ -549,9 +549,9 @@ class ChatOrchestrationService
         $modelName = null;
         $sources = null;
 
-        if (preg_match('/\[MODEL:(.+?)\]\n?/', $combined, $matches)) {
+        if (preg_match('/^\[MODEL:(.+?)\]\n?/', $combined, $matches)) {
             $modelName = trim((string) $matches[1]);
-            $combined = preg_replace('/\[MODEL:.+?\]\n?/', '', $combined, 1) ?? $combined;
+            $combined = preg_replace('/^\[MODEL:.+?\]\n?/', '', $combined, 1) ?? $combined;
         }
 
         [$combined, $sourcesBuffer, $parsedSources] = $this->extractSourcesMetadata($combined);
@@ -573,7 +573,7 @@ class ChatOrchestrationService
             $tail = substr($combined, $markerPos);
             $isComplete = preg_match('/^\[MODEL:(.+?)\]\n?/s', $tail) === 1;
 
-            if (! $isComplete) {
+            if ($markerPos === 0 && ! $isComplete) {
                 $nextBuffer = $tail;
                 $combined = substr($combined, 0, $markerPos);
                 break;

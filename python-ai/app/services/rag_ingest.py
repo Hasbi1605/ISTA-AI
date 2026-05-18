@@ -609,7 +609,7 @@ def delete_document_vectors(
                 # Must NOT be used from ProcessDocument job cleanup — that job runs
                 # after the old document was deleted and a new document with the same
                 # filename may already have been uploaded.
-                vectorstore.delete(where={"$and": [{"filename": filename}, {"user_id": str(user_id)}]})
+                _delete_legacy_chunks_by_filename(vectorstore._collection, filename, str(user_id))
         else:
             vectorstore.delete(where={"$and": [{"filename": filename}, {"user_id": str(user_id)}]})
 
@@ -624,9 +624,7 @@ def delete_document_vectors(
                     "$and": [{"document_id": str(document_id)}, {"user_id": str(user_id)}, {"chunk_type": "parent"}],
                 })
                 if cleanup_legacy:
-                    raw_col.delete(where={
-                        "$and": [{"filename": filename}, {"user_id": str(user_id)}, {"chunk_type": "parent"}],
-                    })
+                    _delete_legacy_chunks_by_filename(raw_col, filename, str(user_id), chunk_type="parent")
             else:
                 raw_col.delete(where={
                     "$and": [{"filename": filename}, {"user_id": str(user_id)}, {"chunk_type": "parent"}],
@@ -640,3 +638,45 @@ def delete_document_vectors(
     except Exception as e:
         logger.error(f"❌ Error deleting vectors for {filename}: {str(e)}")
         return False, str(e)
+
+
+def _delete_legacy_chunks_by_filename(
+    collection,
+    filename: str,
+    user_id: str,
+    chunk_type: str | None = None,
+) -> int:
+    """Delete filename-scoped chunks only when they pre-date document_id metadata."""
+    where_conditions = [{"filename": filename}, {"user_id": str(user_id)}]
+    if chunk_type is not None:
+        where_conditions.append({"chunk_type": chunk_type})
+
+    where = {"$and": where_conditions}
+
+    try:
+        results = collection.get(where=where, include=["metadatas"])
+    except Exception as exc:
+        logger.warning("Legacy vector lookup skipped for %s user_id=%s: %s", filename, user_id, exc)
+        return 0
+
+    ids = results.get("ids", []) if isinstance(results, dict) else []
+    metadatas = results.get("metadatas", []) if isinstance(results, dict) else []
+    legacy_ids: list[str] = []
+
+    for chunk_id, metadata in zip(ids, metadatas):
+        if not isinstance(metadata, dict):
+            continue
+
+        if str(metadata.get("document_id") or "").strip() == "":
+            legacy_ids.append(str(chunk_id))
+
+    if legacy_ids:
+        collection.delete(ids=legacy_ids)
+        logger.info(
+            "✅ Legacy cleanup: deleted %d filename-only chunks for %s user_id=%s",
+            len(legacy_ids),
+            filename,
+            user_id,
+        )
+
+    return len(legacy_ids)

@@ -206,25 +206,63 @@ def test_strict_delete_does_not_delete_by_filename(monkeypatch):
 
 def test_legacy_cleanup_delete_removes_both_new_and_legacy_chunks(monkeypatch):
     """
-    Regression: when cleanup_legacy=True (user-initiated delete), both
-    document_id-based AND filename-based filters must be applied to clean
-    up legacy chunks that pre-date document_id tracking.
+    Regression: cleanup_legacy=True must remove strict document_id chunks and
+    filename-only legacy chunks, but must not broad-delete newer chunks that
+    share the same filename and already have a different document_id.
     """
     from app.services.rag_ingest import delete_document_vectors
 
     delete_calls: list = []
 
     class FakeCollection:
-        def delete(self, where):
-            delete_calls.append({"type": "parent", "where": where})
+        def __init__(self, collection_name):
+            self.collection_name = collection_name
+
+        def get(self, where=None, include=None):
+            delete_calls.append({
+                "type": self.collection_name,
+                "op": "get",
+                "where": where,
+                "include": include,
+            })
+
+            if "parent" in self.collection_name.lower():
+                return {
+                    "ids": ["legacy-parent", "new-parent"],
+                    "metadatas": [
+                        {"filename": "agenda.pdf", "user_id": "user-1", "chunk_type": "parent"},
+                        {"filename": "agenda.pdf", "user_id": "user-1", "document_id": "9", "chunk_type": "parent"},
+                    ],
+                }
+
+            return {
+                "ids": ["legacy-main", "new-main"],
+                "metadatas": [
+                    {"filename": "agenda.pdf", "user_id": "user-1"},
+                    {"filename": "agenda.pdf", "user_id": "user-1", "document_id": "9"},
+                ],
+            }
+
+        def delete(self, where=None, ids=None):
+            delete_calls.append({
+                "type": self.collection_name,
+                "op": "delete",
+                "where": where,
+                "ids": ids,
+            })
 
     class FakeChroma:
         def __init__(self, collection_name, **kwargs):
             self.collection_name = collection_name
-            self._collection = FakeCollection()
+            self._collection = FakeCollection(collection_name)
 
         def delete(self, where):
-            delete_calls.append({"type": "main", "where": where})
+            delete_calls.append({
+                "type": self.collection_name,
+                "op": "delete",
+                "where": where,
+                "ids": None,
+            })
 
     monkeypatch.setattr("app.services.rag_ingest.Chroma", FakeChroma)
     monkeypatch.setattr(
@@ -239,12 +277,15 @@ def test_legacy_cleanup_delete_removes_both_new_and_legacy_chunks(monkeypatch):
         cleanup_legacy=True,    # full cleanup — simulates user-initiated delete
     )
 
-    main_deletes = [c for c in delete_calls if c["type"] == "main"]
-    assert len(main_deletes) == 2, f"Expected 2 main delete calls (new + legacy), got {len(main_deletes)}"
+    delete_filters = [str(c["where"]) for c in delete_calls if c["op"] == "delete" and c["where"] is not None]
+    assert any("document_id" in item for item in delete_filters), "One pass must delete by document_id"
+    assert not any("filename" in item and "document_id" not in item for item in delete_filters), \
+        "Legacy cleanup must not broad-delete every chunk with the same filename"
 
-    filters_str = " ".join(str(c["where"]) for c in main_deletes)
-    assert "document_id" in filters_str, "One pass must delete by document_id"
-    assert "filename" in filters_str, "One pass must delete by filename for legacy cleanup"
+    id_deletes = [c["ids"] for c in delete_calls if c["op"] == "delete" and c["ids"] is not None]
+    assert ["legacy-main"] in id_deletes
+    assert ["legacy-parent"] in id_deletes
+    assert all("new-main" not in ids and "new-parent" not in ids for ids in id_deletes)
 
 
 # ── Embedding consistency guard ──────────────────────────────────────────────
