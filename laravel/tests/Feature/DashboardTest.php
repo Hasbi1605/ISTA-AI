@@ -20,6 +20,18 @@ class DashboardTest extends TestCase
         $response->assertSee(route('guest-memo'), false);
     }
 
+    public function test_dashboard_keeps_header_main_and_footer_inside_viewport(): void
+    {
+        $response = $this->get('/');
+
+        $response->assertStatus(200);
+        $response->assertSee('min-h-[var(--app-viewport-height)]', false);
+        $response->assertSee('flex-none', false);
+        $response->assertSee('flex-1', false);
+        $response->assertSee('All Rights Reserved.', false);
+        $response->assertSee('x-show="darkMode === true" style="display: none;"', false);
+    }
+
     public function test_guest_chat_redirects_to_login_and_saves_prompt(): void
     {
         $response = $this->get('/guest-chat?q=hello');

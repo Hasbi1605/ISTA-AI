@@ -126,7 +126,7 @@
                 </div>
             </div>
 
-            <div x-show="isDraggingFile" x-transition.opacity class="px-3 pb-3 pt-3 w-full">
+            <div x-show="isDraggingFile" x-cloak x-transition.opacity class="px-3 pb-3 pt-3 w-full">
                 <div class="h-[84px] w-full rounded-xl border-2 border-dashed border-ista-primary/40 dark:border-[#8E81FF] bg-ista-primary/5 dark:bg-[#312E81]/20 flex items-center justify-center gap-2 text-[13px] font-semibold text-ista-primary dark:text-[#A5B4FC]">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
@@ -136,7 +136,7 @@
             </div>
         </div>
     </form>
-    <p x-show="dropError" x-transition.opacity class="max-w-3xl mx-auto mt-2 text-xs text-red-500 dark:text-red-400" x-text="dropError"></p>
+    <p x-show="dropError" x-cloak x-transition.opacity class="max-w-3xl mx-auto mt-2 text-xs text-red-500 dark:text-red-400" x-text="dropError"></p>
     <div class="text-center mt-3 text-[11px] text-[#94A3B8] dark:text-[#64748B]">
         ISTA AI dapat keliru. Mohon verifikasi kembali informasi yang penting.
     </div>

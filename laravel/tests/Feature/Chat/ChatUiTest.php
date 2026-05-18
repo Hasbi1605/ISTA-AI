@@ -118,6 +118,21 @@ class ChatUiTest extends TestCase
             ->assertSee('aria-label="Tambahkan dokumen terpilih ke chat"', false);
     }
 
+    public function test_chat_drag_drop_overlay_is_cloaked_and_has_reset_handlers(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('chat'))
+            ->assertOk()
+            ->assertSee('x-on:dragenter.window="onDragEnter($event)"', false)
+            ->assertSee('x-on:dragend.window="resetDraggingFile()"', false)
+            ->assertSee('x-on:blur.window="resetDraggingFile()"', false)
+            ->assertSee('x-on:keydown.escape.window="resetDraggingFile()"', false)
+            ->assertSee('x-show="isDraggingFile" x-cloak', false)
+            ->assertDontSee('x-on:dragenter.window.prevent', false);
+    }
+
     public function test_create_conversation_if_needed_throws_for_unowned_conversation(): void
     {
         $userA = User::factory()->create();
