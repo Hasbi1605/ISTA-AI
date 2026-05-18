@@ -183,7 +183,7 @@ services:
     container_name: ista_laravel
     restart: always
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
       - DB_CONNECTION=mysql
       - DB_HOST=mysql

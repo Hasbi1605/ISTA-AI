@@ -35,9 +35,29 @@ class PendingRegistrationService
         return 'otp_registration_resend:'.$token.'|'.$ipAddress;
     }
 
+    public function startRateLimitIpKey(string $ipAddress): string
+    {
+        return 'otp_registration_start:ip:'.hash('sha256', $ipAddress);
+    }
+
+    public function startRateLimitEmailKey(string $email): string
+    {
+        return 'otp_registration_start:email:'.hash('sha256', Str::lower($email));
+    }
+
     public function pendingRegistrationTtlMinutes(): int
     {
         return max(1, (int) config('auth.otp_registration.ttl_minutes', 60));
+    }
+
+    public function startMaxAttempts(): int
+    {
+        return max(1, (int) config('auth.otp_registration.start_max_attempts', 5));
+    }
+
+    public function startDecaySeconds(): int
+    {
+        return max(1, (int) config('auth.otp_registration.start_decay_seconds', 600));
     }
 
     public function otpMaxAttempts(): int

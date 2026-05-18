@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\User;
+
 return [
 
     /*
@@ -62,7 +64,7 @@ return [
     'providers' => [
         'users' => [
             'driver' => 'eloquent',
-            'model' => env('AUTH_MODEL', App\Models\User::class),
+            'model' => env('AUTH_MODEL', User::class),
         ],
 
         // 'users' => [
@@ -114,6 +116,8 @@ return [
 
     'otp_registration' => [
         'ttl_minutes' => env('AUTH_OTP_REGISTRATION_TTL_MINUTES', 60),
+        'start_max_attempts' => env('AUTH_OTP_REGISTRATION_START_MAX_ATTEMPTS', 5),
+        'start_decay_seconds' => env('AUTH_OTP_REGISTRATION_START_DECAY_SECONDS', 600),
         'max_attempts' => env('AUTH_OTP_REGISTRATION_MAX_ATTEMPTS', 3),
         'decay_seconds' => env('AUTH_OTP_REGISTRATION_DECAY_SECONDS', 600),
         'resend_cooldown_seconds' => env('AUTH_OTP_REGISTRATION_RESEND_COOLDOWN_SECONDS', 60),

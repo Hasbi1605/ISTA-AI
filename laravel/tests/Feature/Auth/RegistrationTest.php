@@ -2,13 +2,14 @@
 
 namespace Tests\Feature\Auth;
 
-use App\Mail\VerificationCodeMail;
 use App\Livewire\Chat\ChatIndex;
+use App\Mail\VerificationCodeMail;
 use App\Models\User;
+use App\Services\Auth\PendingRegistrationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Livewire;
 use Livewire\Volt\Volt;
 use Tests\TestCase;
@@ -73,6 +74,50 @@ class RegistrationTest extends TestCase
         $this->assertDatabaseMissing('users', ['email' => 'replace@example.com']);
 
         Mail::assertQueued(VerificationCodeMail::class, fn (VerificationCodeMail $mail) => $mail->hasTo('replace@example.com') && $mail->queue === 'mail');
+    }
+
+    public function test_registration_start_is_rate_limited_before_sending_another_otp(): void
+    {
+        Mail::fake();
+        $rateLimiter = app(PendingRegistrationService::class);
+        $ipRateLimitKey = $rateLimiter->startRateLimitIpKey('127.0.0.1');
+        $emailRateLimitKey = $rateLimiter->startRateLimitEmailKey('registration-start-limit@example.com');
+
+        RateLimiter::clear($ipRateLimitKey);
+        RateLimiter::clear($emailRateLimitKey);
+
+        try {
+            config([
+                'auth.otp_registration.start_max_attempts' => 1,
+                'auth.otp_registration.start_decay_seconds' => 600,
+            ]);
+
+            Volt::test('pages.auth.login')
+                ->set('view', 'register')
+                ->set('name', 'Rate Limited User')
+                ->set('register_email', 'registration-start-limit@example.com')
+                ->set('register_password', 'password')
+                ->set('register_password_confirmation', 'password')
+                ->call('register')
+                ->assertSet('showVerificationModal', true)
+                ->assertNoRedirect();
+
+            Volt::test('pages.auth.login')
+                ->set('view', 'register')
+                ->set('name', 'Rate Limited User')
+                ->set('register_email', 'registration-start-limit@example.com')
+                ->set('register_password', 'password')
+                ->set('register_password_confirmation', 'password')
+                ->call('register')
+                ->assertHasErrors(['register_email'])
+                ->assertNoRedirect();
+
+            Mail::assertQueued(VerificationCodeMail::class, 1);
+            $this->assertDatabaseMissing('users', ['email' => 'registration-start-limit@example.com']);
+        } finally {
+            RateLimiter::clear($ipRateLimitKey);
+            RateLimiter::clear($emailRateLimitKey);
+        }
     }
 
     public function test_valid_otp_finalizes_registration_logs_in_and_redirects_to_intended_chat(): void
