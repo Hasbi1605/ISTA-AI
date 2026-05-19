@@ -90,8 +90,10 @@ Gunakan `--env-file .env.droplet` agar variable interpolation seperti `ONLYOFFIC
 ```bash
 docker compose --env-file .env.droplet -f docker-compose.production.yml ps
 docker compose --env-file .env.droplet -f docker-compose.production.yml up -d --build
-docker compose --env-file .env.droplet -f docker-compose.production.yml run --rm artisan migrate --force
+docker compose --env-file .env.droplet -f docker-compose.production.yml exec -T laravel php artisan migrate --force
 ```
+
+Jalankan migration dari service `laravel` yang aktif karena service profile `artisan` tidak selalu ikut rebuild saat `up -d --build`.
 
 ## Checklist Sebelum Deploy Config
 

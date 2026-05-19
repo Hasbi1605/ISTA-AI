@@ -107,7 +107,7 @@ docker compose --env-file .env.droplet -f docker-compose.production.yml ps
 ## 7. Jalankan Migrasi
 
 ```bash
-docker compose --env-file .env.droplet -f docker-compose.production.yml run --rm artisan migrate --force
+docker compose --env-file .env.droplet -f docker-compose.production.yml exec -T laravel php artisan migrate --force
 ```
 
 Jika Anda butuh akun awal atau data dummy, jalankan seed secara terpisah sesuai kebutuhan aplikasi.
@@ -115,7 +115,7 @@ Jika Anda butuh akun awal atau data dummy, jalankan seed secara terpisah sesuai 
 ## 8. Restart Aplikasi Setelah Migrasi Pertama
 
 ```bash
-docker compose --env-file .env.droplet -f docker-compose.production.yml restart laravel horizon
+docker compose --env-file .env.droplet -f docker-compose.production.yml restart laravel horizon scheduler
 ```
 
 ## 9. Verifikasi Deploy
@@ -177,8 +177,8 @@ docker compose --env-file .env.droplet -f docker-compose.production.yml logs -f
 cd /opt/ista-ai
 git pull origin main
 docker compose --env-file .env.droplet -f docker-compose.production.yml up -d --build
-docker compose --env-file .env.droplet -f docker-compose.production.yml run --rm artisan migrate --force
-docker compose --env-file .env.droplet -f docker-compose.production.yml restart laravel horizon
+docker compose --env-file .env.droplet -f docker-compose.production.yml exec -T laravel php artisan migrate --force
+docker compose --env-file .env.droplet -f docker-compose.production.yml restart laravel horizon scheduler
 ```
 
 ## 12. Backup Minimum
