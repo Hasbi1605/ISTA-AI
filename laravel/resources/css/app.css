@@ -3177,6 +3177,26 @@
     background-color: #a8a29e;
 }
 
+.admin-documents-modal__summary-grid strong.admin-status-chip--success,
+.admin-documents-drawer__summary strong.admin-status-chip--success {
+    color: #047857;
+}
+
+.admin-documents-modal__summary-grid strong.admin-status-chip--warning,
+.admin-documents-drawer__summary strong.admin-status-chip--warning {
+    color: #b45309;
+}
+
+.admin-documents-modal__summary-grid strong.admin-status-chip--danger,
+.admin-documents-drawer__summary strong.admin-status-chip--danger {
+    color: #be123c;
+}
+
+.admin-documents-modal__summary-grid strong.admin-status-chip--neutral,
+.admin-documents-drawer__summary strong.admin-status-chip--neutral {
+    color: #57534e;
+}
+
 .dark .admin-status-chip--success {
     background-color: rgba(52, 211, 153, 0.1);
     color: #6ee7b7;
@@ -3199,6 +3219,26 @@
     background-color: #1f2937;
     color: #d1d5db;
     --tw-ring-color: #374151;
+}
+
+.dark .admin-documents-modal__summary-grid strong.admin-status-chip--success,
+.dark .admin-documents-drawer__summary strong.admin-status-chip--success {
+    color: #6ee7b7;
+}
+
+.dark .admin-documents-modal__summary-grid strong.admin-status-chip--warning,
+.dark .admin-documents-drawer__summary strong.admin-status-chip--warning {
+    color: #fcd34d;
+}
+
+.dark .admin-documents-modal__summary-grid strong.admin-status-chip--danger,
+.dark .admin-documents-drawer__summary strong.admin-status-chip--danger {
+    color: #fda4af;
+}
+
+.dark .admin-documents-modal__summary-grid strong.admin-status-chip--neutral,
+.dark .admin-documents-drawer__summary strong.admin-status-chip--neutral {
+    color: #d1d5db;
 }
 
 .admin-documents-file-icon--pdf {
