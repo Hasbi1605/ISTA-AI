@@ -76,8 +76,8 @@ docker compose --env-file .env.droplet -f docker-compose.production.yml up -d --
 
 ```bash
 cd /opt/ista-ai
-docker compose --env-file .env.droplet -f docker-compose.production.yml run --rm artisan migrate --force
-docker compose --env-file .env.droplet -f docker-compose.production.yml restart laravel horizon
+docker compose --env-file .env.droplet -f docker-compose.production.yml exec -T laravel php artisan migrate --force
+docker compose --env-file .env.droplet -f docker-compose.production.yml restart laravel horizon scheduler
 ```
 
 ## 7. Cek Status Container
@@ -149,8 +149,8 @@ Update berikutnya cukup:
 cd /opt/ista-ai
 git pull origin main
 docker compose --env-file .env.droplet -f docker-compose.production.yml up -d --build
-docker compose --env-file .env.droplet -f docker-compose.production.yml run --rm artisan migrate --force
-docker compose --env-file .env.droplet -f docker-compose.production.yml restart laravel horizon
+docker compose --env-file .env.droplet -f docker-compose.production.yml exec -T laravel php artisan migrate --force
+docker compose --env-file .env.droplet -f docker-compose.production.yml restart laravel horizon scheduler
 ```
 
 ## Catatan
