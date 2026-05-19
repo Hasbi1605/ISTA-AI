@@ -3134,3 +3134,115 @@
         -webkit-text-fill-color: #94a3b8;
     }
 }
+
+/* Dynamic admin modifiers are composed in Blade, so keep these outside @layer
+   to prevent Tailwind from pruning production-critical color states. */
+.admin-status-chip--success {
+    background-color: #ecfdf5;
+    color: #047857;
+    --tw-ring-color: #d1fae5;
+}
+
+.admin-status-chip--success > span {
+    background-color: #10b981;
+}
+
+.admin-status-chip--warning {
+    background-color: #fffbeb;
+    color: #b45309;
+    --tw-ring-color: #fde68a;
+}
+
+.admin-status-chip--warning > span {
+    background-color: #f59e0b;
+}
+
+.admin-status-chip--danger {
+    background-color: #fff1f2;
+    color: #be123c;
+    --tw-ring-color: #ffe4e6;
+}
+
+.admin-status-chip--danger > span {
+    background-color: #f43f5e;
+}
+
+.admin-status-chip--neutral {
+    background-color: #f5f5f4;
+    color: #57534e;
+    --tw-ring-color: #e7e5e4;
+}
+
+.admin-status-chip--neutral > span {
+    background-color: #a8a29e;
+}
+
+.dark .admin-status-chip--success {
+    background-color: rgba(52, 211, 153, 0.1);
+    color: #6ee7b7;
+    --tw-ring-color: rgba(110, 231, 183, 0.2);
+}
+
+.dark .admin-status-chip--warning {
+    background-color: rgba(251, 191, 36, 0.1);
+    color: #fcd34d;
+    --tw-ring-color: rgba(252, 211, 77, 0.2);
+}
+
+.dark .admin-status-chip--danger {
+    background-color: rgba(244, 63, 94, 0.1);
+    color: #fda4af;
+    --tw-ring-color: rgba(251, 113, 133, 0.2);
+}
+
+.dark .admin-status-chip--neutral {
+    background-color: #1f2937;
+    color: #d1d5db;
+    --tw-ring-color: #374151;
+}
+
+.admin-documents-file-icon--pdf {
+    color: #ff2056;
+}
+
+.admin-documents-file-icon--csv,
+.admin-documents-file-icon--xlsx {
+    color: #32cd32;
+}
+
+.admin-documents-file-icon--docx {
+    color: #2b7fff;
+}
+
+.admin-documents-file-icon--txt,
+.admin-documents-file-icon--file {
+    color: #62748e;
+}
+
+.admin-documents-file-icon--image {
+    color: #fd9a00;
+}
+
+.admin-documents-stage-list__item--done > span {
+    background-color: #10b981;
+}
+
+.admin-documents-stage-list__item--active > span {
+    background-color: #f59e0b;
+}
+
+.admin-documents-stage-list__item--failed > span {
+    background-color: #f43f5e;
+}
+
+.dark .admin-documents-stage-list__item--done > span {
+    background-color: #6ee7b7;
+}
+
+.dark .admin-documents-stage-list__item--active > span {
+    background-color: #fcd34d;
+}
+
+.dark .admin-documents-stage-list__item--failed > span {
+    background-color: #fda4af;
+}
