@@ -24,6 +24,21 @@ from app.services.lightweight_text_splitter import LightweightRecursiveTextSplit
 logger = logging.getLogger(__name__)
 
 
+# ── Optional metadata overrides ──────────────────────────────────────────────
+# Callers (e.g. the knowledge ingest router) can pass a dict that will be
+# merged into every chunk's metadata. Keep the values request-local; a module
+# global would be unsafe when multiple FastAPI requests ingest concurrently.
+def _apply_metadata_overrides(chunk_metadata: dict, metadata_overrides: dict | None = None) -> None:
+    overrides = metadata_overrides
+    if not overrides:
+        return
+
+    for key, value in overrides.items():
+        if value is None:
+            continue
+        chunk_metadata[key] = value
+
+
 def _delete_chroma_ids_with_retry(
     delete_callable,
     ids: list[str],
@@ -80,6 +95,7 @@ def process_document(
     filename: str,
     user_id: str = "unknown",
     document_id: str | None = None,
+    metadata_overrides: dict | None = None,
 ):
     try:
         logger.info("=== Processing document: %s ===", filename)
@@ -172,6 +188,7 @@ def process_document(
                 }
                 if document_id:
                     parent_meta["document_id"] = str(document_id)
+                _apply_metadata_overrides(parent_meta, metadata_overrides)
                 pdr_parent_docs.append((parent_id, parent.page_content, parent_meta))
 
                 children = child_splitter.split_documents([parent])
@@ -230,6 +247,7 @@ def process_document(
             chunk.metadata["chunk_index"] = idx
             if document_id:
                 chunk.metadata["document_id"] = str(document_id)
+            _apply_metadata_overrides(chunk.metadata, metadata_overrides)
             if idx == 0:
                 logger.info("🔍 INGEST: Storing chunk metadata - filename='%s', user_id='%s'", filename, str(user_id))
 
