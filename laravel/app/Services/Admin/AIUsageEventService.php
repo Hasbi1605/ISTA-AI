@@ -61,6 +61,9 @@ class AIUsageEventService
         'knowledge_chunk_count',
         'knowledge_source_count',
         'knowledge_source_ids',
+        'prompt_profile_id',
+        'model_config_id',
+        'ai_config_runtime',
         'has_documents',
         'has_attachment',
         'attachment_extension',
@@ -102,6 +105,10 @@ class AIUsageEventService
         'preview',
         'body_text',
         'searchable_text',
+    ];
+
+    private const FORBIDDEN_KEY_EXCEPTIONS = [
+        'prompt_profile_id',
     ];
 
     /**
@@ -416,6 +423,10 @@ class AIUsageEventService
 
     private function keyLooksForbidden(string $normalizedKey): bool
     {
+        if (in_array($normalizedKey, self::FORBIDDEN_KEY_EXCEPTIONS, true)) {
+            return false;
+        }
+
         foreach (self::FORBIDDEN_KEY_FRAGMENTS as $fragment) {
             if (str_contains($normalizedKey, $fragment)) {
                 return true;

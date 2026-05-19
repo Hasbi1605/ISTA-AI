@@ -134,7 +134,7 @@ class AdminLayoutTest extends TestCase
         $response->assertSee('admin-ai-config-page', false);
         $response->assertSee('admin-ai-config-kpi-card', false);
         $response->assertSee('admin-ai-config-kpi-card__icon', false);
-        $response->assertSee('Parameter Runtime', false);
-        $response->assertSee('Service Endpoints', false);
+        $response->assertSee('Prompt Profile', false);
+        $response->assertSee('Audit Log', false);
     }
 }

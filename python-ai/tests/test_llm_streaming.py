@@ -101,6 +101,84 @@ def test_stream_with_cascade_emits_error_sentinel_when_all_models_fail(monkeypat
     assert output == [llm_streaming.ERROR_SENTINEL + llm_streaming.AI_UNAVAILABLE_MESSAGE]
 
 
+def test_llm_manager_uses_runtime_model_list_and_prompt(monkeypatch):
+    import app.llm_manager as manager
+
+    captured = {}
+
+    monkeypatch.setattr(
+        manager,
+        "get_context_for_query",
+        lambda *args, **kwargs: {"search_context": "", "search_results": []},
+    )
+
+    def fake_stream(messages, model_list, sources=None, logger=None):
+        captured["messages"] = messages
+        captured["model_list"] = model_list
+        captured["sources"] = sources
+        yield "ok"
+
+    monkeypatch.setattr(manager, "_shared_stream_with_cascade", fake_stream)
+
+    output = list(
+        manager.get_llm_stream(
+            [{"role": "user", "content": "Halo"}],
+            allow_auto_realtime_web=False,
+            runtime_config={
+                "system_prompt": "Prompt runtime aktif.",
+                "chat_models": [
+                    {
+                        "label": "Runtime Model",
+                        "provider": "litellm",
+                        "model_name": "openai/gpt-4.1-mini",
+                        "api_key_env": "GITHUB_TOKEN",
+                    }
+                ],
+            },
+        )
+    )
+
+    assert output == ["ok"]
+    assert captured["model_list"][0]["label"] == "Runtime Model"
+    assert captured["messages"][0]["role"] == "system"
+    assert "Prompt runtime aktif." in captured["messages"][0]["content"]
+
+
+def test_llm_manager_prepends_runtime_prompt_for_rag_sources(monkeypatch):
+    import app.llm_manager as manager
+
+    captured = {}
+
+    def fake_stream(messages, model_list, sources=None, logger=None):
+        captured["messages"] = messages
+        captured["sources"] = sources
+        yield "ok"
+
+    monkeypatch.setattr(manager, "_shared_stream_with_cascade", fake_stream)
+
+    output = list(
+        manager.get_llm_stream_with_sources(
+            [{"role": "system", "content": "Prompt RAG."}, {"role": "user", "content": "Halo"}],
+            [{"filename": "dokumen.pdf"}],
+            runtime_config={
+                "system_prompt": "Guardrail runtime.",
+                "chat_models": [
+                    {
+                        "provider": "litellm",
+                        "model_name": "openai/gpt-4.1-mini",
+                        "api_key_env": "GITHUB_TOKEN",
+                    }
+                ],
+            },
+        )
+    )
+
+    assert output == ["ok"]
+    assert captured["messages"][0]["content"].startswith("Guardrail runtime.")
+    assert "Prompt RAG." in captured["messages"][0]["content"]
+    assert captured["sources"] == [{"filename": "dokumen.pdf"}]
+
+
 def test_run_model_bedrock_converse_uses_bearer_token_and_parses_text(monkeypatch):
     from app.services import llm_streaming
 

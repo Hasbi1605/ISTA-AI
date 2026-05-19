@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import os
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Request, Response
@@ -42,6 +42,7 @@ class ChatRequest(BaseModel):
     source_policy: Optional[str] = None
     allow_auto_realtime_web: bool = True
     explicit_web_request: bool = False
+    runtime_config: Optional[Dict[str, Any]] = None
 
 
 def _resolve_policy_flags(request: ChatRequest, documents_active: bool) -> Tuple[bool, str]:
@@ -100,6 +101,18 @@ def _get_chat_streamers():
     from app.llm_manager import get_llm_stream, get_llm_stream_with_sources
 
     return get_llm_stream, get_llm_stream_with_sources
+
+def _llm_stream(get_llm_stream, messages, request: ChatRequest, **kwargs):
+    if request.runtime_config:
+        kwargs["runtime_config"] = request.runtime_config
+
+    return get_llm_stream(messages, **kwargs)
+
+def _llm_stream_with_sources(get_llm_stream_with_sources, messages, sources, request: ChatRequest):
+    if request.runtime_config:
+        return get_llm_stream_with_sources(messages, sources, runtime_config=request.runtime_config)
+
+    return get_llm_stream_with_sources(messages, sources)
 
 
 def _get_rag_policy_helpers():
@@ -237,7 +250,12 @@ async def chat_stream(request: ChatRequest, http_request: Request):
             tracker.end_total("request_routed", extra={"mode": "rag_with_sources"})
             return StreamingResponse(
                 _wrap_stream_with_ttft(
-                    get_llm_stream_with_sources(messages_with_rag, sources),
+                    _llm_stream_with_sources(
+                        get_llm_stream_with_sources,
+                        messages_with_rag,
+                        sources,
+                        request,
+                    ),
                     tracker,
                 ),
                 media_type="text/event-stream",
@@ -248,8 +266,10 @@ async def chat_stream(request: ChatRequest, http_request: Request):
                 tracker.end_total("request_routed", extra={"mode": "web_search_fallback"})
                 return StreamingResponse(
                     _wrap_stream_with_ttft(
-                        get_llm_stream(
+                        _llm_stream(
+                            get_llm_stream,
                             request.messages,
+                            request,
                             force_web_search=request.force_web_search,
                             allow_auto_realtime_web=allow_auto_realtime_web,
                             documents_active=True,
@@ -272,8 +292,10 @@ async def chat_stream(request: ChatRequest, http_request: Request):
             tracker.end_total("request_routed", extra={"mode": "web_search_error_fallback"})
             return StreamingResponse(
                 _wrap_stream_with_ttft(
-                    get_llm_stream(
+                    _llm_stream(
+                        get_llm_stream,
                         request.messages,
+                        request,
                         force_web_search=request.force_web_search,
                         allow_auto_realtime_web=allow_auto_realtime_web,
                         documents_active=True,
@@ -316,7 +338,12 @@ async def chat_stream(request: ChatRequest, http_request: Request):
 
                 return StreamingResponse(
                     _wrap_stream_with_ttft(
-                        get_llm_stream_with_sources(messages_with_knowledge, sources),
+                        _llm_stream_with_sources(
+                            get_llm_stream_with_sources,
+                            messages_with_knowledge,
+                            sources,
+                            request,
+                        ),
                         tracker,
                     ),
                     media_type="text/event-stream",
@@ -328,8 +355,10 @@ async def chat_stream(request: ChatRequest, http_request: Request):
     tracker.end_total("request_routed", extra={"mode": "general_chat", "reason": reason_code})
     return StreamingResponse(
         _wrap_stream_with_ttft(
-            get_llm_stream(
+            _llm_stream(
+                get_llm_stream,
                 request.messages,
+                request,
                 force_web_search=request.force_web_search,
                 allow_auto_realtime_web=allow_auto_realtime_web,
                 documents_active=False,

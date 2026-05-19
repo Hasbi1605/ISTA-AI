@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Generator, List
+from typing import Any, Dict, Generator, List
 
 from app.env_utils import get_env
 from app.services.llm_streaming import (
@@ -80,12 +80,84 @@ def _get_default_system_prompt_fallback():
     )
 
 
+def _runtime_models(runtime_config: Dict[str, Any] | None) -> List[Dict]:
+    if not isinstance(runtime_config, dict):
+        return []
+
+    models = runtime_config.get("chat_models")
+    if not isinstance(models, list):
+        return []
+
+    safe_models: List[Dict] = []
+    for model in models[:3]:
+        if not isinstance(model, dict):
+            continue
+
+        provider = str(model.get("provider") or "").strip()
+        model_name = str(model.get("model_name") or "").strip()
+        api_key_env = str(model.get("api_key_env") or "").strip()
+        if provider == "" or model_name == "" or api_key_env == "":
+            continue
+
+        safe_model = dict(model)
+        safe_model["provider"] = provider
+        safe_model["model_name"] = model_name
+        safe_model["api_key_env"] = api_key_env
+        safe_models.append(safe_model)
+
+    return safe_models
+
+
+def _runtime_system_prompt(runtime_config: Dict[str, Any] | None) -> str:
+    if not isinstance(runtime_config, dict):
+        return ""
+
+    prompt = runtime_config.get("system_prompt")
+    return prompt.strip() if isinstance(prompt, str) else ""
+
+
+def _messages_with_runtime_prompt(
+    messages: List[Dict[str, str]],
+    runtime_config: Dict[str, Any] | None,
+) -> List[Dict[str, str]]:
+    runtime_prompt = _runtime_system_prompt(runtime_config)
+    if runtime_prompt == "":
+        return messages
+
+    enhanced: List[Dict[str, str]] = []
+    injected = False
+    for message in messages:
+        if message.get("role") == "system" and not injected:
+            existing = message.get("content") or ""
+            enhanced.append(
+                {
+                    "role": "system",
+                    "content": f"{runtime_prompt}\n\n{existing}".strip(),
+                }
+            )
+            injected = True
+            continue
+
+        enhanced.append(message)
+
+    if not injected:
+        enhanced.insert(0, {"role": "system", "content": runtime_prompt})
+
+    return enhanced
+
+
 def _stream_with_cascade(
     messages: List[Dict[str, str]],
     sources: List[Dict] | None = None,
+    runtime_config: Dict[str, Any] | None = None,
 ) -> Generator[str, None, None]:
-    model_list = _get_chat_models_fallback()
-    yield from _shared_stream_with_cascade(messages, model_list=model_list, sources=sources, logger=logger)
+    model_list = _runtime_models(runtime_config) or _get_chat_models_fallback()
+    yield from _shared_stream_with_cascade(
+        messages,
+        model_list=model_list,
+        sources=sources,
+        logger=logger,
+    )
 
 
 def get_llm_stream(
@@ -95,6 +167,7 @@ def get_llm_stream(
     documents_active: bool = False,
     explicit_web_request: bool = False,
     request_id: str | None = None,
+    runtime_config: Dict[str, Any] | None = None,
 ) -> Generator[str, None, None]:
     """
     Generator yang yield token dari LLM terbaik yang tersedia.
@@ -111,7 +184,9 @@ def get_llm_stream(
         elif msg["role"] == "system" and system_prompt_base is None:
             system_prompt_base = msg["content"]
 
-    default_system_prompt = _get_default_system_prompt_fallback()
+    default_system_prompt = (
+        _runtime_system_prompt(runtime_config) or _get_default_system_prompt_fallback()
+    )
 
     search_context = ""
     web_sources: list = []
@@ -155,16 +230,25 @@ def get_llm_stream(
 
     enhanced_messages = build_enhanced_messages(messages, enhanced_system)
 
-    yield from _stream_with_cascade(enhanced_messages, sources=web_sources or None)
+    yield from _stream_with_cascade(
+        enhanced_messages,
+        sources=web_sources or None,
+        runtime_config=runtime_config,
+    )
 
 
 def get_llm_stream_with_sources(
     messages: List[Dict[str, str]],
     sources: List[Dict],
+    runtime_config: Dict[str, Any] | None = None,
 ) -> Generator[str, None, None]:
     """
     Generator untuk RAG mode — system message sudah berisi RAG prompt.
     Sources metadata dikirim di akhir stream.
     Cascade fallback aktif termasuk untuk error 413 (konteks terlalu besar).
     """
-    yield from _stream_with_cascade(messages, sources=sources)
+    yield from _stream_with_cascade(
+        _messages_with_runtime_prompt(messages, runtime_config),
+        sources=sources,
+        runtime_config=runtime_config,
+    )

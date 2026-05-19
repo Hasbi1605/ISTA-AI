@@ -225,6 +225,7 @@ def generate_memo_docx(
     context: str,
     text_generator: Callable[[str], str] | None = None,
     configuration: Mapping[str, Any] | None = None,
+    runtime_config: Mapping[str, Any] | None = None,
 ) -> MemoDraft:
     normalized_type = normalize_memo_type(memo_type)
     clean_title = _clean_title(title)
@@ -234,7 +235,9 @@ def generate_memo_docx(
         raise ValueError("Konteks memo wajib diisi.")
 
     config = _normalize_configuration(configuration, clean_title, clean_context)
-    generator = text_generator or _default_text_generator
+    generator = text_generator or (
+        lambda prompt: _default_text_generator(prompt, runtime_config=runtime_config)
+    )
     prompt = build_memo_prompt(normalized_type, clean_title, clean_context, config)
     raw_body = config["body_override"] or generator(prompt)
     body = _sanitize_memo_body(_normalize_generated_text(raw_body), config)
@@ -262,11 +265,11 @@ def generate_memo_docx(
     )
 
 
-def _default_text_generator(prompt: str) -> str:
+def _default_text_generator(prompt: str, runtime_config: Mapping[str, Any] | None = None) -> str:
     from app.llm_manager import get_llm_stream
 
     chunks: list[str] = []
-    for chunk in get_llm_stream([{"role": "user", "content": prompt}]):
+    for chunk in get_llm_stream([{"role": "user", "content": prompt}], runtime_config=dict(runtime_config or {})):
         chunks.append(chunk)
 
     return "".join(chunks)

@@ -283,6 +283,52 @@ def test_request_id_propagated_to_get_llm_stream(monkeypatch):
     )
 
 
+def test_runtime_config_forwarded_to_get_llm_stream(monkeypatch):
+    captured = {}
+    runtime_config = {
+        "system_prompt": "Prompt runtime aktif.",
+        "chat_models": [
+            {
+                "provider": "litellm",
+                "model_name": "openai/gpt-4.1-mini",
+                "api_key_env": "GITHUB_TOKEN",
+            }
+        ],
+    }
+
+    req = chat_api.ChatRequest(
+        messages=[{"role": "user", "content": "halo"}],
+        document_filenames=None,
+        user_id="u1",
+        runtime_config=runtime_config,
+    )
+
+    def fake_policy_helpers():
+        return (
+            lambda q: False,
+            lambda **kwargs: (False, "NO_WEB", "low"),
+            lambda *args, **kwargs: {"search_context": ""},
+        )
+
+    def fake_streamers():
+        def _stream(*args, **kwargs):
+            captured["runtime_config"] = kwargs.get("runtime_config")
+            yield "ok"
+
+        async def _with_sources(*args, **kwargs):
+            yield "ok"
+
+        return _stream, _with_sources
+
+    monkeypatch.setattr(chat_api, "StreamingResponse", _DummyStreamingResponse)
+    monkeypatch.setattr(chat_api, "_get_rag_policy_helpers", fake_policy_helpers)
+    monkeypatch.setattr(chat_api, "_get_chat_streamers", fake_streamers)
+
+    response = asyncio.run(chat_api.chat_stream(req, _make_fake_http_request("rid-runtime-test")))
+    _collect_stream(response.body_iterator)
+
+    assert captured["runtime_config"] == runtime_config
+
 def test_chat_api_no_prefetch_web_on_retrieval_failure(monkeypatch):
     req = chat_api.ChatRequest(
         messages=[{"role": "user", "content": "cek terbaru"}],
