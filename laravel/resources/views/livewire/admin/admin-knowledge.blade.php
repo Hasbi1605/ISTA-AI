@@ -31,18 +31,11 @@
                 'image' => 'IMG',
                 default => strtoupper($extension ?: 'FILE'),
             },
-            'type_label' => match ($type) {
-                'pdf' => 'APPLICATION/PDF',
-                'csv' => 'TEXT/CSV',
-                'xlsx' => 'XLSX',
-                'docx' => 'DOCX',
-                default => strtoupper($mime ?: ($extension ?: 'UNKNOWN')),
-            },
         ];
     };
     $statusMeta = function (?string $status): array {
         return match ($status) {
-            'active' => ['label' => 'Active', 'tone' => 'success'],
+            'active' => ['label' => 'Ready', 'tone' => 'success'],
             'processing' => ['label' => 'Processing', 'tone' => 'warning'],
             'draft' => ['label' => 'Draft', 'tone' => 'neutral'],
             'error' => ['label' => 'Failed', 'tone' => 'danger'],
@@ -61,6 +54,69 @@
 
         return mb_strtoupper($letters ?: 'A');
     };
+    $pipelineMeta = function ($doc): array {
+        $status = (string) ($doc?->status ?? 'draft');
+        $chunks = (int) ($doc?->chunks?->chunk_count ?? 0);
+        $progress = match ($status) {
+            'active' => 100,
+            'processing' => 62,
+            'draft' => 24,
+            'error' => 100,
+            'archived' => 100,
+            default => 12,
+        };
+        $tone = match ($status) {
+            'active' => 'success',
+            'processing' => 'warning',
+            'error' => 'danger',
+            default => 'neutral',
+        };
+        $stageState = function (string $stage) use ($status, $chunks): string {
+            if ($stage === 'uploaded') {
+                return 'done';
+            }
+
+            if ($status === 'error') {
+                return 'failed';
+            }
+
+            if ($stage === 'parsed') {
+                return in_array($status, ['active', 'archived'], true) ? 'done' : ($status === 'processing' ? 'active' : 'pending');
+            }
+
+            if ($stage === 'indexed') {
+                return $chunks > 0 ? 'done' : ($status === 'processing' ? 'active' : 'pending');
+            }
+
+            if ($stage === 'ready') {
+                return $status === 'active' ? 'done' : 'pending';
+            }
+
+            return 'pending';
+        };
+
+        return [
+            'progress' => $progress,
+            'tone' => $tone,
+            'chunks' => $chunks,
+            'summary' => match ($status) {
+                'active' => $chunks > 0 ? 'Indexed' : 'Ready tanpa chunk',
+                'processing' => 'Parsing / indexing',
+                'error' => 'Perlu dicek',
+                'archived' => 'Archived',
+                default => 'Menunggu proses',
+            },
+            'stages' => [
+                ['label' => 'Uploaded', 'state' => $stageState('uploaded')],
+                ['label' => 'Parsed', 'state' => $stageState('parsed')],
+                ['label' => 'Indexed', 'state' => $stageState('indexed')],
+                ['label' => 'Ready', 'state' => $stageState('ready')],
+            ],
+        ];
+    };
+    $uploadedFileName = is_object($file) && method_exists($file, 'getClientOriginalName')
+        ? $file->getClientOriginalName()
+        : 'Pilih file PDF, DOCX, XLSX, atau CSV';
 
     $totalDocs = array_sum($statusCounts);
     $activeCount = (int) ($statusCounts['active'] ?? 0);
@@ -70,21 +126,21 @@
 
     $knowledgeCards = [
         [
-            'label' => 'Total Knowledge',
+            'label' => 'Total knowledge',
             'value' => $totalDocs,
             'description' => $formatInt($archivedCount) . ' archived',
             'tone' => 'primary',
             'icon' => 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5s3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18s-3.332.477-4.5 1.253',
         ],
         [
-            'label' => 'Active',
+            'label' => 'Ready',
             'value' => $activeCount,
             'description' => $formatPct($activeCount, $totalDocs) . ' siap dipakai',
             'tone' => 'success',
             'icon' => 'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
         ],
         [
-            'label' => 'Draft / Processing',
+            'label' => 'Processing',
             'value' => $processingCount,
             'description' => $formatPct($processingCount, $totalDocs) . ' sedang disiapkan',
             'tone' => 'warning',
@@ -106,10 +162,15 @@
             <p class="admin-knowledge-eyebrow">Knowledge</p>
             <h2 class="admin-knowledge-title">Knowledge Base Internal</h2>
             <p class="admin-knowledge-description">
-                Kelola dokumen internal global untuk referensi AI tanpa menampilkan isi dokumen.
+                Kelola dokumen internal sebagai pipeline AI: uploaded, parsed, indexed, lalu ready.
             </p>
         </div>
-        <x-admin.badge tone="neutral" class="admin-knowledge-readonly">Admin only</x-admin.badge>
+        <div class="admin-knowledge-hero__actions">
+            <x-admin.badge tone="neutral" class="admin-knowledge-readonly">Admin only</x-admin.badge>
+            <button type="button" wire:click="openUploadModal" class="admin-knowledge-primary-button">
+                Upload Knowledge
+            </button>
+        </div>
     </div>
 
     @if (session('knowledge_status'))
@@ -137,7 +198,7 @@
         @endforeach
     </div>
 
-    <div class="admin-knowledge-content-grid">
+    <div class="admin-knowledge-content-grid admin-knowledge-content-grid--wide">
         <div class="admin-knowledge-main-stack">
             <section class="admin-knowledge-filter-panel admin-section">
                 <div class="admin-knowledge-filter-panel__header">
@@ -185,38 +246,38 @@
                 <header class="admin-knowledge-table-panel__header">
                     <div>
                         <h3>Dokumen Knowledge</h3>
-                        <p>Maksimum 100 baris pada filter aktif.</p>
+                        <p>{{ $documentsPerPage }} baris per halaman pada filter aktif.</p>
                     </div>
                 </header>
 
                 <div class="admin-knowledge-table-panel__body">
                     @if ($documents->isEmpty())
-                        <x-admin.empty-state title="Belum ada knowledge" description="Belum ada dokumen knowledge yang cocok dengan filter saat ini." />
+                        <x-admin.empty-state title="Belum ada knowledge" description="Upload dokumen internal agar bisa diproses dan dipakai AI saat relevan." />
                     @else
                         <x-admin.table
                             class="admin-knowledge-table"
                             :columns="[
-                                ['key' => 'file', 'label' => 'File', 'width' => '29%'],
-                                ['key' => 'source', 'label' => 'Source', 'width' => '16%'],
-                                ['key' => 'admin', 'label' => 'Admin', 'width' => '19%'],
-                                ['key' => 'type', 'label' => 'Tipe', 'width' => '12%'],
-                                ['key' => 'size', 'label' => 'Size', 'align' => 'right', 'width' => '9%'],
+                                ['key' => 'file', 'label' => 'File', 'width' => '28%'],
+                                ['key' => 'source', 'label' => 'Source', 'width' => '14%'],
+                                ['key' => 'admin', 'label' => 'Uploader', 'width' => '18%'],
                                 ['key' => 'status', 'label' => 'Status', 'width' => '11%'],
-                                ['key' => 'time', 'label' => 'Dibuat', 'align' => 'right', 'width' => '10%'],
-                                ['key' => 'actions', 'label' => 'Aksi', 'align' => 'right', 'width' => '14%'],
+                                ['key' => 'pipeline', 'label' => 'Pipeline', 'width' => '17%'],
+                                ['key' => 'chunks', 'label' => 'Chunks', 'align' => 'center', 'width' => '6%'],
+                                ['key' => 'actions', 'label' => 'Aksi', 'align' => 'right', 'width' => '6%'],
                             ]">
                             @foreach ($documents as $doc)
                                 @php
                                     $typeMeta = $fileTypeMeta($doc);
                                     $status = $statusMeta($doc->status);
+                                    $pipeline = $pipelineMeta($doc);
                                 @endphp
                                 <tr>
                                     <td class="admin-table__td">
                                         <div class="admin-documents-file-cell">
                                             <x-admin.document-icon :type="$typeMeta['key']" :label="$typeMeta['label']" />
                                             <div class="min-w-0">
-                                                <span class="admin-knowledge-file-name" title="{{ $doc->title }}">{{ \Illuminate\Support\Str::limit((string) $doc->title, 52, '...') }}</span>
-                                                <span class="admin-knowledge-file-meta">{{ \Illuminate\Support\Str::limit((string) $doc->original_name, 52, '...') }}</span>
+                                                <span class="admin-knowledge-file-name" title="{{ $doc->title }}">{{ \Illuminate\Support\Str::limit((string) $doc->title, 48, '...') }}</span>
+                                                <span class="admin-knowledge-file-meta">{{ \Illuminate\Support\Str::limit((string) $doc->original_name, 48, '...') }}</span>
                                             </div>
                                         </div>
                                     </td>
@@ -233,12 +294,6 @@
                                         </div>
                                     </td>
                                     <td class="admin-table__td">
-                                        <span class="admin-documents-type-label">{{ $typeMeta['type_label'] }}</span>
-                                    </td>
-                                    <td class="admin-table__td" data-align="right">
-                                        <span class="admin-documents-number">{{ $doc->formatted_size }}</span>
-                                    </td>
-                                    <td class="admin-table__td">
                                         <span class="admin-status-chip admin-status-chip--{{ $status['tone'] }}">
                                             <span aria-hidden="true"></span>
                                             {{ $status['label'] }}
@@ -247,8 +302,16 @@
                                             <p class="admin-knowledge-error-code">{{ $doc->error_code }}</p>
                                         @endif
                                     </td>
-                                    <td class="admin-table__td" data-align="right">
-                                        <span class="admin-documents-muted" title="{{ $doc->created_at?->toDateTimeString() }}">{{ $doc->created_at?->diffForHumans() }}</span>
+                                    <td class="admin-table__td">
+                                        <div class="admin-knowledge-pipeline">
+                                            <div class="admin-knowledge-pipeline__track" aria-hidden="true">
+                                                <span class="admin-knowledge-pipeline__bar admin-knowledge-pipeline__bar--{{ $pipeline['tone'] }}" style="width: {{ $pipeline['progress'] }}%"></span>
+                                            </div>
+                                            <span>{{ $pipeline['summary'] }}</span>
+                                        </div>
+                                    </td>
+                                    <td class="admin-table__td" data-align="center">
+                                        <span class="admin-documents-number">{{ number_format($pipeline['chunks']) }}</span>
                                     </td>
                                     <td class="admin-table__td" data-align="right">
                                         <div class="admin-knowledge-action-group">
@@ -270,72 +333,20 @@
                                 </tr>
                             @endforeach
                         </x-admin.table>
+
+                        <div class="admin-documents-table-footer">
+                            {{ $documents->links('admin.pagination') }}
+                        </div>
                     @endif
                 </div>
             </section>
         </div>
 
         <aside class="admin-knowledge-side-grid">
-            <section class="admin-knowledge-upload-panel admin-section">
-                <header class="admin-knowledge-upload-panel__header">
-                    <div>
-                        <h3>Upload Knowledge</h3>
-                        <p>Format: {{ implode(', ', $allowedExtensions) }}.</p>
-                    </div>
-                </header>
-
-                <form wire:submit.prevent="upload" class="admin-knowledge-upload-form">
-                    <label class="admin-knowledge-filter">
-                        <span>Judul opsional</span>
-                        <input type="text" wire:model.defer="title" placeholder="Contoh: SOP Penerimaan Tamu" class="admin-knowledge-control" />
-                        @error('title') <span class="admin-knowledge-error">{{ $message }}</span> @enderror
-                    </label>
-
-                    <label class="admin-knowledge-filter">
-                        <span>Source existing</span>
-                        <select wire:model.defer="sourceId" class="admin-knowledge-control">
-                            <option value="">Pilih source</option>
-                            @foreach ($sources as $source)
-                                <option value="{{ $source->id }}">{{ $source->name }}</option>
-                            @endforeach
-                        </select>
-                        @error('sourceId') <span class="admin-knowledge-error">{{ $message }}</span> @enderror
-                    </label>
-
-                    <label class="admin-knowledge-filter">
-                        <span>Atau source baru</span>
-                        <input type="text" wire:model.defer="newSourceName" placeholder="Contoh: Aturan internal" class="admin-knowledge-control" />
-                        @error('newSourceName') <span class="admin-knowledge-error">{{ $message }}</span> @enderror
-                    </label>
-
-                    <label class="admin-knowledge-filter">
-                        <span>Catatan internal</span>
-                        <textarea wire:model.defer="notes" rows="2" placeholder="Konteks singkat untuk admin lain" class="admin-knowledge-control admin-knowledge-control--textarea"></textarea>
-                        @error('notes') <span class="admin-knowledge-error">{{ $message }}</span> @enderror
-                    </label>
-
-                    <label class="admin-knowledge-filter">
-                        <span>File knowledge</span>
-                        <input type="file" wire:model="file" accept=".pdf,.docx,.xlsx,.csv" class="admin-knowledge-control admin-knowledge-control--file" />
-                        @error('file') <span class="admin-knowledge-error">{{ $message }}</span> @enderror
-                    </label>
-
-                    <div wire:loading wire:target="file" class="admin-knowledge-upload-note">Meng-upload file...</div>
-
-                    <button type="submit"
-                            class="admin-knowledge-upload-button"
-                            wire:loading.attr="disabled"
-                            wire:target="upload,file">
-                        <span wire:loading.remove wire:target="upload">Upload Knowledge</span>
-                        <span wire:loading wire:target="upload">Memproses...</span>
-                    </button>
-                </form>
-            </section>
-
             <section class="admin-knowledge-status-panel admin-section">
                 <header class="admin-knowledge-status-panel__header">
                     <div>
-                        <h3>Status Knowledge</h3>
+                        <h3>Status pipeline</h3>
                         <p>Berdasarkan seluruh dokumen.</p>
                     </div>
                 </header>
@@ -364,6 +375,97 @@
                     @endif
                 </div>
             </section>
+
+            <section class="admin-knowledge-status-panel admin-section">
+                <header class="admin-knowledge-status-panel__header">
+                    <div>
+                        <h3>Pipeline</h3>
+                        <p>Urutan proses dokumen knowledge.</p>
+                    </div>
+                </header>
+
+                <div class="admin-knowledge-status-panel__body">
+                    <ol class="admin-knowledge-pipeline-steps">
+                        <li><span></span><strong>Uploaded</strong><em>File diterima sistem.</em></li>
+                        <li><span></span><strong>Parsed</strong><em>Konten dibaca tanpa ditampilkan ke admin.</em></li>
+                        <li><span></span><strong>Indexed</strong><em>Chunk dan embedding siap dicari.</em></li>
+                        <li><span></span><strong>Ready</strong><em>AI dapat memakai knowledge saat relevan.</em></li>
+                    </ol>
+                </div>
+            </section>
         </aside>
     </div>
+
+    @if ($showUploadModal)
+        <div class="admin-knowledge-upload-modal" role="dialog" aria-modal="true" aria-labelledby="knowledge-upload-title">
+            <button type="button" class="admin-knowledge-upload-modal__backdrop" wire:click="closeUploadModal" aria-label="Tutup upload knowledge"></button>
+
+            <section class="admin-knowledge-upload-modal__panel">
+                <header class="admin-knowledge-upload-modal__header">
+                    <div>
+                        <p>Knowledge upload</p>
+                        <h3 id="knowledge-upload-title">Upload knowledge</h3>
+                    </div>
+                    <button type="button" wire:click="closeUploadModal" class="admin-knowledge-upload-modal__close" aria-label="Tutup upload knowledge">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M6 6l12 12M18 6L6 18"/>
+                        </svg>
+                    </button>
+                </header>
+
+                <form wire:submit.prevent="upload" class="admin-knowledge-upload-form">
+                    <label class="admin-knowledge-filter">
+                        <span>Judul opsional</span>
+                        <input type="text" wire:model.defer="title" placeholder="Contoh: SOP Penerimaan Tamu" class="admin-knowledge-control" />
+                        @error('title') <span class="admin-knowledge-error">{{ $message }}</span> @enderror
+                    </label>
+
+                    <div class="admin-knowledge-upload-grid">
+                        <label class="admin-knowledge-filter">
+                            <span>Source existing</span>
+                            <select wire:model.defer="sourceId" class="admin-knowledge-control">
+                                <option value="">Pilih source</option>
+                                @foreach ($sources as $source)
+                                    <option value="{{ $source->id }}">{{ $source->name }}</option>
+                                @endforeach
+                            </select>
+                            @error('sourceId') <span class="admin-knowledge-error">{{ $message }}</span> @enderror
+                        </label>
+
+                        <label class="admin-knowledge-filter">
+                            <span>Atau source baru</span>
+                            <input type="text" wire:model.defer="newSourceName" placeholder="Contoh: Aturan internal" class="admin-knowledge-control" />
+                            @error('newSourceName') <span class="admin-knowledge-error">{{ $message }}</span> @enderror
+                        </label>
+                    </div>
+
+                    <label class="admin-knowledge-filter">
+                        <span>Catatan internal</span>
+                        <textarea wire:model.defer="notes" rows="3" placeholder="Konteks singkat untuk admin lain" class="admin-knowledge-control admin-knowledge-control--textarea"></textarea>
+                        @error('notes') <span class="admin-knowledge-error">{{ $message }}</span> @enderror
+                    </label>
+
+                    <label class="admin-knowledge-dropzone">
+                        <input type="file" wire:model="file" accept=".pdf,.docx,.xlsx,.csv" class="sr-only" />
+                        <span>File knowledge</span>
+                        <strong>{{ $uploadedFileName }}</strong>
+                        <em>Format: {{ implode(', ', $allowedExtensions) }}. File akan masuk pipeline processing.</em>
+                    </label>
+                    @error('file') <span class="admin-knowledge-error">{{ $message }}</span> @enderror
+                    <div wire:loading wire:target="file" class="admin-knowledge-upload-note">Meng-upload file...</div>
+
+                    <footer class="admin-knowledge-upload-modal__footer">
+                        <button type="button" wire:click="closeUploadModal" class="admin-knowledge-secondary-button">Batal</button>
+                        <button type="submit"
+                                class="admin-knowledge-primary-button"
+                                wire:loading.attr="disabled"
+                                wire:target="upload,file">
+                            <span wire:loading.remove wire:target="upload">Upload Knowledge</span>
+                            <span wire:loading wire:target="upload">Memproses...</span>
+                        </button>
+                    </footer>
+                </form>
+            </section>
+        </div>
+    @endif
 </div>

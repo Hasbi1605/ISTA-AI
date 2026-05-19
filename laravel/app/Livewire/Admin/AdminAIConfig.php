@@ -15,6 +15,8 @@ use Livewire\Component;
 #[Layout('layouts.admin', ['title' => 'AI Configuration', 'heading' => 'AI Configuration'])]
 class AdminAIConfig extends Component
 {
+    public string $configFeature = AIPromptProfile::FEATURE_CHAT;
+
     public string $promptFeature = AIPromptProfile::FEATURE_CHAT;
 
     public string $promptName = '';
@@ -59,6 +61,13 @@ class AdminAIConfig extends Component
         if (! auth()->user() || ! auth()->user()->isSuperAdmin() || ! auth()->user()->isActive()) {
             abort(403, 'Hanya super admin aktif yang dapat mengakses halaman ini.');
         }
+
+        $this->syncFeatureFields($this->configFeature);
+    }
+
+    public function updatedConfigFeature(string $feature): void
+    {
+        $this->syncFeatureFields($feature);
     }
 
     public function savePromptDraft(AIConfigurationManagementService $service): void
@@ -182,10 +191,16 @@ class AdminAIConfig extends Component
 
     public function render(AIConfigurationResolver $resolver)
     {
+        $feature = in_array($this->configFeature, AIPromptProfile::FEATURES, true)
+            ? $this->configFeature
+            : AIPromptProfile::FEATURE_CHAT;
+
         return view('livewire.admin.admin-ai-config', [
             'runtimeEnabled' => $resolver->runtimeEnabled(),
             'featureOptions' => $this->featureOptions(),
             'modelCatalog' => $resolver->modelCatalog(),
+            'activePrompt' => $resolver->activePrompt($feature),
+            'activeModel' => $resolver->activeModelConfig($feature),
             'promptProfiles' => AIPromptProfile::query()
                 ->with(['creator', 'activator'])
                 ->latest('updated_at')
@@ -201,6 +216,10 @@ class AdminAIConfig extends Component
                 ->latest()
                 ->limit(8)
                 ->get(),
+            'lastAudit' => AIConfigAudit::query()
+                ->with('user')
+                ->latest()
+                ->first(),
         ]);
     }
 
@@ -237,5 +256,17 @@ class AdminAIConfig extends Component
             trim($parts[0]) !== '' ? trim($parts[0]) : null,
             trim($parts[1]) !== '' ? trim($parts[1]) : null,
         ];
+    }
+
+    private function syncFeatureFields(string $feature): void
+    {
+        if (! in_array($feature, AIPromptProfile::FEATURES, true)) {
+            $feature = AIPromptProfile::FEATURE_CHAT;
+            $this->configFeature = $feature;
+        }
+
+        $this->promptFeature = $feature;
+        $this->modelFeature = $feature;
+        $this->playgroundFeature = $feature;
     }
 }

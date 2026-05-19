@@ -10,17 +10,21 @@ use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\WithFileUploads;
+use Livewire\WithPagination;
 
 #[Layout('layouts.admin', ['title' => 'Knowledge', 'heading' => 'Knowledge Base Internal'])]
 class AdminKnowledge extends Component
 {
     use WithFileUploads;
+    use WithPagination;
+
+    private const DOCUMENTS_PER_PAGE = 10;
 
     public string $search = '';
 
     public string $status = '';
 
-    public ?int $sourceFilter = null;
+    public string $sourceFilter = '';
 
     public string $title = '';
 
@@ -29,6 +33,8 @@ class AdminKnowledge extends Component
     public ?int $sourceId = null;
 
     public string $notes = '';
+
+    public bool $showUploadModal = false;
 
     /**
      * @var \Livewire\Features\SupportFileUploads\TemporaryUploadedFile|null
@@ -41,12 +47,38 @@ class AdminKnowledge extends Component
     protected $queryString = [
         'search' => ['except' => ''],
         'status' => ['except' => ''],
-        'sourceFilter' => ['except' => null],
+        'sourceFilter' => ['except' => ''],
     ];
 
     public function resetFilters(): void
     {
         $this->reset(['search', 'status', 'sourceFilter']);
+        $this->resetPage();
+    }
+
+    public function updatingSearch(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingStatus(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingSourceFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function openUploadModal(): void
+    {
+        $this->showUploadModal = true;
+    }
+
+    public function closeUploadModal(): void
+    {
+        $this->showUploadModal = false;
     }
 
     public function upload(KnowledgeLifecycleService $lifecycle): void
@@ -92,6 +124,7 @@ class AdminKnowledge extends Component
         }
 
         $this->reset(['file', 'title', 'newSourceName', 'sourceId', 'notes']);
+        $this->showUploadModal = false;
         $this->dispatch('knowledge-uploaded');
         session()->flash('knowledge_status', 'Dokumen knowledge berhasil di-upload dan sedang diproses.');
     }
@@ -170,14 +203,14 @@ class AdminKnowledge extends Component
                 'created_at',
                 'updated_at',
             ])
-            ->with(['source:id,name,slug', 'uploader:id,name,email']);
+            ->with(['source:id,name,slug', 'uploader:id,name,email', 'chunks']);
 
         if ($this->status !== '') {
             $documentsQuery->where('status', $this->status);
         }
 
-        if ($this->sourceFilter !== null) {
-            $documentsQuery->where('knowledge_source_id', $this->sourceFilter);
+        if (ctype_digit($this->sourceFilter)) {
+            $documentsQuery->where('knowledge_source_id', (int) $this->sourceFilter);
         }
 
         if ($this->search !== '') {
@@ -188,7 +221,7 @@ class AdminKnowledge extends Component
             });
         }
 
-        $documents = $documentsQuery->orderByDesc('created_at')->limit(100)->get();
+        $documents = $documentsQuery->orderByDesc('created_at')->paginate(self::DOCUMENTS_PER_PAGE);
 
         $statusCounts = KnowledgeDocument::query()
             ->selectRaw('status, COUNT(*) as total')
@@ -201,6 +234,7 @@ class AdminKnowledge extends Component
 
         return view('livewire.admin.admin-knowledge', [
             'documents' => $documents,
+            'documentsPerPage' => self::DOCUMENTS_PER_PAGE,
             'statusCounts' => $statusCounts,
             'sources' => $sources,
             'statusOptions' => [
