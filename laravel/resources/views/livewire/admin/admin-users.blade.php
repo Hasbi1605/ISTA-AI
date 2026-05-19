@@ -1,36 +1,134 @@
-<div>
-    <div class="mb-6">
-        <div class="flex flex-wrap items-end justify-between gap-3">
-            <div class="max-w-2xl">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-400 dark:text-gray-500">Monitoring</p>
-                <h2 class="admin-page-title mt-1">User & Presence</h2>
-                <p class="mt-2 text-sm leading-relaxed text-stone-500 dark:text-gray-400">
-                    Pantau status online/idle/offline user dan ringkasan aktivitas mereka. Halaman ini tidak menampilkan isi percakapan, dokumen, atau memo.
-                </p>
-            </div>
-            <x-admin.badge tone="neutral">Read-only</x-admin.badge>
+@php
+    $formatInt = fn ($value): string => number_format((float) $value, 0, ',', '.');
+    $formatPct = function (int $value, int $total): string {
+        if ($total <= 0) {
+            return '0.0%';
+        }
+
+        return number_format(($value / $total) * 100, 1, '.', '') . '%';
+    };
+
+    $totalUsers = (int) ($presenceSummary['total'] ?? 0);
+    $onlineUsers = (int) ($presenceSummary['online'] ?? 0);
+    $idleUsers = (int) ($presenceSummary['idle'] ?? 0);
+    $offlineUsers = (int) ($presenceSummary['offline'] ?? 0);
+
+    $presenceCards = [
+        [
+            'label' => 'Total User',
+            'value' => $totalUsers,
+            'description' => 'Semua user terdaftar',
+            'tone' => 'primary',
+            'icon' => 'M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-5.13a4 4 0 11-8 0 4 4 0 018 0zm6 0a4 4 0 11-8 0 4 4 0 018 0z',
+        ],
+        [
+            'label' => 'Online',
+            'value' => $onlineUsers,
+            'description' => $formatPct($onlineUsers, $totalUsers) . ' dari total user',
+            'tone' => 'success',
+            'icon' => 'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+        ],
+        [
+            'label' => 'Idle',
+            'value' => $idleUsers,
+            'description' => $formatPct($idleUsers, $totalUsers) . ' dari total user',
+            'tone' => 'warning',
+            'icon' => 'M12 6v6l3 2M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+        ],
+        [
+            'label' => 'Offline',
+            'value' => $offlineUsers,
+            'description' => $formatPct($offlineUsers, $totalUsers) . ' dari total user',
+            'tone' => 'neutral',
+            'icon' => 'M18.364 18.364A9 9 0 015.636 5.636m12.728 12.728A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636',
+        ],
+    ];
+
+    $avatarInitials = function ($user): string {
+        $name = trim((string) ($user->name ?: $user->email ?: '?'));
+
+        if ($name === '') {
+            return '?';
+        }
+
+        if ($user->role === \App\Models\User::ROLE_SUPER_ADMIN) {
+            return strtoupper(substr($name, 0, 1));
+        }
+
+        $parts = preg_split('/\s+/', $name) ?: [];
+
+        if (count($parts) >= 2) {
+            return strtoupper(substr($parts[0], 0, 1) . substr($parts[1], 0, 1));
+        }
+
+        return strtoupper(substr($name, 0, 2));
+    };
+
+@endphp
+
+<div class="admin-users-page" wire:poll.30s>
+    <div class="admin-users-hero">
+        <div class="max-w-2xl">
+            <p class="admin-users-eyebrow">Monitoring</p>
+            <h2 class="admin-users-title">
+                User <span>&amp;</span> Presence
+            </h2>
+            <p class="admin-users-description">
+                Ringkasan status user tanpa membuka isi percakapan, dokumen, atau memo.
+            </p>
         </div>
+        <x-admin.badge tone="neutral" class="admin-users-readonly">Read-only</x-admin.badge>
     </div>
 
-    <x-admin.section title="Filter">
-        <x-slot name="actions">
-            <button type="button" wire:click="resetFilters" class="text-[11px] font-semibold uppercase tracking-wider text-stone-500 transition hover:text-ista-primary dark:text-gray-400 dark:hover:text-amber-300">
-                Reset
-            </button>
-        </x-slot>
+    <div class="admin-users-kpi-grid">
+        @foreach ($presenceCards as $card)
+            <article class="admin-users-kpi-card admin-users-kpi-card--{{ $card['tone'] }}">
+                <div class="admin-users-kpi-card__header">
+                    <span class="admin-users-kpi-card__icon" aria-hidden="true">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="{{ $card['icon'] }}"/>
+                        </svg>
+                    </span>
+                    <p class="admin-users-kpi-card__label">{{ $card['label'] }}</p>
+                </div>
+                <div class="admin-users-kpi-card__body">
+                    <strong>{{ $formatInt($card['value']) }}</strong>
+                    <p class="admin-users-kpi-card__description">{{ $card['description'] }}</p>
+                </div>
+            </article>
+        @endforeach
+    </div>
 
-        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <label class="admin-filter">
-                <span class="admin-filter__label">Cari</span>
-                <input type="search"
-                       wire:model.live.debounce.300ms="search"
-                       placeholder="Nama atau email…"
-                       class="admin-filter__control" />
+    <section class="admin-users-filter-panel admin-section">
+        <div class="admin-users-filter-panel__header">
+            <h3>Filter</h3>
+            <div class="admin-users-reset-group">
+                <button type="button" wire:click="resetFilters" class="admin-users-reset-button">
+                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M4 4v6h6M20 20v-6h-6M5.5 14a7 7 0 0012 3M18.5 10a7 7 0 00-12-3"/>
+                    </svg>
+                    Reset
+                </button>
+            </div>
+        </div>
+
+        <div class="admin-users-filter-grid">
+            <label class="admin-users-filter">
+                <span>Cari</span>
+                <div class="admin-users-search-control">
+                    <svg class="h-4 w-4 flex-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M21 21l-4.35-4.35m1.1-5.15a6.25 6.25 0 11-12.5 0 6.25 6.25 0 0112.5 0z" />
+                    </svg>
+                    <input type="search"
+                           wire:model.live.debounce.300ms="search"
+                           placeholder="Nama atau email..."
+                           class="admin-users-control admin-users-control--search" />
+                </div>
             </label>
 
-            <label class="admin-filter">
-                <span class="admin-filter__label">Status</span>
-                <select wire:model.live="status" class="admin-filter__control">
+            <label class="admin-users-filter">
+                <span>Status</span>
+                <select wire:model.live="status" class="admin-users-control">
                     <option value="">Semua</option>
                     @foreach ($statusOptions as $key => $label)
                         <option value="{{ $key }}">{{ $label }}</option>
@@ -38,9 +136,9 @@
                 </select>
             </label>
 
-            <label class="admin-filter">
-                <span class="admin-filter__label">Role</span>
-                <select wire:model.live="role" class="admin-filter__control">
+            <label class="admin-users-filter">
+                <span>Role</span>
+                <select wire:model.live="role" class="admin-users-control">
                     <option value="">Semua</option>
                     @foreach ($roleOptions as $key => $label)
                         <option value="{{ $key }}">{{ $label }}</option>
@@ -48,27 +146,34 @@
                 </select>
             </label>
         </div>
-    </x-admin.section>
+    </section>
 
-    <div class="mt-6">
-        <x-admin.section
-            title="Daftar User"
-            description="Maksimum {{ \App\Services\Admin\AdminMetricsService::RECENT_ROWS_LIMIT }} baris ditampilkan.">
+    <section class="admin-users-table-panel admin-section">
+        <header class="admin-users-table-panel__header">
+            <div>
+                <h3>Daftar User</h3>
+                <p>Menampilkan {{ $usersPerPage }} user per halaman.</p>
+            </div>
+        </header>
+
+        <div class="admin-users-table-panel__body">
             @if ($users->isEmpty())
                 <x-admin.empty-state
                     title="Tidak ada user"
                     description="Tidak ada user yang cocok dengan filter saat ini." />
             @else
-                <x-admin.table :columns="[
-                    ['key' => 'user', 'label' => 'User'],
-                    ['key' => 'role', 'label' => 'Role'],
-                    ['key' => 'status', 'label' => 'Status'],
-                    ['key' => 'last_seen', 'label' => 'Last Seen'],
-                    ['key' => 'last_feature', 'label' => 'Aktivitas Terakhir'],
-                    ['key' => 'events_today', 'label' => 'Event Hari Ini', 'align' => 'right'],
-                    ['key' => 'events_week', 'label' => 'Event 7 Hari', 'align' => 'right'],
-                    ['key' => 'totals', 'label' => 'Total', 'align' => 'right'],
-                ]">
+                <x-admin.table
+                    class="admin-users-table"
+                    :columns="[
+                        ['key' => 'user', 'label' => 'User', 'width' => '21%'],
+                        ['key' => 'role', 'label' => 'Role', 'width' => '9%'],
+                        ['key' => 'status', 'label' => 'Status', 'width' => '10%'],
+                        ['key' => 'last_seen', 'label' => 'Last Seen', 'width' => '11%'],
+                        ['key' => 'last_feature', 'label' => 'Aktivitas Terakhir', 'width' => '20%'],
+                        ['key' => 'events_today', 'label' => 'Event Hari Ini', 'align' => 'right', 'width' => '9%'],
+                        ['key' => 'events_week', 'label' => 'Event 7 Hari', 'align' => 'right', 'width' => '9%'],
+                        ['key' => 'totals', 'label' => 'Total', 'align' => 'right', 'width' => '11%'],
+                    ]">
                     @foreach ($users as $user)
                         @php
                             $statusKey = $user->getAttribute('presence_status') ?? 'offline';
@@ -77,54 +182,72 @@
                                 'idle' => 'warning',
                                 default => 'neutral',
                             };
+                            $roleTone = match ($user->role) {
+                                \App\Models\User::ROLE_SUPER_ADMIN => 'gold',
+                                \App\Models\User::ROLE_ADMIN => 'primary',
+                                default => 'neutral',
+                            };
+                            $lastFeature = $user->last_active_feature
+                                ? strtoupper(str_replace('_', '.', $user->last_active_feature))
+                                : '—';
                         @endphp
-                        <tr>
+                        <tr class="admin-users-table-row">
                             <td class="admin-table__td">
-                                <div class="flex flex-col">
-                                    <span class="text-sm font-semibold text-stone-700 dark:text-gray-200">{{ $user->name }}</span>
-                                    <span class="text-[11px] text-stone-400 dark:text-gray-500">{{ $user->email }}</span>
+                                <div class="admin-users-user-cell">
+                                    <span class="admin-user-avatar" aria-hidden="true">{{ $avatarInitials($user) }}</span>
+                                    <div class="min-w-0">
+                                        <span class="admin-users-user-cell__name">{{ $user->name }}</span>
+                                        <span class="admin-users-user-cell__email">{{ $user->email }}</span>
+                                    </div>
                                 </div>
                             </td>
                             <td class="admin-table__td">
-                                <x-admin.badge :tone="$user->role === 'super_admin' ? 'gold' : ($user->role === 'admin' ? 'primary' : 'neutral')">
+                                <x-admin.badge :tone="$roleTone">
                                     {{ $roleOptions[$user->role] ?? $user->role }}
                                 </x-admin.badge>
                             </td>
                             <td class="admin-table__td">
-                                <x-admin.badge :tone="$statusTone">
+                                <x-admin.badge :tone="$statusTone" class="admin-users-status-badge">
                                     <span @class([
-                                        'h-1.5 w-1.5 rounded-full',
-                                        'bg-emerald-500' => $statusKey === 'online',
-                                        'bg-amber-500' => $statusKey === 'idle',
-                                        'bg-stone-400' => $statusKey === 'offline',
+                                        'admin-users-status-dot',
+                                        'admin-users-status-dot--online' => $statusKey === 'online',
+                                        'admin-users-status-dot--idle' => $statusKey === 'idle',
+                                        'admin-users-status-dot--offline' => $statusKey === 'offline',
                                     ])></span>
                                     {{ ucfirst($statusKey) }}
                                 </x-admin.badge>
                             </td>
                             <td class="admin-table__td">
-                                <span class="text-xs text-stone-500 dark:text-gray-400" title="{{ $user->last_seen_at?->toDateTimeString() }}">
+                                <span class="admin-users-muted" title="{{ $user->last_seen_at?->toDateTimeString() }}">
                                     {{ $user->last_seen_at ? $user->last_seen_at->diffForHumans() : 'Belum pernah' }}
                                 </span>
                             </td>
                             <td class="admin-table__td">
-                                <span class="font-mono text-[11px] uppercase tracking-wider text-stone-500 dark:text-gray-400">{{ $user->last_active_feature ?? '—' }}</span>
+                                <span class="admin-users-feature">{{ $lastFeature }}</span>
                             </td>
                             <td class="admin-table__td" data-align="right">
-                                <span class="font-mono text-xs text-stone-700 dark:text-gray-200">{{ number_format($user->getAttribute('events_today') ?? 0) }}</span>
+                                <span class="admin-users-number">{{ number_format($user->getAttribute('events_today') ?? 0) }}</span>
                             </td>
                             <td class="admin-table__td" data-align="right">
-                                <span class="font-mono text-xs text-stone-500 dark:text-gray-400">{{ number_format($user->getAttribute('events_week') ?? 0) }}</span>
+                                <span class="admin-users-number">{{ number_format($user->getAttribute('events_week') ?? 0) }}</span>
                             </td>
                             <td class="admin-table__td" data-align="right">
-                                <div class="flex flex-col items-end text-[11px] text-stone-500 dark:text-gray-400">
-                                    <span>{{ number_format($user->getAttribute('conversation_count') ?? 0) }} conv</span>
-                                    <span>{{ number_format($user->getAttribute('document_count') ?? 0) }} doc · {{ number_format($user->getAttribute('memo_count') ?? 0) }} memo</span>
+                                <div class="admin-users-total-cell">
+                                    <span class="admin-users-total-cell__primary">{{ number_format($user->getAttribute('conversation_count') ?? 0) }} conv</span>
+                                    <span class="admin-users-total-cell__meta">{{ number_format($user->getAttribute('document_count') ?? 0) }} doc</span>
+                                    <span class="admin-users-total-cell__meta">{{ number_format($user->getAttribute('memo_count') ?? 0) }} memo</span>
                                 </div>
                             </td>
                         </tr>
                     @endforeach
                 </x-admin.table>
+
+                @if ($users->hasPages())
+                    <div class="admin-users-pagination">
+                        {{ $users->links() }}
+                    </div>
+                @endif
             @endif
-        </x-admin.section>
-    </div>
+        </div>
+    </section>
 </div>

@@ -6,10 +6,15 @@ use App\Models\AIUsageEvent;
 use App\Services\Admin\AdminMetricsService;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use Livewire\WithPagination;
 
-#[Layout('layouts.admin', ['title' => 'Usage', 'heading' => 'AI Usage'])]
+#[Layout('layouts.admin', ['title' => 'Usage', 'heading' => 'Usage'])]
 class AdminUsage extends Component
 {
+    use WithPagination;
+
+    private const EVENTS_PER_PAGE = 5;
+
     public string $feature = '';
 
     public string $status = '';
@@ -28,9 +33,30 @@ class AdminUsage extends Component
         'endDate' => ['except' => ''],
     ];
 
+    public function updatingFeature(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingStatus(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingStartDate(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingEndDate(): void
+    {
+        $this->resetPage();
+    }
+
     public function resetFilters(): void
     {
         $this->reset(['feature', 'status', 'startDate', 'endDate']);
+        $this->resetPage();
     }
 
     public function render(AdminMetricsService $metrics)
@@ -42,7 +68,8 @@ class AdminUsage extends Component
             'end_date' => $this->endDate ?: null,
         ];
 
-        $events = $metrics->recentEvents($filters, AdminMetricsService::RECENT_ROWS_LIMIT);
+        $events = $metrics->usageEventsListing($filters, self::EVENTS_PER_PAGE, $this->getPage());
+        $totals = $metrics->usageEventSummary($filters);
 
         // Normalize dates safely. Malformed query strings are dropped here so
         // the dashboard never throws a 500 on unparseable input. Default
@@ -58,15 +85,9 @@ class AdminUsage extends Component
 
         $distribution = $metrics->featureDistribution($distributionStart, $distributionEnd);
 
-        $totals = [
-            'total' => $events->count(),
-            'success' => $events->where('status', AIUsageEvent::STATUS_SUCCESS)->count(),
-            'failed' => $events->where('status', AIUsageEvent::STATUS_ERROR)->count(),
-            'pending' => $events->where('status', AIUsageEvent::STATUS_PENDING)->count(),
-        ];
-
         return view('livewire.admin.admin-usage', [
             'events' => $events,
+            'eventsPerPage' => self::EVENTS_PER_PAGE,
             'distribution' => $distribution,
             'totals' => $totals,
             'featureOptions' => $this->featureOptions(),

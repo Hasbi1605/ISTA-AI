@@ -71,6 +71,9 @@ class AIUsageEventService
         'page_count',
         'job_class',
         'job_attempts',
+        'model_label',
+        'model_name',
+        'model_provider',
         'subject_label',
         'subject_kind',
     ];
@@ -190,6 +193,36 @@ class AIUsageEventService
     }
 
     /**
+     * Convert the Python stream model marker into safe event metadata.
+     *
+     * @return array<string, string>
+     */
+    public function modelMetadata(?string $modelLabel): array
+    {
+        $label = trim((string) $modelLabel);
+
+        if ($label === '') {
+            return [];
+        }
+
+        $metadata = [
+            'model_label' => $label,
+        ];
+
+        $provider = $this->inferModelProvider($label);
+        if ($provider !== null) {
+            $metadata['model_provider'] = $provider;
+        }
+
+        $modelName = $this->inferModelName($label);
+        if ($modelName !== null) {
+            $metadata['model_name'] = $modelName;
+        }
+
+        return $metadata;
+    }
+
+    /**
      * Sanitize event metadata so prompts, answers, and document content
      * cannot leak into the database.
      *
@@ -271,6 +304,43 @@ class AIUsageEventService
 
             return null;
         }
+    }
+
+    private function inferModelProvider(string $label): ?string
+    {
+        $lower = strtolower($label);
+
+        return match (true) {
+            str_contains($lower, 'bedrock') => 'bedrock',
+            str_contains($lower, 'groq') => 'groq',
+            str_contains($lower, 'mistral') => 'github_models',
+            str_contains($lower, 'gpt') => 'github_models',
+            str_contains($lower, 'glm') => 'bedrock',
+            str_contains($lower, 'nova') => 'bedrock',
+            str_contains($label, ':') => trim(strtolower(strtok($label, ':'))) ?: null,
+            default => null,
+        };
+    }
+
+    private function inferModelName(string $label): ?string
+    {
+        $lower = strtolower($label);
+
+        return match (true) {
+            str_contains($lower, 'gpt-4.1 mini') => 'openai/gpt-4.1-mini',
+            str_contains($lower, 'gpt-4.1 nano') => 'openai/gpt-4.1-nano',
+            str_contains($lower, 'gpt-4.1') => 'openai/gpt-4.1',
+            str_contains($lower, 'gpt-4o') => 'openai/gpt-4o',
+            str_contains($lower, 'llama 3.3') => 'groq/llama-3.3-70b-versatile',
+            str_contains($lower, 'mistral medium') => 'mistral-ai/mistral-medium-2505',
+            str_contains($lower, 'mistral small') => 'mistral-ai/mistral-small-2503',
+            str_contains($lower, 'gpt-oss 120b') => 'openai.gpt-oss-120b-1:0',
+            str_contains($lower, 'glm 4.7 flash') => 'zai.glm-4.7-flash',
+            str_contains($lower, 'glm 4.7') => 'zai.glm-4.7',
+            str_contains($lower, 'nova micro') => 'amazon.nova-micro-v1:0',
+            str_contains($label, ':') => trim(substr($label, strpos($label, ':') + 1)) ?: null,
+            default => null,
+        };
     }
 
     private function sanitizeValue(mixed $value, int $depth = 0): mixed

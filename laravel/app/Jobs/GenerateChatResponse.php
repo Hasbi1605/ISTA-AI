@@ -125,6 +125,7 @@ class GenerateChatResponse implements ShouldQueue
         $fullResponse = '';
         $streamBuffer = '';
         $sources = [];
+        $modelMetadata = [];
 
         $pythonCallStart = microtime(true) * 1000;
 
@@ -140,10 +141,14 @@ class GenerateChatResponse implements ShouldQueue
                 $requestId,
             ) as $chunk
         ) {
-            [$chunk, $streamBuffer, $_modelName, $parsedSources] = $orchestrator->extractStreamMetadata(
+            [$chunk, $streamBuffer, $parsedModelName, $parsedSources] = $orchestrator->extractStreamMetadata(
                 (string) $chunk,
                 $streamBuffer
             );
+
+            if ($parsedModelName !== null) {
+                $modelMetadata = $usageEvents->modelMetadata($parsedModelName);
+            }
 
             if (! empty($parsedSources)) {
                 $sources = $parsedSources;
@@ -184,6 +189,7 @@ class GenerateChatResponse implements ShouldQueue
                     'has_documents' => $hasDocumentContext,
                     'document_count' => count($documentIds),
                     'reason' => 'error_sentinel',
+                    ...$modelMetadata,
                 ],
                 requestId: $requestId,
                 latencyMs: $usageEvents->latencyMsSince($jobStartedAt),
@@ -234,6 +240,7 @@ class GenerateChatResponse implements ShouldQueue
                     'sources_count' => count($sources),
                     'has_sources' => ! empty($sources),
                     'response_length' => strlen($cleanContent),
+                    ...$modelMetadata,
                 ],
                 requestId: $requestId,
                 latencyMs: $usageEvents->latencyMsSince($jobStartedAt),

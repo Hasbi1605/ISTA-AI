@@ -1,32 +1,132 @@
-<div>
-    <div class="mb-6">
-        <div class="flex flex-wrap items-end justify-between gap-3">
-            <div class="max-w-2xl">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-400 dark:text-gray-500">Selamat datang</p>
-                <h2 class="admin-page-title mt-1">Ringkasan Operasional</h2>
-                <p class="mt-2 text-sm leading-relaxed text-stone-500 dark:text-gray-400">
-                    Pantau aktivitas user, performa AI, dan kesehatan platform dalam satu halaman. Data diambil dari event tracking ISTA AI dan metadata operasional, tanpa menampilkan isi prompt atau jawaban.
-                </p>
-            </div>
-            <div class="flex flex-wrap items-center gap-2">
-                <x-admin.badge tone="primary">
-                    <span class="h-1.5 w-1.5 rounded-full bg-ista-primary"></span>
-                    Live
-                </x-admin.badge>
-                <x-admin.badge tone="neutral">Read-only</x-admin.badge>
-                <button type="button"
-                        wire:click="refreshMetrics"
-                        wire:loading.attr="disabled"
-                        class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 text-[11px] font-semibold uppercase tracking-wider text-stone-600 transition hover:border-ista-primary/30 hover:text-ista-primary disabled:opacity-60 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-ista-primary/40 dark:hover:text-amber-300">
-                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 4v5h5M20 20v-5h-5M4.5 9A8 8 0 0119 12M19.5 15A8 8 0 015 12"/>
-                    </svg>
-                    Refresh
-                </button>
-            </div>
-        </div>
-    </div>
+@php
+    $formatInt = fn ($value): string => number_format((float) $value, 0, ',', '.');
+    $formatPct = fn ($value): string => number_format((float) $value, 1, ',', '.') . '%';
+    $formatSeconds = fn ($milliseconds): string => number_format(((float) $milliseconds) / 1000, 2, ',', '.') . 's';
+    $trendClass = function (?array $trend): string {
+        return match ($trend['tone'] ?? 'neutral') {
+            'success' => 'text-emerald-600 dark:text-emerald-400',
+            'danger' => 'text-rose-600 dark:text-rose-400',
+            default => 'text-stone-500 dark:text-gray-400',
+        };
+    };
+    $trendLabel = function (?array $trend, string $basis) use ($formatPct, $formatSeconds): ?string {
+        if (empty($trend) || ! ($trend['has_comparison'] ?? false)) {
+            return null;
+        }
 
+        if (($trend['direction'] ?? 'none') === 'flat') {
+            return 'Tidak berubah dari ' . $basis;
+        }
+
+        $icon = ($trend['direction'] ?? 'none') === 'up' ? 'Naik' : 'Turun';
+        $delta = abs((float) ($trend['delta'] ?? 0));
+        $unit = $trend['unit'] ?? 'percent';
+
+        $value = match ($unit) {
+            'percentage_points' => number_format($delta, 1, ',', '.') . ' poin',
+            'milliseconds' => $formatSeconds($delta),
+            default => $formatPct(abs((float) ($trend['delta_percent'] ?? 0))),
+        };
+
+        return $icon . ' ' . $value . ' dari ' . $basis;
+    };
+
+    $requestsToday = (int) ($kpis['ai_requests_today'] ?? 0);
+    $successToday = (int) ($kpis['ai_success_today'] ?? 0);
+    $failedToday = (int) ($kpis['ai_failed_today'] ?? 0);
+    $successRate = $requestsToday > 0 ? ($successToday / $requestsToday) * 100 : 0;
+    $errorRate = $requestsToday > 0 ? ($failedToday / $requestsToday) * 100 : 0;
+    $avgLatencyMs = $kpis['avg_latency_ms_today'] ?? null;
+    $avgLatencyLabel = $avgLatencyMs !== null ? $formatSeconds($avgLatencyMs) : '-';
+    $onlineUsers = (int) ($kpis['online_users'] ?? 0);
+    $activeUsersToday = (int) ($kpis['active_users_today'] ?? 0);
+    $totalErrorsRange = (int) collect($series)->sum('failed');
+    $seriesTotal = (int) collect($series)->sum('total');
+    $chartMax = max(1, (int) ($maxSeriesValue ?? 1));
+    $seriesCount = count($series);
+    $chartPoints = [];
+
+    foreach ($series as $index => $point) {
+        $x = $seriesCount > 1 ? 42 + (($index / ($seriesCount - 1)) * 556) : 320;
+        $y = 180 - (((int) $point['total'] / $chartMax) * 126);
+        $chartPoints[] = [
+            'x' => round($x, 1),
+            'y' => round($y, 1),
+            'total' => (int) $point['total'],
+            'date' => $point['date'],
+            'label' => \Illuminate\Support\Carbon::parse($point['date'])->locale('id')->translatedFormat('j M'),
+        ];
+    }
+
+    $linePath = collect($chartPoints)
+        ->map(fn ($point, $index) => ($index === 0 ? 'M ' : 'L ') . $point['x'] . ' ' . $point['y'])
+        ->implode(' ');
+    $firstPoint = $chartPoints[0] ?? null;
+    $lastPoint = $chartPoints[count($chartPoints) - 1] ?? null;
+    $areaPath = $firstPoint && $lastPoint
+        ? $linePath . ' L ' . $lastPoint['x'] . ' 180 L ' . $firstPoint['x'] . ' 180 Z'
+        : '';
+    $avgSeries = $seriesCount > 0 ? round($seriesTotal / $seriesCount) : 0;
+
+    $requestTrend = $comparisons['ai_requests'] ?? null;
+    $successRateTrend = $comparisons['success_rate'] ?? null;
+    $errorRateTrend = $comparisons['error_rate'] ?? null;
+    $errorsSevenDayTrend = $comparisons['errors_7d'] ?? null;
+    $errorRateSevenDayTrend = $comparisons['error_rate_7d'] ?? null;
+    $totalErrorsRange = (int) ($errorsSevenDayTrend['current'] ?? $totalErrorsRange);
+    $errorRateSevenDay = (float) ($errorRateSevenDayTrend['current'] ?? $errorRate);
+
+    $requestTrendText = $trendLabel($requestTrend, 'kemarin');
+    $successRateTrendText = $trendLabel($successRateTrend, 'kemarin');
+    $errorRateTrendText = $trendLabel($errorRateTrend, 'kemarin');
+    $errorsSevenDayTrendText = $trendLabel($errorsSevenDayTrend, '7 hari lalu');
+    $errorRateSevenDayTrendText = $trendLabel($errorRateSevenDayTrend, '7 hari lalu');
+
+    $overviewCards = [
+        [
+            'title' => 'Users',
+            'value' => $formatInt($kpis['total_users'] ?? 0),
+            'label' => 'Total user',
+            'meta' => $formatInt($onlineUsers) . ' online',
+            'support' => $formatInt($activeUsersToday) . ' aktif hari ini',
+            'tone' => 'primary',
+            'route' => route('admin.users'),
+            'icon' => 'M15.75 7.5a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.5 20.25a7.5 7.5 0 0115 0',
+        ],
+        [
+            'title' => 'AI Usage',
+            'value' => $formatInt($requestsToday),
+            'label' => 'Request hari ini',
+            'meta' => $formatPct($successRate) . ' sukses',
+            'support' => 'Latensi ' . $avgLatencyLabel,
+            'tone' => 'gold',
+            'route' => route('admin.usage'),
+            'icon' => 'M12 3l1.65 4.7L18 9.5l-4.35 1.8L12 16l-1.65-4.7L6 9.5l4.35-1.8L12 3zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z',
+        ],
+        [
+            'title' => 'Documents',
+            'value' => $formatInt($kpis['documents_ready'] ?? 0),
+            'label' => 'Dokumen ready',
+            'meta' => $formatInt($kpis['documents_processing'] ?? 0) . ' processing',
+            'support' => $formatInt($kpis['documents_failed'] ?? 0) . ' failed',
+            'tone' => 'success',
+            'route' => route('admin.documents'),
+            'icon' => 'M8 3.75h6.25L19 8.5v11.75H8A3 3 0 015 17.25V6.75a3 3 0 013-3zM14 3.75V8.5H19M9 13h6M9 16h5',
+        ],
+        [
+            'title' => 'Percakapan & Memo',
+            'value' => $formatInt($kpis['conversations_today'] ?? 0),
+            'label' => 'Percakapan baru',
+            'meta' => $formatInt($kpis['memos_today'] ?? 0) . ' memo hari ini',
+            'support' => $formatInt($kpis['memos_week'] ?? 0) . ' memo / 7 hari',
+            'tone' => 'warning',
+            'route' => route('admin.usage'),
+            'icon' => 'M4.5 6.75A3.75 3.75 0 018.25 3h7.5a3.75 3.75 0 013.75 3.75v5A3.75 3.75 0 0115.75 15H11l-4.5 4.5V15A3.75 3.75 0 014.5 11.25v-4.5z',
+        ],
+    ];
+@endphp
+
+<div class="admin-overview">
     <div wire:loading.flex wire:target="setRange,refreshMetrics" class="mb-4 hidden">
         <x-admin.loading :rows="2" label="Memuat metrik dashboard" class="w-full" />
     </div>
@@ -38,230 +138,250 @@
         </select>
     </label>
 
-    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <x-admin.kpi-card
-            label="Total User"
-            :value="number_format($kpis['total_users'])"
-            tone="primary"
-            description="Jumlah akun terdaftar." />
+    <section class="admin-overview-hero admin-section">
+        <div class="relative z-10 min-w-0">
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="admin-health-pulse" aria-hidden="true">
+                    <span></span>
+                </span>
+                <span class="text-xs font-bold uppercase text-amber-600 dark:text-amber-300">Sistem sehat</span>
+            </div>
+            <div class="mt-3 flex flex-wrap items-center gap-3">
+                <h2 class="admin-overview-title">Ringkasan Operasional</h2>
+                <x-admin.badge tone="success">Live</x-admin.badge>
+            </div>
+            <p class="mt-2 max-w-2xl text-sm leading-relaxed text-stone-600 dark:text-gray-400">
+                Platform berjalan normal. Detail analitik tersedia di tab khusus.
+            </p>
+            <button type="button"
+                    wire:click="refreshMetrics"
+                    wire:loading.attr="disabled"
+                    class="mt-4 inline-flex items-center gap-2 text-xs font-medium text-stone-500 transition hover:text-ista-primary disabled:opacity-60 dark:text-gray-400 dark:hover:text-amber-300">
+                Terakhir diperbarui:
+                {{ $lastUpdatedAt ? $lastUpdatedAt->diffForHumans() : 'Belum ada aktivitas' }}
+                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 4v5h5M20 20v-5h-5M4.5 9A8 8 0 0119 12M19.5 15A8 8 0 015 12"/>
+                </svg>
+            </button>
+        </div>
 
-        <x-admin.kpi-card
-            label="User Online"
-            :value="number_format($kpis['online_users'])"
-            tone="success"
-            :description="'Aktif <= ' . \App\Services\Admin\AdminMetricsService::PRESENCE_ONLINE_MINUTES . ' menit terakhir.'" />
+        <div class="admin-hero-stats relative z-10">
+            <div class="admin-hero-stat">
+                <span>AI Request Hari Ini</span>
+                <strong>{{ $formatInt($requestsToday) }}</strong>
+                <em class="{{ $requestTrendText ? $trendClass($requestTrend) : 'text-stone-500 dark:text-gray-500' }}">
+                    {{ $requestTrendText ?? 'Hari ini' }}
+                </em>
+            </div>
+            <div class="admin-hero-stat">
+                <span>Success Rate</span>
+                <strong>{{ $formatPct($successRate) }}</strong>
+                <em class="{{ $successRateTrendText ? $trendClass($successRateTrend) : 'text-stone-500 dark:text-gray-500' }}">
+                    {{ $successRateTrendText ?? $formatInt($successToday) . ' sukses' }}
+                </em>
+            </div>
+            <div class="admin-hero-stat">
+                <span>Error Rate</span>
+                <strong>{{ $formatPct($errorRate) }}</strong>
+                <em class="{{ $errorRateTrendText ? $trendClass($errorRateTrend) : 'text-stone-500 dark:text-gray-500' }}">
+                    {{ $errorRateTrendText ?? $formatInt($failedToday) . ' gagal' }}
+                </em>
+            </div>
+        </div>
+    </section>
 
-        <x-admin.kpi-card
-            label="Aktif Hari Ini"
-            :value="number_format($kpis['active_users_today'])"
-            tone="gold"
-            description="User dengan event atau presence hari ini." />
-
-        <x-admin.kpi-card
-            label="Aktif Minggu Ini"
-            :value="number_format($kpis['active_users_week'])"
-            tone="default"
-            description="Aktivitas 7 hari terakhir." />
-    </div>
-
-    <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <x-admin.kpi-card
-            label="Request AI Hari Ini"
-            :value="number_format($kpis['ai_requests_today'])"
-            tone="primary"
-            :description="'Sukses ' . number_format($kpis['ai_success_today']) . ' / Pending ' . number_format($kpis['ai_pending_today'])" />
-
-        <x-admin.kpi-card
-            label="Error AI Hari Ini"
-            :value="number_format($kpis['ai_failed_today'])"
-            tone="danger"
-            description="Status failed pada AI Usage Events." />
-
-        <x-admin.kpi-card
-            label="Latensi Rata-rata"
-            :value="$kpis['avg_latency_ms_today'] !== null ? number_format($kpis['avg_latency_ms_today']) . ' ms' : '—'"
-            tone="success"
-            description="Rata-rata event sukses hari ini." />
-
-        <x-admin.kpi-card
-            label="Pesan User Hari Ini"
-            :value="number_format($kpis['messages_today'])"
-            tone="gold"
-            :description="number_format($kpis['conversations_today']) . ' percakapan baru.'" />
-    </div>
-
-    <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <x-admin.kpi-card
-            label="Dokumen Ready"
-            :value="number_format($kpis['documents_ready'])"
-            tone="success" />
-        <x-admin.kpi-card
-            label="Dokumen Processing"
-            :value="number_format($kpis['documents_processing'])"
-            tone="warning" />
-        <x-admin.kpi-card
-            label="Dokumen Gagal"
-            :value="number_format($kpis['documents_failed'])"
-            tone="danger" />
-        <x-admin.kpi-card
-            label="Memo (Hari/Minggu)"
-            :value="number_format($kpis['memos_today']) . ' / ' . number_format($kpis['memos_week'])"
-            tone="primary"
-            description="Memo dibuat hari ini / 7 hari terakhir." />
-    </div>
-
-    <div class="mt-6 grid gap-4 lg:grid-cols-3">
-        <div class="lg:col-span-2 space-y-4">
-            <x-admin.section
-                title="Aktivitas {{ $rangeDays }} Hari Terakhir"
-                description="Total event AI per hari berdasarkan AI Usage Events.">
-                <x-slot name="actions">
-                    <div class="inline-flex rounded-lg border border-stone-200 bg-white p-1 text-[11px] font-semibold uppercase tracking-wider dark:border-gray-800 dark:bg-gray-900">
-                        @foreach ([7, 14, 30] as $option)
-                            <button type="button"
-                                    wire:click="setRange({{ $option }})"
-                                    @class([
-                                        'rounded-md px-2.5 py-1 transition',
-                                        'bg-ista-primary text-white' => $rangeDays === $option,
-                                        'text-stone-500 hover:text-ista-primary dark:text-gray-400' => $rangeDays !== $option,
-                                    ])>
-                                {{ $option }}h
-                            </button>
-                        @endforeach
+    <div class="admin-summary-grid">
+        @foreach ($overviewCards as $card)
+            <a href="{{ $card['route'] }}" class="admin-summary-card admin-summary-card--{{ $card['tone'] }} admin-kpi admin-section">
+                <div class="admin-summary-card__top">
+                    <span class="admin-summary-card__icon" aria-hidden="true">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="{{ $card['icon'] }}"/>
+                        </svg>
+                    </span>
+                    <h3>{{ $card['title'] }}</h3>
+                </div>
+                <div class="admin-summary-card__body">
+                    <p>{{ $card['label'] }}</p>
+                    <strong>{{ $card['value'] }}</strong>
+                    <div>
+                        <em>{{ $card['meta'] }}</em>
+                        <em>{{ $card['support'] }}</em>
                     </div>
-                </x-slot>
+                </div>
+            </a>
+        @endforeach
+    </div>
 
-                @if (collect($series)->sum('total') === 0)
+    <div class="admin-overview-main-grid">
+        <section class="admin-section admin-panel">
+            <header class="admin-panel-header">
+                <h3>Tren Aktivitas AI ({{ $rangeDays }} Hari Terakhir)</h3>
+                <div class="admin-range-select">
+                    <select wire:change="setRange($event.target.value)" aria-label="Rentang aktivitas AI">
+                        @foreach ([7, 14, 30] as $option)
+                            <option value="{{ $option }}" @selected($rangeDays === $option)>{{ $option }} hari</option>
+                        @endforeach
+                    </select>
+                </div>
+            </header>
+
+            @if ($seriesTotal === 0)
+                <div class="p-5">
                     <x-admin.empty-state
                         title="Belum ada aktivitas"
                         description="Event akan muncul setelah user memakai fitur AI." />
-                @else
-                    <div class="flex h-48 items-end gap-1.5" role="img" aria-label="Grafik aktivitas event AI per hari">
-                        @foreach ($series as $point)
-                            @php
-                                $heightPct = $maxSeriesValue > 0 ? max(2, (int) round(($point['total'] / $maxSeriesValue) * 100)) : 0;
-                                $failedPct = $point['total'] > 0 ? (int) round(($point['failed'] / $point['total']) * $heightPct) : 0;
-                            @endphp
-                            <div class="group flex flex-1 flex-col items-center gap-1.5">
-                                <div class="relative flex w-full flex-col-reverse items-stretch overflow-hidden rounded-t-md bg-stone-100 dark:bg-gray-800" style="height: 100%">
-                                    <div class="w-full bg-ista-primary/80 transition-all" style="height: {{ $heightPct }}%" title="Total: {{ $point['total'] }} (failed: {{ $point['failed'] }})"></div>
-                                    @if ($failedPct > 0)
-                                        <div class="absolute bottom-0 left-0 w-full bg-rose-500/80" style="height: {{ $failedPct }}%"></div>
-                                    @endif
-                                </div>
-                                <span class="text-[9px] font-semibold uppercase tracking-wider text-stone-400 dark:text-gray-500">{{ \Illuminate\Support\Carbon::parse($point['date'])->format('d/m') }}</span>
-                            </div>
+                </div>
+            @else
+                <div class="admin-line-chart" role="img" aria-label="Grafik aktivitas event AI per hari">
+                    <svg viewBox="0 0 640 236" preserveAspectRatio="none">
+                        <defs>
+                            <linearGradient id="adminOverviewArea" x1="0" x2="0" y1="0" y2="1">
+                                <stop offset="0%" stop-color="#a4063a" stop-opacity="0.16" />
+                                <stop offset="100%" stop-color="#a4063a" stop-opacity="0" />
+                            </linearGradient>
+                        </defs>
+                        @foreach ([54, 96, 138, 180] as $gridY)
+                            <line x1="42" y1="{{ $gridY }}" x2="598" y2="{{ $gridY }}" class="admin-chart-grid" />
                         @endforeach
-                    </div>
-                    <div class="mt-3 flex items-center gap-3 text-[10.5px] font-semibold uppercase tracking-wider text-stone-400 dark:text-gray-500">
-                        <span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-sm bg-ista-primary/80"></span>Total event</span>
-                        <span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-sm bg-rose-500/80"></span>Failed</span>
-                    </div>
-                @endif
-            </x-admin.section>
-
-            <x-admin.section
-                title="Aktivitas Terbaru"
-                description="10 event AI terakhir dari semua user. Tidak menampilkan isi prompt atau jawaban.">
-                <x-admin.table :columns="[
-                    ['key' => 'user', 'label' => 'User'],
-                    ['key' => 'feature', 'label' => 'Fitur'],
-                    ['key' => 'status', 'label' => 'Status'],
-                    ['key' => 'latency', 'label' => 'Latensi', 'align' => 'right'],
-                    ['key' => 'time', 'label' => 'Waktu', 'align' => 'right'],
-                ]">
-                    @forelse ($recentEvents as $event)
-                        <tr>
-                            <td class="admin-table__td">
-                                <div class="flex flex-col">
-                                    <span class="text-sm font-semibold text-stone-700 dark:text-gray-200">{{ $event->user?->name ?? 'Sistem' }}</span>
-                                    <span class="text-[11px] text-stone-400 dark:text-gray-500">{{ $event->user?->email ?? '—' }}</span>
-                                </div>
-                            </td>
-                            <td class="admin-table__td">
-                                <span class="font-mono text-[11px] uppercase tracking-wider text-stone-500 dark:text-gray-400">{{ $event->feature }}</span>
-                            </td>
-                            <td class="admin-table__td">
-                                @php
-                                    $tone = match ($event->status) {
-                                        'success' => 'success',
-                                        'error' => 'danger',
-                                        'pending' => 'warning',
-                                        'blocked' => 'danger',
-                                        default => 'neutral',
-                                    };
-                                @endphp
-                                <x-admin.badge :tone="$tone">{{ ucfirst($event->status) }}</x-admin.badge>
-                            </td>
-                            <td class="admin-table__td" data-align="right">
-                                <span class="font-mono text-xs text-stone-500 dark:text-gray-400">{{ $event->latency_ms !== null ? number_format($event->latency_ms) . ' ms' : '—' }}</span>
-                            </td>
-                            <td class="admin-table__td" data-align="right">
-                                <span class="text-xs text-stone-500 dark:text-gray-400" title="{{ $event->created_at?->toDateTimeString() }}">{{ $event->created_at?->diffForHumans() }}</span>
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="5" class="admin-table__empty">
-                                <x-admin.empty-state
-                                    title="Belum ada aktivitas"
-                                    description="Event akan muncul setelah user mengirim chat atau upload dokumen." />
-                            </td>
-                        </tr>
-                    @endforelse
-                </x-admin.table>
-            </x-admin.section>
-        </div>
-
-        <div class="space-y-4">
-            <x-admin.section
-                title="Distribusi Fitur"
-                description="Berdasarkan event AI {{ $rangeDays }} hari terakhir.">
-                @if (empty($distribution))
-                    <x-admin.empty-state title="Belum ada data" description="Tidak ada event pada rentang ini." />
-                @else
-                    @php $totalDist = max(1, collect($distribution)->sum('total')); @endphp
-                    <ul class="space-y-3 text-sm">
-                        @foreach ($distribution as $row)
-                            @php $pct = (int) round(($row['total'] / $totalDist) * 100); @endphp
-                            <li>
-                                <div class="flex items-center justify-between">
-                                    <span class="font-mono text-[11px] uppercase tracking-wider text-stone-500 dark:text-gray-400">{{ $row['feature'] }}</span>
-                                    <span class="text-xs font-semibold text-stone-700 dark:text-gray-200">{{ number_format($row['total']) }}</span>
-                                </div>
-                                <div class="mt-1 h-1.5 overflow-hidden rounded-full bg-stone-100 dark:bg-gray-800">
-                                    <div class="h-full bg-ista-primary/80" style="width: {{ $pct }}%"></div>
-                                </div>
-                                <div class="mt-1 flex items-center justify-between text-[10px] uppercase tracking-wider text-stone-400 dark:text-gray-500">
-                                    <span>Sukses {{ number_format($row['success']) }}</span>
-                                    <span>Gagal {{ number_format($row['failed']) }}</span>
-                                </div>
-                            </li>
+                        @foreach ([0, (int) round($chartMax / 2), $chartMax] as $index => $axisValue)
+                            <text x="0" y="{{ [184, 120, 58][$index] }}" class="admin-chart-axis">{{ $formatInt($axisValue) }}</text>
                         @endforeach
-                    </ul>
-                @endif
-            </x-admin.section>
+                        <path d="{{ $areaPath }}" fill="url(#adminOverviewArea)" />
+                        <path d="{{ $linePath }}" class="admin-chart-line" />
+                        @foreach ($chartPoints as $point)
+                            <circle cx="{{ $point['x'] }}" cy="{{ $point['y'] }}" r="4.2" class="admin-chart-dot" />
+                            <text x="{{ $point['x'] }}" y="{{ max(18, $point['y'] - 13) }}" text-anchor="middle" class="admin-chart-value">{{ $formatInt($point['total']) }}</text>
+                            <text x="{{ $point['x'] }}" y="215" text-anchor="middle" class="admin-chart-label">{{ $point['label'] }}</text>
+                        @endforeach
+                    </svg>
+                </div>
+                <div class="admin-chart-legend">
+                    <span><i class="bg-ista-primary"></i> Request</span>
+                    <span><i class="border border-stone-400 bg-transparent"></i> Rata-rata ({{ $rangeDays }} Hari): {{ $formatInt($avgSeries) }}</span>
+                </div>
+            @endif
+        </section>
 
-            <x-admin.section
-                title="Error Terbaru"
-                description="5 error terakhir untuk korelasi cepat.">
-                @if ($recentErrors->isEmpty())
+        <section class="admin-section admin-panel">
+            <header class="admin-panel-header">
+                <h3>Insiden Terbaru</h3>
+                <a href="{{ route('admin.errors') }}">Lihat semua</a>
+            </header>
+            <div class="admin-incident-summary admin-incident-summary--compact">
+                <div>
+                    <span>Total Error</span>
+                    <strong>{{ $formatInt($totalErrorsRange) }}</strong>
+                    <em class="{{ $errorsSevenDayTrendText ? $trendClass($errorsSevenDayTrend) : 'text-stone-500 dark:text-gray-500' }}">
+                        {{ $errorsSevenDayTrendText ?? '7 hari terakhir' }}
+                    </em>
+                </div>
+                <div>
+                    <span>Error Rate</span>
+                    <strong>{{ $formatPct($errorRateSevenDay) }}</strong>
+                    <em class="{{ $errorRateSevenDayTrendText ? $trendClass($errorRateSevenDayTrend) : 'text-stone-500 dark:text-gray-500' }}">
+                        {{ $errorRateSevenDayTrendText ?? 'Dari seluruh request' }}
+                    </em>
+                </div>
+            </div>
+
+            @if ($recentErrors->isEmpty())
+                <div class="p-5">
                     <x-admin.empty-state title="Tidak ada error" description="Sistem berjalan tanpa kegagalan." />
-                @else
-                    <ul class="space-y-3 text-sm">
-                        @foreach ($recentErrors as $error)
-                            <li class="rounded-lg border border-rose-100 bg-rose-50/60 p-3 dark:border-rose-900/40 dark:bg-rose-950/30">
-                                <div class="flex items-center justify-between gap-2">
-                                    <span class="font-mono text-[11px] uppercase tracking-wider text-rose-700 dark:text-rose-300">{{ $error->feature }}</span>
-                                    <span class="text-[10px] uppercase tracking-wider text-rose-500 dark:text-rose-400">{{ $error->created_at?->diffForHumans() }}</span>
-                                </div>
-                                <p class="mt-1 text-[11px] text-rose-700 dark:text-rose-300">{{ $error->error_code ?? 'unknown_error' }}</p>
-                                <p class="mt-1 truncate font-mono text-[10px] text-rose-500/80 dark:text-rose-400/80" title="{{ $error->request_id }}">req: {{ $error->request_id ?? '—' }}</p>
-                            </li>
-                        @endforeach
-                    </ul>
-                @endif
-            </x-admin.section>
-        </div>
+                </div>
+            @else
+                <ul class="admin-error-list admin-error-list--compact">
+                    @foreach ($recentErrors as $error)
+                        <li>
+                            <span class="admin-error-icon" aria-hidden="true">
+                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 8v4m0 4h.01M10.3 4.7L2.8 18a2 2 0 001.74 3h14.92a2 2 0 001.74-3L13.7 4.7a2 2 0 00-3.4 0z" />
+                                </svg>
+                            </span>
+                            <div class="min-w-0 flex-1">
+                                <p title="{{ $error->feature }}">{{ strtoupper(str_replace('_', '.', (string) $error->feature)) }}</p>
+                                <em>{{ $error->created_at?->format('d M Y, H:i') }} WIB</em>
+                                @if ($error->error_code)
+                                    <span class="admin-error-code">{{ $error->error_code }}</span>
+                                @endif
+                            </div>
+                            <x-admin.badge tone="danger">Gagal</x-admin.badge>
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
+        </section>
     </div>
+
+    <section class="admin-section admin-panel admin-activity-panel">
+        <header class="admin-panel-header">
+            <div>
+                <h3>Aktivitas Terbaru</h3>
+                <p>3 event terakhir. Detail lengkap ada di tab Usage.</p>
+            </div>
+            <a href="{{ route('admin.usage') }}">Lihat semua</a>
+        </header>
+        <x-admin.table :columns="[
+            ['key' => 'user', 'label' => 'User'],
+            ['key' => 'feature', 'label' => 'Fitur'],
+            ['key' => 'status', 'label' => 'Status'],
+            ['key' => 'latency', 'label' => 'Latensi', 'align' => 'right'],
+            ['key' => 'time', 'label' => 'Waktu', 'align' => 'right'],
+        ]" class="admin-overview-table">
+            @forelse ($recentEvents as $event)
+                @php
+                    $statusTone = match ($event->status) {
+                        'success' => 'success',
+                        'error' => 'danger',
+                        'pending' => 'warning',
+                        'blocked' => 'danger',
+                        default => 'neutral',
+                    };
+                    $statusLabel = match ($event->status) {
+                        'success' => 'Sukses',
+                        'error' => 'Gagal',
+                        'pending' => 'Pending',
+                        'blocked' => 'Blocked',
+                        default => ucfirst((string) $event->status),
+                    };
+                    $displayFeature = strtoupper(str_replace('_', '.', (string) $event->feature));
+                    $userName = $event->user?->name ?? 'Sistem';
+                    $initial = strtoupper(substr($userName, 0, 1));
+                @endphp
+                <tr>
+                    <td class="admin-table__td">
+                        <div class="flex items-center gap-3">
+                            <span class="admin-row-avatar">{{ $initial }}</span>
+                            <div class="min-w-0">
+                                <span class="block truncate text-sm font-semibold text-stone-800 dark:text-gray-100">{{ $userName }}</span>
+                                <span class="block truncate text-xs text-stone-500 dark:text-gray-500">{{ $event->user?->email ?? '-' }}</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="admin-table__td">
+                        <span class="font-mono text-xs font-medium uppercase text-stone-600 dark:text-gray-400" title="{{ $event->feature }}">{{ $displayFeature }}</span>
+                    </td>
+                    <td class="admin-table__td">
+                        <x-admin.badge :tone="$statusTone">{{ $statusLabel }}</x-admin.badge>
+                    </td>
+                    <td class="admin-table__td" data-align="right">
+                        <span class="font-mono text-xs text-stone-600 dark:text-gray-400">
+                            {{ $event->latency_ms !== null ? number_format(((float) $event->latency_ms) / 1000, 2, ',', '.') . 's' : '-' }}
+                        </span>
+                    </td>
+                    <td class="admin-table__td" data-align="right">
+                        <span class="text-xs text-stone-500 dark:text-gray-400" title="{{ $event->created_at?->toDateTimeString() }}">{{ $event->created_at?->diffForHumans() }}</span>
+                    </td>
+                </tr>
+            @empty
+                <tr>
+                    <td colspan="5" class="admin-table__empty">
+                        <x-admin.empty-state
+                            title="Belum ada aktivitas"
+                            description="Event akan muncul setelah user mengirim chat atau upload dokumen." />
+                    </td>
+                </tr>
+            @endforelse
+        </x-admin.table>
+    </section>
 </div>

@@ -1,6 +1,6 @@
 @php
     $user = auth()->user();
-    $items = [
+    $monitoringItems = [
         [
             'label' => 'Overview',
             'description' => 'Ringkasan dashboard',
@@ -19,7 +19,7 @@
             'label' => 'Usage',
             'description' => 'Event AI per fitur',
             'route' => 'admin.usage',
-            'icon' => 'M9 19V6l12-3v13M9 19c0 1.657-1.343 3-3 3s-3-1.343-3-3 1.343-3 3-3 3 1.343 3 3zm12-3c0 1.657-1.343 3-3 3s-3-1.343-3-3 1.343-3 3-3 3 1.343 3 3z',
+            'icon' => 'M4 19V10m5 9V5m5 14v-7m5 7V8M3 19h18',
             'visible' => true,
         ],
         [
@@ -45,8 +45,10 @@
         ],
     ];
 
+    $administrationItems = [];
+
     if ($user && method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin()) {
-        $items[] = [
+        $administrationItems[] = [
             'label' => 'Account Management',
             'description' => 'Kelola akun admin',
             'route' => 'admin.accounts',
@@ -54,7 +56,7 @@
             'visible' => true,
         ];
 
-        $items[] = [
+        $administrationItems[] = [
             'label' => 'AI Configuration',
             'description' => 'Hanya super admin',
             'route' => 'admin.ai-config',
@@ -73,8 +75,8 @@
 <div class="flex h-full flex-col">
     <div class="flex items-center justify-between gap-3 border-b border-stone-200/80 px-6 py-5 dark:border-gray-800">
         <a href="{{ route('admin.dashboard') }}" class="group flex items-center gap-3">
-            <img src="{{ asset('images/ista/logo.png') }}" alt="ISTA AI" class="h-8 w-8 object-contain transition-transform duration-300 group-hover:rotate-6 group-hover:scale-110">
-            <div class="ista-brand-title text-lg text-ista-primary not-italic">
+            <img src="{{ asset('images/ista/logo.png') }}" alt="ISTA AI" class="h-9 w-9 object-contain transition-transform duration-300 group-hover:rotate-6 group-hover:scale-105">
+            <div class="ista-brand-title text-[1.15rem] text-ista-primary not-italic">
                 ISTA <span class="font-light italic text-ista-gold">AI</span>
             </div>
         </a>
@@ -88,49 +90,137 @@
         </button>
     </div>
 
-    <nav class="flex-1 overflow-y-auto px-3 py-4" aria-label="Navigasi admin">
-        <p class="px-3 pb-2 text-[10.5px] font-bold uppercase tracking-[0.16em] text-stone-400 dark:text-gray-500">Menu</p>
-        <ul class="space-y-1" role="list">
-            @foreach ($items as $item)
-                @continue(! ($item['visible'] ?? false))
-                @php
-                    $active = request()->routeIs($item['route']);
-                @endphp
-                <li>
-                    <a href="{{ route($item['route']) }}"
-                       @class([
-                           'admin-nav-link group',
-                           'admin-nav-link--active' => $active,
-                       ])
-                       @if ($active) aria-current="page" @endif>
-                        <span class="admin-nav-link__icon" aria-hidden="true">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="{{ $item['icon'] }}"/>
-                            </svg>
-                        </span>
-                        <span class="flex-1">
-                            <span class="block text-sm font-semibold leading-tight">{{ $item['label'] }}</span>
-                            @if (! empty($item['description']))
-                                <span class="mt-0.5 block text-[11px] font-medium text-stone-400 group-hover:text-ista-primary/60 dark:text-gray-500 dark:group-hover:text-amber-300/70">{{ $item['description'] }}</span>
-                            @endif
-                        </span>
-                    </a>
-                </li>
-            @endforeach
-        </ul>
+    <nav class="flex-1 overflow-y-auto px-4 py-5" aria-label="Navigasi admin">
+        <div class="admin-sidebar-group">
+            <p class="admin-sidebar-heading">Monitoring</p>
+            <ul class="space-y-2" role="list">
+                @foreach ($monitoringItems as $item)
+                    @continue(! ($item['visible'] ?? false))
+                    @php
+                        $active = request()->routeIs($item['route']);
+                    @endphp
+                    <li>
+                        <a href="{{ route($item['route']) }}"
+                           @class([
+                               'admin-nav-link group',
+                               'admin-nav-link--active' => $active,
+                           ])
+                           @if ($active) aria-current="page" @endif>
+                            <span class="admin-nav-link__icon" aria-hidden="true">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="{{ $item['icon'] }}"/>
+                                </svg>
+                            </span>
+                            <span class="flex-1">
+                                <span class="block text-sm font-semibold leading-tight">{{ $item['label'] }}</span>
+                                @if (! empty($item['description']))
+                                    <span class="sr-only">{{ $item['description'] }}</span>
+                                @endif
+                            </span>
+                        </a>
+                    </li>
+                @endforeach
+            </ul>
+        </div>
+
+        @if (! empty($administrationItems))
+            <div class="admin-sidebar-group mt-6 border-t border-stone-200/80 pt-5 dark:border-gray-800">
+                <p class="admin-sidebar-heading">Administration</p>
+                <ul class="space-y-2" role="list">
+                    @foreach ($administrationItems as $item)
+                        @continue(! ($item['visible'] ?? false))
+                        @php
+                            $active = request()->routeIs($item['route']);
+                        @endphp
+                        <li>
+                            <a href="{{ route($item['route']) }}"
+                               @class([
+                                   'admin-nav-link group',
+                                   'admin-nav-link--active' => $active,
+                               ])
+                               @if ($active) aria-current="page" @endif>
+                                <span class="admin-nav-link__icon" aria-hidden="true">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="{{ $item['icon'] }}"/>
+                                    </svg>
+                                </span>
+                                <span class="flex-1">
+                                    <span class="block text-sm font-semibold leading-tight">{{ $item['label'] }}</span>
+                                    @if (! empty($item['description']))
+                                        <span class="sr-only">{{ $item['description'] }}</span>
+                                    @endif
+                                </span>
+                            </a>
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
     </nav>
 
-    <div class="border-t border-stone-200/80 px-4 py-4 dark:border-gray-800">
+    <div class="relative border-t border-stone-200/80 px-6 py-4 dark:border-gray-800"
+         x-data="{ open: false }"
+         @click.outside="open = false"
+         @keydown.escape.window="open = false">
         @auth
-            <div class="flex items-center gap-3">
-                <div class="flex h-9 w-9 items-center justify-center rounded-full bg-ista-primary text-sm font-bold text-amber-300">
+            <div x-show="open"
+                 x-transition:enter="transition ease-out duration-150"
+                 x-transition:enter-start="translate-y-1 opacity-0"
+                 x-transition:enter-end="translate-y-0 opacity-100"
+                 x-transition:leave="transition ease-in duration-100"
+                 x-transition:leave-start="translate-y-0 opacity-100"
+                 x-transition:leave-end="translate-y-1 opacity-0"
+                 id="admin-sidebar-profile-menu"
+                 class="absolute bottom-full left-4 right-4 z-50 mb-2 overflow-hidden rounded-xl border border-stone-100 bg-white py-1 shadow-xl ring-1 ring-black/5 dark:border-gray-800 dark:bg-gray-900"
+                 role="menu"
+                 style="display: none;">
+                <a href="{{ route('admin.dashboard') }}"
+                   class="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-ista-primary transition hover:bg-stone-50 dark:text-amber-300 dark:hover:bg-gray-800"
+                   role="menuitem"
+                   @click="open = false">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                    </svg>
+                    Dashboard Admin
+                </a>
+                <a href="{{ route('profile') }}"
+                   class="block px-4 py-2.5 text-sm text-stone-700 transition hover:bg-stone-50 hover:text-ista-primary dark:text-gray-200 dark:hover:bg-gray-800 dark:hover:text-amber-300"
+                   role="menuitem"
+                   @click="open = false">
+                    Profil
+                </a>
+                <form method="POST" action="{{ route('admin.logout') }}">
+                    @csrf
+                    <button type="submit"
+                            class="block w-full border-t border-stone-100 px-4 py-2.5 text-left text-sm text-stone-700 transition hover:bg-stone-50 hover:text-ista-primary dark:border-gray-800 dark:text-gray-200 dark:hover:bg-gray-800 dark:hover:text-amber-300"
+                            role="menuitem">
+                        Keluar
+                    </button>
+                </form>
+            </div>
+
+            <button type="button"
+                    class="-mx-2 flex w-[calc(100%+1rem)] items-center gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-stone-100/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/30 dark:hover:bg-gray-900"
+                    aria-haspopup="menu"
+                    aria-controls="admin-sidebar-profile-menu"
+                    :aria-expanded="open ? 'true' : 'false'"
+                    @click="open = ! open">
+                <div class="flex h-9 w-9 items-center justify-center rounded-full bg-ista-primary text-sm font-bold text-amber-300 shadow-sm">
                     {{ substr(auth()->user()->name, 0, 1) }}
                 </div>
                 <div class="min-w-0 flex-1">
                     <p class="truncate text-sm font-semibold text-stone-800 dark:text-gray-100">{{ auth()->user()->name }}</p>
                     <p class="truncate text-[11px] font-medium uppercase tracking-wider text-stone-400 dark:text-gray-500">{{ $roleLabel }}</p>
                 </div>
-            </div>
+                <svg class="h-4 w-4 text-stone-900 transition dark:text-gray-200"
+                     :class="open ? 'rotate-180' : 'rotate-0'"
+                     fill="none"
+                     viewBox="0 0 24 24"
+                     stroke="currentColor"
+                     aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M19 9l-7 7-7-7" />
+                </svg>
+            </button>
         @endauth
     </div>
 </div>

@@ -79,6 +79,7 @@ class AIUsageEventTrackingTest extends TestCase
                 ?array $document_ids = null,
                 ?string $request_id = null,
             ): \Generator {
+                yield "[MODEL:GPT-4.1 (Primary)]\n";
                 yield 'OK';
             }
         });
@@ -128,6 +129,8 @@ class AIUsageEventTrackingTest extends TestCase
         $this->assertSame(AIUsageEvent::ACTION_STARTED, $events[0]->action);
         $this->assertSame(AIUsageEvent::ACTION_COMPLETED, $events[1]->action);
         $this->assertSame('stream', $events[1]->metadata['channel'] ?? null);
+        $this->assertSame('GPT-4.1 (Primary)', $events[1]->metadata['model_label'] ?? null);
+        $this->assertSame('openai/gpt-4.1', $events[1]->metadata['model_name'] ?? null);
         $this->assertSame((int) $conversation->id, (int) ($events[1]->metadata['conversation_id'] ?? 0));
     }
 
@@ -156,6 +159,7 @@ class AIUsageEventTrackingTest extends TestCase
                 ?array $document_ids = null,
                 ?string $request_id = null,
             ): \Generator {
+                yield "[MODEL:GPT-4o (Primary)]\n";
                 yield AIService::ERROR_SENTINEL.'AI tidak tersedia';
             }
         });
@@ -204,6 +208,7 @@ class AIUsageEventTrackingTest extends TestCase
         $this->assertSame(AIUsageEvent::ACTION_FAILED, $events[1]->action);
         $this->assertSame('error_sentinel', $events[1]->error_code);
         $this->assertSame('stream', $events[1]->metadata['channel'] ?? null);
+        $this->assertSame('GPT-4o (Primary)', $events[1]->metadata['model_label'] ?? null);
     }
 
     public function test_stream_controller_rejects_malformed_request_id_query_param(): void
@@ -383,6 +388,7 @@ class AIUsageEventTrackingTest extends TestCase
         {
             public function sendChat(array $messages, ?array $document_filenames = null, ?string $user_id = null, bool $force_web_search = false, ?string $source_policy = null, bool $allow_auto_realtime_web = true, ?array $document_ids = null, ?string $request_id = null): \Generator
             {
+                yield "[MODEL:GPT-4.1 Mini (Primary)]\n";
                 yield 'Halo juga ';
                 yield 'pengguna ';
             }
@@ -413,6 +419,8 @@ class AIUsageEventTrackingTest extends TestCase
         $this->assertNotNull($event);
         $this->assertSame(AIUsageEvent::STATUS_SUCCESS, $event->status);
         $this->assertNotNull($event->metadata['response_length'] ?? null);
+        $this->assertSame('GPT-4.1 Mini (Primary)', $event->metadata['model_label'] ?? null);
+        $this->assertSame('openai/gpt-4.1-mini', $event->metadata['model_name'] ?? null);
         $this->assertNotNull($event->subject_id);
         $this->assertSame(Message::class, $event->subject_type);
     }
@@ -434,6 +442,7 @@ class AIUsageEventTrackingTest extends TestCase
         {
             public function sendChat(array $messages, ?array $document_filenames = null, ?string $user_id = null, bool $force_web_search = false, ?string $source_policy = null, bool $allow_auto_realtime_web = true, ?array $document_ids = null, ?string $request_id = null): \Generator
             {
+                yield "[MODEL:Llama 3.3 70B (Groq)]\n";
                 yield AIService::ERROR_SENTINEL.'AI tidak tersedia';
             }
         });
@@ -461,6 +470,8 @@ class AIUsageEventTrackingTest extends TestCase
         $this->assertNotNull($event);
         $this->assertSame(AIUsageEvent::STATUS_ERROR, $event->status);
         $this->assertSame('error_sentinel', $event->error_code);
+        $this->assertSame('Llama 3.3 70B (Groq)', $event->metadata['model_label'] ?? null);
+        $this->assertSame('groq/llama-3.3-70b-versatile', $event->metadata['model_name'] ?? null);
     }
 
     public function test_document_upload_records_completed_event(): void

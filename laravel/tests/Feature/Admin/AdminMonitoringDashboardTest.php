@@ -2,11 +2,14 @@
 
 namespace Tests\Feature\Admin;
 
+use App\Livewire\Admin\AdminErrors;
+use App\Livewire\Admin\AdminDocuments;
 use App\Livewire\Admin\AdminUsage;
 use App\Livewire\Admin\AdminUsers;
 use App\Models\AIUsageEvent;
 use App\Models\Conversation;
 use App\Models\Document;
+use App\Models\DocumentChunk;
 use App\Models\Memo;
 use App\Models\Message;
 use App\Models\User;
@@ -41,12 +44,18 @@ class AdminMonitoringDashboardTest extends TestCase
         $response->assertOk();
         $response->assertSee('Ringkasan Operasional', false);
         $response->assertSee('Aktivitas Terbaru', false);
-        $response->assertSee('Distribusi Fitur', false);
-        $response->assertSee('Error Terbaru', false);
+        $response->assertSee('Insiden Terbaru', false);
+        $response->assertSee('Detail lengkap ada di tab Usage.', false);
+        $response->assertDontSee('Distribusi Fitur', false);
+        $response->assertDontSee('Error Terbaru', false);
         $response->assertSee('chat', false);
         $response->assertSee('document_rag', false);
         $response->assertSee('rag_timeout', false);
         $response->assertSee('admin-kpi', false);
+        $response->assertDontSee('Belum ada pembanding', false);
+        $response->assertSee('Terakhir diperbarui:', false);
+        $response->assertDontSee('↑ 18% dari kemarin', false);
+        $response->assertDontSee('↓ 33% dari 7 hari lalu', false);
 
         Carbon::setTestNow();
     }
@@ -76,7 +85,16 @@ class AdminMonitoringDashboardTest extends TestCase
 
         $response = $this->actingAs($admin)->get('/admin/users');
         $response->assertOk();
-        $response->assertSee('User & Presence', false);
+        $response->assertSeeText('User & Presence');
+        $response->assertDontSeeText('User dan Presence');
+        $response->assertSee('wire:poll.30s', false);
+        $response->assertSee('Ringkasan status user tanpa membuka isi percakapan', false);
+        $response->assertDontSee('Pantau status online/idle/offline user dan ringkasan aktivitas mereka.', false);
+        $response->assertSee('Menampilkan 15 user per halaman.', false);
+        $response->assertSee('Total User', false);
+        $response->assertSee('admin-users-kpi-card', false);
+        $response->assertSee('admin-users-kpi-card__icon', false);
+        $response->assertSee('admin-user-avatar', false);
         $response->assertSee('Admin Aktif', false);
         $response->assertSee('User Idle', false);
         $response->assertSee('User Offline', false);
@@ -122,15 +140,65 @@ class AdminMonitoringDashboardTest extends TestCase
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
         $user = User::factory()->create(['role' => User::ROLE_USER]);
 
-        $this->makeEvent($user->id, AIUsageEvent::FEATURE_CHAT, AIUsageEvent::ACTION_COMPLETED, AIUsageEvent::STATUS_SUCCESS, $now->copy()->subHour(), 'req-chat');
-        $this->makeEvent($user->id, AIUsageEvent::FEATURE_DOCUMENT_RAG, AIUsageEvent::ACTION_COMPLETED, AIUsageEvent::STATUS_SUCCESS, $now->copy()->subMinutes(30), 'req-rag');
+        $this->makeEvent($user->id, AIUsageEvent::FEATURE_CHAT, AIUsageEvent::ACTION_COMPLETED, AIUsageEvent::STATUS_SUCCESS, $now->copy()->subHour(), 'req-chat', null, null, [
+            'model_label' => 'GPT-4.1 (Primary)',
+            'model_name' => 'openai/gpt-4.1',
+            'model_provider' => 'github_models',
+        ]);
+        $this->makeEvent($user->id, AIUsageEvent::FEATURE_DOCUMENT_RAG, AIUsageEvent::ACTION_COMPLETED, AIUsageEvent::STATUS_SUCCESS, $now->copy()->subMinutes(30), 'req-rag', null, null, [
+            'model_label' => 'RAG Model',
+            'model_name' => 'internal/rag',
+            'model_provider' => 'internal',
+        ]);
 
         $this->actingAs($admin);
 
         Livewire::test(AdminUsage::class)
             ->set('feature', AIUsageEvent::FEATURE_CHAT)
-            ->assertSee('req-chat', false)
-            ->assertDontSee('req-rag', false);
+            ->assertSee('Usage Events')
+            ->assertSee('admin-usage-kpi-card', false)
+            ->assertSee('admin-usage-kpi-card__icon', false)
+            ->assertSee('Distribusi Fitur')
+            ->assertSee('Event Terbaru')
+            ->assertSee('Model')
+            ->assertSee('GPT-4.1 (Primary)', false)
+            ->assertDontSee('Detail')
+            ->assertDontSee('RAG Model', false);
+
+        Carbon::setTestNow();
+    }
+
+    public function test_admin_usage_paginates_event_table_at_five_rows(): void
+    {
+        $now = Carbon::parse('2026-05-18 12:00:00');
+        Carbon::setTestNow($now);
+
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        for ($index = 1; $index <= 6; $index++) {
+            $rowUser = User::factory()->create([
+                'role' => User::ROLE_USER,
+                'email' => 'usage-row-' . $index . '@example.test',
+            ]);
+
+            $this->makeEvent(
+                $rowUser->id,
+                AIUsageEvent::FEATURE_CHAT,
+                AIUsageEvent::ACTION_COMPLETED,
+                AIUsageEvent::STATUS_SUCCESS,
+                $now->copy()->subMinutes($index),
+                'req-page-' . $index,
+            );
+        }
+
+        $this->actingAs($admin);
+
+        Livewire::test(AdminUsage::class)
+            ->assertSee('Menampilkan 5 event per halaman')
+            ->assertSee('usage-row-1@example.test', false)
+            ->assertDontSee('usage-row-6@example.test', false)
+            ->call('gotoPage', 2)
+            ->assertSee('usage-row-6@example.test', false)
+            ->assertDontSee('usage-row-1@example.test', false);
 
         Carbon::setTestNow();
     }
@@ -141,18 +209,25 @@ class AdminMonitoringDashboardTest extends TestCase
         Carbon::setTestNow($now);
 
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
-        $user = User::factory()->create(['role' => User::ROLE_USER]);
+        $includedUser = User::factory()->create([
+            'role' => User::ROLE_USER,
+            'email' => 'usage-end-day@example.test',
+        ]);
+        $excludedUser = User::factory()->create([
+            'role' => User::ROLE_USER,
+            'email' => 'usage-next-day@example.test',
+        ]);
 
-        $this->makeEvent($user->id, AIUsageEvent::FEATURE_CHAT, AIUsageEvent::ACTION_COMPLETED, AIUsageEvent::STATUS_SUCCESS, Carbon::parse('2026-05-18 23:45:00'), 'req-end-day');
-        $this->makeEvent($user->id, AIUsageEvent::FEATURE_CHAT, AIUsageEvent::ACTION_COMPLETED, AIUsageEvent::STATUS_SUCCESS, Carbon::parse('2026-05-19 00:01:00'), 'req-next-day');
+        $this->makeEvent($includedUser->id, AIUsageEvent::FEATURE_CHAT, AIUsageEvent::ACTION_COMPLETED, AIUsageEvent::STATUS_SUCCESS, Carbon::parse('2026-05-18 23:45:00'), 'req-end-day');
+        $this->makeEvent($excludedUser->id, AIUsageEvent::FEATURE_CHAT, AIUsageEvent::ACTION_COMPLETED, AIUsageEvent::STATUS_SUCCESS, Carbon::parse('2026-05-19 00:01:00'), 'req-next-day');
 
         $this->actingAs($admin);
 
         Livewire::test(AdminUsage::class)
             ->set('startDate', '2026-05-18')
             ->set('endDate', '2026-05-18')
-            ->assertSee('req-end-day', false)
-            ->assertDontSee('req-next-day', false);
+            ->assertSee('usage-end-day@example.test', false)
+            ->assertDontSee('usage-next-day@example.test', false);
 
         Carbon::setTestNow();
     }
@@ -166,12 +241,90 @@ class AdminMonitoringDashboardTest extends TestCase
         $user = User::factory()->create(['role' => User::ROLE_USER]);
 
         $this->makeEvent($user->id, AIUsageEvent::FEATURE_CHAT, AIUsageEvent::ACTION_COMPLETED, AIUsageEvent::STATUS_SUCCESS, $now->copy()->subHour(), 'req-success');
-        $this->makeEvent($user->id, AIUsageEvent::FEATURE_CHAT, AIUsageEvent::ACTION_FAILED, AIUsageEvent::STATUS_ERROR, $now->copy()->subMinutes(30), 'req-fail', null, 'rate_limited');
+        $this->makeEvent($user->id, AIUsageEvent::FEATURE_CHAT, AIUsageEvent::ACTION_FAILED, AIUsageEvent::STATUS_ERROR, $now->copy()->subMinutes(30), 'req-fail', null, 'error_sentinel', [
+            'model_label' => 'GPT-4o (Primary)',
+            'model_name' => 'openai/gpt-4o',
+            'model_provider' => 'github_models',
+        ]);
 
         $response = $this->actingAs($admin)->get('/admin/errors');
         $response->assertOk();
-        $response->assertSee('rate_limited', false);
+        $response->assertSee('Error Operasional', false);
+        $response->assertSee('admin-errors-kpi-card', false);
+        $response->assertSee('admin-errors-kpi-card__icon', false);
+        $response->assertSee('Menampilkan 5 error per halaman', false);
+        $response->assertSee('ERROR SENTINEL', false);
+        $response->assertSee('Severity', false);
+        $response->assertSee('High', false);
+        $response->assertSee('Detail', false);
         $response->assertDontSee('req-success', false);
+
+        Carbon::setTestNow();
+    }
+
+    public function test_admin_errors_detail_modal_shows_guidance_and_safe_metadata(): void
+    {
+        $now = Carbon::parse('2026-05-18 12:00:00');
+        Carbon::setTestNow($now);
+
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $user = User::factory()->create(['role' => User::ROLE_USER]);
+
+        $event = $this->makeEvent($user->id, AIUsageEvent::FEATURE_CHAT, AIUsageEvent::ACTION_FAILED, AIUsageEvent::STATUS_ERROR, $now->copy()->subMinutes(10), 'req-detail', 1200, 'error_sentinel', [
+            'conversation_id' => 99,
+            'channel' => 'stream',
+            'model_label' => 'GPT-4o (Primary)',
+            'model_name' => 'openai/gpt-4o',
+            'model_provider' => 'github_models',
+        ]);
+
+        $this->actingAs($admin);
+
+        Livewire::test(AdminErrors::class)
+            ->call('showDetail', $event->id)
+            ->assertSee('Detail Error')
+            ->assertSee('Langkah Penanganan')
+            ->assertSee('Kemungkinan Penyebab')
+            ->assertSee('GPT-4o (Primary)', false)
+            ->assertSee('req-detail', false)
+            ->assertSee('Cari request ID di log Laravel dan Python AI.');
+
+        Carbon::setTestNow();
+    }
+
+    public function test_admin_errors_paginates_error_table_at_five_rows(): void
+    {
+        $now = Carbon::parse('2026-05-18 12:00:00');
+        Carbon::setTestNow($now);
+
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        for ($index = 1; $index <= 6; $index++) {
+            $rowUser = User::factory()->create([
+                'role' => User::ROLE_USER,
+                'email' => 'error-row-' . $index . '@example.test',
+            ]);
+
+            $this->makeEvent(
+                $rowUser->id,
+                AIUsageEvent::FEATURE_CHAT,
+                AIUsageEvent::ACTION_FAILED,
+                AIUsageEvent::STATUS_ERROR,
+                $now->copy()->subMinutes($index),
+                'req-error-' . $index,
+                null,
+                'error_code_' . $index,
+            );
+        }
+
+        $this->actingAs($admin);
+
+        Livewire::test(AdminErrors::class)
+            ->assertSee('Menampilkan 5 error per halaman')
+            ->assertSee('error-row-1@example.test', false)
+            ->assertDontSee('error-row-6@example.test', false)
+            ->call('gotoPage', 2)
+            ->assertSee('error-row-6@example.test', false)
+            ->assertDontSee('error-row-1@example.test', false);
 
         Carbon::setTestNow();
     }
@@ -204,10 +357,170 @@ class AdminMonitoringDashboardTest extends TestCase
         $response = $this->actingAs($admin)->get('/admin/documents');
         $response->assertOk();
         $response->assertSee('Dokumen User', false);
+        $response->assertSee('admin-documents-kpi-card', false);
+        $response->assertSee('admin-documents-kpi-card__icon', false);
+        $response->assertSee('Menampilkan 10 dokumen per halaman', false);
+        $response->assertSee('Distribusi Tipe', false);
+        $response->assertSee('Status Pipeline', false);
+        $response->assertSee('PDF', false);
+        $response->assertSee('Pipeline Dokumen', false);
+        $response->assertSee('Detail', false);
         $response->assertSee('a.pdf', false);
         $response->assertSee('b.pdf', false);
         $response->assertSee('Ready', false);
-        $response->assertSee('Error', false);
+        $response->assertSee('Failed', false);
+    }
+
+    public function test_admin_documents_filters_by_type_owner_and_date(): void
+    {
+        $now = Carbon::parse('2026-05-18 12:00:00');
+        Carbon::setTestNow($now);
+
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $includedOwner = User::factory()->create([
+            'role' => User::ROLE_USER,
+            'email' => 'included-owner@example.test',
+        ]);
+        $otherOwner = User::factory()->create([
+            'role' => User::ROLE_USER,
+            'email' => 'other-owner@example.test',
+        ]);
+
+        $included = Document::create([
+            'user_id' => $includedOwner->id,
+            'filename' => 'finance.csv',
+            'original_name' => 'finance.csv',
+            'file_path' => 'docs/finance.csv',
+            'status' => 'ready',
+            'mime_type' => 'text/csv',
+            'file_size_bytes' => 1024,
+        ]);
+        $included->timestamps = false;
+        $included->created_at = Carbon::parse('2026-05-18 09:00:00');
+        $included->updated_at = Carbon::parse('2026-05-18 09:00:00');
+        $included->save();
+
+        $excludedByType = Document::create([
+            'user_id' => $includedOwner->id,
+            'filename' => 'finance.pdf',
+            'original_name' => 'finance.pdf',
+            'file_path' => 'docs/finance.pdf',
+            'status' => 'ready',
+            'mime_type' => 'application/pdf',
+            'file_size_bytes' => 2048,
+        ]);
+        $excludedByType->timestamps = false;
+        $excludedByType->created_at = Carbon::parse('2026-05-18 10:00:00');
+        $excludedByType->updated_at = Carbon::parse('2026-05-18 10:00:00');
+        $excludedByType->save();
+
+        $excludedByOwner = Document::create([
+            'user_id' => $otherOwner->id,
+            'filename' => 'other.csv',
+            'original_name' => 'other.csv',
+            'file_path' => 'docs/other.csv',
+            'status' => 'ready',
+            'mime_type' => 'text/csv',
+            'file_size_bytes' => 1024,
+        ]);
+        $excludedByOwner->timestamps = false;
+        $excludedByOwner->created_at = Carbon::parse('2026-05-18 11:00:00');
+        $excludedByOwner->updated_at = Carbon::parse('2026-05-18 11:00:00');
+        $excludedByOwner->save();
+
+        $this->actingAs($admin);
+
+        Livewire::test(AdminDocuments::class)
+            ->set('type', 'csv')
+            ->set('ownerId', (string) $includedOwner->id)
+            ->set('startDate', '2026-05-18')
+            ->set('endDate', '2026-05-18')
+            ->assertSee('finance.csv', false)
+            ->assertDontSee('finance.pdf', false)
+            ->assertDontSee('other.csv', false);
+
+        Carbon::setTestNow();
+    }
+
+    public function test_admin_documents_detail_drawer_shows_pipeline_metadata(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $owner = User::factory()->create(['role' => User::ROLE_USER]);
+
+        $document = Document::create([
+            'user_id' => $owner->id,
+            'filename' => 'ai-policy.pdf',
+            'original_name' => 'ai-policy.pdf',
+            'file_path' => 'docs/ai-policy.pdf',
+            'status' => 'ready',
+            'preview_status' => Document::PREVIEW_STATUS_READY,
+            'mime_type' => 'application/pdf',
+            'file_size_bytes' => 4096,
+            'source_provider' => 'google_drive',
+            'source_external_id' => 'drive-document-id',
+            'source_synced_at' => Carbon::parse('2026-05-18 08:00:00'),
+        ]);
+
+        DocumentChunk::create([
+            'document_id' => $document->id,
+            'page_number' => 1,
+            'text_content' => 'Hidden chunk content must not be rendered.',
+        ]);
+        DocumentChunk::create([
+            'document_id' => $document->id,
+            'page_number' => 2,
+            'text_content' => 'Another hidden chunk.',
+        ]);
+
+        $this->actingAs($admin);
+
+        Livewire::test(AdminDocuments::class)
+            ->call('showDetail', $document->id)
+            ->assertSee('Document Pipeline')
+            ->assertSee('AI Index Metadata')
+            ->assertSee('Chunk Count')
+            ->assertSee('2')
+            ->assertSee('Indexed')
+            ->assertSee('GOOGLE DRIVE', false)
+            ->assertDontSee('Hidden chunk content must not be rendered.', false);
+    }
+
+    public function test_admin_documents_paginates_document_table_at_ten_rows(): void
+    {
+        $now = Carbon::parse('2026-05-18 12:00:00');
+        Carbon::setTestNow($now);
+
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $owner = User::factory()->create(['role' => User::ROLE_USER]);
+
+        for ($index = 1; $index <= 11; $index++) {
+            $document = Document::create([
+                'user_id' => $owner->id,
+                'filename' => 'document-row-' . $index . '.pdf',
+                'original_name' => 'document-row-' . $index . '.pdf',
+                'file_path' => 'docs/document-row-' . $index . '.pdf',
+                'status' => 'ready',
+                'mime_type' => 'application/pdf',
+                'file_size_bytes' => 1024,
+            ]);
+
+            $document->timestamps = false;
+            $document->created_at = $now->copy()->subMinutes($index);
+            $document->updated_at = $now->copy()->subMinutes($index);
+            $document->save();
+        }
+
+        $this->actingAs($admin);
+
+        Livewire::test(AdminDocuments::class)
+            ->assertSee('Menampilkan 10 dokumen per halaman')
+            ->assertSee('document-row-1.pdf', false)
+            ->assertDontSee('document-row-11.pdf', false)
+            ->call('gotoPage', 2)
+            ->assertSee('document-row-11.pdf', false)
+            ->assertDontSee('document-row-1.pdf', false);
+
+        Carbon::setTestNow();
     }
 
     public function test_regular_user_cannot_access_monitoring_pages(): void
@@ -283,6 +596,7 @@ class AdminMonitoringDashboardTest extends TestCase
         $response->assertOk();
         $response->assertSee(route('admin.users'), false);
         $response->assertSee(route('admin.usage'), false);
+        $response->assertSee('M4 19V10m5 9V5m5 14v-7m5 7V8M3 19h18', false);
         $response->assertSee(route('admin.errors'), false);
         $response->assertSee(route('admin.documents'), false);
     }
@@ -296,12 +610,12 @@ class AdminMonitoringDashboardTest extends TestCase
         // values rather than passing them into Carbon::parse().
         $response = $this->actingAs($admin)->get('/admin/usage?startDate=not-a-date&endDate=also-bad');
         $response->assertOk();
-        $response->assertSee('AI Usage Events', false);
+        $response->assertSee('Usage Events', false);
 
         // Empty values must also be tolerated.
         $response = $this->actingAs($admin)->get('/admin/usage?startDate=&endDate=');
         $response->assertOk();
-        $response->assertSee('AI Usage Events', false);
+        $response->assertSee('Usage Events', false);
     }
 
     public function test_admin_usage_livewire_component_handles_invalid_date_input(): void
@@ -313,10 +627,10 @@ class AdminMonitoringDashboardTest extends TestCase
             ->set('startDate', 'banana')
             ->set('endDate', 'pineapple')
             ->assertOk()
-            ->assertSee('AI Usage Events');
+            ->assertSee('Usage Events');
     }
 
-    private function makeEvent(int $userId, string $feature, string $action, string $status, Carbon $createdAt, ?string $requestId = null, ?int $latencyMs = null, ?string $errorCode = null): AIUsageEvent
+    private function makeEvent(int $userId, string $feature, string $action, string $status, Carbon $createdAt, ?string $requestId = null, ?int $latencyMs = null, ?string $errorCode = null, ?array $metadata = null): AIUsageEvent
     {
         $event = new AIUsageEvent([
             'user_id' => $userId,
@@ -326,6 +640,7 @@ class AdminMonitoringDashboardTest extends TestCase
             'request_id' => $requestId,
             'latency_ms' => $latencyMs,
             'error_code' => $errorCode,
+            'metadata' => $metadata,
         ]);
         $event->timestamps = false;
         $event->created_at = $createdAt;

@@ -6,10 +6,15 @@ use App\Models\AIUsageEvent;
 use App\Services\Admin\AdminMetricsService;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use Livewire\WithPagination;
 
-#[Layout('layouts.admin', ['title' => 'Errors', 'heading' => 'AI Errors'])]
+#[Layout('layouts.admin', ['title' => 'Errors', 'heading' => 'Errors'])]
 class AdminErrors extends Component
 {
+    use WithPagination;
+
+    private const ERRORS_PER_PAGE = 5;
+
     public string $feature = '';
 
     public string $startDate = '';
@@ -17,6 +22,8 @@ class AdminErrors extends Component
     public string $endDate = '';
 
     public string $requestId = '';
+
+    public ?int $selectedErrorId = null;
 
     /**
      * @var array<string, array<int, string>>
@@ -28,9 +35,45 @@ class AdminErrors extends Component
         'requestId' => ['except' => ''],
     ];
 
+    public function updatingFeature(): void
+    {
+        $this->resetPage();
+        $this->closeDetail();
+    }
+
+    public function updatingStartDate(): void
+    {
+        $this->resetPage();
+        $this->closeDetail();
+    }
+
+    public function updatingEndDate(): void
+    {
+        $this->resetPage();
+        $this->closeDetail();
+    }
+
+    public function updatingRequestId(): void
+    {
+        $this->resetPage();
+        $this->closeDetail();
+    }
+
     public function resetFilters(): void
     {
         $this->reset(['feature', 'startDate', 'endDate', 'requestId']);
+        $this->resetPage();
+        $this->closeDetail();
+    }
+
+    public function showDetail(int $eventId): void
+    {
+        $this->selectedErrorId = $eventId;
+    }
+
+    public function closeDetail(): void
+    {
+        $this->selectedErrorId = null;
     }
 
     public function render(AdminMetricsService $metrics)
@@ -42,15 +85,19 @@ class AdminErrors extends Component
             'request_id' => $this->requestId ?: null,
         ];
 
-        $errors = $metrics->recentErrors($filters, AdminMetricsService::RECENT_ROWS_LIMIT);
-
-        $byFeature = $errors->groupBy('feature')->map->count()->sortDesc();
-        $byCode = $errors->whereNotNull('error_code')->groupBy('error_code')->map->count()->sortDesc();
+        $errors = $metrics->errorEventsListing($filters, self::ERRORS_PER_PAGE, $this->getPage());
+        $errorSummary = $metrics->errorEventSummary($filters);
+        $selectedError = $this->selectedErrorId !== null
+            ? $metrics->errorEventDetail($this->selectedErrorId)
+            : null;
 
         return view('livewire.admin.admin-errors', [
             'errors' => $errors,
-            'byFeature' => $byFeature,
-            'byCode' => $byCode,
+            'errorsPerPage' => self::ERRORS_PER_PAGE,
+            'selectedError' => $selectedError,
+            'errorSummary' => $errorSummary,
+            'byFeature' => $errorSummary['by_feature'],
+            'byCode' => $errorSummary['by_code'],
             'featureOptions' => [
                 AIUsageEvent::FEATURE_CHAT => 'Chat',
                 AIUsageEvent::FEATURE_DOCUMENT_RAG => 'Chat Dokumen (RAG)',

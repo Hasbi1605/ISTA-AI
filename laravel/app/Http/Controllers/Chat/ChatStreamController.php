@@ -194,6 +194,7 @@ class ChatStreamController extends Controller
             $streamBuffer = '';
             $sources = [];
             $errorStreamDetected = false;
+            $modelMetadata = [];
 
             try {
                 foreach (
@@ -205,6 +206,7 @@ class ChatStreamController extends Controller
                         $sourcePolicy,
                         $allowAutoRealtimeWeb,
                         $resolvedDocumentIds,
+                        $requestId,
                     ) as $rawChunk
                 ) {
                     // Abort if browser disconnected
@@ -218,6 +220,7 @@ class ChatStreamController extends Controller
                     );
 
                     if ($parsedModelName !== null) {
+                        $modelMetadata = $usageEvents->modelMetadata($parsedModelName);
                         $this->sendSseEvent('model-name', $parsedModelName);
                     }
 
@@ -260,6 +263,7 @@ class ChatStreamController extends Controller
                         'has_documents' => $hasDocumentContext,
                         'document_count' => count($resolvedDocumentIds),
                         'reason' => 'stream_exception',
+                        ...$modelMetadata,
                     ],
                     requestId: $requestId,
                     latencyMs: $usageEvents->latencyMsSince($streamStartedAt),
@@ -290,6 +294,7 @@ class ChatStreamController extends Controller
                         'has_documents' => $hasDocumentContext,
                         'document_count' => count($resolvedDocumentIds),
                         'reason' => 'error_sentinel',
+                        ...$modelMetadata,
                     ],
                     requestId: $requestId,
                     latencyMs: $usageEvents->latencyMsSince($streamStartedAt),
@@ -336,6 +341,7 @@ class ChatStreamController extends Controller
                         'sources_count' => count($sources),
                         'has_sources' => ! empty($sources),
                         'response_length' => strlen($cleanContent),
+                        ...$modelMetadata,
                     ],
                     requestId: $requestId,
                     latencyMs: $usageEvents->latencyMsSince($streamStartedAt),

@@ -35,17 +35,16 @@ class AdminDashboard extends Component
     {
         $kpis = $metrics->overviewKpis();
         $series = $metrics->dailyActivitySeries($this->rangeDays);
-        $distribution = $metrics->featureDistribution(
-            now()->subDays($this->rangeDays - 1)->startOfDay(),
-            now(),
-        );
-        $recentEvents = $metrics->recentEvents([], 10);
-        $recentErrors = $metrics->recentErrors([], 5);
+        $recentEvents = $metrics->recentEvents([], 3);
+        $recentErrors = $metrics->recentErrors([], 2);
+        $comparisons = $metrics->overviewComparisons();
+        $lastUpdatedAt = $metrics->lastOverviewActivityAt();
 
         return view('livewire.admin.admin-dashboard', [
             'kpis' => $kpis,
+            'comparisons' => $comparisons,
+            'lastUpdatedAt' => $lastUpdatedAt,
             'series' => $series,
-            'distribution' => $distribution,
             'recentEvents' => $recentEvents,
             'recentErrors' => $recentErrors,
             'rangeDays' => $this->rangeDays,

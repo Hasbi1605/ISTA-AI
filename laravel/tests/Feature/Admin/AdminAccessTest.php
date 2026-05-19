@@ -75,6 +75,9 @@ class AdminAccessTest extends TestCase
         $response->assertStatus(200);
         $response->assertSee('AI Configuration', false);
         $response->assertSee('Akses terbatas', false);
+        $response->assertSee('Model Routing', false);
+        $response->assertSee('Prompt Profiles', false);
+        $response->assertDontSee('Placeholder', false);
     }
 
     public function test_unverified_user_is_redirected_for_admin_routes(): void
