@@ -8,10 +8,12 @@ use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-#[Layout('layouts.admin', ['title' => 'Users', 'heading' => 'User Activity'])]
+#[Layout('layouts.admin', ['title' => 'Users', 'heading' => 'Users'])]
 class AdminUsers extends Component
 {
     use WithPagination;
+
+    private const USERS_PER_PAGE = 15;
 
     public string $search = '';
 
@@ -57,11 +59,15 @@ class AdminUsers extends Component
                 'role' => $this->normalizedRole(),
                 'search' => $this->search,
             ],
-            AdminMetricsService::RECENT_ROWS_LIMIT,
+            self::USERS_PER_PAGE,
+            null,
+            $this->getPage(),
         );
 
         return view('livewire.admin.admin-users', [
             'users' => $users,
+            'usersPerPage' => self::USERS_PER_PAGE,
+            'presenceSummary' => $metrics->userPresenceSummary(),
             'statusOptions' => [
                 'online' => 'Online',
                 'idle' => 'Idle',

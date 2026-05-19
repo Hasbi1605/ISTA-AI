@@ -148,6 +148,18 @@ class AIUsageEventServiceTest extends TestCase
         $this->assertLessThanOrEqual(AIUsageEventService::MAX_LIST_ITEMS, count($clean['document_ids']));
     }
 
+    public function test_model_metadata_is_allowed_and_inferred_from_stream_label(): void
+    {
+        $service = app(AIUsageEventService::class);
+
+        $metadata = $service->modelMetadata('GPT-4.1 Mini (Primary)');
+        $clean = $service->sanitizeMetadata($metadata);
+
+        $this->assertSame('GPT-4.1 Mini (Primary)', $clean['model_label']);
+        $this->assertSame('openai/gpt-4.1-mini', $clean['model_name']);
+        $this->assertSame('github_models', $clean['model_provider']);
+    }
+
     public function test_record_is_best_effort_when_database_throws(): void
     {
         Log::spy();

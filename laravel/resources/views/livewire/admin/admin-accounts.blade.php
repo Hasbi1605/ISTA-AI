@@ -1,316 +1,419 @@
-<div>
-    <div class="mb-6">
-        <div class="flex flex-wrap items-end justify-between gap-3">
-            <div class="max-w-2xl">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-400 dark:text-gray-500">Super Admin</p>
-                <h2 class="admin-page-title mt-1">Account Management</h2>
-                <p class="mt-2 text-sm leading-relaxed text-stone-500 dark:text-gray-400">
-                    Kelola akun admin dan super admin. Buat akun baru, ubah role, aktifkan atau nonaktifkan akses, dan reset password sementara.
-                </p>
-            </div>
-            <div class="flex flex-wrap items-center gap-2">
-                <x-admin.badge tone="gold">
-                    <span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
-                    Akses terbatas
-                </x-admin.badge>
-                <x-admin.badge tone="primary">
-                    Total Super Admin Aktif: {{ $totalActiveSuperAdmins }}
-                </x-admin.badge>
-                <button type="button"
-                        wire:click="openCreateModal"
-                        class="inline-flex h-9 items-center gap-2 rounded-lg bg-ista-primary px-3 text-xs font-semibold uppercase tracking-wider text-amber-300 transition hover:bg-stone-800">
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 4v16m8-8H4"/>
-                    </svg>
-                    Tambah Akun
-                </button>
-            </div>
+@php
+    $formatInt = fn ($value): string => number_format((float) $value, 0, ',', '.');
+    $summaryTotal = (int) ($accountSummary['total'] ?? 0);
+    $activeAccounts = (int) ($accountSummary['active'] ?? 0);
+    $forcedPasswordAccounts = (int) ($accountSummary['force_password_change'] ?? 0);
+    $activeSuperAdminAccounts = (int) ($accountSummary['active_super_admins'] ?? 0);
+    $accountCards = [
+        [
+            'label' => 'Total Akun Admin',
+            'value' => $summaryTotal,
+            'description' => 'Semua akun admin & super admin',
+            'tone' => 'primary',
+            'icon' => 'M12 11c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v3h16v-3c0-2.66-5.33-4-8-4z',
+        ],
+        [
+            'label' => 'Akun Aktif',
+            'value' => $activeAccounts,
+            'description' => 'Sedang memiliki akses',
+            'tone' => 'success',
+            'icon' => 'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+        ],
+        [
+            'label' => 'Perlu Reset Password',
+            'value' => $forcedPasswordAccounts,
+            'description' => 'Tindakan keamanan tertunda',
+            'tone' => 'warning',
+            'icon' => 'M15 7.5a3 3 0 11-4.95 2.3L4.5 15.35V18h2.65l5.55-5.55A3 3 0 0015 7.5zM15 7.5h.01M17.5 4.5l2 2m0 0l2-2m-2 2V2.75',
+        ],
+        [
+            'label' => 'Super Admin Aktif',
+            'value' => $activeSuperAdminAccounts,
+            'description' => 'Hak akses tertinggi',
+            'tone' => 'danger',
+            'icon' => 'M12 3l7.5 4.5v5.25c0 4.5-3.075 7.55-7.5 8.25-4.425-.7-7.5-3.75-7.5-8.25V7.5L12 3z',
+        ],
+    ];
+    $roleLabel = fn (?string $role): string => $role === 'super_admin' ? 'Super Admin' : 'Admin';
+    $roleTone = fn (?string $role): string => $role === 'super_admin' ? 'gold' : 'primary';
+    $statusMeta = fn ($account): array => (bool) $account->is_active
+        ? ['label' => 'Aktif', 'tone' => 'success']
+        : ['label' => 'Nonaktif', 'tone' => 'danger'];
+    $initials = function (?string $name): string {
+        $parts = collect(explode(' ', trim((string) $name)))
+            ->filter()
+            ->take(2)
+            ->map(fn ($part) => mb_substr($part, 0, 1));
+
+        return strtoupper($parts->implode('') ?: 'A');
+    };
+@endphp
+
+<div class="admin-accounts-page">
+    <div class="admin-accounts-hero">
+        <div class="max-w-2xl">
+            <p class="admin-accounts-eyebrow">Super Admin</p>
+            <h2 class="admin-accounts-title">Account Management</h2>
+            <p class="admin-accounts-description">
+                Kelola akses admin, role, status akun, dan password sementara.
+            </p>
+        </div>
+        <div class="admin-accounts-hero__actions">
+            <span class="admin-accounts-access-badge">
+                <span></span>
+                Akses terbatas
+            </span>
+            <button type="button" wire:click="openCreateModal" class="admin-accounts-primary-button">
+                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M12 4v16m8-8H4"/>
+                </svg>
+                Tambah Akun
+            </button>
         </div>
     </div>
 
+    <div class="admin-accounts-kpi-grid">
+        @foreach ($accountCards as $card)
+            <article class="admin-accounts-kpi-card admin-accounts-kpi-card--{{ $card['tone'] }}">
+                <div class="admin-accounts-kpi-card__header">
+                    <span class="admin-accounts-kpi-card__icon" aria-hidden="true">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="{{ $card['icon'] }}"/>
+                        </svg>
+                    </span>
+                    <p class="admin-accounts-kpi-card__label">{{ $card['label'] }}</p>
+                </div>
+                <div class="admin-accounts-kpi-card__body">
+                    <strong>{{ $formatInt($card['value']) }}</strong>
+                    <p class="admin-accounts-kpi-card__description">{{ $card['description'] }}</p>
+                </div>
+            </article>
+        @endforeach
+    </div>
+
     @if ($flashMessage)
-        <div class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50/80 p-3 text-sm text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-200">
-            <div class="flex items-start justify-between gap-3">
-                <span>{{ $flashMessage }}</span>
-                <button type="button" wire:click="clearFlash" class="text-emerald-700/80 hover:text-emerald-900 dark:text-emerald-200/80 dark:hover:text-emerald-100">
-                    <span class="sr-only">Tutup</span>
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
-            </div>
+        <div class="admin-accounts-alert admin-accounts-alert--success">
+            <span>{{ $flashMessage }}</span>
+            <button type="button" wire:click="clearFlash" aria-label="Tutup pesan">
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M6 6l12 12M18 6L6 18"/>
+                </svg>
+            </button>
         </div>
     @endif
 
     @if ($flashError)
-        <div class="mb-4 rounded-lg border border-rose-200 bg-rose-50/80 p-3 text-sm text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-200">
-            <div class="flex items-start justify-between gap-3">
-                <span>{{ $flashError }}</span>
-                <button type="button" wire:click="clearFlash" class="text-rose-600 hover:text-rose-800 dark:text-rose-200/80 dark:hover:text-rose-100">
-                    <span class="sr-only">Tutup</span>
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
-            </div>
+        <div class="admin-accounts-alert admin-accounts-alert--danger">
+            <span>{{ $flashError }}</span>
+            <button type="button" wire:click="clearFlash" aria-label="Tutup pesan">
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M6 6l12 12M18 6L6 18"/>
+                </svg>
+            </button>
         </div>
     @endif
 
     @if ($generatedTemporaryPassword)
-        <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
-            <div class="flex items-start justify-between gap-3">
-                <div class="min-w-0">
-                    <p class="font-semibold">Password sementara berhasil dibuat</p>
-                    <p class="mt-1 text-xs">Salin password berikut sekarang. Sistem tidak akan menampilkannya kembali.</p>
-                    <code class="mt-2 inline-block rounded bg-white/80 px-3 py-1.5 font-mono text-sm tracking-widest text-stone-900 dark:bg-gray-900 dark:text-amber-200">
-                        {{ $generatedTemporaryPassword }}
-                    </code>
-                </div>
-                <button type="button" wire:click="dismissTemporaryPassword" class="text-amber-800/80 hover:text-amber-900 dark:text-amber-200/80 dark:hover:text-amber-100">
-                    <span class="sr-only">Tutup</span>
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
+        <div class="admin-accounts-temp-password">
+            <div class="min-w-0">
+                <p>Password sementara berhasil dibuat</p>
+                <span>Simpan password ini sekarang. Sistem tidak akan menampilkannya kembali.</span>
+                <code>{{ $generatedTemporaryPassword }}</code>
             </div>
+            <button type="button" wire:click="dismissTemporaryPassword" aria-label="Tutup password sementara">
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M6 6l12 12M18 6L6 18"/>
+                </svg>
+            </button>
         </div>
     @endif
 
-    <x-admin.section
-        title="Daftar Akun Admin"
-        description="Akun admin dan super admin yang terdaftar dalam sistem.">
-        <x-slot name="actions">
-            <div class="flex flex-wrap items-center gap-2">
-                <label class="admin-filter">
-                    <span class="admin-filter__label">Cari</span>
-                    <input type="text"
-                           wire:model.live.debounce.300ms="search"
-                           placeholder="Nama atau email"
-                           class="admin-filter__control">
-                </label>
-                <label class="admin-filter">
-                    <span class="admin-filter__label">Role</span>
-                    <select wire:model.live="roleFilter" class="admin-filter__control">
-                        <option value="all">Semua</option>
-                        <option value="admin">Admin</option>
-                        <option value="super_admin">Super Admin</option>
-                    </select>
-                </label>
-                <label class="admin-filter">
-                    <span class="admin-filter__label">Status</span>
-                    <select wire:model.live="statusFilter" class="admin-filter__control">
-                        <option value="all">Semua</option>
-                        <option value="active">Aktif</option>
-                        <option value="inactive">Nonaktif</option>
-                    </select>
-                </label>
-            </div>
-        </x-slot>
+    <section class="admin-accounts-filter-panel admin-section">
+        <div class="admin-accounts-filter-panel__header">
+            <h3>Filter</h3>
+            <button type="button" wire:click="resetFilters" class="admin-accounts-reset-button">
+                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M4 4v6h6M20 20v-6h-6M5.5 14a7 7 0 0012 3M18.5 10a7 7 0 00-12-3"/>
+                </svg>
+                Reset
+            </button>
+        </div>
 
-        <x-admin.table :columns="[
-            ['key' => 'name', 'label' => 'Akun'],
-            ['key' => 'role', 'label' => 'Role'],
-            ['key' => 'status', 'label' => 'Status'],
-            ['key' => 'last_login', 'label' => 'Login Terakhir', 'align' => 'right'],
-            ['key' => 'actions', 'label' => 'Aksi', 'align' => 'right'],
-        ]">
-            @forelse ($accounts as $account)
-                <tr>
-                    <td class="admin-table__td">
-                        <div class="flex flex-col">
-                            <span class="text-sm font-semibold text-stone-700 dark:text-gray-200">{{ $account->name }}</span>
-                            <span class="text-[11px] text-stone-400 dark:text-gray-500">{{ $account->email }}</span>
-                            @if ($account->force_password_change)
-                                <span class="mt-1 inline-flex w-fit items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
-                                    Wajib ganti password
+        <div class="admin-accounts-filter-grid">
+            <label class="admin-accounts-filter">
+                <span>Cari</span>
+                <input type="search"
+                       wire:model.live.debounce.300ms="search"
+                       placeholder="Nama atau email"
+                       class="admin-accounts-control" />
+            </label>
+
+            <label class="admin-accounts-filter">
+                <span>Role</span>
+                <select wire:model.live="roleFilter" class="admin-accounts-control">
+                    @foreach ($roleOptions as $key => $label)
+                        <option value="{{ $key }}">{{ $label }}</option>
+                    @endforeach
+                </select>
+            </label>
+
+            <label class="admin-accounts-filter">
+                <span>Status</span>
+                <select wire:model.live="statusFilter" class="admin-accounts-control">
+                    @foreach ($statusOptions as $key => $label)
+                        <option value="{{ $key }}">{{ $label }}</option>
+                    @endforeach
+                </select>
+            </label>
+        </div>
+    </section>
+
+    <div class="admin-accounts-content-grid">
+        <section class="admin-accounts-table-panel admin-section">
+            <header class="admin-accounts-table-panel__header">
+                <div>
+                    <h3>Daftar Akun Admin</h3>
+                    <p>Menampilkan {{ $accountsPerPage }} akun per halaman pada filter aktif.</p>
+                </div>
+            </header>
+
+            <div class="admin-accounts-table-panel__body">
+                <x-admin.table
+                    class="admin-accounts-table"
+                    :columns="[
+                        ['key' => 'account', 'label' => 'Akun', 'width' => '29%'],
+                        ['key' => 'role', 'label' => 'Role', 'width' => '13%'],
+                        ['key' => 'status', 'label' => 'Status', 'width' => '13%'],
+                        ['key' => 'last_login', 'label' => 'Login Terakhir', 'width' => '18%'],
+                        ['key' => 'actions', 'label' => 'Aksi', 'align' => 'center', 'width' => '27%'],
+                    ]">
+                    @forelse ($accounts as $account)
+                        @php
+                            $accountStatus = $statusMeta($account);
+                        @endphp
+                        <tr>
+                            <td class="admin-table__td">
+                                <div class="admin-users-user-cell">
+                                    <span class="admin-user-avatar" aria-hidden="true">{{ $initials($account->name) }}</span>
+                                    <div class="min-w-0">
+                                        <span class="admin-users-user-cell__name">{{ $account->name }}</span>
+                                        <span class="admin-users-user-cell__email">{{ $account->email }}</span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="admin-table__td">
+                                <x-admin.badge :tone="$roleTone($account->role)">
+                                    {{ $roleLabel($account->role) }}
+                                </x-admin.badge>
+                            </td>
+                            <td class="admin-table__td">
+                                <x-admin.badge :tone="$accountStatus['tone']" class="admin-users-status-badge">
+                                    <span @class([
+                                        'admin-users-status-dot',
+                                        'admin-users-status-dot--online' => $account->is_active,
+                                        'admin-users-status-dot--offline' => ! $account->is_active,
+                                    ])></span>
+                                    {{ $accountStatus['label'] }}
+                                </x-admin.badge>
+                            </td>
+                            <td class="admin-table__td">
+                                <span class="admin-accounts-muted" title="{{ $account->last_admin_login_at?->toDateTimeString() ?? '-' }}">
+                                    {{ $account->last_admin_login_at?->diffForHumans() ?? '-' }}
                                 </span>
-                            @endif
-                        </div>
-                    </td>
-                    <td class="admin-table__td">
-                        <x-admin.badge :tone="$account->role === 'super_admin' ? 'gold' : 'primary'">
-                            {{ $account->role === 'super_admin' ? 'Super Admin' : 'Admin' }}
-                        </x-admin.badge>
-                    </td>
-                    <td class="admin-table__td">
-                        @if ($account->is_active)
-                            <x-admin.badge tone="success">Aktif</x-admin.badge>
-                        @else
-                            <x-admin.badge tone="danger">Nonaktif</x-admin.badge>
-                        @endif
-                    </td>
-                    <td class="admin-table__td" data-align="right">
-                        <span class="text-xs text-stone-500 dark:text-gray-400" title="{{ $account->last_admin_login_at?->toDateTimeString() ?? '—' }}">
-                            {{ $account->last_admin_login_at?->diffForHumans() ?? '—' }}
-                        </span>
-                    </td>
-                    <td class="admin-table__td" data-align="right">
-                        <div class="flex flex-wrap items-center justify-end gap-1.5">
-                            <button type="button"
-                                    wire:click="startEdit({{ $account->id }})"
-                                    class="inline-flex h-8 items-center gap-1 rounded-md border border-stone-200 bg-white px-2 text-[11px] font-semibold uppercase tracking-wider text-stone-600 transition hover:border-ista-primary/30 hover:text-ista-primary dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-ista-primary/40 dark:hover:text-amber-300">
-                                Edit
-                            </button>
+                            </td>
+                            <td class="admin-table__td" data-align="right">
+                                <div class="admin-accounts-action-group">
+                                    <button type="button"
+                                            wire:click="startEdit({{ $account->id }})"
+                                            class="admin-accounts-action-button">
+                                        Edit
+                                    </button>
 
-                            @if ($account->is_active)
-                                <button type="button"
-                                        wire:click="startDeactivate({{ $account->id }})"
-                                        class="inline-flex h-8 items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2 text-[11px] font-semibold uppercase tracking-wider text-rose-700 transition hover:bg-rose-100 dark:border-rose-900/40 dark:bg-rose-950/40 dark:text-rose-200">
-                                    Nonaktifkan
-                                </button>
-                            @else
-                                <button type="button"
-                                        wire:click="activate({{ $account->id }})"
-                                        class="inline-flex h-8 items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 text-[11px] font-semibold uppercase tracking-wider text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-200">
-                                    Aktifkan
-                                </button>
-                            @endif
+                                    @if ($account->is_active)
+                                        <button type="button"
+                                                wire:click="startDeactivate({{ $account->id }})"
+                                                class="admin-accounts-toggle admin-accounts-toggle--active"
+                                                aria-label="Nonaktifkan {{ $account->email }}"
+                                                aria-pressed="true">
+                                            <span aria-hidden="true"></span>
+                                        </button>
+                                    @else
+                                        <button type="button"
+                                                wire:click="activate({{ $account->id }})"
+                                                class="admin-accounts-toggle"
+                                                aria-label="Aktifkan {{ $account->email }}"
+                                                aria-pressed="false">
+                                            <span aria-hidden="true"></span>
+                                        </button>
+                                    @endif
 
-                            <button type="button"
-                                    wire:click="startResetPassword({{ $account->id }})"
-                                    wire:confirm="Reset password admin {{ $account->email }}? Password lama tidak dapat dipakai lagi."
-                                    class="inline-flex h-8 items-center gap-1 rounded-md border border-stone-200 bg-white px-2 text-[11px] font-semibold uppercase tracking-wider text-stone-600 transition hover:border-ista-primary/30 hover:text-ista-primary dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-ista-primary/40 dark:hover:text-amber-300">
-                                Reset Password
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-            @empty
-                <tr>
-                    <td colspan="5" class="admin-table__empty">
-                        <x-admin.empty-state
-                            title="Belum ada akun admin"
-                            description="Tambahkan akun admin atau super admin baru untuk mulai mengelola sistem." />
-                    </td>
-                </tr>
-            @endforelse
-        </x-admin.table>
+                                    <button type="button"
+                                            wire:click="startResetPassword({{ $account->id }})"
+                                            wire:confirm="Reset password admin {{ $account->email }}? Password lama tidak dapat dipakai lagi."
+                                            class="admin-accounts-reset-password-button">
+                                        Reset Password
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="5" class="admin-table__empty">
+                                <x-admin.empty-state
+                                    title="Belum ada akun admin"
+                                    description="Tambahkan akun admin atau super admin baru untuk mulai mengelola sistem." />
+                            </td>
+                        </tr>
+                    @endforelse
+                </x-admin.table>
 
-        @if ($accounts->hasPages())
-            <div class="mt-4">
-                {{ $accounts->links() }}
+                @if ($accounts->hasPages())
+                    <div class="admin-accounts-pagination">
+                        {{ $accounts->links() }}
+                    </div>
+                @endif
             </div>
-        @endif
-    </x-admin.section>
+        </section>
 
-    {{-- Edit drawer --}}
+    </div>
+
     @if ($editingUserId)
-        @php
-            $editingUser = \App\Models\User::query()->find($editingUserId);
-        @endphp
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/40 p-4 backdrop-blur-sm dark:bg-black/60" role="dialog" aria-modal="true">
-            <div class="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl dark:border-gray-800 dark:bg-gray-900">
-                <h3 class="text-base font-semibold text-stone-900 dark:text-gray-100">Edit Akun Admin</h3>
-                <p class="mt-1 text-xs text-stone-500 dark:text-gray-400">{{ $editingUser?->email }}</p>
+        <div class="admin-accounts-modal" role="dialog" aria-modal="true" aria-labelledby="admin-edit-account-title">
+            <button type="button" class="admin-accounts-modal__backdrop" wire:click="cancelEdit" aria-label="Tutup edit akun"></button>
+            <section class="admin-accounts-modal__panel">
+                <header class="admin-accounts-modal__header">
+                    <div>
+                        <p class="admin-accounts-modal__eyebrow">Account Update</p>
+                        <h3 id="admin-edit-account-title">Edit Akun Admin</h3>
+                        <span>{{ $editingUser?->email }}</span>
+                    </div>
+                    <button type="button" wire:click="cancelEdit" class="admin-accounts-modal__close" aria-label="Tutup edit akun">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M6 6l12 12M18 6L6 18"/>
+                        </svg>
+                    </button>
+                </header>
 
-                <div class="mt-4 space-y-3">
-                    <div>
-                        <label class="block text-[11px] font-semibold uppercase tracking-wider text-stone-500 dark:text-gray-400">Nama</label>
-                        <input type="text" wire:model.defer="editName" class="mt-1 admin-filter__control w-full">
-                        @error('editName') <p class="mt-1 text-[11px] text-rose-600 dark:text-rose-300">{{ $message }}</p> @enderror
-                    </div>
-                    <div>
-                        <label class="block text-[11px] font-semibold uppercase tracking-wider text-stone-500 dark:text-gray-400">Email</label>
-                        <input type="email" wire:model.defer="editEmail" class="mt-1 admin-filter__control w-full">
-                        @error('editEmail') <p class="mt-1 text-[11px] text-rose-600 dark:text-rose-300">{{ $message }}</p> @enderror
-                    </div>
-                    <div>
-                        <label class="block text-[11px] font-semibold uppercase tracking-wider text-stone-500 dark:text-gray-400">Role</label>
-                        <select wire:model.defer="editRole" class="mt-1 admin-filter__control w-full">
+                <div class="admin-accounts-modal__body">
+                    <label class="admin-accounts-modal__field">
+                        <span>Nama</span>
+                        <input type="text" wire:model.defer="editName" class="admin-accounts-control">
+                        @error('editName') <em>{{ $message }}</em> @enderror
+                    </label>
+                    <label class="admin-accounts-modal__field">
+                        <span>Email</span>
+                        <input type="email" wire:model.defer="editEmail" class="admin-accounts-control">
+                        @error('editEmail') <em>{{ $message }}</em> @enderror
+                    </label>
+                    <label class="admin-accounts-modal__field">
+                        <span>Role</span>
+                        <select wire:model.defer="editRole" class="admin-accounts-control">
                             <option value="admin">Admin</option>
                             <option value="super_admin">Super Admin</option>
                         </select>
-                        @error('editRole') <p class="mt-1 text-[11px] text-rose-600 dark:text-rose-300">{{ $message }}</p> @enderror
-                    </div>
-                    <label class="flex items-center gap-2 text-xs text-stone-600 dark:text-gray-300">
-                        <input type="checkbox" wire:model.defer="editForcePasswordChange" class="h-4 w-4 rounded border-stone-300 text-ista-primary focus:ring-ista-primary/20 dark:border-gray-700">
-                        Wajib ganti password saat login berikutnya
+                        @error('editRole') <em>{{ $message }}</em> @enderror
+                    </label>
+                    <label class="admin-accounts-checkbox">
+                        <input type="checkbox" wire:model.defer="editForcePasswordChange">
+                        <span>Wajib ganti password saat login berikutnya</span>
                     </label>
                 </div>
 
-                <div class="mt-5 flex items-center justify-end gap-2">
-                    <button type="button" wire:click="cancelEdit" class="inline-flex h-9 items-center gap-1 rounded-md border border-stone-200 bg-white px-3 text-[11px] font-semibold uppercase tracking-wider text-stone-600 transition hover:border-ista-primary/30 hover:text-ista-primary dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300">
-                        Batal
-                    </button>
-                    <button type="button" wire:click="saveEdit" class="inline-flex h-9 items-center gap-1 rounded-md bg-ista-primary px-3 text-[11px] font-semibold uppercase tracking-wider text-amber-300 transition hover:bg-stone-800">
-                        Simpan Perubahan
-                    </button>
-                </div>
-            </div>
+                <footer class="admin-accounts-modal__footer">
+                    <button type="button" wire:click="cancelEdit" class="admin-accounts-secondary-button">Batal</button>
+                    <button type="button" wire:click="saveEdit" class="admin-accounts-primary-button">Simpan Perubahan</button>
+                </footer>
+            </section>
         </div>
     @endif
 
-    {{-- Deactivate confirmation --}}
     @if ($deactivatingUserId)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/40 p-4 backdrop-blur-sm dark:bg-black/60" role="dialog" aria-modal="true">
-            <div class="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl dark:border-gray-800 dark:bg-gray-900">
-                <h3 class="text-base font-semibold text-stone-900 dark:text-gray-100">Konfirmasi Nonaktifkan Akun</h3>
-                <p class="mt-1 text-xs leading-relaxed text-stone-500 dark:text-gray-400">
-                    Akun yang dinonaktifkan tidak dapat login ke admin meskipun masih memiliki sesi aktif.
-                </p>
-
-                <div class="mt-3">
-                    <label class="block text-[11px] font-semibold uppercase tracking-wider text-stone-500 dark:text-gray-400">Alasan (opsional)</label>
-                    <textarea wire:model.defer="deactivateReason" rows="2" class="mt-1 admin-filter__control w-full" placeholder="Misal: rotasi tugas, mutasi"></textarea>
-                </div>
-
-                <div class="mt-5 flex items-center justify-end gap-2">
-                    <button type="button" wire:click="cancelDeactivate" class="inline-flex h-9 items-center gap-1 rounded-md border border-stone-200 bg-white px-3 text-[11px] font-semibold uppercase tracking-wider text-stone-600 transition hover:border-ista-primary/30 hover:text-ista-primary dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300">
-                        Batal
+        <div class="admin-accounts-modal" role="dialog" aria-modal="true" aria-labelledby="admin-deactivate-account-title">
+            <button type="button" class="admin-accounts-modal__backdrop" wire:click="cancelDeactivate" aria-label="Tutup nonaktifkan akun"></button>
+            <section class="admin-accounts-modal__panel">
+                <header class="admin-accounts-modal__header">
+                    <div>
+                        <p class="admin-accounts-modal__eyebrow">Access Control</p>
+                        <h3 id="admin-deactivate-account-title">Konfirmasi Nonaktifkan Akun</h3>
+                        <span>Akun nonaktif tidak dapat login admin.</span>
+                    </div>
+                    <button type="button" wire:click="cancelDeactivate" class="admin-accounts-modal__close" aria-label="Tutup nonaktifkan akun">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M6 6l12 12M18 6L6 18"/>
+                        </svg>
                     </button>
-                    <button type="button" wire:click="confirmDeactivate" class="inline-flex h-9 items-center gap-1 rounded-md bg-rose-600 px-3 text-[11px] font-semibold uppercase tracking-wider text-white transition hover:bg-rose-700">
-                        Nonaktifkan
-                    </button>
-                </div>
-            </div>
-        </div>
-    @endif
+                </header>
 
-    {{-- Create modal --}}
-    @if ($showCreateModal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/40 p-4 backdrop-blur-sm dark:bg-black/60" role="dialog" aria-modal="true">
-            <div class="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl dark:border-gray-800 dark:bg-gray-900">
-                <h3 class="text-base font-semibold text-stone-900 dark:text-gray-100">Tambah Akun Admin</h3>
-                <p class="mt-1 text-xs text-stone-500 dark:text-gray-400">Buat akun admin atau super admin baru. Akun otomatis diverifikasi.</p>
-
-                <div class="mt-4 space-y-3">
-                    <div>
-                        <label class="block text-[11px] font-semibold uppercase tracking-wider text-stone-500 dark:text-gray-400">Nama</label>
-                        <input type="text" wire:model.defer="newName" class="mt-1 admin-filter__control w-full">
-                        @error('newName') <p class="mt-1 text-[11px] text-rose-600 dark:text-rose-300">{{ $message }}</p> @enderror
-                    </div>
-                    <div>
-                        <label class="block text-[11px] font-semibold uppercase tracking-wider text-stone-500 dark:text-gray-400">Email</label>
-                        <input type="email" wire:model.defer="newEmail" class="mt-1 admin-filter__control w-full" placeholder="email@instansi.go.id">
-                        @error('newEmail') <p class="mt-1 text-[11px] text-rose-600 dark:text-rose-300">{{ $message }}</p> @enderror
-                    </div>
-                    <div>
-                        <label class="block text-[11px] font-semibold uppercase tracking-wider text-stone-500 dark:text-gray-400">Password Sementara</label>
-                        <div class="mt-1 flex gap-2">
-                            <input type="text" wire:model.defer="newPassword" class="admin-filter__control w-full font-mono">
-                            <button type="button" wire:click="generateNewPassword" class="inline-flex h-10 items-center rounded-md border border-stone-200 bg-white px-3 text-[11px] font-semibold uppercase tracking-wider text-stone-600 transition hover:border-ista-primary/30 hover:text-ista-primary dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300">
-                                Generate
-                            </button>
-                        </div>
-                        @error('newPassword') <p class="mt-1 text-[11px] text-rose-600 dark:text-rose-300">{{ $message }}</p> @enderror
-                    </div>
-                    <div>
-                        <label class="block text-[11px] font-semibold uppercase tracking-wider text-stone-500 dark:text-gray-400">Role</label>
-                        <select wire:model.defer="newRole" class="mt-1 admin-filter__control w-full">
-                            <option value="admin">Admin</option>
-                            <option value="super_admin">Super Admin</option>
-                        </select>
-                        @error('newRole') <p class="mt-1 text-[11px] text-rose-600 dark:text-rose-300">{{ $message }}</p> @enderror
-                    </div>
-                    <label class="flex items-center gap-2 text-xs text-stone-600 dark:text-gray-300">
-                        <input type="checkbox" wire:model.defer="newForcePasswordChange" class="h-4 w-4 rounded border-stone-300 text-ista-primary focus:ring-ista-primary/20 dark:border-gray-700">
-                        Wajibkan ganti password setelah login pertama
+                <div class="admin-accounts-modal__body">
+                    <label class="admin-accounts-modal__field">
+                        <span>Alasan</span>
+                        <textarea wire:model.defer="deactivateReason" rows="3" class="admin-accounts-control" placeholder="Opsional"></textarea>
                     </label>
                 </div>
 
-                <div class="mt-5 flex items-center justify-end gap-2">
-                    <button type="button" wire:click="closeCreateModal" class="inline-flex h-9 items-center gap-1 rounded-md border border-stone-200 bg-white px-3 text-[11px] font-semibold uppercase tracking-wider text-stone-600 transition hover:border-ista-primary/30 hover:text-ista-primary dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300">
-                        Batal
+                <footer class="admin-accounts-modal__footer">
+                    <button type="button" wire:click="cancelDeactivate" class="admin-accounts-secondary-button">Batal</button>
+                    <button type="button" wire:click="confirmDeactivate" class="admin-accounts-danger-button">Nonaktifkan</button>
+                </footer>
+            </section>
+        </div>
+    @endif
+
+    @if ($showCreateModal)
+        <div class="admin-accounts-modal" role="dialog" aria-modal="true" aria-labelledby="admin-create-account-title">
+            <button type="button" class="admin-accounts-modal__backdrop" wire:click="closeCreateModal" aria-label="Tutup tambah akun"></button>
+            <section class="admin-accounts-modal__panel">
+                <header class="admin-accounts-modal__header">
+                    <div>
+                        <p class="admin-accounts-modal__eyebrow">New Admin</p>
+                        <h3 id="admin-create-account-title">Tambah Akun Admin</h3>
+                        <span>Akun baru otomatis diverifikasi.</span>
+                    </div>
+                    <button type="button" wire:click="closeCreateModal" class="admin-accounts-modal__close" aria-label="Tutup tambah akun">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M6 6l12 12M18 6L6 18"/>
+                        </svg>
                     </button>
-                    <button type="button" wire:click="createAccount" class="inline-flex h-9 items-center gap-1 rounded-md bg-ista-primary px-3 text-[11px] font-semibold uppercase tracking-wider text-amber-300 transition hover:bg-stone-800">
-                        Buat Akun
-                    </button>
+                </header>
+
+                <div class="admin-accounts-modal__body">
+                    <label class="admin-accounts-modal__field">
+                        <span>Nama</span>
+                        <input type="text" wire:model.defer="newName" class="admin-accounts-control">
+                        @error('newName') <em>{{ $message }}</em> @enderror
+                    </label>
+                    <label class="admin-accounts-modal__field">
+                        <span>Email</span>
+                        <input type="email" wire:model.defer="newEmail" class="admin-accounts-control" placeholder="email@instansi.go.id">
+                        @error('newEmail') <em>{{ $message }}</em> @enderror
+                    </label>
+                    <label class="admin-accounts-modal__field">
+                        <span>Password Sementara</span>
+                        <div class="admin-accounts-password-row">
+                            <input type="text" wire:model.defer="newPassword" class="admin-accounts-control font-mono">
+                            <button type="button" wire:click="generateNewPassword" class="admin-accounts-secondary-button">Generate</button>
+                        </div>
+                        @error('newPassword') <em>{{ $message }}</em> @enderror
+                    </label>
+                    <label class="admin-accounts-modal__field">
+                        <span>Role</span>
+                        <select wire:model.defer="newRole" class="admin-accounts-control">
+                            <option value="admin">Admin</option>
+                            <option value="super_admin">Super Admin</option>
+                        </select>
+                        @error('newRole') <em>{{ $message }}</em> @enderror
+                    </label>
+                    <label class="admin-accounts-checkbox">
+                        <input type="checkbox" wire:model.defer="newForcePasswordChange">
+                        <span>Wajibkan ganti password setelah login pertama</span>
+                    </label>
                 </div>
-            </div>
+
+                <footer class="admin-accounts-modal__footer">
+                    <button type="button" wire:click="closeCreateModal" class="admin-accounts-secondary-button">Batal</button>
+                    <button type="button" wire:click="createAccount" class="admin-accounts-primary-button">Buat Akun</button>
+                </footer>
+            </section>
         </div>
     @endif
 </div>

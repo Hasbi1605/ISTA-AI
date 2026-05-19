@@ -26,6 +26,11 @@ class AdminAccountManagementTest extends TestCase
         $response->assertOk();
         $response->assertSee('Account Management');
         $response->assertSee('Daftar Akun Admin');
+        $response->assertSee('Super Admin Aktif');
+        $response->assertSee('admin-accounts-kpi-card__icon', false);
+        $response->assertDontSee('Ringkasan Keamanan');
+        $response->assertSee('Reset Password');
+        $response->assertSee('Menampilkan 15 akun per halaman');
     }
 
     public function test_admin_cannot_access_account_management_page(): void

@@ -18,7 +18,8 @@ class AdminLoginTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Login Admin');
-        $response->assertSee('Admin Console');
+        $response->assertDontSee('Admin Console');
+        $response->assertSee('data-admin-theme-toggle', false);
         $response->assertDontSee('Daftar', false);
         $response->assertDontSee('Lupa Password', false);
         $response->assertDontSee('Guest Chat', false);

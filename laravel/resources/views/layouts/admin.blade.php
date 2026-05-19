@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}"
       x-data="{ darkMode: localStorage.getItem('theme') === 'dark', sidebarOpen: false }"
-      x-init="$watch('darkMode', value => { localStorage.setItem('theme', value ? 'dark' : 'light'); document.documentElement.classList.toggle('dark', value); })"
+      x-init="document.documentElement.classList.toggle('dark', darkMode); $watch('darkMode', value => { localStorage.setItem('theme', value ? 'dark' : 'light'); document.documentElement.classList.toggle('dark', value); })"
       :class="{ 'dark': darkMode }">
 <head>
     <meta charset="utf-8">
@@ -25,7 +25,7 @@
     </script>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="ista-shell ista-display-sans text-stone-800 dark:text-gray-100 transition-colors duration-300">
+<body class="ista-shell ista-display-sans overflow-hidden text-stone-800 dark:text-gray-100 transition-colors duration-300">
     <x-page-loader />
 
     <div class="admin-shell relative flex min-h-[var(--app-viewport-height)] w-full">
@@ -45,9 +45,9 @@
         </aside>
 
         <!-- Main column -->
-        <div class="flex min-w-0 flex-1 flex-col">
+        <div class="admin-content">
             <header class="admin-topbar">
-                <div class="flex items-center gap-3">
+                <div class="flex min-w-0 items-center gap-3">
                     <button type="button"
                             @click="sidebarOpen = true"
                             class="inline-flex h-10 w-10 items-center justify-center rounded-lg text-stone-500 transition hover:bg-stone-100 dark:text-gray-300 dark:hover:bg-gray-800 lg:hidden"
@@ -57,9 +57,10 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 6h16M4 12h16M4 18h16" />
                         </svg>
                     </button>
-                    <div>
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-400 dark:text-gray-500">Dashboard Admin</p>
-                        <h1 class="ista-brand-title text-xl text-stone-900 not-italic dark:text-gray-100">
+                    <div class="admin-breadcrumb min-w-0">
+                        <a href="{{ route('admin.dashboard') }}" class="truncate text-stone-500 transition hover:text-ista-primary dark:text-gray-400 dark:hover:text-amber-300">Dashboard Admin</a>
+                        <span class="text-stone-300 dark:text-gray-700">/</span>
+                        <h1 class="truncate text-sm font-bold text-stone-950 dark:text-gray-100">
                             {{ $heading ?? ($title ?? 'Admin') }}
                         </h1>
                     </div>
@@ -67,7 +68,8 @@
                 <div class="flex items-center gap-2 sm:gap-3">
                     <button type="button"
                             @click="darkMode = !darkMode"
-                            class="inline-flex h-10 w-10 items-center justify-center rounded-lg text-stone-500 transition hover:bg-stone-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                            class="admin-icon-button"
+                            :aria-pressed="darkMode ? 'true' : 'false'"
                             aria-label="Toggle dark mode">
                         <svg x-show="darkMode === false" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 3v2.5M12 18.5V21M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M3 12h2.5M18.5 12H21M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8M12 16a4 4 0 100-8 4 4 0 000 8z" />
@@ -77,24 +79,12 @@
                         </svg>
                     </button>
                     <a href="{{ route('chat') }}"
-                       class="hidden h-10 items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 text-xs font-semibold uppercase tracking-wider text-stone-600 transition hover:border-ista-primary/30 hover:text-ista-primary dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-ista-primary/40 dark:hover:text-amber-300 sm:inline-flex">
+                       class="admin-action-button hidden sm:inline-flex">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M21 12H3m0 0l6-6m-6 6l6 6"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 12h18m0 0l-6-6m6 6l-6 6"/>
                         </svg>
-                        Kembali ke Chat
+                        Masuk ke Chat
                     </a>
-                    <form method="POST" action="{{ route('admin.logout') }}" class="inline-flex">
-                        @csrf
-                        <button type="submit"
-                                class="inline-flex h-10 items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 text-xs font-semibold uppercase tracking-wider text-stone-600 transition hover:border-rose-400/40 hover:text-rose-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-rose-400/40 dark:hover:text-rose-300"
-                                aria-label="Keluar dari admin">
-                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
-                            </svg>
-                            <span class="hidden sm:inline">Logout</span>
-                        </button>
-                    </form>
-                    <livewire:dashboard-nav-profile />
                 </div>
             </header>
 

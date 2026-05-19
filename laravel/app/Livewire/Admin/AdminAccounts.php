@@ -81,6 +81,14 @@ class AdminAccounts extends Component
         $this->resetPage();
     }
 
+    public function resetFilters(): void
+    {
+        $this->reset(['search', 'roleFilter', 'statusFilter']);
+        $this->roleFilter = 'all';
+        $this->statusFilter = 'all';
+        $this->resetPage();
+    }
+
     public function openCreateModal(): void
     {
         $this->reset(['newName', 'newEmail', 'newPassword']);
@@ -295,11 +303,34 @@ class AdminAccounts extends Component
             $query->where('is_active', false);
         }
 
+        $summary = [
+            'total' => (clone $query)->count(),
+            'active' => (clone $query)->where('is_active', true)->count(),
+            'inactive' => (clone $query)->where('is_active', false)->count(),
+            'force_password_change' => (clone $query)->where('force_password_change', true)->count(),
+            'active_super_admins' => (clone $query)
+                ->where('role', User::ROLE_SUPER_ADMIN)
+                ->where('is_active', true)
+                ->count(),
+        ];
+
         $accounts = $query->paginate(15);
 
         return view('livewire.admin.admin-accounts', [
             'accounts' => $accounts,
-            'totalActiveSuperAdmins' => $service->activeSuperAdminsCount(),
+            'accountsPerPage' => 15,
+            'accountSummary' => $summary,
+            'editingUser' => $this->editingUserId ? User::query()->find($this->editingUserId) : null,
+            'roleOptions' => [
+                'all' => 'Semua',
+                User::ROLE_ADMIN => 'Admin',
+                User::ROLE_SUPER_ADMIN => 'Super Admin',
+            ],
+            'statusOptions' => [
+                'all' => 'Semua',
+                'active' => 'Aktif',
+                'inactive' => 'Nonaktif',
+            ],
         ]);
     }
 

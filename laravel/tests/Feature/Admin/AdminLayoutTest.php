@@ -23,6 +23,7 @@ class AdminLayoutTest extends TestCase
         // Sidebar branding & nav.
         $response->assertSee('admin-sidebar', false);
         $response->assertSee('admin-nav-link', false);
+        $response->assertSee('admin-sidebar-profile-menu', false);
         $response->assertSee('Overview', false);
 
         // Topbar.
@@ -106,7 +107,7 @@ class AdminLayoutTest extends TestCase
         $response->assertSee('ista-shell', false);
     }
 
-    public function test_admin_layout_provides_link_back_to_chat(): void
+    public function test_admin_layout_provides_link_to_enter_chat(): void
     {
         $admin = User::factory()->create([
             'role' => User::ROLE_ADMIN,
@@ -116,6 +117,24 @@ class AdminLayoutTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertSee(route('chat'), false);
-        $response->assertSee('Kembali ke Chat', false);
+        $response->assertSee('Masuk ke Chat', false);
+        $response->assertDontSee('Kembali ke Chat', false);
+        $response->assertDontSee('Logout', false);
+    }
+
+    public function test_ai_configuration_renders_consistent_admin_surface(): void
+    {
+        $superAdmin = User::factory()->create([
+            'role' => User::ROLE_SUPER_ADMIN,
+        ]);
+
+        $response = $this->actingAs($superAdmin)->get('/admin/ai-config');
+
+        $response->assertStatus(200);
+        $response->assertSee('admin-ai-config-page', false);
+        $response->assertSee('admin-ai-config-kpi-card', false);
+        $response->assertSee('admin-ai-config-kpi-card__icon', false);
+        $response->assertSee('Parameter Runtime', false);
+        $response->assertSee('Service Endpoints', false);
     }
 }
