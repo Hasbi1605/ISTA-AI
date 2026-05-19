@@ -294,6 +294,69 @@
     .admin-badge--gold { @apply border-amber-300 bg-amber-100/70 text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-300; }
     .admin-badge--primary { @apply border-ista-primary/30 bg-ista-primary/10 text-ista-primary dark:border-ista-primary/40 dark:bg-ista-primary/20 dark:text-amber-300; }
 
+    .admin-status-chip {
+        @apply inline-flex min-w-[4.8rem] items-center justify-center gap-1.5 rounded-full px-2.5 py-1 text-[0.64rem] font-bold ring-1;
+        letter-spacing: 0;
+    }
+
+    .admin-status-chip > span {
+        @apply h-1.5 w-1.5 rounded-full;
+    }
+
+    .admin-status-chip--success {
+        @apply bg-emerald-50 text-emerald-700 ring-emerald-100 dark:bg-emerald-400/10 dark:text-emerald-300 dark:ring-emerald-300/20;
+    }
+
+    .admin-status-chip--success > span { @apply bg-emerald-500; }
+
+    .admin-status-chip--warning {
+        @apply bg-amber-50 text-amber-700 ring-amber-100 dark:bg-amber-400/10 dark:text-amber-300 dark:ring-amber-300/20;
+    }
+
+    .admin-status-chip--warning > span { @apply bg-amber-500; }
+
+    .admin-status-chip--danger {
+        @apply bg-rose-50 text-rose-700 ring-rose-100 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-400/20;
+    }
+
+    .admin-status-chip--danger > span { @apply bg-rose-500; }
+
+    .admin-status-chip--neutral {
+        @apply bg-stone-100 text-stone-600 ring-stone-200 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-700;
+    }
+
+    .admin-status-chip--neutral > span { @apply bg-stone-400 dark:bg-gray-500; }
+
+    .admin-pagination {
+        @apply flex w-full flex-wrap items-center justify-between gap-3 text-[0.72rem] text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-pagination__summary {
+        @apply font-medium;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .admin-pagination__nav {
+        @apply flex flex-wrap items-center justify-end gap-1.5;
+    }
+
+    .admin-pagination__button {
+        @apply inline-flex h-7 min-w-7 items-center justify-center rounded-md border border-stone-200 bg-white px-2 text-[0.68rem] font-semibold text-stone-600 transition hover:border-ista-primary/40 hover:bg-ista-primary/5 hover:text-ista-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/25 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300 dark:hover:border-amber-300/40 dark:hover:bg-amber-300/10 dark:hover:text-amber-300;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .admin-pagination__button--active {
+        @apply border-ista-primary bg-ista-primary text-white shadow-[0_8px_18px_rgba(139,8,54,0.16)] dark:border-amber-300 dark:bg-amber-300 dark:text-gray-950;
+    }
+
+    .admin-pagination__button--disabled {
+        @apply cursor-not-allowed bg-stone-50 text-stone-300 dark:bg-gray-900 dark:text-gray-600;
+    }
+
+    .admin-pagination__ellipsis {
+        @apply inline-flex h-7 min-w-7 items-center justify-center text-stone-400 dark:text-gray-500;
+    }
+
     .admin-empty-state {
         @apply flex flex-col items-center justify-center rounded-xl border border-dashed border-stone-200 bg-stone-50/40 px-6 py-10 text-center dark:border-gray-800 dark:bg-gray-900/40;
     }
@@ -454,6 +517,10 @@
         @apply grid gap-3 px-4 pb-3.5 pt-3 md:grid-cols-[minmax(15rem,1fr)_minmax(10rem,0.7fr)_minmax(10rem,0.85fr)_minmax(5rem,0.25fr)];
     }
 
+    .admin-users-filter-grid--compact {
+        @apply md:grid-cols-[minmax(15rem,1fr)_minmax(10rem,0.42fr)];
+    }
+
     .admin-users-filter {
         @apply flex flex-col gap-1.5;
     }
@@ -569,6 +636,22 @@
 
     .admin-users-total-cell__meta {
         @apply whitespace-nowrap;
+    }
+
+    .admin-users-alert {
+        @apply mx-4 mt-3 flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-[0.74rem] font-medium;
+    }
+
+    .admin-users-alert--success {
+        @apply border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300;
+    }
+
+    .admin-users-alert button {
+        @apply inline-flex h-7 w-7 flex-none items-center justify-center rounded-md transition hover:bg-black/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/25 dark:hover:bg-white/10;
+    }
+
+    .admin-users-delete-button {
+        @apply inline-flex h-7 items-center justify-center rounded-md border border-rose-200 bg-rose-50 px-2.5 text-[0.68rem] font-semibold text-rose-700 transition hover:border-ista-primary/40 hover:bg-ista-primary hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/25 dark:border-rose-400/20 dark:bg-rose-500/10 dark:text-rose-300 dark:hover:border-amber-300/40 dark:hover:bg-amber-300 dark:hover:text-gray-950;
     }
 
     .admin-users-pagination {
@@ -964,58 +1047,28 @@
     }
 
     .admin-documents-file-icon {
-        @apply relative inline-flex h-9 w-8 flex-none items-center justify-center font-mono text-[0.52rem] font-black;
-        letter-spacing: 0;
+        @apply inline-flex h-[34px] w-[34px] flex-none items-center justify-center rounded-lg border border-stone-200/60 bg-white/80 backdrop-blur-sm dark:border-gray-700 dark:bg-gray-800;
     }
 
     .admin-documents-file-icon svg {
-        @apply absolute inset-0 h-full w-full;
+        @apply h-[18px] w-[18px] shrink-0;
     }
 
-    .admin-documents-file-icon > span {
-        @apply absolute bottom-1 left-1/2 z-10 -translate-x-1/2 rounded-[0.16rem] px-0.5 py-px text-[0.43rem] font-black leading-none text-white shadow-sm;
-        letter-spacing: 0;
+    .admin-documents-file-icon--modal {
+        @apply h-10 w-10;
     }
 
-    .admin-documents-file-icon--pdf {
-        @apply text-red-500 dark:text-red-300;
+    .admin-documents-file-icon--modal svg {
+        @apply h-[21px] w-[21px];
     }
 
-    .admin-documents-file-icon--pdf > span {
-        @apply bg-red-600 dark:bg-red-500;
-    }
-
-    .admin-documents-file-icon--csv {
-        @apply text-emerald-600 dark:text-emerald-300;
-    }
-
-    .admin-documents-file-icon--csv > span {
-        @apply bg-emerald-700 dark:bg-emerald-500;
-    }
-
-    .admin-documents-file-icon--xlsx {
-        @apply text-green-700 dark:text-green-300;
-    }
-
-    .admin-documents-file-icon--xlsx > span {
-        @apply bg-green-700 dark:bg-green-500;
-    }
-
-    .admin-documents-file-icon--docx {
-        @apply text-sky-600 dark:text-sky-300;
-    }
-
-    .admin-documents-file-icon--docx > span {
-        @apply bg-sky-600 dark:bg-sky-500;
-    }
-
-    .admin-documents-file-icon--file {
-        @apply text-stone-500 dark:text-gray-300;
-    }
-
-    .admin-documents-file-icon--file > span {
-        @apply bg-stone-600 dark:bg-gray-500;
-    }
+    .admin-documents-file-icon--pdf { color: #FF2056; }
+    .admin-documents-file-icon--csv,
+    .admin-documents-file-icon--xlsx { color: #32CD32; }
+    .admin-documents-file-icon--docx { color: #2B7FFF; }
+    .admin-documents-file-icon--txt,
+    .admin-documents-file-icon--file { color: #62748E; }
+    .admin-documents-file-icon--image { color: #FD9A00; }
 
     .admin-documents-file-cell__name,
     .admin-documents-user-cell__name {
@@ -1108,7 +1161,7 @@
     }
 
     .admin-documents-table-footer {
-        @apply flex flex-wrap items-center justify-center gap-3 border-t border-stone-100 px-3 py-3 text-center text-[0.74rem] text-stone-500 dark:border-gray-800 dark:text-gray-400;
+        @apply border-t border-stone-100 px-3 py-3 text-[0.74rem] text-stone-500 dark:border-gray-800 dark:text-gray-400;
     }
 
     .admin-documents-pagination {
@@ -1240,7 +1293,8 @@
         @apply mt-1 block truncate text-xs font-semibold text-stone-900 dark:text-gray-100;
     }
 
-    .admin-documents-modal__summary-grid strong.admin-documents-status-chip {
+    .admin-documents-modal__summary-grid strong.admin-documents-status-chip,
+    .admin-documents-modal__summary-grid strong.admin-status-chip {
         @apply inline-flex;
     }
 
@@ -1336,7 +1390,8 @@
         @apply mt-1 block truncate text-xs font-semibold text-stone-900 dark:text-gray-100;
     }
 
-    .admin-documents-drawer__summary strong.admin-documents-status-chip {
+    .admin-documents-drawer__summary strong.admin-documents-status-chip,
+    .admin-documents-drawer__summary strong.admin-status-chip {
         @apply inline-flex;
     }
 
@@ -1649,6 +1704,10 @@
 
     .admin-accounts-primary-button {
         @apply bg-ista-primary text-white shadow-[0_8px_20px_rgba(139,8,54,0.18)] hover:bg-rose-900 focus-visible:ring-ista-primary/30 dark:bg-amber-300 dark:text-gray-950 dark:hover:bg-amber-200;
+    }
+
+    .admin-accounts-table-add-button {
+        @apply h-8 px-3 text-[0.72rem];
     }
 
     .admin-accounts-secondary-button {

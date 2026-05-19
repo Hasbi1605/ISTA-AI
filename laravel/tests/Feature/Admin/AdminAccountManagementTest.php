@@ -31,6 +31,7 @@ class AdminAccountManagementTest extends TestCase
         $response->assertDontSee('Ringkasan Keamanan');
         $response->assertSee('Reset Password');
         $response->assertSee('Menampilkan 15 akun per halaman');
+        $response->assertSee('admin-accounts-table-add-button', false);
     }
 
     public function test_admin_cannot_access_account_management_page(): void

@@ -2,10 +2,10 @@
     $formatInt = fn ($value): string => number_format((float) $value, 0, ',', '.');
     $formatPct = function (int $value, int $total): string {
         if ($total <= 0) {
-            return '0.0%';
+            return '0%';
         }
 
-        return number_format(($value / $total) * 100, 1, '.', '') . '%';
+        return ((int) round(($value / $total) * 100)) . '%';
     };
 
     $totalEvents = (int) ($totals['total'] ?? 0);
@@ -224,7 +224,7 @@
 
                     @if ($events->hasPages())
                         <div class="admin-usage-pagination">
-                            {{ $events->links() }}
+                            {{ $events->links('admin.pagination') }}
                         </div>
                     @endif
                 @endif

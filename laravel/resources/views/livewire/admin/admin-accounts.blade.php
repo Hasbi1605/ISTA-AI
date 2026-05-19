@@ -63,12 +63,6 @@
                 <span></span>
                 Akses terbatas
             </span>
-            <button type="button" wire:click="openCreateModal" class="admin-accounts-primary-button">
-                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M12 4v16m8-8H4"/>
-                </svg>
-                Tambah Akun
-            </button>
         </div>
     </div>
 
@@ -175,6 +169,12 @@
                     <h3>Daftar Akun Admin</h3>
                     <p>Menampilkan {{ $accountsPerPage }} akun per halaman pada filter aktif.</p>
                 </div>
+                <button type="button" wire:click="openCreateModal" class="admin-accounts-primary-button admin-accounts-table-add-button">
+                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Tambah Akun
+                </button>
             </header>
 
             <div class="admin-accounts-table-panel__body">
@@ -269,7 +269,7 @@
 
                 @if ($accounts->hasPages())
                     <div class="admin-accounts-pagination">
-                        {{ $accounts->links() }}
+                        {{ $accounts->links('admin.pagination') }}
                     </div>
                 @endif
             </div>

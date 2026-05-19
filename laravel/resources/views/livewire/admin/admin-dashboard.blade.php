@@ -1,6 +1,6 @@
 @php
     $formatInt = fn ($value): string => number_format((float) $value, 0, ',', '.');
-    $formatPct = fn ($value): string => number_format((float) $value, 1, ',', '.') . '%';
+    $formatPct = fn ($value): string => number_format((float) $value, 0, ',', '.') . '%';
     $formatSeconds = fn ($milliseconds): string => number_format(((float) $milliseconds) / 1000, 2, ',', '.') . 's';
     $trendClass = function (?array $trend): string {
         return match ($trend['tone'] ?? 'neutral') {
@@ -23,7 +23,7 @@
         $unit = $trend['unit'] ?? 'percent';
 
         $value = match ($unit) {
-            'percentage_points' => number_format($delta, 1, ',', '.') . ' poin',
+            'percentage_points' => number_format($delta, 0, ',', '.') . ' poin',
             'milliseconds' => $formatSeconds($delta),
             default => $formatPct(abs((float) ($trend['delta_percent'] ?? 0))),
         };

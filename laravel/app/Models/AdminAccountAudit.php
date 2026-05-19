@@ -28,6 +28,8 @@ class AdminAccountAudit extends Model
 
     public const ACTION_ROLE_CHANGED = 'admin_role_changed';
 
+    public const ACTION_REGULAR_USER_DELETED = 'regular_user_deleted';
+
     protected $fillable = [
         'actor_id',
         'target_user_id',

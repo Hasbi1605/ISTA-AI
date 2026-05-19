@@ -130,17 +130,23 @@ class AdminMetricsService
      *
      * @return array{total: int, online: int, idle: int, offline: int}
      */
-    public function userPresenceSummary(?CarbonInterface $now = null): array
+    public function userPresenceSummary(?CarbonInterface $now = null, ?string $role = null): array
     {
         $now = $now ? $now->copy() : now();
-        $total = User::query()->count();
+        $baseQuery = User::query();
 
-        $online = User::query()
+        if ($role !== null && in_array($role, User::ROLES, true)) {
+            $baseQuery->where('role', $role);
+        }
+
+        $total = (clone $baseQuery)->count();
+
+        $online = (clone $baseQuery)
             ->whereNotNull('last_seen_at')
             ->where('last_seen_at', '>=', $now->copy()->subMinutes(self::PRESENCE_ONLINE_MINUTES))
             ->count();
 
-        $idle = User::query()
+        $idle = (clone $baseQuery)
             ->whereNotNull('last_seen_at')
             ->where('last_seen_at', '<', $now->copy()->subMinutes(self::PRESENCE_ONLINE_MINUTES))
             ->where('last_seen_at', '>=', $now->copy()->subMinutes(self::PRESENCE_IDLE_MINUTES))
