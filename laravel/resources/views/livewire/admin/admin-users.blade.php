@@ -2,10 +2,10 @@
     $formatInt = fn ($value): string => number_format((float) $value, 0, ',', '.');
     $formatPct = function (int $value, int $total): string {
         if ($total <= 0) {
-            return '0.0%';
+            return '0%';
         }
 
-        return number_format(($value / $total) * 100, 1, '.', '') . '%';
+        return ((int) round(($value / $total) * 100)) . '%';
     };
 
     $totalUsers = (int) ($presenceSummary['total'] ?? 0);
@@ -112,7 +112,18 @@
             </div>
         </div>
 
-        <div class="admin-users-filter-grid">
+        @if ($flashMessage)
+            <div class="admin-users-alert admin-users-alert--success">
+                <span>{{ $flashMessage }}</span>
+                <button type="button" wire:click="clearFlash" aria-label="Tutup pesan">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M6 6l12 12M18 6L6 18"/>
+                    </svg>
+                </button>
+            </div>
+        @endif
+
+        <div class="admin-users-filter-grid admin-users-filter-grid--compact">
             <label class="admin-users-filter">
                 <span>Cari</span>
                 <div class="admin-users-search-control">
@@ -131,16 +142,6 @@
                 <select wire:model.live="status" class="admin-users-control">
                     <option value="">Semua</option>
                     @foreach ($statusOptions as $key => $label)
-                        <option value="{{ $key }}">{{ $label }}</option>
-                    @endforeach
-                </select>
-            </label>
-
-            <label class="admin-users-filter">
-                <span>Role</span>
-                <select wire:model.live="role" class="admin-users-control">
-                    <option value="">Semua</option>
-                    @foreach ($roleOptions as $key => $label)
                         <option value="{{ $key }}">{{ $label }}</option>
                     @endforeach
                 </select>
@@ -165,14 +166,12 @@
                 <x-admin.table
                     class="admin-users-table"
                     :columns="[
-                        ['key' => 'user', 'label' => 'User', 'width' => '21%'],
-                        ['key' => 'role', 'label' => 'Role', 'width' => '9%'],
-                        ['key' => 'status', 'label' => 'Status', 'width' => '10%'],
-                        ['key' => 'last_seen', 'label' => 'Last Seen', 'width' => '11%'],
+                        ['key' => 'user', 'label' => 'User', 'width' => '30%'],
+                        ['key' => 'status', 'label' => 'Status', 'width' => '13%'],
+                        ['key' => 'last_seen', 'label' => 'Last Seen', 'width' => '15%'],
                         ['key' => 'last_feature', 'label' => 'Aktivitas Terakhir', 'width' => '20%'],
-                        ['key' => 'events_today', 'label' => 'Event Hari Ini', 'align' => 'right', 'width' => '9%'],
-                        ['key' => 'events_week', 'label' => 'Event 7 Hari', 'align' => 'right', 'width' => '9%'],
-                        ['key' => 'totals', 'label' => 'Total', 'align' => 'right', 'width' => '11%'],
+                        ['key' => 'totals', 'label' => 'Total', 'align' => 'right', 'width' => '13%'],
+                        ['key' => 'actions', 'label' => 'Aksi', 'align' => 'right', 'width' => '9%'],
                     ]">
                     @foreach ($users as $user)
                         @php
@@ -180,11 +179,6 @@
                             $statusTone = match ($statusKey) {
                                 'online' => 'success',
                                 'idle' => 'warning',
-                                default => 'neutral',
-                            };
-                            $roleTone = match ($user->role) {
-                                \App\Models\User::ROLE_SUPER_ADMIN => 'gold',
-                                \App\Models\User::ROLE_ADMIN => 'primary',
                                 default => 'neutral',
                             };
                             $lastFeature = $user->last_active_feature
@@ -200,11 +194,6 @@
                                         <span class="admin-users-user-cell__email">{{ $user->email }}</span>
                                     </div>
                                 </div>
-                            </td>
-                            <td class="admin-table__td">
-                                <x-admin.badge :tone="$roleTone">
-                                    {{ $roleOptions[$user->role] ?? $user->role }}
-                                </x-admin.badge>
                             </td>
                             <td class="admin-table__td">
                                 <x-admin.badge :tone="$statusTone" class="admin-users-status-badge">
@@ -226,17 +215,23 @@
                                 <span class="admin-users-feature">{{ $lastFeature }}</span>
                             </td>
                             <td class="admin-table__td" data-align="right">
-                                <span class="admin-users-number">{{ number_format($user->getAttribute('events_today') ?? 0) }}</span>
-                            </td>
-                            <td class="admin-table__td" data-align="right">
-                                <span class="admin-users-number">{{ number_format($user->getAttribute('events_week') ?? 0) }}</span>
-                            </td>
-                            <td class="admin-table__td" data-align="right">
                                 <div class="admin-users-total-cell">
                                     <span class="admin-users-total-cell__primary">{{ number_format($user->getAttribute('conversation_count') ?? 0) }} conv</span>
                                     <span class="admin-users-total-cell__meta">{{ number_format($user->getAttribute('document_count') ?? 0) }} doc</span>
                                     <span class="admin-users-total-cell__meta">{{ number_format($user->getAttribute('memo_count') ?? 0) }} memo</span>
                                 </div>
+                            </td>
+                            <td class="admin-table__td" data-align="right">
+                                @if ($canDeleteUsers)
+                                    <button type="button"
+                                            wire:click="deleteUser({{ $user->id }})"
+                                            wire:confirm="Hapus akun user {{ $user->email }}? Percakapan, memo, dokumen, file, dan vector dokumen milik user ini akan ikut dibersihkan."
+                                            class="admin-users-delete-button">
+                                        Delete
+                                    </button>
+                                @else
+                                    <span class="admin-users-muted">-</span>
+                                @endif
                             </td>
                         </tr>
                     @endforeach
@@ -244,7 +239,7 @@
 
                 @if ($users->hasPages())
                     <div class="admin-users-pagination">
-                        {{ $users->links() }}
+                        {{ $users->links('admin.pagination') }}
                     </div>
                 @endif
             @endif

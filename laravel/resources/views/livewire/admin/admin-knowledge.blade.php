@@ -2,10 +2,10 @@
     $formatInt = fn ($value): string => number_format((float) $value, 0, ',', '.');
     $formatPct = function (int $value, int $total): string {
         if ($total <= 0) {
-            return '0.0%';
+            return '0%';
         }
 
-        return number_format(($value / $total) * 100, 1, '.', '') . '%';
+        return ((int) round(($value / $total) * 100)) . '%';
     };
     $fileTypeMeta = function ($doc): array {
         $mime = (string) ($doc?->mime_type ?? '');
@@ -15,6 +15,8 @@
             in_array($mime, ['text/csv', 'text/plain', 'application/csv'], true) || $extension === 'csv' => 'csv',
             in_array($mime, ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel'], true) || in_array($extension, ['xls', 'xlsx'], true) => 'xlsx',
             $mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || $extension === 'docx' => 'docx',
+            $extension === 'txt' => 'txt',
+            in_array($extension, ['png', 'jpg', 'jpeg', 'gif', 'webp', 'img'], true) => 'image',
             default => 'file',
         };
 
@@ -25,6 +27,8 @@
                 'csv' => 'CSV',
                 'xlsx' => 'XLSX',
                 'docx' => 'DOCX',
+                'txt' => 'TXT',
+                'image' => 'IMG',
                 default => strtoupper($extension ?: 'FILE'),
             },
             'type_label' => match ($type) {
@@ -209,13 +213,7 @@
                                 <tr>
                                     <td class="admin-table__td">
                                         <div class="admin-documents-file-cell">
-                                            <span class="admin-documents-file-icon admin-documents-file-icon--{{ $typeMeta['key'] }}" aria-hidden="true">
-                                                <svg viewBox="0 0 32 38" fill="none" aria-hidden="true">
-                                                    <path d="M7 1.75h12.6L29.25 11.4V33A3.25 3.25 0 0 1 26 36.25H7A3.25 3.25 0 0 1 3.75 33V5A3.25 3.25 0 0 1 7 1.75Z" stroke="currentColor" stroke-width="2"/>
-                                                    <path d="M19.5 2.5V10a2 2 0 0 0 2 2H29" stroke="currentColor" stroke-width="2"/>
-                                                </svg>
-                                                <span>{{ $typeMeta['label'] }}</span>
-                                            </span>
+                                            <x-admin.document-icon :type="$typeMeta['key']" :label="$typeMeta['label']" />
                                             <div class="min-w-0">
                                                 <span class="admin-knowledge-file-name" title="{{ $doc->title }}">{{ \Illuminate\Support\Str::limit((string) $doc->title, 52, '...') }}</span>
                                                 <span class="admin-knowledge-file-meta">{{ \Illuminate\Support\Str::limit((string) $doc->original_name, 52, '...') }}</span>
@@ -241,7 +239,7 @@
                                         <span class="admin-documents-number">{{ $doc->formatted_size }}</span>
                                     </td>
                                     <td class="admin-table__td">
-                                        <span class="admin-documents-status-chip admin-documents-status-chip--{{ $status['tone'] }}">
+                                        <span class="admin-status-chip admin-status-chip--{{ $status['tone'] }}">
                                             <span aria-hidden="true"></span>
                                             {{ $status['label'] }}
                                         </span>

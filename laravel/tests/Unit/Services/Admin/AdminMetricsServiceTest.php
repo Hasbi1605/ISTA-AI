@@ -125,6 +125,36 @@ class AdminMetricsServiceTest extends TestCase
         Carbon::setTestNow();
     }
 
+    public function test_user_presence_summary_can_be_scoped_to_regular_users(): void
+    {
+        $now = Carbon::parse('2026-05-18 12:00:00');
+        Carbon::setTestNow($now);
+
+        User::factory()->create([
+            'role' => User::ROLE_ADMIN,
+            'last_seen_at' => $now->copy()->subSeconds(30),
+        ]);
+        User::factory()->create([
+            'role' => User::ROLE_USER,
+            'last_seen_at' => $now->copy()->subSeconds(30),
+        ]);
+        User::factory()->create([
+            'role' => User::ROLE_USER,
+            'last_seen_at' => $now->copy()->subMinutes(8),
+        ]);
+
+        $summary = $this->metrics->userPresenceSummary($now, User::ROLE_USER);
+
+        $this->assertSame([
+            'total' => 2,
+            'online' => 1,
+            'idle' => 1,
+            'offline' => 0,
+        ], $summary);
+
+        Carbon::setTestNow();
+    }
+
     public function test_overview_comparisons_use_real_previous_periods(): void
     {
         $now = Carbon::parse('2026-05-18 12:00:00');

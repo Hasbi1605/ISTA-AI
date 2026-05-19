@@ -73,6 +73,12 @@ class AdminMonitoringDashboardTest extends TestCase
 
         User::factory()->create([
             'role' => User::ROLE_USER,
+            'name' => 'User Online',
+            'last_seen_at' => $now->copy()->subSeconds(30),
+        ]);
+
+        User::factory()->create([
+            'role' => User::ROLE_USER,
             'name' => 'User Idle',
             'last_seen_at' => $now->copy()->subMinutes(8),
         ]);
@@ -95,12 +101,14 @@ class AdminMonitoringDashboardTest extends TestCase
         $response->assertSee('admin-users-kpi-card', false);
         $response->assertSee('admin-users-kpi-card__icon', false);
         $response->assertSee('admin-user-avatar', false);
-        $response->assertSee('Admin Aktif', false);
+        $response->assertSee('User Online', false);
         $response->assertSee('User Idle', false);
         $response->assertSee('User Offline', false);
         $response->assertSee('Online', false);
         $response->assertSee('Idle', false);
         $response->assertSee('Offline', false);
+        $response->assertDontSee('Event Hari Ini', false);
+        $response->assertDontSee('Event 7 Hari', false);
 
         Carbon::setTestNow();
     }
@@ -118,6 +126,12 @@ class AdminMonitoringDashboardTest extends TestCase
 
         User::factory()->create([
             'role' => User::ROLE_USER,
+            'name' => 'Online Person',
+            'last_seen_at' => $now->copy()->subSeconds(30),
+        ]);
+
+        User::factory()->create([
+            'role' => User::ROLE_USER,
             'name' => 'Idle Person',
             'last_seen_at' => $now->copy()->subMinutes(8),
         ]);
@@ -126,10 +140,51 @@ class AdminMonitoringDashboardTest extends TestCase
 
         Livewire::test(AdminUsers::class)
             ->set('status', 'online')
-            ->assertSee('Admin Aktif')
+            ->assertSee('Online Person')
+            ->assertDontSee('Admin Aktif')
             ->assertDontSee('Idle Person');
 
         Carbon::setTestNow();
+    }
+
+    public function test_super_admin_can_delete_regular_user_from_users_page(): void
+    {
+        $superAdmin = User::factory()->create([
+            'role' => User::ROLE_SUPER_ADMIN,
+            'is_active' => true,
+        ]);
+        $regular = User::factory()->create([
+            'role' => User::ROLE_USER,
+            'email' => 'delete-me@example.test',
+        ]);
+
+        $this->actingAs($superAdmin);
+
+        Livewire::test(AdminUsers::class)
+            ->assertSee('delete-me@example.test', false)
+            ->assertSee('admin-users-delete-button', false)
+            ->call('deleteUser', $regular->id)
+            ->assertSee('berhasil dihapus');
+
+        $this->assertDatabaseMissing('users', ['id' => $regular->id]);
+    }
+
+    public function test_users_page_delete_action_refuses_admin_family_targets(): void
+    {
+        $superAdmin = User::factory()->create([
+            'role' => User::ROLE_SUPER_ADMIN,
+            'is_active' => true,
+        ]);
+        $adminTarget = User::factory()->create([
+            'role' => User::ROLE_ADMIN,
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($superAdmin);
+
+        Livewire::test(AdminUsers::class)
+            ->call('deleteUser', $adminTarget->id)
+            ->assertStatus(404);
     }
 
     public function test_admin_usage_filter_by_feature(): void
@@ -366,6 +421,10 @@ class AdminMonitoringDashboardTest extends TestCase
         $response->assertSee('Dokumen Terbaru', false);
         $response->assertSee('Chunks', false);
         $response->assertDontSee('Pipeline Dokumen', false);
+        $response->assertDontSee('admin-documents-type-label', false);
+        $response->assertSee('admin-documents-file-icon--pdf', false);
+        $response->assertSee('admin-status-chip--success', false);
+        $response->assertSee('admin-status-chip--danger', false);
         $response->assertSee('Detail', false);
         $response->assertSee('a.pdf', false);
         $response->assertSee('b.pdf', false);
@@ -480,12 +539,42 @@ class AdminMonitoringDashboardTest extends TestCase
             ->call('showDetail', $document->id)
             ->assertSee('Document Detail')
             ->assertSee('Status AI')
+            ->assertSee('admin-documents-stage-list', false)
             ->assertSee('Metadata ringkas')
+            ->assertSee('Original file')
+            ->assertSee('Uploaded')
+            ->assertSee('Source')
+            ->assertSee('Updated')
             ->assertSee('Chunks')
             ->assertSee('2')
             ->assertSee('Indexed')
             ->assertSee('GOOGLE DRIVE', false)
+            ->assertDontSee('Stored file')
             ->assertDontSee('Hidden chunk content must not be rendered.', false);
+    }
+
+    public function test_admin_documents_detail_marks_empty_index_when_ready_document_has_no_chunks(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $owner = User::factory()->create(['role' => User::ROLE_USER]);
+
+        $document = Document::create([
+            'user_id' => $owner->id,
+            'filename' => 'empty-index.pdf',
+            'original_name' => 'empty-index.pdf',
+            'file_path' => 'docs/empty-index.pdf',
+            'status' => 'ready',
+            'preview_status' => Document::PREVIEW_STATUS_READY,
+            'mime_type' => 'application/pdf',
+            'file_size_bytes' => 4096,
+        ]);
+
+        $this->actingAs($admin);
+
+        Livewire::test(AdminDocuments::class)
+            ->call('showDetail', $document->id)
+            ->assertSee('Index kosong')
+            ->assertDontSee('chunk siap');
     }
 
     public function test_admin_documents_paginates_document_table_at_ten_rows(): void
@@ -517,6 +606,10 @@ class AdminMonitoringDashboardTest extends TestCase
 
         Livewire::test(AdminDocuments::class)
             ->assertSee('Maksimum 10 baris')
+            ->assertSee('Menampilkan', false)
+            ->assertSee('dari 11', false)
+            ->assertSee('admin-pagination__button--active', false)
+            ->assertDontSee('Showing', false)
             ->assertSee('document-row-1.pdf', false)
             ->assertDontSee('document-row-11.pdf', false)
             ->call('gotoPage', 2)

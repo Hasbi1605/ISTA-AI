@@ -2,10 +2,10 @@
     $formatInt = fn ($value): string => number_format((float) $value, 0, ',', '.');
     $formatPct = function (int $value, int $total): string {
         if ($total <= 0) {
-            return '0.0%';
+            return '0%';
         }
 
-        return number_format(($value / $total) * 100, 1, '.', '') . '%';
+        return ((int) round(($value / $total) * 100)) . '%';
     };
     $formatBytes = function (int $bytes): string {
         if ($bytes >= 1073741824) {
@@ -30,6 +30,8 @@
             in_array($mime, ['text/csv', 'text/plain', 'application/csv'], true) || $extension === 'csv' => 'csv',
             in_array($mime, ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel'], true) || in_array($extension, ['xls', 'xlsx'], true) => 'xlsx',
             $mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || $extension === 'docx' => 'docx',
+            $extension === 'txt' => 'txt',
+            in_array($extension, ['png', 'jpg', 'jpeg', 'gif', 'webp', 'img'], true) => 'image',
             default => 'file',
         };
 
@@ -40,6 +42,8 @@
                 'csv' => 'CSV',
                 'xlsx' => 'XLSX',
                 'docx' => 'DOCX',
+                'txt' => 'TXT',
+                'image' => 'IMG',
                 default => strtoupper($extension ?: 'FILE'),
             },
             'type_label' => match ($type) {
@@ -71,12 +75,12 @@
         return match ($status) {
             'ready' => ['label' => 'Ready', 'tone' => 'success'],
             'processing' => ['label' => 'Processing', 'tone' => 'warning'],
-            'pending' => ['label' => 'Pending', 'tone' => 'neutral'],
+            'pending' => ['label' => 'Pending', 'tone' => 'warning'],
             'error' => ['label' => 'Failed', 'tone' => 'danger'],
             default => ['label' => ucfirst((string) ($status ?: 'Unknown')), 'tone' => 'neutral'],
         };
     };
-    $stageState = function (string $status, string $previewStatus, string $stage): string {
+    $stageState = function (string $status, string $previewStatus, string $stage, int $chunks = 0): string {
         if ($stage === 'uploaded') {
             return 'done';
         }
@@ -94,7 +98,7 @@
         }
 
         if ($stage === 'indexed') {
-            if ($status === 'ready') {
+            if ($status === 'ready' && $chunks > 0) {
                 return 'done';
             }
 
@@ -124,11 +128,17 @@
             $status === 'processing' => 'Parsing',
             default => 'Queued',
         };
-        $embeddingStatus = match ($status) {
-            'ready' => 'Indexed',
-            'processing' => 'Indexing',
-            'error' => 'Failed',
+        $embeddingStatus = match (true) {
+            $status === 'ready' && $chunks > 0 => 'Indexed',
+            $status === 'ready' && $chunks === 0 => 'Index kosong',
+            $status === 'processing' => 'Indexing',
+            $status === 'error' => 'Failed',
             default => 'Waiting',
+        };
+        $chunkStatus = match (true) {
+            $chunks > 0 => number_format($chunks) . ' chunk siap',
+            $status === 'error' => 'Belum ada chunk',
+            default => 'Index kosong',
         };
 
         return [
@@ -136,12 +146,13 @@
             'tone' => $status === 'error' ? 'danger' : ($status === 'ready' ? 'success' : 'warning'),
             'parse_status' => $parseStatus,
             'embedding_status' => $embeddingStatus,
+            'chunk_status' => $chunkStatus,
             'chunk_count' => $chunks,
             'stages' => [
-                ['key' => 'uploaded', 'label' => 'Uploaded', 'state' => $stageState($status, $previewStatus, 'uploaded')],
-                ['key' => 'parsed', 'label' => 'Parsed', 'state' => $stageState($status, $previewStatus, 'parsed')],
-                ['key' => 'indexed', 'label' => 'Indexed', 'state' => $stageState($status, $previewStatus, 'indexed')],
-                ['key' => 'ready', 'label' => 'Ready', 'state' => $stageState($status, $previewStatus, 'ready')],
+                ['key' => 'uploaded', 'label' => 'Uploaded', 'state' => $stageState($status, $previewStatus, 'uploaded', $chunks)],
+                ['key' => 'parsed', 'label' => 'Parsed', 'state' => $stageState($status, $previewStatus, 'parsed', $chunks)],
+                ['key' => 'indexed', 'label' => 'Indexed', 'state' => $stageState($status, $previewStatus, 'indexed', $chunks)],
+                ['key' => 'ready', 'label' => 'Ready', 'state' => $stageState($status, $previewStatus, 'ready', $chunks)],
             ],
         ];
     };
@@ -297,14 +308,13 @@
                     <x-admin.table
                         class="admin-documents-table"
                         :columns="[
-                            ['key' => 'file', 'label' => 'File', 'width' => '26%'],
-                            ['key' => 'owner', 'label' => 'User', 'width' => '18%'],
-                            ['key' => 'type', 'label' => 'Tipe', 'width' => '12%'],
-                            ['key' => 'size', 'label' => 'Size', 'align' => 'right', 'width' => '9%'],
-                            ['key' => 'status', 'label' => 'Status', 'width' => '11%'],
+                            ['key' => 'file', 'label' => 'File', 'width' => '34%'],
+                            ['key' => 'owner', 'label' => 'User', 'width' => '21%'],
+                            ['key' => 'size', 'label' => 'Size', 'align' => 'right', 'width' => '10%'],
+                            ['key' => 'status', 'label' => 'Status', 'width' => '12%'],
                             ['key' => 'chunks', 'label' => 'Chunks', 'align' => 'center', 'width' => '8%'],
                             ['key' => 'uploaded', 'label' => 'Waktu', 'align' => 'right', 'width' => '9%'],
-                            ['key' => 'action', 'label' => 'Aksi', 'align' => 'right', 'width' => '7%'],
+                            ['key' => 'action', 'label' => 'Aksi', 'align' => 'right', 'width' => '6%'],
                         ]">
                         @foreach ($documents as $doc)
                             @php
@@ -314,13 +324,7 @@
                             <tr>
                                 <td class="admin-table__td">
                                     <div class="admin-documents-file-cell">
-                                        <span class="admin-documents-file-icon admin-documents-file-icon--{{ $typeMeta['key'] }}" aria-hidden="true">
-                                            <svg viewBox="0 0 32 38" fill="none" aria-hidden="true">
-                                                <path d="M7 1.75h12.6L29.25 11.4V33A3.25 3.25 0 0 1 26 36.25H7A3.25 3.25 0 0 1 3.75 33V5A3.25 3.25 0 0 1 7 1.75Z" stroke="currentColor" stroke-width="2"/>
-                                                <path d="M19.5 2.5V10a2 2 0 0 0 2 2H29" stroke="currentColor" stroke-width="2"/>
-                                            </svg>
-                                            <span>{{ $typeMeta['label'] }}</span>
-                                        </span>
+                                        <x-admin.document-icon :type="$typeMeta['key']" :label="$typeMeta['label']" />
                                         <div class="min-w-0">
                                             <span class="admin-documents-file-cell__name" title="{{ $doc->original_name }}">
                                                 {{ \Illuminate\Support\Str::limit((string) $doc->original_name, 54, '...') }}
@@ -337,14 +341,11 @@
                                         </div>
                                     </div>
                                 </td>
-                                <td class="admin-table__td">
-                                    <span class="admin-documents-type-label">{{ $typeMeta['type_label'] }}</span>
-                                </td>
                                 <td class="admin-table__td" data-align="right">
                                     <span class="admin-documents-number">{{ $doc->formatted_size }}</span>
                                 </td>
                                 <td class="admin-table__td">
-                                    <span class="admin-documents-status-chip admin-documents-status-chip--{{ $status['tone'] }}">
+                                    <span class="admin-status-chip admin-status-chip--{{ $status['tone'] }}">
                                         <span aria-hidden="true"></span>
                                         {{ $status['label'] }}
                                     </span>
@@ -369,11 +370,12 @@
                     </x-admin.table>
 
                     <div class="admin-documents-table-footer">
-                        <span>Menampilkan {{ number_format($documents->firstItem() ?? 0) }}-{{ number_format($documents->lastItem() ?? 0) }} dari {{ number_format($documents->total()) }} dokumen</span>
                         @if ($documents->hasPages())
                             <div class="admin-documents-pagination">
-                                {{ $documents->links() }}
+                                {{ $documents->links('admin.pagination') }}
                             </div>
+                        @else
+                            {{ $documents->links('admin.pagination') }}
                         @endif
                     </div>
                 @endif
@@ -467,19 +469,12 @@
             <section class="admin-documents-modal__panel">
                 <header class="admin-documents-modal__header">
                     <div class="admin-documents-modal__title-row">
-                        <span class="admin-documents-file-icon admin-documents-file-icon--{{ $selectedType['key'] }}" aria-hidden="true">
-                            <svg viewBox="0 0 32 38" fill="none" aria-hidden="true">
-                                <path d="M7 1.75h12.6L29.25 11.4V33A3.25 3.25 0 0 1 26 36.25H7A3.25 3.25 0 0 1 3.75 33V5A3.25 3.25 0 0 1 7 1.75Z" stroke="currentColor" stroke-width="2"/>
-                                <path d="M19.5 2.5V10a2 2 0 0 0 2 2H29" stroke="currentColor" stroke-width="2"/>
-                            </svg>
-                            <span>{{ $selectedType['label'] }}</span>
-                        </span>
+                        <x-admin.document-icon :type="$selectedType['key']" :label="$selectedType['label']" class="admin-documents-file-icon--modal" />
                         <div class="min-w-0">
                             <p class="admin-documents-modal__eyebrow">Document Detail</p>
                             <h3 id="admin-document-detail-title" title="{{ $selectedDocument->original_name }}">
                                 {{ \Illuminate\Support\Str::limit((string) $selectedDocument->original_name, 64, '...') }}
                             </h3>
-                            <span class="admin-documents-modal__code">{{ $selectedType['type_label'] }}</span>
                         </div>
                     </div>
                     <button type="button" wire:click="closeDetail" class="admin-documents-modal__close" aria-label="Tutup detail dokumen">
@@ -493,7 +488,7 @@
                     <div class="admin-documents-modal__summary-grid">
                         <div>
                             <span>Status</span>
-                            <strong class="admin-documents-status-chip admin-documents-status-chip--{{ $selectedStatus['tone'] }}">
+                            <strong class="admin-status-chip admin-status-chip--{{ $selectedStatus['tone'] }}">
                                 <span aria-hidden="true"></span>
                                 {{ $selectedStatus['label'] }}
                             </strong>
@@ -511,7 +506,7 @@
                         <div>
                             <span>Chunks</span>
                             <strong>{{ number_format((int) ($selectedDocument->chunks_count ?? 0)) }}</strong>
-                            <em>{{ $selectedPipeline['embedding_status'] }}</em>
+                            <em>{{ $selectedPipeline['chunk_status'] }}</em>
                         </div>
                         <div>
                             <span>Uploaded</span>
@@ -535,23 +530,35 @@
                                 <span class="admin-documents-pipeline__bar admin-documents-pipeline__bar--{{ $selectedPipeline['tone'] }}" style="width: {{ $selectedPipeline['progress'] }}%"></span>
                             </div>
                         </div>
-                        <p>{{ $selectedPipeline['parse_status'] }} · {{ $selectedPipeline['embedding_status'] }} · preview {{ ucfirst((string) ($selectedDocument->preview_status ?? 'pending')) }}.</p>
+                        <ul class="admin-documents-stage-list" role="list">
+                            @foreach ($selectedPipeline['stages'] as $stage)
+                                <li class="admin-documents-stage-list__item admin-documents-stage-list__item--{{ $stage['state'] }}">
+                                    <span aria-hidden="true"></span>
+                                    <strong>{{ $stage['label'] }}</strong>
+                                </li>
+                            @endforeach
+                        </ul>
+                        <p>{{ $selectedPipeline['parse_status'] }} · {{ $selectedPipeline['embedding_status'] }} · {{ $selectedPipeline['chunk_status'] }} · preview {{ ucfirst((string) ($selectedDocument->preview_status ?? 'pending')) }}.</p>
                     </section>
 
                     <section class="admin-documents-modal__section">
                         <h4>Metadata ringkas</h4>
                         <dl class="admin-documents-modal__metadata">
                             <div>
-                                <dt>Stored file</dt>
-                                <dd>{{ $selectedDocument->filename ?? '-' }}</dd>
-                            </div>
-                            <div>
                                 <dt>Original file</dt>
                                 <dd>{{ $selectedDocument->original_name ?? '-' }}</dd>
                             </div>
+                            <div>
+                                <dt>Uploaded</dt>
+                                <dd>{{ $selectedDocument->created_at?->toDateTimeString() ?? '-' }}</dd>
+                            </div>
+                            <div>
+                                <dt>Source</dt>
+                                <dd>{{ $selectedSource }}</dd>
+                            </div>
                             @if ($selectedDocument->source_external_id)
                                 <div>
-                                    <dt>External ID</dt>
+                                    <dt>Source ID</dt>
                                     <dd>{{ $selectedDocument->source_external_id }}</dd>
                                 </div>
                             @endif

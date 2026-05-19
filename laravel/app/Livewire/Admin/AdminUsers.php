@@ -4,6 +4,7 @@ namespace App\Livewire\Admin;
 
 use App\Models\User;
 use App\Services\Admin\AdminMetricsService;
+use App\Services\Admin\AdminUserManagementService;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -19,7 +20,7 @@ class AdminUsers extends Component
 
     public string $status = '';
 
-    public string $role = '';
+    public ?string $flashMessage = null;
 
     /**
      * @var array<string, array<int, string>>
@@ -27,7 +28,6 @@ class AdminUsers extends Component
     protected $queryString = [
         'search' => ['except' => ''],
         'status' => ['except' => ''],
-        'role' => ['except' => ''],
     ];
 
     public function updatingSearch(): void
@@ -40,15 +40,25 @@ class AdminUsers extends Component
         $this->resetPage();
     }
 
-    public function updatingRole(): void
+    public function resetFilters(): void
     {
+        $this->reset(['search', 'status']);
         $this->resetPage();
     }
 
-    public function resetFilters(): void
+    public function deleteUser(int $userId, AdminUserManagementService $service): void
     {
-        $this->reset(['search', 'status', 'role']);
+        $target = User::query()->findOrFail($userId);
+
+        $service->deleteRegularUser(auth()->user(), $target, request());
+
+        $this->flashMessage = sprintf('Akun "%s" berhasil dihapus.', $target->email);
         $this->resetPage();
+    }
+
+    public function clearFlash(): void
+    {
+        $this->flashMessage = null;
     }
 
     public function render(AdminMetricsService $metrics)
@@ -56,7 +66,7 @@ class AdminUsers extends Component
         $users = $metrics->userPresenceListing(
             [
                 'status' => $this->normalizedStatus(),
-                'role' => $this->normalizedRole(),
+                'role' => User::ROLE_USER,
                 'search' => $this->search,
             ],
             self::USERS_PER_PAGE,
@@ -67,17 +77,13 @@ class AdminUsers extends Component
         return view('livewire.admin.admin-users', [
             'users' => $users,
             'usersPerPage' => self::USERS_PER_PAGE,
-            'presenceSummary' => $metrics->userPresenceSummary(),
+            'presenceSummary' => $metrics->userPresenceSummary(role: User::ROLE_USER),
             'statusOptions' => [
                 'online' => 'Online',
                 'idle' => 'Idle',
                 'offline' => 'Offline',
             ],
-            'roleOptions' => [
-                User::ROLE_USER => 'User',
-                User::ROLE_ADMIN => 'Admin',
-                User::ROLE_SUPER_ADMIN => 'Super Admin',
-            ],
+            'canDeleteUsers' => auth()->user()?->isSuperAdmin() && auth()->user()?->isActive(),
         ]);
     }
 
@@ -86,8 +92,4 @@ class AdminUsers extends Component
         return in_array($this->status, ['online', 'idle', 'offline'], true) ? $this->status : null;
     }
 
-    private function normalizedRole(): ?string
-    {
-        return in_array($this->role, User::ROLES, true) ? $this->role : null;
-    }
 }
