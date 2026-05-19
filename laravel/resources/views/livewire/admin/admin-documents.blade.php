@@ -42,7 +42,30 @@
                 'docx' => 'DOCX',
                 default => strtoupper($extension ?: 'FILE'),
             },
+            'type_label' => match ($type) {
+                'pdf' => 'APPLICATION/PDF',
+                'csv' => 'TEXT/CSV',
+                'xlsx' => 'XLSX',
+                'docx' => 'DOCX',
+                default => strtoupper($mime ?: ($extension ?: 'UNKNOWN')),
+            },
         ];
+    };
+    $initials = function (?string $name, ?string $email = null): string {
+        $base = trim((string) ($name ?: $email ?: 'Sistem'));
+        $parts = preg_split('/\s+/', $base) ?: [];
+        $letters = '';
+
+        foreach (array_slice($parts, 0, 2) as $part) {
+            $letters .= mb_substr($part, 0, 1);
+        }
+
+        return mb_strtoupper($letters ?: 'S');
+    };
+    $sourceLabel = function (?string $provider): string {
+        $provider = trim((string) $provider);
+
+        return $provider === '' ? 'LOCAL' : strtoupper(str_replace('_', ' ', $provider));
     };
     $statusMeta = function (?string $status): array {
         return match ($status) {
@@ -260,8 +283,8 @@
         <section class="admin-documents-table-panel admin-section">
             <header class="admin-documents-table-panel__header">
                 <div>
-                    <h3>Pipeline Dokumen</h3>
-                    <p>Menampilkan {{ $documentsPerPage }} dokumen per halaman pada filter aktif.</p>
+                    <h3>Dokumen Terbaru</h3>
+                    <p>Maksimum {{ $documentsPerPage }} baris pada filter aktif.</p>
                 </div>
             </header>
 
@@ -274,64 +297,70 @@
                     <x-admin.table
                         class="admin-documents-table"
                         :columns="[
-                            ['key' => 'file', 'label' => 'File', 'width' => '25%'],
-                            ['key' => 'owner', 'label' => 'Owner', 'width' => '17%'],
-                            ['key' => 'status', 'label' => 'Status', 'width' => '12%'],
-                            ['key' => 'pipeline', 'label' => 'Pipeline', 'width' => '20%'],
-                            ['key' => 'size', 'label' => 'Size', 'align' => 'right', 'width' => '8%'],
-                            ['key' => 'uploaded', 'label' => 'Uploaded', 'align' => 'right', 'width' => '10%'],
-                            ['key' => 'action', 'label' => '', 'align' => 'right', 'width' => '8%'],
+                            ['key' => 'file', 'label' => 'File', 'width' => '26%'],
+                            ['key' => 'owner', 'label' => 'User', 'width' => '18%'],
+                            ['key' => 'type', 'label' => 'Tipe', 'width' => '12%'],
+                            ['key' => 'size', 'label' => 'Size', 'align' => 'right', 'width' => '9%'],
+                            ['key' => 'status', 'label' => 'Status', 'width' => '11%'],
+                            ['key' => 'chunks', 'label' => 'Chunks', 'align' => 'center', 'width' => '8%'],
+                            ['key' => 'uploaded', 'label' => 'Waktu', 'align' => 'right', 'width' => '9%'],
+                            ['key' => 'action', 'label' => 'Aksi', 'align' => 'right', 'width' => '7%'],
                         ]">
                         @foreach ($documents as $doc)
                             @php
                                 $typeMeta = $fileTypeMeta($doc);
                                 $status = $statusMeta($doc->status);
-                                $pipeline = $pipelineMeta($doc);
                             @endphp
                             <tr>
                                 <td class="admin-table__td">
                                     <div class="admin-documents-file-cell">
                                         <span class="admin-documents-file-icon admin-documents-file-icon--{{ $typeMeta['key'] }}" aria-hidden="true">
-                                            {{ $typeMeta['label'] }}
+                                            <svg viewBox="0 0 32 38" fill="none" aria-hidden="true">
+                                                <path d="M7 1.75h12.6L29.25 11.4V33A3.25 3.25 0 0 1 26 36.25H7A3.25 3.25 0 0 1 3.75 33V5A3.25 3.25 0 0 1 7 1.75Z" stroke="currentColor" stroke-width="2"/>
+                                                <path d="M19.5 2.5V10a2 2 0 0 0 2 2H29" stroke="currentColor" stroke-width="2"/>
+                                            </svg>
+                                            <span>{{ $typeMeta['label'] }}</span>
                                         </span>
                                         <div class="min-w-0">
                                             <span class="admin-documents-file-cell__name" title="{{ $doc->original_name }}">
                                                 {{ \Illuminate\Support\Str::limit((string) $doc->original_name, 54, '...') }}
                                             </span>
-                                            <span class="admin-documents-file-cell__meta">{{ $doc->mime_type ?? 'unknown' }}</span>
                                         </div>
                                     </div>
                                 </td>
                                 <td class="admin-table__td">
-                                    <div class="admin-documents-user-cell">
-                                        <span class="admin-documents-user-cell__name">{{ $doc->user?->name ?? 'Sistem' }}</span>
-                                        <span class="admin-documents-user-cell__email">{{ $doc->user?->email ?? '-' }}</span>
+                                    <div class="admin-documents-user-row">
+                                        <span class="admin-documents-avatar" aria-hidden="true">{{ $initials($doc->user?->name, $doc->user?->email) }}</span>
+                                        <div class="admin-documents-user-cell">
+                                            <span class="admin-documents-user-cell__name">{{ $doc->user?->name ?? 'Sistem' }}</span>
+                                            <span class="admin-documents-user-cell__email">{{ $doc->user?->email ?? '-' }}</span>
+                                        </div>
                                     </div>
                                 </td>
                                 <td class="admin-table__td">
-                                    <span class="admin-documents-status-chip admin-documents-status-chip--{{ $status['tone'] }}">
-                                        {{ $status['label'] }}
-                                    </span>
-                                </td>
-                                <td class="admin-table__td">
-                                    <div class="admin-documents-pipeline">
-                                        <div class="admin-documents-pipeline__track" aria-hidden="true">
-                                            <span class="admin-documents-pipeline__bar admin-documents-pipeline__bar--{{ $pipeline['tone'] }}" style="width: {{ $pipeline['progress'] }}%"></span>
-                                        </div>
-                                        <div class="admin-documents-pipeline__meta">
-                                            <span>{{ $pipeline['parse_status'] }}</span>
-                                            <span>{{ $pipeline['embedding_status'] }}</span>
-                                        </div>
-                                    </div>
+                                    <span class="admin-documents-type-label">{{ $typeMeta['type_label'] }}</span>
                                 </td>
                                 <td class="admin-table__td" data-align="right">
                                     <span class="admin-documents-number">{{ $doc->formatted_size }}</span>
+                                </td>
+                                <td class="admin-table__td">
+                                    <span class="admin-documents-status-chip admin-documents-status-chip--{{ $status['tone'] }}">
+                                        <span aria-hidden="true"></span>
+                                        {{ $status['label'] }}
+                                    </span>
+                                </td>
+                                <td class="admin-table__td" data-align="center">
+                                    <span class="admin-documents-number">{{ number_format((int) ($doc->chunks_count ?? 0)) }}</span>
                                 </td>
                                 <td class="admin-table__td" data-align="right">
                                     <span class="admin-documents-muted" title="{{ $doc->created_at?->toDateTimeString() }}">{{ $doc->created_at?->diffForHumans() }}</span>
                                 </td>
                                 <td class="admin-table__td" data-align="right">
                                     <button type="button" wire:click="showDetail({{ $doc->id }})" class="admin-documents-detail-button">
+                                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12z"/>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 9.25a2.75 2.75 0 110 5.5 2.75 2.75 0 010-5.5z"/>
+                                        </svg>
                                         Detail
                                     </button>
                                 </td>
@@ -339,11 +368,14 @@
                         @endforeach
                     </x-admin.table>
 
-                    @if ($documents->hasPages())
-                        <div class="admin-documents-pagination">
-                            {{ $documents->links() }}
-                        </div>
-                    @endif
+                    <div class="admin-documents-table-footer">
+                        <span>Menampilkan {{ number_format($documents->firstItem() ?? 0) }}-{{ number_format($documents->lastItem() ?? 0) }} dari {{ number_format($documents->total()) }} dokumen</span>
+                        @if ($documents->hasPages())
+                            <div class="admin-documents-pagination">
+                                {{ $documents->links() }}
+                            </div>
+                        @endif
+                    </div>
                 @endif
             </div>
         </section>
@@ -427,35 +459,42 @@
             $selectedType = $fileTypeMeta($selectedDocument);
             $selectedStatus = $statusMeta($selectedDocument->status);
             $selectedPipeline = $pipelineMeta($selectedDocument);
+            $selectedSource = $sourceLabel($selectedDocument->source_provider);
         @endphp
-        <div class="admin-documents-drawer" role="dialog" aria-modal="true" aria-labelledby="admin-document-detail-title">
-            <button type="button" class="admin-documents-drawer__backdrop" wire:click="closeDetail" aria-label="Tutup detail dokumen"></button>
+        <div class="admin-documents-modal" role="dialog" aria-modal="true" aria-labelledby="admin-document-detail-title">
+            <button type="button" class="admin-documents-modal__backdrop" wire:click="closeDetail" aria-label="Tutup detail dokumen"></button>
 
-            <aside class="admin-documents-drawer__panel">
-                <header class="admin-documents-drawer__header">
-                    <div class="admin-documents-drawer__title-row">
+            <section class="admin-documents-modal__panel">
+                <header class="admin-documents-modal__header">
+                    <div class="admin-documents-modal__title-row">
                         <span class="admin-documents-file-icon admin-documents-file-icon--{{ $selectedType['key'] }}" aria-hidden="true">
-                            {{ $selectedType['label'] }}
+                            <svg viewBox="0 0 32 38" fill="none" aria-hidden="true">
+                                <path d="M7 1.75h12.6L29.25 11.4V33A3.25 3.25 0 0 1 26 36.25H7A3.25 3.25 0 0 1 3.75 33V5A3.25 3.25 0 0 1 7 1.75Z" stroke="currentColor" stroke-width="2"/>
+                                <path d="M19.5 2.5V10a2 2 0 0 0 2 2H29" stroke="currentColor" stroke-width="2"/>
+                            </svg>
+                            <span>{{ $selectedType['label'] }}</span>
                         </span>
                         <div class="min-w-0">
-                            <p class="admin-documents-drawer__eyebrow">Document Pipeline</p>
+                            <p class="admin-documents-modal__eyebrow">Document Detail</p>
                             <h3 id="admin-document-detail-title" title="{{ $selectedDocument->original_name }}">
                                 {{ \Illuminate\Support\Str::limit((string) $selectedDocument->original_name, 64, '...') }}
                             </h3>
+                            <span class="admin-documents-modal__code">{{ $selectedType['type_label'] }}</span>
                         </div>
                     </div>
-                    <button type="button" wire:click="closeDetail" class="admin-documents-drawer__close" aria-label="Tutup detail dokumen">
+                    <button type="button" wire:click="closeDetail" class="admin-documents-modal__close" aria-label="Tutup detail dokumen">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M6 6l12 12M18 6L6 18"/>
                         </svg>
                     </button>
                 </header>
 
-                <div class="admin-documents-drawer__body">
-                    <div class="admin-documents-drawer__summary">
+                <div class="admin-documents-modal__body">
+                    <div class="admin-documents-modal__summary-grid">
                         <div>
                             <span>Status</span>
                             <strong class="admin-documents-status-chip admin-documents-status-chip--{{ $selectedStatus['tone'] }}">
+                                <span aria-hidden="true"></span>
                                 {{ $selectedStatus['label'] }}
                             </strong>
                         </div>
@@ -470,15 +509,25 @@
                             <em>{{ $selectedDocument->mime_type ?? 'unknown' }}</em>
                         </div>
                         <div>
+                            <span>Chunks</span>
+                            <strong>{{ number_format((int) ($selectedDocument->chunks_count ?? 0)) }}</strong>
+                            <em>{{ $selectedPipeline['embedding_status'] }}</em>
+                        </div>
+                        <div>
                             <span>Uploaded</span>
                             <strong>{{ $selectedDocument->created_at?->diffForHumans() ?? '-' }}</strong>
                             <em>{{ $selectedDocument->created_at?->toDateTimeString() ?? '-' }}</em>
                         </div>
+                        <div>
+                            <span>Source</span>
+                            <strong>{{ $selectedSource }}</strong>
+                            <em>{{ $selectedDocument->source_synced_at?->toDateTimeString() ?? 'Local upload' }}</em>
+                        </div>
                     </div>
 
-                    <section class="admin-documents-drawer__section">
-                        <div class="admin-documents-drawer__section-heading">
-                            <h4>Pipeline</h4>
+                    <section class="admin-documents-modal__section">
+                        <div class="admin-documents-modal__section-heading">
+                            <h4>Status AI</h4>
                             <span>{{ $selectedPipeline['progress'] }}%</span>
                         </div>
                         <div class="admin-documents-pipeline admin-documents-pipeline--drawer">
@@ -486,69 +535,34 @@
                                 <span class="admin-documents-pipeline__bar admin-documents-pipeline__bar--{{ $selectedPipeline['tone'] }}" style="width: {{ $selectedPipeline['progress'] }}%"></span>
                             </div>
                         </div>
-                        <ol class="admin-documents-stage-list" role="list">
-                            @foreach ($selectedPipeline['stages'] as $stage)
-                                <li class="admin-documents-stage-list__item admin-documents-stage-list__item--{{ $stage['state'] }}">
-                                    <span aria-hidden="true"></span>
-                                    <strong>{{ $stage['label'] }}</strong>
-                                </li>
-                            @endforeach
-                        </ol>
+                        <p>{{ $selectedPipeline['parse_status'] }} · {{ $selectedPipeline['embedding_status'] }} · preview {{ ucfirst((string) ($selectedDocument->preview_status ?? 'pending')) }}.</p>
                     </section>
 
-                    <section class="admin-documents-drawer__section">
-                        <h4>AI Index Metadata</h4>
-                        <dl class="admin-documents-metadata-grid">
+                    <section class="admin-documents-modal__section">
+                        <h4>Metadata ringkas</h4>
+                        <dl class="admin-documents-modal__metadata">
                             <div>
-                                <dt>Parsing Status</dt>
-                                <dd>{{ $selectedPipeline['parse_status'] }}</dd>
-                            </div>
-                            <div>
-                                <dt>Chunk Count</dt>
-                                <dd>{{ number_format($selectedPipeline['chunk_count']) }}</dd>
-                            </div>
-                            <div>
-                                <dt>Embedding Status</dt>
-                                <dd>{{ $selectedPipeline['embedding_status'] }}</dd>
-                            </div>
-                            <div>
-                                <dt>Preview Status</dt>
-                                <dd>{{ ucfirst((string) ($selectedDocument->preview_status ?? 'pending')) }}</dd>
-                            </div>
-                        </dl>
-                    </section>
-
-                    <section class="admin-documents-drawer__section">
-                        <h4>File Metadata</h4>
-                        <dl class="admin-documents-metadata-grid">
-                            <div>
-                                <dt>File Name</dt>
+                                <dt>Stored file</dt>
                                 <dd>{{ $selectedDocument->filename ?? '-' }}</dd>
                             </div>
                             <div>
-                                <dt>Original Name</dt>
+                                <dt>Original file</dt>
                                 <dd>{{ $selectedDocument->original_name ?? '-' }}</dd>
                             </div>
+                            @if ($selectedDocument->source_external_id)
+                                <div>
+                                    <dt>External ID</dt>
+                                    <dd>{{ $selectedDocument->source_external_id }}</dd>
+                                </div>
+                            @endif
                             <div>
-                                <dt>Source</dt>
-                                <dd>{{ strtoupper(str_replace('_', ' ', (string) ($selectedDocument->source_provider ?? 'local'))) }}</dd>
-                            </div>
-                            <div>
-                                <dt>External ID</dt>
-                                <dd>{{ $selectedDocument->source_external_id ?? '-' }}</dd>
-                            </div>
-                            <div>
-                                <dt>Synced At</dt>
-                                <dd>{{ $selectedDocument->source_synced_at?->toDateTimeString() ?? '-' }}</dd>
-                            </div>
-                            <div>
-                                <dt>Updated At</dt>
+                                <dt>Updated</dt>
                                 <dd>{{ $selectedDocument->updated_at?->toDateTimeString() ?? '-' }}</dd>
                             </div>
                         </dl>
                     </section>
                 </div>
-            </aside>
+            </section>
         </div>
     @endif
 </div>

@@ -28,7 +28,10 @@ class AdminKnowledgeManagementTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Knowledge Base Internal', false);
-        $response->assertSee('global_internal', false);
+        $response->assertSee('admin-knowledge-kpi-card', false);
+        $response->assertSee('Dokumen Knowledge', false);
+        $response->assertSee('Upload Knowledge', false);
+        $response->assertSee('Admin only', false);
     }
 
     public function test_regular_user_cannot_access_knowledge_page(): void

@@ -909,11 +909,11 @@
     }
 
     .admin-documents-content-grid {
-        @apply mt-3 grid gap-3 xl:grid-cols-[minmax(0,1.85fr)_minmax(18rem,0.7fr)];
+        @apply mt-3 grid gap-3;
     }
 
     .admin-documents-side-grid {
-        @apply grid gap-3 content-start;
+        @apply grid gap-3 content-start lg:grid-cols-2;
     }
 
     .admin-documents-table-panel,
@@ -947,36 +947,74 @@
     }
 
     .admin-documents-file-cell {
-        @apply flex min-w-[12rem] items-center gap-2.5;
+        @apply flex min-w-[10rem] items-center gap-3;
+    }
+
+    .admin-documents-user-row {
+        @apply flex min-w-[9rem] items-center gap-2.5;
+    }
+
+    .admin-documents-avatar {
+        @apply inline-flex h-8 w-8 flex-none items-center justify-center rounded-full bg-ista-primary text-[0.64rem] font-bold text-amber-200 ring-2 ring-white dark:bg-rose-900 dark:text-amber-200 dark:ring-gray-900;
+        letter-spacing: 0;
     }
 
     .admin-documents-user-cell {
-        @apply flex min-w-[9rem] flex-col;
+        @apply flex min-w-0 flex-col;
     }
 
     .admin-documents-file-icon {
-        @apply inline-flex h-8 w-8 flex-none items-center justify-center rounded-lg font-mono text-[0.58rem] font-bold ring-1;
+        @apply relative inline-flex h-9 w-8 flex-none items-center justify-center font-mono text-[0.52rem] font-black;
+        letter-spacing: 0;
+    }
+
+    .admin-documents-file-icon svg {
+        @apply absolute inset-0 h-full w-full;
+    }
+
+    .admin-documents-file-icon > span {
+        @apply absolute bottom-1 left-1/2 z-10 -translate-x-1/2 rounded-[0.16rem] px-0.5 py-px text-[0.43rem] font-black leading-none text-white shadow-sm;
         letter-spacing: 0;
     }
 
     .admin-documents-file-icon--pdf {
-        @apply bg-rose-50 text-rose-600 ring-rose-100 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-400/20;
+        @apply text-red-500 dark:text-red-300;
+    }
+
+    .admin-documents-file-icon--pdf > span {
+        @apply bg-red-600 dark:bg-red-500;
     }
 
     .admin-documents-file-icon--csv {
-        @apply bg-emerald-50 text-emerald-700 ring-emerald-100 dark:bg-emerald-400/10 dark:text-emerald-300 dark:ring-emerald-300/20;
+        @apply text-emerald-600 dark:text-emerald-300;
+    }
+
+    .admin-documents-file-icon--csv > span {
+        @apply bg-emerald-700 dark:bg-emerald-500;
     }
 
     .admin-documents-file-icon--xlsx {
-        @apply bg-teal-50 text-teal-700 ring-teal-100 dark:bg-teal-400/10 dark:text-teal-300 dark:ring-teal-300/20;
+        @apply text-green-700 dark:text-green-300;
+    }
+
+    .admin-documents-file-icon--xlsx > span {
+        @apply bg-green-700 dark:bg-green-500;
     }
 
     .admin-documents-file-icon--docx {
-        @apply bg-sky-50 text-sky-700 ring-sky-100 dark:bg-sky-400/10 dark:text-sky-300 dark:ring-sky-300/20;
+        @apply text-sky-600 dark:text-sky-300;
+    }
+
+    .admin-documents-file-icon--docx > span {
+        @apply bg-sky-600 dark:bg-sky-500;
     }
 
     .admin-documents-file-icon--file {
-        @apply bg-stone-100 text-stone-600 ring-stone-200 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-700;
+        @apply text-stone-500 dark:text-gray-300;
+    }
+
+    .admin-documents-file-icon--file > span {
+        @apply bg-stone-600 dark:bg-gray-500;
     }
 
     .admin-documents-file-cell__name,
@@ -989,26 +1027,43 @@
         @apply block truncate text-[0.68rem] text-stone-500 dark:text-gray-500;
     }
 
-    .admin-documents-status-chip {
-        @apply inline-flex min-w-[4.6rem] items-center justify-center rounded-full px-2 py-0.5 text-[0.64rem] font-bold uppercase ring-1;
+    .admin-documents-type-label {
+        @apply font-mono text-[0.68rem] font-medium uppercase text-stone-500 dark:text-gray-400;
         letter-spacing: 0;
+    }
+
+    .admin-documents-status-chip {
+        @apply inline-flex min-w-[4.8rem] items-center justify-center gap-1.5 rounded-full px-2 py-1 text-[0.64rem] font-bold ring-1;
+        letter-spacing: 0;
+    }
+
+    .admin-documents-status-chip > span {
+        @apply h-1.5 w-1.5 rounded-full;
     }
 
     .admin-documents-status-chip--success {
         @apply bg-emerald-50 text-emerald-700 ring-emerald-100 dark:bg-emerald-400/10 dark:text-emerald-300 dark:ring-emerald-300/20;
     }
 
+    .admin-documents-status-chip--success > span { @apply bg-emerald-500; }
+
     .admin-documents-status-chip--warning {
         @apply bg-amber-50 text-amber-700 ring-amber-100 dark:bg-amber-400/10 dark:text-amber-300 dark:ring-amber-300/20;
     }
+
+    .admin-documents-status-chip--warning > span { @apply bg-amber-500; }
 
     .admin-documents-status-chip--danger {
         @apply bg-rose-50 text-rose-700 ring-rose-100 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-400/20;
     }
 
+    .admin-documents-status-chip--danger > span { @apply bg-rose-500; }
+
     .admin-documents-status-chip--neutral {
         @apply bg-stone-100 text-stone-600 ring-stone-200 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-700;
     }
+
+    .admin-documents-status-chip--neutral > span { @apply bg-stone-400; }
 
     .admin-documents-number {
         @apply whitespace-nowrap font-mono text-[0.72rem] font-medium text-stone-800 dark:text-gray-200;
@@ -1049,11 +1104,15 @@
     }
 
     .admin-documents-detail-button {
-        @apply inline-flex h-7 items-center justify-center rounded-md border border-stone-200 bg-white px-2.5 text-[0.68rem] font-semibold text-stone-700 transition hover:border-ista-primary/30 hover:text-ista-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/25 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200 dark:hover:border-amber-300/30 dark:hover:text-amber-300;
+        @apply inline-flex h-7 items-center justify-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 text-[0.68rem] font-semibold text-stone-700 transition hover:border-ista-primary/30 hover:text-ista-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/25 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200 dark:hover:border-amber-300/30 dark:hover:text-amber-300;
+    }
+
+    .admin-documents-table-footer {
+        @apply flex flex-wrap items-center justify-center gap-3 border-t border-stone-100 px-3 py-3 text-center text-[0.74rem] text-stone-500 dark:border-gray-800 dark:text-gray-400;
     }
 
     .admin-documents-pagination {
-        @apply mt-3 border-t border-stone-100 pt-3 dark:border-gray-800;
+        @apply w-full;
     }
 
     .admin-documents-distribution-list {
@@ -1120,6 +1179,107 @@
     .admin-documents-status-dot--warning { @apply bg-amber-500; }
     .admin-documents-status-dot--danger { @apply bg-rose-500; }
     .admin-documents-status-dot--neutral { @apply bg-stone-400 dark:bg-gray-500; }
+
+    .admin-documents-modal {
+        @apply fixed inset-0 z-50 flex items-center justify-center p-4;
+    }
+
+    .admin-documents-modal__backdrop {
+        @apply absolute inset-0 bg-stone-950/35 backdrop-blur-sm dark:bg-black/60;
+    }
+
+    .admin-documents-modal__panel {
+        @apply relative flex max-h-[86vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-stone-200 bg-white shadow-[0_24px_80px_rgba(28,25,23,0.24)] dark:border-gray-800 dark:bg-gray-950;
+    }
+
+    .admin-documents-modal__header {
+        @apply flex flex-none items-start justify-between gap-4 border-b border-stone-100 px-5 py-4 dark:border-gray-800;
+    }
+
+    .admin-documents-modal__title-row {
+        @apply flex min-w-0 items-center gap-3;
+    }
+
+    .admin-documents-modal__eyebrow {
+        @apply text-[0.6rem] font-bold uppercase text-ista-primary dark:text-amber-300;
+        letter-spacing: 0;
+    }
+
+    .admin-documents-modal__header h3 {
+        @apply mt-1 truncate text-lg font-semibold text-stone-950 dark:text-gray-100;
+    }
+
+    .admin-documents-modal__code {
+        @apply mt-2 inline-block rounded-md bg-stone-50 px-2 py-0.5 font-mono text-[0.68rem] font-semibold uppercase text-stone-600 ring-1 ring-stone-100 dark:bg-gray-900 dark:text-gray-300 dark:ring-gray-800;
+        letter-spacing: 0;
+    }
+
+    .admin-documents-modal__close {
+        @apply inline-flex h-8 w-8 flex-none items-center justify-center rounded-lg text-stone-500 transition hover:bg-stone-100 hover:text-stone-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/25 dark:text-gray-400 dark:hover:bg-gray-900 dark:hover:text-gray-100;
+    }
+
+    .admin-documents-modal__body {
+        @apply min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-4;
+    }
+
+    .admin-documents-modal__summary-grid {
+        @apply grid gap-3 md:grid-cols-2 xl:grid-cols-3;
+    }
+
+    .admin-documents-modal__summary-grid > div {
+        @apply rounded-lg border border-stone-100 bg-stone-50/50 p-3 dark:border-gray-800 dark:bg-gray-900/50;
+    }
+
+    .admin-documents-modal__summary-grid span,
+    .admin-documents-modal__metadata dt {
+        @apply block text-[0.6rem] font-bold uppercase text-stone-400 dark:text-gray-500;
+        letter-spacing: 0;
+    }
+
+    .admin-documents-modal__summary-grid strong {
+        @apply mt-1 block truncate text-xs font-semibold text-stone-900 dark:text-gray-100;
+    }
+
+    .admin-documents-modal__summary-grid strong.admin-documents-status-chip {
+        @apply inline-flex;
+    }
+
+    .admin-documents-modal__summary-grid em {
+        @apply mt-1 block truncate text-[0.68rem] not-italic text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-documents-modal__section {
+        @apply mt-4 rounded-lg border border-stone-100 bg-white p-3.5 dark:border-gray-800 dark:bg-gray-900/40;
+    }
+
+    .admin-documents-modal__section-heading {
+        @apply flex items-center justify-between gap-3;
+    }
+
+    .admin-documents-modal__section h4 {
+        @apply text-[0.82rem] font-semibold text-stone-950 dark:text-gray-100;
+    }
+
+    .admin-documents-modal__section-heading span {
+        @apply text-xs font-semibold text-stone-500 dark:text-gray-400;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .admin-documents-modal__section p {
+        @apply mt-2 text-[0.76rem] leading-relaxed text-stone-600 dark:text-gray-300;
+    }
+
+    .admin-documents-modal__metadata {
+        @apply mt-2 grid gap-2 md:grid-cols-2;
+    }
+
+    .admin-documents-modal__metadata div {
+        @apply min-w-0 rounded-md bg-stone-50 px-2.5 py-2 dark:bg-gray-950/70;
+    }
+
+    .admin-documents-modal__metadata dd {
+        @apply mt-1 truncate font-mono text-[0.68rem] text-stone-700 dark:text-gray-300;
+    }
 
     .admin-documents-drawer {
         @apply fixed inset-0 z-50 flex justify-end;
@@ -1235,6 +1395,215 @@
 
     .admin-documents-metadata-grid dd {
         @apply mt-1 break-words text-[0.74rem] font-semibold text-stone-700 dark:text-gray-200;
+    }
+
+    .admin-knowledge-page {
+        @apply pb-6 text-stone-900 dark:text-gray-100;
+    }
+
+    .admin-knowledge-hero {
+        @apply mb-4 flex flex-wrap items-start justify-between gap-4;
+    }
+
+    .admin-knowledge-eyebrow {
+        @apply text-[0.64rem] font-bold uppercase text-ista-primary dark:text-amber-300;
+        letter-spacing: 0;
+    }
+
+    .admin-knowledge-title {
+        font-family: "Fraunces", serif;
+        @apply mt-1 text-[1.38rem] font-semibold leading-tight text-stone-950 dark:text-gray-100;
+        letter-spacing: 0;
+    }
+
+    .admin-knowledge-description {
+        @apply mt-2 max-w-xl text-[0.82rem] leading-relaxed text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-knowledge-readonly {
+        @apply px-3.5 py-1.5 text-[0.72rem] font-medium;
+    }
+
+    .admin-knowledge-alert {
+        @apply mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200;
+    }
+
+    .admin-knowledge-kpi-grid {
+        @apply grid gap-3 sm:grid-cols-2 xl:grid-cols-4;
+    }
+
+    .admin-knowledge-kpi-card {
+        @apply block min-h-[5.75rem] overflow-hidden rounded-lg border border-stone-200/80 bg-white p-0 shadow-[0_8px_24px_rgba(28,25,23,0.04)] transition-colors dark:border-gray-800 dark:bg-gray-900/80;
+    }
+
+    .admin-knowledge-kpi-card__header {
+        @apply flex items-center gap-2.5 border-b border-stone-200/80 px-4 py-2.5 text-ista-primary dark:border-gray-800 dark:text-amber-300;
+    }
+
+    .admin-knowledge-kpi-card__icon {
+        @apply inline-flex h-4 w-4 flex-none items-center justify-center;
+    }
+
+    .admin-knowledge-kpi-card__label {
+        @apply truncate text-[0.72rem] font-bold uppercase text-ista-primary dark:text-amber-300;
+        letter-spacing: 0;
+    }
+
+    .admin-knowledge-kpi-card__body {
+        @apply min-w-0 px-4 py-3;
+    }
+
+    .admin-knowledge-kpi-card__body strong {
+        @apply block text-2xl font-semibold leading-none text-stone-950 dark:text-gray-100;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .admin-knowledge-kpi-card__description {
+        @apply mt-1.5 text-[0.7rem] font-medium text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-knowledge-kpi-card--success .admin-knowledge-kpi-card__description { @apply text-emerald-600 dark:text-emerald-400; }
+    .admin-knowledge-kpi-card--warning .admin-knowledge-kpi-card__description { @apply text-amber-600 dark:text-amber-400; }
+    .admin-knowledge-kpi-card--danger .admin-knowledge-kpi-card__description { @apply text-rose-600 dark:text-rose-400; }
+
+    .admin-knowledge-content-grid {
+        @apply mt-3 grid gap-3 xl:grid-cols-[minmax(0,1.72fr)_minmax(18rem,0.72fr)];
+    }
+
+    .admin-knowledge-main-stack,
+    .admin-knowledge-side-grid {
+        @apply grid content-start gap-3;
+    }
+
+    .admin-knowledge-filter-panel,
+    .admin-knowledge-table-panel,
+    .admin-knowledge-upload-panel,
+    .admin-knowledge-status-panel {
+        @apply overflow-hidden rounded-lg;
+    }
+
+    .admin-knowledge-filter-panel__header,
+    .admin-knowledge-table-panel__header,
+    .admin-knowledge-upload-panel__header,
+    .admin-knowledge-status-panel__header {
+        @apply flex flex-wrap items-start justify-between gap-3 px-4 pt-3.5;
+    }
+
+    .admin-knowledge-filter-panel__header h3,
+    .admin-knowledge-table-panel__header h3,
+    .admin-knowledge-upload-panel__header h3,
+    .admin-knowledge-status-panel__header h3 {
+        @apply text-[0.95rem] font-semibold text-stone-950 dark:text-gray-100;
+    }
+
+    .admin-knowledge-table-panel__header p,
+    .admin-knowledge-upload-panel__header p,
+    .admin-knowledge-status-panel__header p {
+        @apply mt-1 text-[0.72rem] text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-knowledge-reset-button {
+        @apply inline-flex items-center gap-1.5 text-[0.72rem] font-semibold text-ista-primary transition hover:text-rose-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/30 dark:text-rose-300 dark:hover:text-rose-200;
+    }
+
+    .admin-knowledge-filter-grid {
+        @apply grid gap-3 px-4 pb-3.5 pt-3 md:grid-cols-3;
+    }
+
+    .admin-knowledge-filter {
+        @apply flex flex-col gap-1.5;
+    }
+
+    .admin-knowledge-filter span {
+        @apply text-[0.6rem] font-bold uppercase text-stone-500 dark:text-gray-400;
+        letter-spacing: 0;
+    }
+
+    .admin-knowledge-control {
+        @apply h-9 w-full rounded-lg border border-stone-200 bg-white px-3 text-xs text-stone-800 shadow-[inset_0_1px_0_rgba(28,25,23,0.02)] transition placeholder:text-stone-400 focus:border-ista-primary focus:outline-none focus:ring-2 focus:ring-ista-primary/15 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100 dark:placeholder:text-gray-500;
+    }
+
+    .admin-knowledge-control--textarea {
+        @apply min-h-20 py-2;
+    }
+
+    .admin-knowledge-control--file {
+        @apply h-auto py-2;
+    }
+
+    .admin-knowledge-table-panel__body,
+    .admin-knowledge-status-panel__body {
+        @apply px-3.5 pb-3.5 pt-3;
+    }
+
+    .admin-knowledge-table {
+        @apply rounded-lg;
+    }
+
+    .admin-knowledge-table .admin-table__th {
+        @apply bg-white px-3 py-2.5 text-[0.61rem] text-stone-500 dark:bg-gray-900/80 dark:text-gray-400;
+    }
+
+    .admin-knowledge-table .admin-table__td {
+        @apply px-3 py-2;
+    }
+
+    .admin-knowledge-table tbody tr {
+        @apply transition hover:bg-stone-50/80 dark:hover:bg-gray-800/50;
+    }
+
+    .admin-knowledge-file-name {
+        @apply block truncate text-xs font-semibold text-stone-800 dark:text-gray-100;
+    }
+
+    .admin-knowledge-file-meta {
+        @apply block truncate text-[0.68rem] text-stone-500 dark:text-gray-500;
+    }
+
+    .admin-knowledge-source {
+        @apply inline-flex max-w-[9rem] truncate rounded-md bg-stone-50 px-2 py-1 text-[0.68rem] font-semibold text-stone-600 ring-1 ring-stone-100 dark:bg-gray-950 dark:text-gray-300 dark:ring-gray-800;
+    }
+
+    .admin-knowledge-error-code,
+    .admin-knowledge-error {
+        @apply text-[0.66rem] font-medium text-rose-500 dark:text-rose-300;
+    }
+
+    .admin-knowledge-error-code {
+        @apply mt-1;
+    }
+
+    .admin-knowledge-action-group {
+        @apply flex flex-wrap items-center justify-end gap-1.5;
+    }
+
+    .admin-knowledge-action {
+        @apply inline-flex h-7 items-center justify-center rounded-md border border-stone-200 bg-white px-2 text-[0.64rem] font-semibold text-stone-600 transition hover:border-ista-primary/30 hover:text-ista-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/25 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300 dark:hover:border-amber-300/30 dark:hover:text-amber-300;
+    }
+
+    .admin-knowledge-action--success {
+        @apply text-emerald-700 hover:border-emerald-200 hover:text-emerald-600 dark:text-emerald-300 dark:hover:border-emerald-300/30 dark:hover:text-emerald-200;
+    }
+
+    .admin-knowledge-action--warning {
+        @apply text-amber-700 hover:border-amber-200 hover:text-amber-600 dark:text-amber-300 dark:hover:border-amber-300/30 dark:hover:text-amber-200;
+    }
+
+    .admin-knowledge-action--danger {
+        @apply text-rose-700 hover:border-rose-200 hover:text-rose-600 dark:text-rose-300 dark:hover:border-rose-300/30 dark:hover:text-rose-200;
+    }
+
+    .admin-knowledge-upload-form {
+        @apply space-y-3 px-4 pb-4 pt-3;
+    }
+
+    .admin-knowledge-upload-note {
+        @apply text-[0.72rem] text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-knowledge-upload-button {
+        @apply inline-flex h-10 w-full items-center justify-center rounded-lg bg-ista-primary px-4 text-xs font-semibold uppercase text-amber-200 transition hover:bg-ista-primary/90 disabled:opacity-50;
+        letter-spacing: 0;
     }
 
     .admin-accounts-page {
