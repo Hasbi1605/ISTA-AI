@@ -52,7 +52,8 @@ class AdminAccountManagementService
         }
 
         return DB::transaction(function () use ($actor, $name, $email, $password, $role, $data, $request) {
-            $user = User::create([
+            // forceFill + save: email_verified_at is not in $fillable on the User model.
+            $user = (new User)->forceFill([
                 'name' => $name,
                 'email' => $email,
                 'password' => Hash::make($password),
@@ -61,6 +62,7 @@ class AdminAccountManagementService
                 'is_active' => true,
                 'force_password_change' => (bool) ($data['force_password_change'] ?? true),
             ]);
+            $user->save();
 
             $this->audit->record(
                 AdminAccountAudit::ACTION_CREATED,

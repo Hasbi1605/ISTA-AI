@@ -66,7 +66,9 @@ class BootstrapAdminAccounts extends Command
                 $user = User::query()->where('email', $email)->first();
 
                 if (! $user) {
-                    $user = User::create([
+                    // Use forceFill+save instead of create() because email_verified_at
+                    // is not in $fillable on the User model.
+                    $user = (new User)->forceFill([
                         'name' => $entry['name'],
                         'email' => $email,
                         'password' => Hash::make($password),
@@ -75,6 +77,7 @@ class BootstrapAdminAccounts extends Command
                         'is_active' => true,
                         'force_password_change' => true,
                     ]);
+                    $user->save();
 
                     $audit->record(
                         AdminAccountAudit::ACTION_CREATED,
