@@ -256,10 +256,18 @@ class ChatOrchestrationService
 
         $webSources = [];
         $documentSources = [];
+        $knowledgeSources = [];
 
         foreach ($normalizedSources as $source) {
             if (! empty($source['url'])) {
                 $webSources[] = $source;
+
+                continue;
+            }
+
+            $type = strtolower(trim((string) ($source['type'] ?? '')));
+            if ($type === 'knowledge' || ! empty($source['knowledge_source_id'])) {
+                $knowledgeSources[] = $this->sourceDisplayLabel($source);
 
                 continue;
             }
@@ -270,9 +278,14 @@ class ChatOrchestrationService
         }
 
         $documentSources = array_values(array_unique($documentSources));
+        $knowledgeSources = array_values(array_unique(array_filter($knowledgeSources)));
 
-        if (count($webSources) === 0 && count($documentSources) === 1) {
+        if (count($webSources) === 0 && count($knowledgeSources) === 0 && count($documentSources) === 1) {
             return "\n\n---\nDokumen rujukan: **{$documentSources[0]}**";
+        }
+
+        if (count($webSources) === 0 && count($documentSources) === 0 && count($knowledgeSources) === 1) {
+            return "\n\n---\nPengetahuan internal: **{$knowledgeSources[0]}**";
         }
 
         $lines = ['', '', '---', '**Rujukan:**'];
@@ -286,7 +299,55 @@ class ChatOrchestrationService
             $lines[] = "- Dokumen: {$filename}";
         }
 
+        foreach ($knowledgeSources as $label) {
+            $lines[] = "- Pengetahuan internal: {$label}";
+        }
+
         return implode("\n", $lines);
+    }
+
+    /**
+     * Convert streamed source metadata into safe usage-event metadata.
+     *
+     * @param  array<int, array<string, mixed>>  $sources
+     * @return array<string, mixed>
+     */
+    public function knowledgeMetadataFromSources(array $sources): array
+    {
+        $knowledgeChunks = [];
+        $sourceIds = [];
+
+        foreach ($sources as $source) {
+            if (! is_array($source)) {
+                continue;
+            }
+
+            $type = strtolower(trim((string) ($source['type'] ?? '')));
+            $sourceId = trim((string) ($source['knowledge_source_id'] ?? ''));
+
+            if ($type !== 'knowledge' && $sourceId === '') {
+                continue;
+            }
+
+            $knowledgeChunks[] = $source;
+            if ($sourceId !== '') {
+                $sourceIds[$sourceId] = true;
+            }
+        }
+
+        if ($knowledgeChunks === []) {
+            return [
+                'knowledge_used' => false,
+                'knowledge_chunk_count' => 0,
+            ];
+        }
+
+        return [
+            'knowledge_used' => true,
+            'knowledge_chunk_count' => count($knowledgeChunks),
+            'knowledge_source_count' => count($sourceIds),
+            'knowledge_source_ids' => array_map('strval', array_keys($sourceIds)),
+        ];
     }
 
     private function normalizeSources(array $sources): array
@@ -295,14 +356,31 @@ class ChatOrchestrationService
         $seen = [];
 
         foreach ($sources as $source) {
-            $url = trim((string) ($source['url'] ?? ''));
-            $filename = trim((string) ($source['filename'] ?? ''));
-
-            if ($url === '' && $filename === '') {
+            if (! is_array($source)) {
                 continue;
             }
 
-            $key = $url !== '' ? "web:{$url}" : "doc:{$filename}";
+            $type = strtolower(trim((string) ($source['type'] ?? '')));
+            $url = trim((string) ($source['url'] ?? ''));
+            $filename = trim((string) ($source['filename'] ?? ''));
+            $knowledgeSourceId = trim((string) ($source['knowledge_source_id'] ?? ''));
+            $label = $this->sourceDisplayLabel($source);
+            $isKnowledgeSource = $type === 'knowledge' || $knowledgeSourceId !== '';
+
+            if ($url === '' && $filename === '' && ! $isKnowledgeSource) {
+                continue;
+            }
+
+            if ($isKnowledgeSource && $label === '' && $knowledgeSourceId === '') {
+                continue;
+            }
+
+            if ($isKnowledgeSource) {
+                $key = 'knowledge:'.($knowledgeSourceId !== '' ? $knowledgeSourceId : ($label !== '' ? $label : $filename));
+            } else {
+                $key = $url !== '' ? "web:{$url}" : "doc:{$filename}";
+            }
+
             if (isset($seen[$key])) {
                 continue;
             }
@@ -312,6 +390,19 @@ class ChatOrchestrationService
         }
 
         return $normalized;
+    }
+
+    /**
+     * @param  array<string, mixed>  $source
+     */
+    private function sourceDisplayLabel(array $source): string
+    {
+        $title = trim((string) ($source['title'] ?? ''));
+        if ($title !== '') {
+            return $title;
+        }
+
+        return trim((string) ($source['filename'] ?? ''));
     }
 
     public function sanitizeAssistantOutput(string $text): string

@@ -186,13 +186,44 @@ class ChatOrchestrationServiceTest extends TestCase
         $footer = $service->sanitizeAndFormatSources([
             ['type' => 'web', 'title' => 'Portal Resmi', 'url' => 'https://example.com/resmi'],
             ['filename' => 'briefing-harian.docx'],
+            ['type' => 'knowledge', 'title' => 'SOP Tamu', 'filename' => 'sop-tamu.pdf', 'knowledge_source_id' => '7'],
         ]);
 
         $this->assertStringContainsString('**Rujukan:**', $footer);
         $this->assertStringContainsString('[Portal Resmi](https://example.com/resmi)', $footer);
         $this->assertStringContainsString('- Dokumen: briefing-harian.docx', $footer);
+        $this->assertStringContainsString('- Pengetahuan internal: SOP Tamu', $footer);
         $this->assertStringNotContainsString('🌐', $footer);
         $this->assertStringNotContainsString('`https://example.com/resmi`', $footer);
+    }
+
+    public function test_single_knowledge_source_uses_compact_reference_footer(): void
+    {
+        $service = new ChatOrchestrationService;
+
+        $footer = $service->sanitizeAndFormatSources([
+            ['type' => 'knowledge', 'title' => 'SOP Penerimaan Tamu', 'filename' => 'sop-tamu.pdf'],
+        ]);
+
+        $this->assertSame("\n\n---\nPengetahuan internal: **SOP Penerimaan Tamu**", $footer);
+    }
+
+    public function test_knowledge_metadata_from_sources_is_safe_and_deduplicated(): void
+    {
+        $service = new ChatOrchestrationService;
+
+        $metadata = $service->knowledgeMetadataFromSources([
+            ['type' => 'knowledge', 'knowledge_source_id' => '7', 'filename' => 'sop.pdf'],
+            ['type' => 'knowledge', 'knowledge_source_id' => '7', 'filename' => 'sop.pdf'],
+            ['filename' => 'dokumen-user.pdf'],
+        ]);
+
+        $this->assertSame([
+            'knowledge_used' => true,
+            'knowledge_chunk_count' => 2,
+            'knowledge_source_count' => 1,
+            'knowledge_source_ids' => ['7'],
+        ], $metadata);
     }
 
     public function test_duplicate_sources_are_deduplicated_before_rendering(): void

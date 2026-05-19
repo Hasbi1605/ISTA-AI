@@ -2,10 +2,10 @@
 
 namespace Tests\Feature\Admin;
 
+use App\Http\Controllers\Chat\ChatStreamController;
 use App\Jobs\GenerateChatResponse;
 use App\Jobs\ProcessDocument;
 use App\Jobs\RenderDocumentPreview;
-use App\Http\Controllers\Chat\ChatStreamController;
 use App\Livewire\Chat\ChatIndex;
 use App\Models\AIUsageEvent;
 use App\Models\Conversation;
@@ -13,15 +13,16 @@ use App\Models\Document;
 use App\Models\Memo;
 use App\Models\Message;
 use App\Models\User;
+use App\Services\Admin\AIUsageEventService;
 use App\Services\AIService;
 use App\Services\ChatOrchestrationService;
 use App\Services\DocumentLifecycleService;
 use App\Services\Memo\MemoGenerationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -86,7 +87,7 @@ class AIUsageEventTrackingTest extends TestCase
 
         // Pre-record the started event so we can confirm both events share id.
         $sharedRequestId = 'req-shared-stream-1';
-        app(\App\Services\Admin\AIUsageEventService::class)->started(
+        app(AIUsageEventService::class)->started(
             feature: AIUsageEvent::FEATURE_CHAT,
             userId: (int) $user->id,
             metadata: [
@@ -165,7 +166,7 @@ class AIUsageEventTrackingTest extends TestCase
         });
 
         $sharedRequestId = 'req-shared-stream-fail';
-        app(\App\Services\Admin\AIUsageEventService::class)->started(
+        app(AIUsageEventService::class)->started(
             feature: AIUsageEvent::FEATURE_CHAT,
             userId: (int) $user->id,
             metadata: [
@@ -406,7 +407,7 @@ class AIUsageEventTrackingTest extends TestCase
         $job->handle(
             app(AIService::class),
             app(ChatOrchestrationService::class),
-            app(\App\Services\Admin\AIUsageEventService::class),
+            app(AIUsageEventService::class),
         );
 
         $event = AIUsageEvent::query()
@@ -423,6 +424,64 @@ class AIUsageEventTrackingTest extends TestCase
         $this->assertSame('openai/gpt-4.1-mini', $event->metadata['model_name'] ?? null);
         $this->assertNotNull($event->subject_id);
         $this->assertSame(Message::class, $event->subject_type);
+    }
+
+    public function test_chat_job_records_knowledge_metadata_from_python_sources(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::create([
+            'user_id' => $user->id,
+            'title' => 'SOP',
+        ]);
+        Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'user',
+            'content' => 'Apa SOP penerimaan tamu?',
+        ]);
+
+        $this->app->bind(AIService::class, fn () => new class extends AIService
+        {
+            public function sendChat(array $messages, ?array $document_filenames = null, ?string $user_id = null, bool $force_web_search = false, ?string $source_policy = null, bool $allow_auto_realtime_web = true, ?array $document_ids = null, ?string $request_id = null): \Generator
+            {
+                yield "[MODEL:GPT-4.1 Mini (Primary)]\n";
+                yield 'Berdasarkan pengetahuan internal, tamu wajib registrasi.';
+                yield '[SOURCES:[{"type":"knowledge","title":"SOP Tamu","filename":"sop-tamu.pdf","knowledge_source_id":"7","chunk_index":0}]]';
+            }
+        });
+
+        $job = new GenerateChatResponse(
+            conversationId: $conversation->id,
+            userId: $user->id,
+            history: [['role' => 'user', 'content' => 'Apa SOP penerimaan tamu?']],
+            conversationDocuments: [],
+            webSearchMode: false,
+            requestId: 'req-job-knowledge',
+        );
+
+        $job->handle(
+            app(AIService::class),
+            app(ChatOrchestrationService::class),
+            app(AIUsageEventService::class),
+        );
+
+        $event = AIUsageEvent::query()
+            ->where('user_id', $user->id)
+            ->where('feature', AIUsageEvent::FEATURE_CHAT)
+            ->where('action', AIUsageEvent::ACTION_COMPLETED)
+            ->where('request_id', 'req-job-knowledge')
+            ->first();
+
+        $this->assertNotNull($event);
+        $this->assertTrue($event->metadata['knowledge_used'] ?? false);
+        $this->assertSame(1, $event->metadata['knowledge_chunk_count'] ?? null);
+        $this->assertSame(['7'], $event->metadata['knowledge_source_ids'] ?? null);
+        $this->assertSame(1, $event->metadata['knowledge_source_count'] ?? null);
+
+        $this->assertDatabaseHas('messages', [
+            'conversation_id' => $conversation->id,
+            'role' => 'assistant',
+            'content' => "Berdasarkan pengetahuan internal, tamu wajib registrasi.\n\n---\nPengetahuan internal: **SOP Tamu**",
+        ]);
     }
 
     public function test_chat_job_records_failure_event_on_error_sentinel(): void
@@ -459,7 +518,7 @@ class AIUsageEventTrackingTest extends TestCase
         $job->handle(
             app(AIService::class),
             app(ChatOrchestrationService::class),
-            app(\App\Services\Admin\AIUsageEventService::class),
+            app(AIUsageEventService::class),
         );
 
         $event = AIUsageEvent::query()
@@ -614,7 +673,7 @@ class AIUsageEventTrackingTest extends TestCase
         // Drop the events table to force AIUsageEventService::record() to
         // hit the catch path. The service must swallow the failure so the
         // chat send flow keeps working end to end.
-        \Illuminate\Support\Facades\Schema::drop('ai_usage_events');
+        Schema::drop('ai_usage_events');
 
         $component = Livewire::actingAs($user)
             ->test(ChatIndex::class)
