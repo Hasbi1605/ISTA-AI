@@ -9,6 +9,7 @@ use App\Http\Controllers\Documents\DocumentPreviewController;
 use App\Http\Controllers\Memos\MemoFileController;
 use App\Http\Controllers\OnlyOfficeCallbackController;
 use App\Livewire\Admin\AdminAccounts;
+use App\Livewire\Admin\AdminAIConfig;
 use App\Livewire\Admin\AdminDashboard;
 use App\Livewire\Admin\AdminDocuments;
 use App\Livewire\Admin\AdminErrors;
@@ -154,7 +155,7 @@ Route::middleware(['auth', 'verified', 'super_admin', 'admin.password_changed'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
-        Route::view('/ai-config', 'admin.ai-config')->name('ai-config');
+        Route::get('/ai-config', AdminAIConfig::class)->name('ai-config');
         Route::get('/accounts', AdminAccounts::class)->name('accounts');
     });
 

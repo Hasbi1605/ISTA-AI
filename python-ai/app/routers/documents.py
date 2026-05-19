@@ -1,5 +1,6 @@
 import os
 import uuid
+from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import Response
@@ -167,6 +168,7 @@ class SummarizeRequest(BaseModel):
     filename: str
     user_id: str
     document_id: str = ""
+    runtime_config: dict[str, Any] | None = None
 
 
 class ExportRequest(BaseModel):
@@ -187,6 +189,21 @@ def _render_prompt_or_http_exception(template: str, **kwargs) -> str:
         return _render_prompt(template, **kwargs)
     except (RuntimeError, KeyError, IndexError) as exc:
         raise HTTPException(status_code=500, detail=f"Gagal merender prompt: {exc}") from exc
+
+def _generate_summary_text(
+    get_llm_stream,
+    messages: list[dict[str, str]],
+    runtime_config: dict[str, Any] | None,
+) -> str:
+    full_response = ""
+    kwargs = {"runtime_config": runtime_config} if runtime_config else {}
+    for chunk in get_llm_stream(messages, **kwargs):
+        full_response += chunk
+
+    if "[MODEL:" in full_response:
+        full_response = full_response.split("]", 1)[1] if "]" in full_response else full_response
+
+    return full_response
 
 
 @router.post("/extract-tables", dependencies=[Depends(verify_token)])
@@ -295,12 +312,7 @@ def summarize_document_endpoint(request: SummarizeRequest):
 
         messages = [{"role": "user", "content": summarize_prompt}]
 
-        full_response = ""
-        for chunk in get_llm_stream(messages):
-            full_response += chunk
-
-        if "[MODEL:" in full_response:
-            full_response = full_response.split("]", 1)[1] if "]" in full_response else full_response
+        full_response = _generate_summary_text(get_llm_stream, messages, request.runtime_config)
 
         return {
             "status": "success",
@@ -320,14 +332,7 @@ def summarize_document_endpoint(request: SummarizeRequest):
         )
 
         batch_messages = [{"role": "user", "content": partial_prompt}]
-        partial_response = ""
-        for chunk in get_llm_stream(batch_messages):
-            partial_response += chunk
-
-        if "[MODEL:" in partial_response:
-            parts = partial_response.split("]", 1)
-            if len(parts) > 1:
-                partial_response = parts[1]
+        partial_response = _generate_summary_text(get_llm_stream, batch_messages, request.runtime_config)
 
         partial_summaries.append(partial_response.strip())
 
@@ -340,12 +345,7 @@ def summarize_document_endpoint(request: SummarizeRequest):
 
     final_messages = [{"role": "user", "content": final_prompt}]
 
-    full_response = ""
-    for chunk in get_llm_stream(final_messages):
-        full_response += chunk
-
-    if "[MODEL:" in full_response:
-        full_response = full_response.split("]", 1)[1] if "]" in full_response else full_response
+    full_response = _generate_summary_text(get_llm_stream, final_messages, request.runtime_config)
 
     return {
         "status": "success",

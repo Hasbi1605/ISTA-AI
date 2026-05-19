@@ -75,7 +75,7 @@ class AdminAccessTest extends TestCase
         $response->assertStatus(200);
         $response->assertSee('AI Configuration', false);
         $response->assertSee('Akses terbatas', false);
-        $response->assertSee('Model Routing', false);
+        $response->assertSee('Model Config', false);
         $response->assertSee('Prompt Profiles', false);
         $response->assertDontSee('Placeholder', false);
     }

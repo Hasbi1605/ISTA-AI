@@ -8,6 +8,7 @@ use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\User;
 use App\Services\Admin\AIUsageEventService;
+use App\Services\AI\AIConfigurationResolver;
 use App\Services\AIService;
 use App\Services\ChatOrchestrationService;
 use Illuminate\Http\Request;
@@ -138,6 +139,7 @@ class ChatStreamController extends Controller
         $streamStartedAt = microtime(true);
         $hasDocumentContext = ! empty($resolvedDocumentIds) || ! empty($documentFilenames);
         $feature = $this->resolveChatFeature($webSearchMode, $hasDocumentContext);
+        $configMetadata = app(AIConfigurationResolver::class)->usageMetadataForFeature($feature);
         $requestId = $clientRequestId ?? $usageEvents->newRequestId();
 
         $streamClaimKey = $orchestrator->acquireStreamRunner($conversationId);
@@ -174,6 +176,7 @@ class ChatStreamController extends Controller
                         'has_documents' => $hasDocumentContext,
                         'document_count' => count($resolvedDocumentIds),
                         'reason' => 'document_context_unavailable',
+                        ...$configMetadata,
                     ],
                     requestId: $requestId,
                     latencyMs: $usageEvents->latencyMsSince($streamStartedAt),
@@ -263,6 +266,7 @@ class ChatStreamController extends Controller
                         'has_documents' => $hasDocumentContext,
                         'document_count' => count($resolvedDocumentIds),
                         'reason' => 'stream_exception',
+                        ...$configMetadata,
                         ...$modelMetadata,
                     ],
                     requestId: $requestId,
@@ -294,6 +298,7 @@ class ChatStreamController extends Controller
                         'has_documents' => $hasDocumentContext,
                         'document_count' => count($resolvedDocumentIds),
                         'reason' => 'error_sentinel',
+                        ...$configMetadata,
                         ...$modelMetadata,
                     ],
                     requestId: $requestId,
@@ -342,6 +347,7 @@ class ChatStreamController extends Controller
                         'sources_count' => count($sources),
                         'has_sources' => ! empty($sources),
                         ...$knowledgeMetadata,
+                        ...$configMetadata,
                         'response_length' => strlen($cleanContent),
                         ...$modelMetadata,
                     ],

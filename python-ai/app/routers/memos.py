@@ -1,4 +1,5 @@
 import base64
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
@@ -17,6 +18,7 @@ class GenerateMemoRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=160)
     context: str = Field(..., min_length=1, max_length=MEMO_CONTEXT_MAX_LENGTH)
     configuration: dict[str, str] | None = None
+    runtime_config: dict[str, Any] | None = None
 
 
 @router.post("/generate-body", dependencies=[Depends(verify_token)])
@@ -27,6 +29,7 @@ def generate_memo_body(request: GenerateMemoRequest):
             title=request.title,
             context=request.context,
             configuration=request.configuration,
+            runtime_config=request.runtime_config,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

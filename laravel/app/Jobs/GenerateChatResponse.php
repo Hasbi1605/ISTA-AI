@@ -6,6 +6,7 @@ use App\Models\AIUsageEvent;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Services\Admin\AIUsageEventService;
+use App\Services\AI\AIConfigurationResolver;
 use App\Services\AIService;
 use App\Services\ChatOrchestrationService;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -52,6 +53,7 @@ class GenerateChatResponse implements ShouldQueue
         $jobStartedAt = microtime(true);
         $hasDocumentContext = ! empty($this->conversationDocuments);
         $feature = $this->resolveChatFeature($this->webSearchMode, $hasDocumentContext);
+        $configMetadata = app(AIConfigurationResolver::class)->usageMetadataForFeature($feature);
 
         $this->logLatency('job_start', 0, $requestId, [
             'conversation_id' => $this->conversationId,
@@ -108,6 +110,7 @@ class GenerateChatResponse implements ShouldQueue
                     'has_documents' => $hasDocumentContext,
                     'document_count' => count($documentIds),
                     'reason' => 'document_context_unavailable',
+                    ...$configMetadata,
                 ],
                 requestId: $requestId,
                 latencyMs: $usageEvents->latencyMsSince($jobStartedAt),
@@ -189,6 +192,7 @@ class GenerateChatResponse implements ShouldQueue
                     'has_documents' => $hasDocumentContext,
                     'document_count' => count($documentIds),
                     'reason' => 'error_sentinel',
+                    ...$configMetadata,
                     ...$modelMetadata,
                 ],
                 requestId: $requestId,
@@ -241,6 +245,7 @@ class GenerateChatResponse implements ShouldQueue
                     'sources_count' => count($sources),
                     'has_sources' => ! empty($sources),
                     ...$knowledgeMetadata,
+                    ...$configMetadata,
                     'response_length' => strlen($cleanContent),
                     ...$modelMetadata,
                 ],
@@ -270,6 +275,7 @@ class GenerateChatResponse implements ShouldQueue
 
         $hasDocumentContext = ! empty($this->conversationDocuments);
         $feature = $this->resolveChatFeature($this->webSearchMode, $hasDocumentContext);
+        $configMetadata = app(AIConfigurationResolver::class)->usageMetadataForFeature($feature);
 
         $usageEvents->failed(
             feature: $feature,
@@ -282,6 +288,7 @@ class GenerateChatResponse implements ShouldQueue
                 'document_count' => count($this->conversationDocuments),
                 'reason' => 'job_failed',
                 'job_attempts' => method_exists($this, 'attempts') ? $this->attempts() : null,
+                ...$configMetadata,
             ],
             requestId: $this->requestId,
             errorCode: 'job_failed',

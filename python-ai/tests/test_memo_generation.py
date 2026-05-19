@@ -38,6 +38,47 @@ def _find_table_containing(document, text):
     raise AssertionError(f"Table containing {text!r} not found")
 
 
+def test_generate_memo_docx_forwards_runtime_config_to_default_generator(monkeypatch):
+    import app.llm_manager as manager
+
+    captured = {}
+    runtime_config = {
+        "system_prompt": "Prompt memo runtime.",
+        "chat_models": [
+            {
+                "provider": "litellm",
+                "model_name": "openai/gpt-4.1-mini",
+                "api_key_env": "GITHUB_TOKEN",
+            }
+        ],
+    }
+
+    def fake_stream(messages, **kwargs):
+        captured["messages"] = messages
+        captured["runtime_config"] = kwargs.get("runtime_config")
+        yield "Mohon unit terkait menyiapkan bahan rapat koordinasi."
+
+    monkeypatch.setattr(manager, "get_llm_stream", fake_stream)
+
+    draft = generate_memo_docx(
+        "memo_internal",
+        "Rapat Koordinasi",
+        "Buat memo singkat terkait rapat koordinasi.",
+        configuration={
+            "number": "EVAL-08/IST/YK/05/2026",
+            "recipient": "Kepala Unit Layanan",
+            "sender": "Kepala Istana Kepresidenan Yogyakarta",
+            "subject": "Rapat Koordinasi",
+            "date": "19 Mei 2026",
+            "signatory": "Deni Mulyana",
+        },
+        runtime_config=runtime_config,
+    )
+
+    assert draft.content.startswith(b"PK")
+    assert captured["runtime_config"] == runtime_config
+    assert "Rapat Koordinasi" in captured["messages"][0]["content"]
+
 def _has_table_containing(document, text):
     try:
         _find_table_containing(document, text)
@@ -2020,7 +2061,7 @@ def test_generate_memo_endpoint_requires_token():
 def test_generate_memo_endpoint_accepts_full_laravel_configuration_context(monkeypatch):
     captured = {}
 
-    def fake_generate_memo_docx(memo_type, title, context, configuration=None):
+    def fake_generate_memo_docx(memo_type, title, context, configuration=None, runtime_config=None):
         captured["context"] = context
 
         return MemoDraft(
@@ -2050,7 +2091,7 @@ def test_generate_memo_endpoint_accepts_full_laravel_configuration_context(monke
 
 
 def test_generate_memo_endpoint_handles_unicode_searchable_text(monkeypatch):
-    def fake_generate_memo_docx(memo_type, title, context, configuration=None):
+    def fake_generate_memo_docx(memo_type, title, context, configuration=None, runtime_config=None):
         assert configuration == {"number": "M-01/I-Yog/IT.02/05/2026"}
 
         return MemoDraft(
