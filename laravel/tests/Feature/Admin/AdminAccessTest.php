@@ -10,14 +10,14 @@ class AdminAccessTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_guest_is_redirected_to_login_for_admin_dashboard(): void
+    public function test_guest_is_redirected_to_admin_login_for_admin_dashboard(): void
     {
         $response = $this->get('/admin');
 
-        $response->assertRedirect(route('login'));
+        $response->assertRedirect(route('admin.login'));
     }
 
-    public function test_regular_user_is_forbidden_from_admin_dashboard(): void
+    public function test_regular_user_is_redirected_to_admin_login_when_accessing_admin(): void
     {
         $user = User::factory()->create([
             'role' => User::ROLE_USER,
@@ -25,7 +25,7 @@ class AdminAccessTest extends TestCase
 
         $response = $this->actingAs($user)->get('/admin');
 
-        $response->assertStatus(403);
+        $response->assertRedirect(route('admin.login'));
     }
 
     public function test_admin_can_access_admin_dashboard(): void

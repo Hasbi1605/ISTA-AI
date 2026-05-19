@@ -1,11 +1,14 @@
 <?php
 
+use App\Http\Controllers\Admin\AdminLoginController;
+use App\Http\Controllers\Admin\AdminPasswordChangeController;
 use App\Http\Controllers\Chat\ChatStreamController;
 use App\Http\Controllers\CloudStorage\GoogleDriveOAuthController;
 use App\Http\Controllers\Documents\DocumentExportController;
 use App\Http\Controllers\Documents\DocumentPreviewController;
 use App\Http\Controllers\Memos\MemoFileController;
 use App\Http\Controllers\OnlyOfficeCallbackController;
+use App\Livewire\Admin\AdminAccounts;
 use App\Livewire\Admin\AdminDashboard;
 use App\Livewire\Admin\AdminDocuments;
 use App\Livewire\Admin\AdminErrors;
@@ -106,7 +109,35 @@ Route::middleware(['auth', 'verified'])
         Route::get('/callback', [GoogleDriveOAuthController::class, 'callback'])->name('callback');
     });
 
-Route::middleware(['auth', 'verified', 'admin'])
+Route::middleware(['web'])
+    ->prefix('admin')
+    ->name('admin.')
+    ->group(function () {
+        Route::middleware('guest')->group(function () {
+            Route::get('/login', [AdminLoginController::class, 'showLoginForm'])->name('login');
+            Route::post('/login', [AdminLoginController::class, 'login'])
+                ->middleware('throttle:10,1')
+                ->name('login.attempt');
+        });
+
+        Route::middleware('auth')->group(function () {
+            // Logout must remain accessible for any authenticated user (including inactive
+            // admins whose session is still valid) so they can clear their session.
+            Route::post('/logout', [AdminLoginController::class, 'logout'])->name('logout');
+        });
+
+        // Force password change endpoints require the same active-admin guard as the
+        // rest of /admin/*. We deliberately omit `admin.password_changed` here to avoid
+        // a redirect loop while the flag is still true.
+        Route::middleware(['auth', 'verified', 'admin'])->group(function () {
+            Route::get('/password/change', [AdminPasswordChangeController::class, 'show'])->name('password.change');
+            Route::post('/password/change', [AdminPasswordChangeController::class, 'update'])
+                ->middleware('throttle:10,1')
+                ->name('password.update');
+        });
+    });
+
+Route::middleware(['auth', 'verified', 'admin', 'admin.password_changed'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
@@ -117,11 +148,12 @@ Route::middleware(['auth', 'verified', 'admin'])
         Route::get('/documents', AdminDocuments::class)->name('documents');
     });
 
-Route::middleware(['auth', 'verified', 'super_admin'])
+Route::middleware(['auth', 'verified', 'super_admin', 'admin.password_changed'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
         Route::view('/ai-config', 'admin.ai-config')->name('ai-config');
+        Route::get('/accounts', AdminAccounts::class)->name('accounts');
     });
 
 require __DIR__.'/auth.php';

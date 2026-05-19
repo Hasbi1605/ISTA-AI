@@ -42,6 +42,13 @@ class User extends Authenticatable implements MustVerifyEmail
         'role',
         'last_seen_at',
         'last_active_feature',
+        'is_active',
+        'disabled_at',
+        'disabled_by',
+        'disabled_reason',
+        'force_password_change',
+        'last_admin_login_at',
+        'last_admin_login_ip',
     ];
 
     /**
@@ -60,6 +67,10 @@ class User extends Authenticatable implements MustVerifyEmail
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'last_seen_at' => 'datetime',
+            'is_active' => 'boolean',
+            'disabled_at' => 'datetime',
+            'force_password_change' => 'boolean',
+            'last_admin_login_at' => 'datetime',
         ];
     }
 
@@ -84,7 +95,39 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function canAccessAdmin(): bool
     {
+        return ($this->isAdmin() || $this->isSuperAdmin()) && $this->isActive();
+    }
+
+    /**
+     * Determine whether the user account is considered active.
+     */
+    public function isActive(): bool
+    {
+        return (bool) ($this->is_active ?? true);
+    }
+
+    /**
+     * Determine whether the user is part of the admin family (admin or super admin).
+     */
+    public function isAdminFamily(): bool
+    {
         return $this->isAdmin() || $this->isSuperAdmin();
+    }
+
+    /**
+     * Audit log entries where this user is the actor.
+     */
+    public function adminAuditActions()
+    {
+        return $this->hasMany(AdminAccountAudit::class, 'actor_id');
+    }
+
+    /**
+     * Audit log entries where this user is the target.
+     */
+    public function adminAuditTargets()
+    {
+        return $this->hasMany(AdminAccountAudit::class, 'target_user_id');
     }
 
     /**
