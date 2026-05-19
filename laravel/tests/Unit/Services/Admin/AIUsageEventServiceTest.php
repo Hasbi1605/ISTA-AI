@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\Admin\AIUsageEventService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class AIUsageEventServiceTest extends TestCase
@@ -160,13 +161,33 @@ class AIUsageEventServiceTest extends TestCase
         $this->assertSame('github_models', $clean['model_provider']);
     }
 
+    public function test_knowledge_metadata_is_allowed_without_raw_content(): void
+    {
+        $service = app(AIUsageEventService::class);
+
+        $clean = $service->sanitizeMetadata([
+            'knowledge_used' => true,
+            'knowledge_chunk_count' => 2,
+            'knowledge_source_count' => 1,
+            'knowledge_source_ids' => ['7'],
+            'context_text' => 'raw knowledge chunk should never be stored',
+        ]);
+
+        $this->assertSame([
+            'knowledge_used' => true,
+            'knowledge_chunk_count' => 2,
+            'knowledge_source_count' => 1,
+            'knowledge_source_ids' => ['7'],
+        ], $clean);
+    }
+
     public function test_record_is_best_effort_when_database_throws(): void
     {
         Log::spy();
         $service = app(AIUsageEventService::class);
 
         // Force the create() call to fail by removing the underlying table.
-        \Illuminate\Support\Facades\Schema::drop('ai_usage_events');
+        Schema::drop('ai_usage_events');
 
         $event = $service->started(
             feature: AIUsageEvent::FEATURE_CHAT,

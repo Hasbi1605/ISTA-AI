@@ -313,6 +313,7 @@ class ChatStreamController extends Controller
             if (! empty($sources)) {
                 $cleanContent .= $orchestrator->sanitizeAndFormatSources($sources);
             }
+            $knowledgeMetadata = $orchestrator->knowledgeMetadataFromSources($sources);
 
             if ($cleanContent === '') {
                 $cleanContent = 'Maaf, ISTA AI belum menerima jawaban yang bisa ditampilkan. Silakan coba lagi.';
@@ -340,6 +341,7 @@ class ChatStreamController extends Controller
                         'document_count' => count($resolvedDocumentIds),
                         'sources_count' => count($sources),
                         'has_sources' => ! empty($sources),
+                        ...$knowledgeMetadata,
                         'response_length' => strlen($cleanContent),
                         ...$modelMetadata,
                     ],

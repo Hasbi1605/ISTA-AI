@@ -122,6 +122,21 @@ def _get_rag_document_helpers():
 
     return run_retrieval_search, build_rag_prompt
 
+def _get_knowledge_helpers():
+    from app.services.knowledge_retrieval import (
+        build_knowledge_prompt,
+        knowledge_internal_enabled,
+        search_internal_knowledge,
+        should_use_internal_knowledge,
+    )
+
+    return (
+        knowledge_internal_enabled,
+        should_use_internal_knowledge,
+        search_internal_knowledge,
+        build_knowledge_prompt,
+    )
+
 
 @app.get("/api/health", response_model=HealthResponse)
 async def health_check():
@@ -276,6 +291,39 @@ async def chat_stream(request: ChatRequest, http_request: Request):
             yield ERROR_SENTINEL + _document_context_error_message()
 
         return StreamingResponse(document_error_stream(), media_type="text/event-stream")
+
+    if query and not documents_active and not request.force_web_search and not explicit_web_request:
+        (
+            knowledge_enabled,
+            should_use_knowledge,
+            search_internal_knowledge,
+            build_knowledge_prompt,
+        ) = _get_knowledge_helpers()
+
+        if knowledge_enabled() and should_use_knowledge(query):
+            tracker.start("knowledge_retrieval")
+            chunks, success = await asyncio.to_thread(
+                search_internal_knowledge,
+                query,
+                request_id=tracker.request_id,
+            )
+            tracker.end("knowledge_retrieval", extra={"chunks": len(chunks), "success": success})
+
+            if success and chunks:
+                knowledge_prompt, sources = build_knowledge_prompt(query, chunks)
+                messages_with_knowledge = [{"role": "system", "content": knowledge_prompt}] + request.messages
+                tracker.end_total("request_routed", extra={"mode": "knowledge_internal"})
+
+                return StreamingResponse(
+                    _wrap_stream_with_ttft(
+                        get_llm_stream_with_sources(messages_with_knowledge, sources),
+                        tracker,
+                    ),
+                    media_type="text/event-stream",
+                )
+
+            if not success:
+                logger.warning("Knowledge retrieval failed; falling back to general chat")
 
     tracker.end_total("request_routed", extra={"mode": "general_chat", "reason": reason_code})
     return StreamingResponse(

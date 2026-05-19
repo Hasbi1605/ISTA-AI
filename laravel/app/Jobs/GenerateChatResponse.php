@@ -209,6 +209,7 @@ class GenerateChatResponse implements ShouldQueue
         if (! empty($sources)) {
             $cleanContent .= $orchestrator->sanitizeAndFormatSources($sources);
         }
+        $knowledgeMetadata = $orchestrator->knowledgeMetadataFromSources($sources);
 
         if ($cleanContent === '') {
             $cleanContent = 'Maaf, ISTA AI belum menerima jawaban yang bisa ditampilkan. Silakan coba lagi.';
@@ -239,6 +240,7 @@ class GenerateChatResponse implements ShouldQueue
                     'document_count' => count($documentIds),
                     'sources_count' => count($sources),
                     'has_sources' => ! empty($sources),
+                    ...$knowledgeMetadata,
                     'response_length' => strlen($cleanContent),
                     ...$modelMetadata,
                 ],
