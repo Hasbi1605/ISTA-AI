@@ -359,11 +359,13 @@ class AdminMonitoringDashboardTest extends TestCase
         $response->assertSee('Dokumen User', false);
         $response->assertSee('admin-documents-kpi-card', false);
         $response->assertSee('admin-documents-kpi-card__icon', false);
-        $response->assertSee('Menampilkan 10 dokumen per halaman', false);
+        $response->assertSee('Maksimum 10 baris', false);
         $response->assertSee('Distribusi Tipe', false);
         $response->assertSee('Status Pipeline', false);
         $response->assertSee('PDF', false);
-        $response->assertSee('Pipeline Dokumen', false);
+        $response->assertSee('Dokumen Terbaru', false);
+        $response->assertSee('Chunks', false);
+        $response->assertDontSee('Pipeline Dokumen', false);
         $response->assertSee('Detail', false);
         $response->assertSee('a.pdf', false);
         $response->assertSee('b.pdf', false);
@@ -442,7 +444,7 @@ class AdminMonitoringDashboardTest extends TestCase
         Carbon::setTestNow();
     }
 
-    public function test_admin_documents_detail_drawer_shows_pipeline_metadata(): void
+    public function test_admin_documents_detail_modal_shows_compact_metadata(): void
     {
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
         $owner = User::factory()->create(['role' => User::ROLE_USER]);
@@ -476,9 +478,10 @@ class AdminMonitoringDashboardTest extends TestCase
 
         Livewire::test(AdminDocuments::class)
             ->call('showDetail', $document->id)
-            ->assertSee('Document Pipeline')
-            ->assertSee('AI Index Metadata')
-            ->assertSee('Chunk Count')
+            ->assertSee('Document Detail')
+            ->assertSee('Status AI')
+            ->assertSee('Metadata ringkas')
+            ->assertSee('Chunks')
             ->assertSee('2')
             ->assertSee('Indexed')
             ->assertSee('GOOGLE DRIVE', false)
@@ -513,7 +516,7 @@ class AdminMonitoringDashboardTest extends TestCase
         $this->actingAs($admin);
 
         Livewire::test(AdminDocuments::class)
-            ->assertSee('Menampilkan 10 dokumen per halaman')
+            ->assertSee('Maksimum 10 baris')
             ->assertSee('document-row-1.pdf', false)
             ->assertDontSee('document-row-11.pdf', false)
             ->call('gotoPage', 2)
