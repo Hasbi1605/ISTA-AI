@@ -68,6 +68,9 @@ class AdminAccountManagementTest extends TestCase
         $this->assertEquals(User::ROLE_ADMIN, $created->role);
         $this->assertTrue((bool) $created->is_active);
         $this->assertTrue((bool) $created->force_password_change);
+        // Created admin must already be email-verified so they can pass the
+        // `verified` middleware that guards /admin/*.
+        $this->assertNotNull($created->email_verified_at, 'Created admin must have email_verified_at set');
         $this->assertDatabaseHas('admin_account_audits', [
             'actor_id' => $superAdmin->id,
             'target_user_id' => $created->id,
