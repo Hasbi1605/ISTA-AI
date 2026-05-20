@@ -120,6 +120,10 @@
     $uploadHasFile = is_object($file);
     $uploadHasSource = filled($sourceId) || trim((string) $newSourceName) !== '';
     $uploadCanSubmit = $uploadHasFile && $uploadHasSource;
+    $uploadErrorMessages = collect(['upload', 'file', 'newSourceName', 'sourceId', 'title', 'notes'])
+        ->flatMap(fn (string $field) => $errors->get($field))
+        ->unique()
+        ->values();
 
     $totalDocs = array_sum($statusCounts);
     $activeCount = (int) ($statusCounts['active'] ?? 0);
@@ -274,7 +278,7 @@
                                     $status = $statusMeta($doc->status);
                                     $pipeline = $pipelineMeta($doc);
                                 @endphp
-                                <tr>
+                                <tr @class(['admin-knowledge-table__row--recent' => $recentUploadDocumentId === (int) $doc->id])>
                                     <td class="admin-table__td">
                                         <div class="admin-documents-file-cell">
                                             <x-admin.document-icon :type="$typeMeta['key']" :label="$typeMeta['label']" />
@@ -430,22 +434,35 @@
                       wire:loading.class="admin-knowledge-upload-form--busy"
                       wire:target="upload,file"
                       class="admin-knowledge-upload-form">
-                    @if ($errors->has('file') || $errors->has('newSourceName') || $errors->has('sourceId'))
+                    @if ($uploadErrorMessages->isNotEmpty())
                         <div class="admin-knowledge-upload-validation" role="alert">
-                            Lengkapi source dan file knowledge sebelum upload.
+                            <strong>Upload knowledge belum bisa diproses.</strong>
+                            <ul role="list">
+                                @foreach ($uploadErrorMessages as $message)
+                                    <li>{{ $message }}</li>
+                                @endforeach
+                            </ul>
                         </div>
                     @endif
 
                     <label class="admin-knowledge-filter">
                         <span>Judul opsional</span>
-                        <input type="text" wire:model.defer="title" placeholder="Contoh: SOP Penerimaan Tamu" class="admin-knowledge-control" />
+                        <input type="text"
+                               wire:model.defer="title"
+                               wire:loading.attr="disabled"
+                               wire:target="upload,file"
+                               placeholder="Contoh: SOP Penerimaan Tamu"
+                               class="admin-knowledge-control" />
                         @error('title') <span class="admin-knowledge-error">{{ $message }}</span> @enderror
                     </label>
 
                     <div class="admin-knowledge-upload-grid">
                         <label class="admin-knowledge-filter">
-                            <span>Source existing <em class="admin-knowledge-required">Wajib pilih salah satu</em></span>
-                            <select wire:model.live="sourceId" class="admin-knowledge-control">
+                            <span>Source existing</span>
+                            <select wire:model.live="sourceId"
+                                    wire:loading.attr="disabled"
+                                    wire:target="upload,file"
+                                    class="admin-knowledge-control">
                                 <option value="">Pilih source</option>
                                 @foreach ($sources as $source)
                                     <option value="{{ $source->id }}">{{ $source->name }}</option>
@@ -455,25 +472,45 @@
                         </label>
 
                         <label class="admin-knowledge-filter">
-                            <span>Atau source baru <em class="admin-knowledge-required">Wajib pilih salah satu</em></span>
-                            <input type="text" wire:model.live.debounce.300ms="newSourceName" placeholder="Contoh: Aturan internal" class="admin-knowledge-control" />
+                            <span>Atau source baru</span>
+                            <input type="text"
+                                   wire:model.live.debounce.300ms="newSourceName"
+                                   wire:loading.attr="disabled"
+                                   wire:target="upload,file"
+                                   placeholder="Contoh: Aturan internal"
+                                   class="admin-knowledge-control" />
                             @error('newSourceName') <span class="admin-knowledge-error">{{ $message }}</span> @enderror
                         </label>
                     </div>
+                    <p @class(['admin-knowledge-upload-source-note', 'admin-knowledge-upload-source-note--error' => $errors->has('newSourceName') || $errors->has('sourceId')])>
+                        Pilih source existing atau isi source baru.
+                    </p>
 
                     <label class="admin-knowledge-filter">
                         <span>Catatan internal</span>
-                        <textarea wire:model.defer="notes" rows="3" placeholder="Konteks singkat untuk admin lain" class="admin-knowledge-control admin-knowledge-control--textarea"></textarea>
+                        <textarea wire:model.defer="notes"
+                                  wire:loading.attr="disabled"
+                                  wire:target="upload,file"
+                                  rows="3"
+                                  placeholder="Konteks singkat untuk admin lain"
+                                  class="admin-knowledge-control admin-knowledge-control--textarea"></textarea>
                         @error('notes') <span class="admin-knowledge-error">{{ $message }}</span> @enderror
                     </label>
 
-                    <label class="admin-knowledge-dropzone @error('file') admin-knowledge-dropzone--error @enderror">
-                        <input type="file" wire:model="file" accept=".pdf,.docx,.xlsx,.csv" class="sr-only" />
-                        <span>File knowledge <em class="admin-knowledge-required">Wajib</em></span>
+                    <label class="admin-knowledge-dropzone @error('file') admin-knowledge-dropzone--error @enderror"
+                           wire:loading.class="admin-knowledge-dropzone--disabled"
+                           wire:target="upload,file">
+                        <input type="file"
+                               wire:model="file"
+                               wire:loading.attr="disabled"
+                               wire:target="upload,file"
+                               accept=".pdf,.docx,.xlsx,.csv"
+                               class="sr-only" />
+                        <span>File knowledge <em>Wajib</em></span>
                         <strong>{{ $uploadedFileName }}</strong>
                         <em>Format: {{ implode(', ', $allowedExtensions) }}. File akan masuk pipeline processing.</em>
+                        @error('file') <b>{{ $message }}</b> @enderror
                     </label>
-                    @error('file') <span class="admin-knowledge-error">{{ $message }}</span> @enderror
 
                     <div wire:loading.flex wire:target="file" class="admin-knowledge-upload-progress" role="status" aria-live="polite">
                         <span class="admin-knowledge-upload-progress__spinner" aria-hidden="true"></span>

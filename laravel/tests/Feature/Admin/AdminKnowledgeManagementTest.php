@@ -3,11 +3,11 @@
 namespace Tests\Feature\Admin;
 
 use App\Jobs\ProcessKnowledgeDocument;
+use App\Livewire\Admin\AdminKnowledge;
 use App\Models\AIUsageEvent;
 use App\Models\KnowledgeDocument;
 use App\Models\KnowledgeSource;
 use App\Models\User;
-use App\Services\Knowledge\KnowledgeLifecycleService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
@@ -58,7 +58,7 @@ class AdminKnowledgeManagementTest extends TestCase
 
         $this->actingAs($admin);
 
-        Livewire::test(\App\Livewire\Admin\AdminKnowledge::class)
+        Livewire::test(AdminKnowledge::class)
             ->call('openUploadModal')
             ->assertSee('Mengirim file knowledge')
             ->assertSee('Menjadwalkan processing')
@@ -81,11 +81,11 @@ class AdminKnowledgeManagementTest extends TestCase
 
         $this->actingAs($admin);
 
-        Livewire::test(\App\Livewire\Admin\AdminKnowledge::class)
+        Livewire::test(AdminKnowledge::class)
             ->call('openUploadModal')
             ->call('upload')
             ->assertHasErrors(['file', 'newSourceName'])
-            ->assertSee('Lengkapi source dan file knowledge sebelum upload')
+            ->assertSee('Upload knowledge belum bisa diproses')
             ->assertSee('Pilih file knowledge terlebih dahulu')
             ->assertSee('Pilih source existing atau isi source baru');
 
@@ -116,12 +116,19 @@ class AdminKnowledgeManagementTest extends TestCase
 
         $this->actingAs($admin);
 
-        Livewire::test(\App\Livewire\Admin\AdminKnowledge::class)
+        Livewire::test(AdminKnowledge::class)
+            ->set('search', 'filter yang disiapkan sebelum upload')
+            ->set('status', KnowledgeDocument::STATUS_ACTIVE)
             ->set('title', 'SOP Penerimaan Tamu')
             ->set('newSourceName', 'SOP Internal')
             ->set('file', $file)
             ->call('upload')
-            ->assertHasNoErrors();
+            ->assertHasNoErrors()
+            ->assertSet('search', '')
+            ->assertSet('status', '')
+            ->assertSet('sourceFilter', '')
+            ->assertSee('SOP Penerimaan Tamu')
+            ->assertSee('admin-knowledge-table__row--recent', false);
 
         $this->assertDatabaseHas('knowledge_sources', [
             'name' => 'SOP Internal',
@@ -156,11 +163,36 @@ class AdminKnowledgeManagementTest extends TestCase
 
         $this->actingAs($admin);
 
-        Livewire::test(\App\Livewire\Admin\AdminKnowledge::class)
+        Livewire::test(AdminKnowledge::class)
             ->set('newSourceName', 'SOP Internal')
             ->set('file', $file)
             ->call('upload')
             ->assertHasErrors(['file']);
+
+        $this->assertDatabaseCount('knowledge_documents', 0);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_upload_keeps_modal_open_and_shows_visible_file_error_when_mime_is_rejected(): void
+    {
+        Storage::fake('local');
+        Queue::fake();
+
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $file = UploadedFile::fake()->create('sop.pdf', 12, 'application/octet-stream');
+
+        $this->actingAs($admin);
+
+        Livewire::test(AdminKnowledge::class)
+            ->call('openUploadModal')
+            ->set('newSourceName', 'SOP Internal')
+            ->set('file', $file)
+            ->call('upload')
+            ->assertHasErrors(['file'])
+            ->assertSet('showUploadModal', true)
+            ->assertSee('Upload knowledge belum bisa diproses')
+            ->assertSee('Tipe file tidak didukung')
+            ->assertSee('sop.pdf');
 
         $this->assertDatabaseCount('knowledge_documents', 0);
         Queue::assertNothingPushed();
@@ -176,7 +208,7 @@ class AdminKnowledgeManagementTest extends TestCase
 
         $this->actingAs($admin);
 
-        Livewire::test(\App\Livewire\Admin\AdminKnowledge::class)
+        Livewire::test(AdminKnowledge::class)
             ->set('newSourceName', 'SOP Internal')
             ->set('file', $file)
             ->call('upload')
@@ -195,12 +227,12 @@ class AdminKnowledgeManagementTest extends TestCase
 
         $this->actingAs($admin);
 
-        Livewire::test(\App\Livewire\Admin\AdminKnowledge::class)
+        Livewire::test(AdminKnowledge::class)
             ->call('archive', $document->id);
 
         $this->assertSame(KnowledgeDocument::STATUS_ARCHIVED, $document->fresh()->status);
 
-        Livewire::test(\App\Livewire\Admin\AdminKnowledge::class)
+        Livewire::test(AdminKnowledge::class)
             ->call('activate', $document->id);
 
         $this->assertSame(KnowledgeDocument::STATUS_ACTIVE, $document->fresh()->status);
@@ -219,7 +251,7 @@ class AdminKnowledgeManagementTest extends TestCase
 
         $this->actingAs($admin);
 
-        Livewire::test(\App\Livewire\Admin\AdminKnowledge::class)
+        Livewire::test(AdminKnowledge::class)
             ->call('reprocess', $document->id);
 
         Queue::assertPushed(ProcessKnowledgeDocument::class);
@@ -246,7 +278,7 @@ class AdminKnowledgeManagementTest extends TestCase
 
         $this->actingAs($admin);
 
-        Livewire::test(\App\Livewire\Admin\AdminKnowledge::class)
+        Livewire::test(AdminKnowledge::class)
             ->call('delete', $document->id);
 
         $this->assertDatabaseMissing('knowledge_documents', ['id' => $document->id]);
@@ -276,7 +308,7 @@ class AdminKnowledgeManagementTest extends TestCase
 
         $this->actingAs($admin);
 
-        Livewire::test(\App\Livewire\Admin\AdminKnowledge::class)
+        Livewire::test(AdminKnowledge::class)
             ->set('status', KnowledgeDocument::STATUS_ACTIVE)
             ->assertSee('SOP Active Doc')
             ->assertDontSee('SOP Archived Doc');

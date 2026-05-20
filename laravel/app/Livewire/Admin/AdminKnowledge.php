@@ -5,10 +5,11 @@ namespace App\Livewire\Admin;
 use App\Models\KnowledgeDocument;
 use App\Models\KnowledgeSource;
 use App\Services\Knowledge\KnowledgeLifecycleService;
-use Illuminate\Support\Facades\Storage;
+use App\Support\UserFacingError;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
 use Livewire\WithPagination;
 
@@ -36,8 +37,10 @@ class AdminKnowledge extends Component
 
     public bool $showUploadModal = false;
 
+    public ?int $recentUploadDocumentId = null;
+
     /**
-     * @var \Livewire\Features\SupportFileUploads\TemporaryUploadedFile|null
+     * @var TemporaryUploadedFile|null
      */
     public $file = null;
 
@@ -106,7 +109,6 @@ class AdminKnowledge extends Component
                 'file',
                 'max:'.KnowledgeLifecycleService::MAX_DOCUMENT_SIZE_KILOBYTES,
                 'extensions:'.implode(',', KnowledgeLifecycleService::ALLOWED_EXTENSIONS),
-                'mimetypes:'.implode(',', KnowledgeLifecycleService::ALLOWED_MIME_TYPES),
             ],
             'title' => ['nullable', 'string', 'max:191'],
             'newSourceName' => ['required_without:sourceId', 'nullable', 'string', 'max:191'],
@@ -114,6 +116,9 @@ class AdminKnowledge extends Component
             'notes' => ['nullable', 'string', 'max:2000'],
         ], [
             'file.required' => 'Pilih file knowledge terlebih dahulu.',
+            'file.file' => 'Lampiran knowledge harus berupa file.',
+            'file.max' => 'Ukuran file knowledge tidak boleh lebih dari 50 MB.',
+            'file.extensions' => 'Format file tidak didukung. Gunakan PDF, DOCX, XLSX, atau CSV.',
             'newSourceName.required_without' => 'Pilih source existing atau isi source baru.',
         ]);
 
@@ -128,7 +133,7 @@ class AdminKnowledge extends Component
         $sourceArg = $this->resolveSourceArgument();
 
         try {
-            $lifecycle->upload($this->file, $admin, [
+            $document = $lifecycle->upload($this->file, $admin, [
                 'title' => $this->title ?: null,
                 'knowledge_source_id' => $sourceArg,
                 'notes' => $this->notes ?: null,
@@ -141,9 +146,17 @@ class AdminKnowledge extends Component
             }
 
             return;
+        } catch (\Throwable $e) {
+            report($e);
+            $this->addError('upload', UserFacingError::message($e, 'Upload knowledge gagal. Periksa file dan coba lagi.'));
+
+            return;
         }
 
-        $this->reset(['file', 'title', 'newSourceName', 'sourceId', 'notes']);
+        $this->reset(['file', 'title', 'newSourceName', 'sourceId', 'notes', 'search', 'status', 'sourceFilter']);
+        $this->resetValidation();
+        $this->resetPage();
+        $this->recentUploadDocumentId = (int) $document->id;
         $this->showUploadModal = false;
         $this->dispatch('knowledge-uploaded');
         session()->flash('knowledge_status', 'Dokumen knowledge berhasil di-upload dan sedang diproses.');
