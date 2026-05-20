@@ -1008,6 +1008,10 @@
         @apply overflow-hidden rounded-lg;
     }
 
+    .admin-documents-table-panel {
+        @apply mt-3;
+    }
+
     .admin-documents-table-panel__body,
     .admin-documents-distribution-panel__body {
         @apply px-3.5 pb-3.5 pt-3;
