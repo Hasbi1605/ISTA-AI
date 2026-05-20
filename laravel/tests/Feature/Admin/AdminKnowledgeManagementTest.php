@@ -78,10 +78,12 @@ class AdminKnowledgeManagementTest extends TestCase
         $css = file_get_contents(resource_path('css/app.css'));
 
         $this->assertStringContainsString('x-on:submit.prevent="submitKnowledgeUpload()"', $blade);
-        $this->assertStringContainsString('Promise.resolve($wire.upload())', $blade);
-        $this->assertStringContainsString('data-upload-can-submit="{{ $uploadCanSubmit ? \'true\' : \'false\' }}"', $blade);
-        $this->assertStringContainsString('x-bind:disabled="isBusy || ! canSubmit()"', $blade);
+        $this->assertStringContainsString("Promise.resolve(\$wire.\$call('submitKnowledgeUpload'))", $blade);
+        $this->assertStringNotContainsString('data-upload-can-submit', $blade);
+        $this->assertStringNotContainsString('canSubmit()', $blade);
+        $this->assertStringNotContainsString('x-bind:disabled="isBusy || ! canSubmit()"', $blade);
         $this->assertStringContainsString('x-bind:disabled="isBusy"', $blade);
+        $this->assertStringContainsString('wire:target="submitKnowledgeUpload,file"', $blade);
         $this->assertStringContainsString("x-bind:class=\"{ 'admin-knowledge-dropzone--disabled': isBusy }\"", $blade);
         $this->assertStringContainsString('.admin-knowledge-upload-progress--visible', $css);
     }

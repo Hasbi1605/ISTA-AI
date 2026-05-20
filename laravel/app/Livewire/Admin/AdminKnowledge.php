@@ -109,6 +109,11 @@ class AdminKnowledge extends Component
 
     public function upload(KnowledgeLifecycleService $lifecycle): void
     {
+        $this->submitKnowledgeUpload($lifecycle);
+    }
+
+    public function submitKnowledgeUpload(KnowledgeLifecycleService $lifecycle): void
+    {
         if ($this->isUploading) {
             return;
         }
