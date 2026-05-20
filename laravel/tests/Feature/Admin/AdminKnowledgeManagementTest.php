@@ -34,6 +34,31 @@ class AdminKnowledgeManagementTest extends TestCase
         $response->assertSee('Admin only', false);
     }
 
+    public function test_admin_knowledge_layout_focuses_on_full_width_documents_table(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+
+        $response = $this->actingAs($admin)->get('/admin/knowledge');
+
+        $response->assertOk();
+        $response->assertSee('admin-knowledge-main-stack admin-knowledge-main-stack--full', false);
+        $response->assertSee('admin-knowledge-table-panel__actions', false);
+        $response->assertSee('Upload Knowledge', false);
+        $response->assertDontSee('Status pipeline', false);
+        $response->assertDontSee('Urutan proses dokumen knowledge', false);
+
+        $blade = file_get_contents(resource_path('views/livewire/admin/admin-knowledge.blade.php'));
+        $css = file_get_contents(resource_path('css/app.css'));
+
+        $this->assertStringNotContainsString('admin-knowledge-content-grid', $blade);
+        $this->assertStringNotContainsString('admin-knowledge-side-grid', $blade);
+        $this->assertStringNotContainsString('admin-knowledge-status-panel', $blade);
+        $this->assertStringNotContainsString('admin-knowledge-pipeline-steps', $blade);
+        $this->assertStringContainsString('.admin-knowledge-main-stack--full', $css);
+        $this->assertStringContainsString('.admin-knowledge-table-panel__actions', $css);
+        $this->assertStringNotContainsString('.admin-knowledge-content-grid--wide', $css);
+    }
+
     public function test_upload_modal_backdrop_stays_behind_panel(): void
     {
         $css = file_get_contents(resource_path('css/app.css'));

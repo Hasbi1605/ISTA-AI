@@ -178,9 +178,6 @@
         </div>
         <div class="admin-knowledge-hero__actions">
             <x-admin.badge tone="neutral" class="admin-knowledge-readonly">Admin only</x-admin.badge>
-            <button type="button" wire:click="openUploadModal" class="admin-knowledge-primary-button">
-                Upload Knowledge
-            </button>
         </div>
     </div>
 
@@ -219,8 +216,7 @@
         @endforeach
     </div>
 
-    <div class="admin-knowledge-content-grid admin-knowledge-content-grid--wide">
-        <div class="admin-knowledge-main-stack">
+    <div class="admin-knowledge-main-stack admin-knowledge-main-stack--full">
             <section class="admin-knowledge-filter-panel admin-section">
                 <div class="admin-knowledge-filter-panel__header">
                     <h3>Filter</h3>
@@ -268,6 +264,11 @@
                     <div>
                         <h3>Dokumen Knowledge</h3>
                         <p>{{ $documentsPerPage }} baris per halaman pada filter aktif.</p>
+                    </div>
+                    <div class="admin-knowledge-table-panel__actions">
+                        <button type="button" wire:click="openUploadModal" class="admin-knowledge-primary-button">
+                            Upload Knowledge
+                        </button>
                     </div>
                 </header>
 
@@ -403,60 +404,6 @@
                     @endif
                 </div>
             </section>
-        </div>
-
-        <aside class="admin-knowledge-side-grid">
-            <section class="admin-knowledge-status-panel admin-section">
-                <header class="admin-knowledge-status-panel__header">
-                    <div>
-                        <h3>Status pipeline</h3>
-                        <p>Berdasarkan seluruh dokumen.</p>
-                    </div>
-                </header>
-
-                <div class="admin-knowledge-status-panel__body">
-                    @if (empty($statusCounts))
-                        <x-admin.empty-state title="Tidak ada status" />
-                    @else
-                        @php $totalStatus = max(1, array_sum($statusCounts)); @endphp
-                        <ul class="admin-documents-status-list" role="list">
-                            @foreach ($statusCounts as $statusName => $count)
-                                @php
-                                    $statusItem = $statusMeta($statusName);
-                                    $pct = (int) round(($count / $totalStatus) * 100);
-                                @endphp
-                                <li>
-                                    <span class="admin-documents-status-dot admin-documents-status-dot--{{ $statusItem['tone'] }}" aria-hidden="true"></span>
-                                    <div>
-                                        <strong>{{ $statusItem['label'] }}</strong>
-                                        <em>{{ $pct }}% dari knowledge</em>
-                                    </div>
-                                    <b>{{ number_format($count) }}</b>
-                                </li>
-                            @endforeach
-                        </ul>
-                    @endif
-                </div>
-            </section>
-
-            <section class="admin-knowledge-status-panel admin-section">
-                <header class="admin-knowledge-status-panel__header">
-                    <div>
-                        <h3>Pipeline</h3>
-                        <p>Urutan proses dokumen knowledge.</p>
-                    </div>
-                </header>
-
-                <div class="admin-knowledge-status-panel__body">
-                    <ol class="admin-knowledge-pipeline-steps">
-                        <li><span></span><strong>Uploaded</strong><em>File diterima sistem.</em></li>
-                        <li><span></span><strong>Parsed</strong><em>Konten dibaca tanpa ditampilkan ke admin.</em></li>
-                        <li><span></span><strong>Indexed</strong><em>Chunk dan embedding siap dicari.</em></li>
-                        <li><span></span><strong>Ready</strong><em>AI dapat memakai knowledge saat relevan.</em></li>
-                    </ol>
-                </div>
-            </section>
-        </aside>
     </div>
 
     @if ($showUploadModal)
