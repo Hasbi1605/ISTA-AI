@@ -164,6 +164,10 @@
 @endphp
 
 <div class="admin-knowledge-page">
+    @if ($shouldPollKnowledgePipeline)
+        <div wire:poll.5s="refreshKnowledgePipeline" class="admin-knowledge-pipeline-poll hidden" aria-hidden="true"></div>
+    @endif
+
     <div class="admin-knowledge-hero">
         <div class="max-w-2xl">
             <p class="admin-knowledge-eyebrow">Knowledge</p>
@@ -183,6 +187,16 @@
     @if (session('knowledge_status'))
         <div class="admin-knowledge-alert">
             {{ session('knowledge_status') }}
+        </div>
+    @endif
+
+    @if ($hasPendingKnowledgeDocuments)
+        <div class="admin-knowledge-pipeline-sync" role="status" aria-live="polite">
+            <span class="admin-knowledge-pipeline-sync__spinner" aria-hidden="true"></span>
+            <span>
+                <strong>{{ $formatInt($pendingKnowledgeCount) }} dokumen sedang diproses</strong>
+                <em>Status pipeline akan tersinkron otomatis.</em>
+            </span>
         </div>
     @endif
 
@@ -270,13 +284,17 @@
                                 ['key' => 'status', 'label' => 'Status', 'width' => '11%'],
                                 ['key' => 'pipeline', 'label' => 'Pipeline', 'width' => '17%'],
                                 ['key' => 'chunks', 'label' => 'Chunks', 'align' => 'center', 'width' => '6%'],
-                                ['key' => 'actions', 'label' => 'Aksi', 'align' => 'right', 'width' => '6%'],
+                                ['key' => 'actions', 'label' => 'Aksi', 'align' => 'right', 'width' => '8rem'],
                             ]">
                             @foreach ($documents as $doc)
                                 @php
                                     $typeMeta = $fileTypeMeta($doc);
                                     $status = $statusMeta($doc->status);
                                     $pipeline = $pipelineMeta($doc);
+                                    $canActivate = $doc->isActivatable();
+                                    $canArchive = $doc->isArchivable();
+                                    $canReprocess = $doc->isReprocessable();
+                                    $actionLabel = \Illuminate\Support\Str::limit((string) $doc->title, 56, '...');
                                 @endphp
                                 <tr @class(['admin-knowledge-table__row--recent' => $recentUploadDocumentId === (int) $doc->id])>
                                     <td class="admin-table__td">
@@ -322,18 +340,56 @@
                                     </td>
                                     <td class="admin-table__td" data-align="right">
                                         <div class="admin-knowledge-action-group">
-                                            @if ($doc->status !== 'active')
-                                                <button type="button" wire:click="activate({{ $doc->id }})" class="admin-knowledge-action admin-knowledge-action--success">Aktifkan</button>
+                                            @if ($canActivate)
+                                                <button type="button"
+                                                        wire:click="activate({{ $doc->id }})"
+                                                        wire:loading.attr="disabled"
+                                                        wire:target="activate({{ $doc->id }})"
+                                                        class="admin-knowledge-action admin-knowledge-action--success"
+                                                        title="Aktifkan"
+                                                        aria-label="Aktifkan {{ $actionLabel }}">
+                                                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.5 12.75l5.25 5.25L19.5 6.75"/>
+                                                    </svg>
+                                                </button>
                                             @endif
-                                            @if ($doc->status !== 'archived')
-                                                <button type="button" wire:click="archive({{ $doc->id }})" class="admin-knowledge-action admin-knowledge-action--warning">Arsip</button>
+                                            @if ($canArchive)
+                                                <button type="button"
+                                                        wire:click="archive({{ $doc->id }})"
+                                                        wire:loading.attr="disabled"
+                                                        wire:target="archive({{ $doc->id }})"
+                                                        class="admin-knowledge-action admin-knowledge-action--warning"
+                                                        title="Arsip"
+                                                        aria-label="Arsip {{ $actionLabel }}">
+                                                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M20.25 7.5v10.25a2 2 0 01-2 2H5.75a2 2 0 01-2-2V7.5m16.5 0H3.75m16.5 0l-1.4-3.1A2 2 0 0017.02 3.25H6.98a2 2 0 00-1.83 1.15L3.75 7.5m5 4.25h6.5"/>
+                                                    </svg>
+                                                </button>
                                             @endif
-                                            <button type="button" wire:click="reprocess({{ $doc->id }})" class="admin-knowledge-action">Proses ulang</button>
+                                            @if ($canReprocess)
+                                                <button type="button"
+                                                        wire:click="reprocess({{ $doc->id }})"
+                                                        wire:loading.attr="disabled"
+                                                        wire:target="reprocess({{ $doc->id }})"
+                                                        class="admin-knowledge-action"
+                                                        title="Proses ulang"
+                                                        aria-label="Proses ulang {{ $actionLabel }}">
+                                                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M4 4v6h6M20 20v-6h-6M5.5 14a7 7 0 0012 3M18.5 10a7 7 0 00-12-3"/>
+                                                    </svg>
+                                                </button>
+                                            @endif
                                             <button type="button"
                                                     wire:click="delete({{ $doc->id }})"
+                                                    wire:loading.attr="disabled"
+                                                    wire:target="delete({{ $doc->id }})"
                                                     wire:confirm="Yakin hapus knowledge ini? Vector akan dihapus juga."
-                                                    class="admin-knowledge-action admin-knowledge-action--danger">
-                                                Hapus
+                                                    class="admin-knowledge-action admin-knowledge-action--danger"
+                                                    title="Hapus"
+                                                    aria-label="Hapus {{ $actionLabel }}">
+                                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M19 7l-.86 11.14A2 2 0 0116.15 20H7.85a2 2 0 01-1.99-1.86L5 7m4 4v5m6-5v5M10 7V4.75A1.75 1.75 0 0111.75 3h.5A1.75 1.75 0 0114 4.75V7M4 7h16"/>
+                                                </svg>
                                             </button>
                                         </div>
                                     </td>

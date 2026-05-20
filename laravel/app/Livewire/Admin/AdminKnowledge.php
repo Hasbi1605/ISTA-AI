@@ -112,6 +112,11 @@ class AdminKnowledge extends Component
         $this->submitKnowledgeUpload($lifecycle);
     }
 
+    public function refreshKnowledgePipeline(): void
+    {
+        // Livewire polling hook: render() will read fresh pipeline state from the database.
+    }
+
     public function submitKnowledgeUpload(KnowledgeLifecycleService $lifecycle): void
     {
         if ($this->isUploading) {
@@ -194,6 +199,12 @@ class AdminKnowledge extends Component
             return;
         }
 
+        if (! $document->isActivatable()) {
+            session()->flash('knowledge_status', 'Dokumen belum siap diaktifkan.');
+
+            return;
+        }
+
         $lifecycle->activate($document, $admin);
         session()->flash('knowledge_status', 'Dokumen knowledge diaktifkan.');
     }
@@ -207,6 +218,12 @@ class AdminKnowledge extends Component
             return;
         }
 
+        if (! $document->isArchivable()) {
+            session()->flash('knowledge_status', 'Dokumen sedang diproses dan belum bisa di-archive.');
+
+            return;
+        }
+
         $lifecycle->archive($document, $admin);
         session()->flash('knowledge_status', 'Dokumen knowledge di-archive.');
     }
@@ -217,6 +234,12 @@ class AdminKnowledge extends Component
         $admin = auth()->user();
 
         if ($admin === null) {
+            return;
+        }
+
+        if (! $document->isReprocessable()) {
+            session()->flash('knowledge_status', 'Dokumen sedang diproses ulang.');
+
             return;
         }
 
@@ -287,11 +310,15 @@ class AdminKnowledge extends Component
             ->all();
 
         $sources = KnowledgeSource::query()->orderBy('name')->get();
+        $pendingKnowledgeCount = (int) (($statusCounts[KnowledgeDocument::STATUS_DRAFT] ?? 0) + ($statusCounts[KnowledgeDocument::STATUS_PROCESSING] ?? 0));
 
         return view('livewire.admin.admin-knowledge', [
             'documents' => $documents,
             'documentsPerPage' => self::DOCUMENTS_PER_PAGE,
             'statusCounts' => $statusCounts,
+            'pendingKnowledgeCount' => $pendingKnowledgeCount,
+            'hasPendingKnowledgeDocuments' => $pendingKnowledgeCount > 0,
+            'shouldPollKnowledgePipeline' => $pendingKnowledgeCount > 0 && ! $this->showUploadModal && ! $this->isUploading,
             'sources' => $sources,
             'statusOptions' => [
                 KnowledgeDocument::STATUS_DRAFT => 'Draft',

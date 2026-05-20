@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
@@ -25,9 +26,9 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property string $vector_namespace
  * @property array<string, mixed>|null $metadata
  * @property string|null $notes
- * @property \Illuminate\Support\Carbon|null $processed_at
- * @property \Illuminate\Support\Carbon|null $archived_at
- * @property \Illuminate\Support\Carbon|null $failed_at
+ * @property Carbon|null $processed_at
+ * @property Carbon|null $archived_at
+ * @property Carbon|null $failed_at
  * @property string|null $error_code
  * @property string|null $error_message
  */
@@ -116,7 +117,7 @@ class KnowledgeDocument extends Model
 
     public function isActivatable(): bool
     {
-        return in_array($this->status, [self::STATUS_DRAFT, self::STATUS_ARCHIVED, self::STATUS_ERROR], true);
+        return in_array($this->status, [self::STATUS_ARCHIVED, self::STATUS_ERROR], true);
     }
 
     public function isArchivable(): bool

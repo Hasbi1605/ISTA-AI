@@ -1549,6 +1549,22 @@
         @apply mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200;
     }
 
+    .admin-knowledge-pipeline-sync {
+        @apply mb-4 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-300/20 dark:bg-amber-300/10 dark:text-amber-100;
+    }
+
+    .admin-knowledge-pipeline-sync__spinner {
+        @apply mt-0.5 h-4 w-4 flex-none animate-spin rounded-full border-2 border-current border-t-transparent;
+    }
+
+    .admin-knowledge-pipeline-sync strong {
+        @apply block text-[0.78rem] font-semibold;
+    }
+
+    .admin-knowledge-pipeline-sync em {
+        @apply mt-0.5 block text-[0.7rem] not-italic opacity-80;
+    }
+
     .admin-knowledge-kpi-grid {
         @apply grid gap-3 sm:grid-cols-2 xl:grid-cols-4;
     }
@@ -1699,23 +1715,27 @@
     }
 
     .admin-knowledge-action-group {
-        @apply flex flex-wrap items-center justify-end gap-1.5;
+        @apply flex min-w-[7.1rem] flex-nowrap items-center justify-end gap-1.5;
     }
 
     .admin-knowledge-action {
-        @apply inline-flex h-7 items-center justify-center rounded-md border border-stone-200 bg-white px-2 text-[0.64rem] font-semibold text-stone-600 transition hover:border-ista-primary/30 hover:text-ista-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/25 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300 dark:hover:border-amber-300/30 dark:hover:text-amber-300;
+        @apply inline-flex h-7 w-7 flex-none items-center justify-center rounded-md border border-stone-200 bg-white p-0 text-stone-600 shadow-[0_1px_0_rgba(28,25,23,0.03)] transition hover:border-ista-primary/30 hover:bg-ista-primary/5 hover:text-ista-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/25 disabled:cursor-wait disabled:opacity-55 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300 dark:hover:border-amber-300/30 dark:hover:bg-amber-300/10 dark:hover:text-amber-300;
+    }
+
+    .admin-knowledge-action svg {
+        @apply h-3.5 w-3.5;
     }
 
     .admin-knowledge-action--success {
-        @apply text-emerald-700 hover:border-emerald-200 hover:text-emerald-600 dark:text-emerald-300 dark:hover:border-emerald-300/30 dark:hover:text-emerald-200;
+        @apply border-emerald-100 bg-emerald-50 text-emerald-700 hover:border-emerald-200 hover:bg-emerald-100/70 hover:text-emerald-800 dark:border-emerald-300/20 dark:bg-emerald-400/10 dark:text-emerald-300 dark:hover:border-emerald-300/35 dark:hover:bg-emerald-300/15 dark:hover:text-emerald-200;
     }
 
     .admin-knowledge-action--warning {
-        @apply text-amber-700 hover:border-amber-200 hover:text-amber-600 dark:text-amber-300 dark:hover:border-amber-300/30 dark:hover:text-amber-200;
+        @apply border-amber-100 bg-amber-50 text-amber-700 hover:border-amber-200 hover:bg-amber-100/70 hover:text-amber-800 dark:border-amber-300/25 dark:bg-amber-300/10 dark:text-amber-300 dark:hover:border-amber-300/40 dark:hover:bg-amber-300/15 dark:hover:text-amber-200;
     }
 
     .admin-knowledge-action--danger {
-        @apply text-rose-700 hover:border-rose-200 hover:text-rose-600 dark:text-rose-300 dark:hover:border-rose-300/30 dark:hover:text-rose-200;
+        @apply border-rose-100 bg-rose-50 text-rose-700 hover:border-rose-200 hover:bg-rose-100/70 hover:text-rose-800 dark:border-rose-400/20 dark:bg-rose-500/10 dark:text-rose-300 dark:hover:border-rose-300/35 dark:hover:bg-rose-500/15 dark:hover:text-rose-200;
     }
 
     .admin-knowledge-upload-form {

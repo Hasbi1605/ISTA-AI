@@ -88,6 +88,58 @@ class AdminKnowledgeManagementTest extends TestCase
         $this->assertStringContainsString('.admin-knowledge-upload-progress--visible', $css);
     }
 
+    public function test_knowledge_pipeline_polls_while_documents_are_pending(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+
+        $this->makeKnowledgeDocument([
+            'title' => 'Pending Pipeline Knowledge',
+            'status' => KnowledgeDocument::STATUS_PROCESSING,
+        ]);
+
+        $this->actingAs($admin);
+
+        Livewire::test(AdminKnowledge::class)
+            ->assertSee('wire:poll.5s="refreshKnowledgePipeline"', false)
+            ->assertSee('admin-knowledge-pipeline-sync', false)
+            ->assertSee('1 dokumen sedang diproses')
+            ->assertSee('Status pipeline akan tersinkron otomatis.');
+    }
+
+    public function test_knowledge_pipeline_polling_stops_when_no_documents_are_pending(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+
+        $this->makeKnowledgeDocument([
+            'title' => 'Ready Pipeline Knowledge',
+            'status' => KnowledgeDocument::STATUS_ACTIVE,
+        ]);
+
+        $this->actingAs($admin);
+
+        Livewire::test(AdminKnowledge::class)
+            ->assertDontSee('wire:poll.5s="refreshKnowledgePipeline"', false)
+            ->assertDontSee('admin-knowledge-pipeline-sync', false)
+            ->assertDontSee('Status pipeline akan tersinkron otomatis.');
+    }
+
+    public function test_knowledge_pipeline_polling_pauses_while_upload_modal_is_open(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+
+        $this->makeKnowledgeDocument([
+            'title' => 'Pending Pipeline Knowledge',
+            'status' => KnowledgeDocument::STATUS_PROCESSING,
+        ]);
+
+        $this->actingAs($admin);
+
+        Livewire::test(AdminKnowledge::class)
+            ->call('openUploadModal')
+            ->assertDontSee('wire:poll.5s="refreshKnowledgePipeline"', false)
+            ->assertSee('admin-knowledge-pipeline-sync', false);
+    }
+
     public function test_upload_modal_cannot_close_while_uploading(): void
     {
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
@@ -273,6 +325,45 @@ class AdminKnowledgeManagementTest extends TestCase
         $this->assertGreaterThanOrEqual(2, AIUsageEvent::query()
             ->where('feature', AIUsageEvent::FEATURE_KNOWLEDGE_ADMIN)
             ->count());
+    }
+
+    public function test_knowledge_action_buttons_are_compact_icon_only_and_state_aware(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+
+        $this->makeKnowledgeDocument([
+            'title' => 'Active Knowledge',
+            'status' => KnowledgeDocument::STATUS_ACTIVE,
+        ]);
+        $processing = $this->makeKnowledgeDocument([
+            'title' => 'Processing Knowledge',
+            'status' => KnowledgeDocument::STATUS_PROCESSING,
+        ]);
+        $this->makeKnowledgeDocument([
+            'title' => 'Archived Knowledge',
+            'status' => KnowledgeDocument::STATUS_ARCHIVED,
+        ]);
+
+        $this->actingAs($admin);
+
+        Livewire::test(AdminKnowledge::class)
+            ->assertSee('aria-label="Arsip Active Knowledge"', false)
+            ->assertSee('aria-label="Proses ulang Active Knowledge"', false)
+            ->assertSee('aria-label="Hapus Processing Knowledge"', false)
+            ->assertDontSee('aria-label="Aktifkan Processing Knowledge"', false)
+            ->assertDontSee('aria-label="Arsip Processing Knowledge"', false)
+            ->assertDontSee('aria-label="Proses ulang Processing Knowledge"', false)
+            ->assertSee('aria-label="Aktifkan Archived Knowledge"', false)
+            ->call('activate', $processing->id);
+
+        $this->assertSame(KnowledgeDocument::STATUS_PROCESSING, $processing->fresh()->status);
+
+        $blade = file_get_contents(resource_path('views/livewire/admin/admin-knowledge.blade.php'));
+
+        $this->assertStringNotContainsString('>Aktifkan</button>', $blade);
+        $this->assertStringNotContainsString('>Arsip</button>', $blade);
+        $this->assertStringNotContainsString('>Proses ulang</button>', $blade);
+        $this->assertStringNotContainsString('>Hapus</button>', $blade);
     }
 
     public function test_admin_can_reprocess_knowledge_document(): void
