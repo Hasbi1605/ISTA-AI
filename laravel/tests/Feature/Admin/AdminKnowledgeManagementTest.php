@@ -165,6 +165,29 @@ class AdminKnowledgeManagementTest extends TestCase
             ->assertSee('admin-knowledge-pipeline-sync', false);
     }
 
+    public function test_recent_upload_row_highlight_clears_after_processing_finishes(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $document = $this->makeKnowledgeDocument([
+            'title' => 'Recently Uploaded Knowledge',
+            'status' => KnowledgeDocument::STATUS_PROCESSING,
+        ]);
+
+        $this->actingAs($admin);
+
+        $component = Livewire::test(AdminKnowledge::class)
+            ->set('recentUploadDocumentId', $document->id)
+            ->assertSee('admin-knowledge-table__row--recent', false);
+
+        $document->update(['status' => KnowledgeDocument::STATUS_ACTIVE]);
+
+        $component
+            ->call('refreshKnowledgePipeline')
+            ->assertSet('recentUploadDocumentId', null)
+            ->assertDontSee('admin-knowledge-table__row--recent', false)
+            ->assertSee('Ready');
+    }
+
     public function test_upload_modal_cannot_close_while_uploading(): void
     {
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);

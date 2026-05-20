@@ -114,7 +114,21 @@ class AdminKnowledge extends Component
 
     public function refreshKnowledgePipeline(): void
     {
-        // Livewire polling hook: render() will read fresh pipeline state from the database.
+        if ($this->recentUploadDocumentId === null) {
+            return;
+        }
+
+        $recentUploadStillPending = KnowledgeDocument::query()
+            ->whereKey($this->recentUploadDocumentId)
+            ->whereIn('status', [
+                KnowledgeDocument::STATUS_DRAFT,
+                KnowledgeDocument::STATUS_PROCESSING,
+            ])
+            ->exists();
+
+        if (! $recentUploadStillPending) {
+            $this->recentUploadDocumentId = null;
+        }
     }
 
     public function submitKnowledgeUpload(KnowledgeLifecycleService $lifecycle): void

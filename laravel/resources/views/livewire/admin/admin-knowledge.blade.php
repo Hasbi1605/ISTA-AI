@@ -295,9 +295,11 @@
                                     $canActivate = $doc->isActivatable();
                                     $canArchive = $doc->isArchivable();
                                     $canReprocess = $doc->isReprocessable();
+                                    $isRecentlyUploadedPending = $recentUploadDocumentId === (int) $doc->id
+                                        && in_array($doc->status, ['draft', 'processing'], true);
                                     $actionLabel = \Illuminate\Support\Str::limit((string) $doc->title, 56, '...');
                                 @endphp
-                                <tr @class(['admin-knowledge-table__row--recent' => $recentUploadDocumentId === (int) $doc->id])>
+                                <tr @class(['admin-knowledge-table__row--recent' => $isRecentlyUploadedPending])>
                                     <td class="admin-table__td">
                                         <div class="admin-documents-file-cell">
                                             <x-admin.document-icon :type="$typeMeta['key']" :label="$typeMeta['label']" />
