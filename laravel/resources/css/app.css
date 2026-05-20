@@ -651,7 +651,7 @@
     }
 
     .admin-users-delete-button {
-        @apply inline-flex h-7 items-center justify-center rounded-md border border-rose-200 bg-rose-50 px-2.5 text-[0.68rem] font-semibold text-rose-700 transition hover:border-ista-primary/40 hover:bg-ista-primary hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/25 dark:border-rose-400/20 dark:bg-rose-500/10 dark:text-rose-300 dark:hover:border-amber-300/40 dark:hover:bg-amber-300 dark:hover:text-gray-950;
+        @apply inline-flex h-7 w-7 items-center justify-center rounded-md border border-rose-200 bg-rose-50 text-rose-700 transition hover:border-ista-primary/40 hover:bg-ista-primary hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/25 dark:border-rose-400/20 dark:bg-rose-500/10 dark:text-rose-300 dark:hover:border-amber-300/40 dark:hover:bg-amber-300 dark:hover:text-gray-950;
     }
 
     .admin-users-pagination {
@@ -745,11 +745,19 @@
     }
 
     .admin-usage-reset-group {
-        @apply flex items-center justify-end;
+        @apply flex flex-wrap items-center justify-end gap-3;
     }
 
     .admin-usage-reset-button {
         @apply inline-flex items-center gap-1.5 text-[0.72rem] font-semibold text-ista-primary transition hover:text-rose-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/30 dark:text-rose-300 dark:hover:text-rose-200;
+    }
+
+    .admin-usage-lifecycle-toggle {
+        @apply inline-flex h-7 cursor-pointer items-center gap-2 rounded-full border border-stone-200 bg-stone-50 px-2.5 text-[0.66rem] font-semibold text-stone-500 transition hover:border-ista-primary/30 hover:text-ista-primary dark:border-gray-800 dark:bg-gray-950 dark:text-gray-400 dark:hover:border-amber-300/30 dark:hover:text-amber-300;
+    }
+
+    .admin-usage-lifecycle-toggle input {
+        @apply h-3.5 w-3.5 rounded border-stone-300 text-ista-primary focus:ring-ista-primary/20 dark:border-gray-700 dark:bg-gray-900;
     }
 
     .admin-usage-filter-grid {
@@ -991,12 +999,8 @@
         @apply h-9 w-full rounded-lg border border-stone-200 bg-white px-3 text-xs text-stone-800 shadow-[inset_0_1px_0_rgba(28,25,23,0.02)] transition placeholder:text-stone-400 focus:border-ista-primary focus:outline-none focus:ring-2 focus:ring-ista-primary/15 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100 dark:placeholder:text-gray-500;
     }
 
-    .admin-documents-content-grid {
-        @apply mt-3 grid gap-3;
-    }
-
-    .admin-documents-side-grid {
-        @apply grid gap-3 content-start lg:grid-cols-2;
+    .admin-documents-insight-grid {
+        @apply mt-3 grid gap-3 xl:grid-cols-[minmax(18rem,0.78fr)_minmax(0,1.22fr)];
     }
 
     .admin-documents-table-panel,
@@ -1123,6 +1127,10 @@
         font-variant-numeric: tabular-nums;
     }
 
+    .admin-documents-unsynced {
+        @apply inline-flex h-6 min-w-6 items-center justify-center rounded-md bg-stone-50 px-2 font-mono text-[0.72rem] font-semibold text-stone-400 ring-1 ring-stone-100 dark:bg-gray-950 dark:text-gray-500 dark:ring-gray-800;
+    }
+
     .admin-documents-muted {
         @apply text-[0.72rem] text-stone-500 dark:text-gray-400;
     }
@@ -1168,40 +1176,61 @@
         @apply w-full;
     }
 
-    .admin-documents-distribution-list {
-        @apply space-y-3;
+    .admin-documents-type-donut-card {
+        @apply grid items-center gap-4 sm:grid-cols-[8rem_1fr];
     }
 
-    .admin-documents-distribution-list li {
-        @apply rounded-lg border border-stone-100 bg-stone-50/40 p-3 dark:border-gray-800 dark:bg-gray-950/40;
+    .admin-documents-type-donut {
+        @apply relative mx-auto flex h-28 w-28 items-center justify-center rounded-full;
+        background: var(--document-donut);
     }
 
-    .admin-documents-distribution-list__top {
-        @apply flex items-center justify-between gap-3;
+    .admin-documents-type-donut::after {
+        content: "";
+        @apply absolute inset-4 rounded-full bg-white shadow-[inset_0_0_0_1px_rgba(231,229,228,0.9)] dark:bg-gray-900 dark:shadow-[inset_0_0_0_1px_rgba(31,41,55,0.95)];
     }
 
-    .admin-documents-distribution-list__top span {
-        @apply truncate font-mono text-[0.66rem] uppercase text-stone-600 dark:text-gray-300;
-        letter-spacing: 0;
+    .admin-documents-type-donut span,
+    .admin-documents-type-donut em {
+        @apply relative z-10 block text-center;
     }
 
-    .admin-documents-distribution-list__top strong,
-    .admin-documents-status-list b {
-        @apply text-xs font-semibold text-stone-900 dark:text-gray-100;
+    .admin-documents-type-donut span {
+        @apply text-lg font-semibold leading-none text-stone-950 dark:text-gray-100;
         font-variant-numeric: tabular-nums;
     }
 
-    .admin-documents-distribution-bar {
-        @apply mt-2 h-1.5 overflow-hidden rounded-full bg-stone-200/70 dark:bg-gray-800;
-    }
-
-    .admin-documents-distribution-bar span {
-        @apply block h-full rounded-full bg-ista-primary/80 dark:bg-amber-300/80;
-    }
-
-    .admin-documents-distribution-list__meta {
-        @apply mt-2 flex flex-wrap items-center justify-between gap-2 text-[0.62rem] font-semibold uppercase text-stone-400 dark:text-gray-500;
+    .admin-documents-type-donut em {
+        @apply mt-1 text-[0.62rem] not-italic font-semibold uppercase text-stone-400 dark:text-gray-500;
         letter-spacing: 0;
+    }
+
+    .admin-documents-type-legend {
+        @apply grid gap-2;
+    }
+
+    .admin-documents-type-legend li {
+        @apply grid grid-cols-[auto_1fr_auto] items-center gap-2 rounded-lg border border-stone-100 bg-stone-50/45 px-2.5 py-2 dark:border-gray-800 dark:bg-gray-950/40;
+    }
+
+    .admin-documents-type-legend li > span {
+        @apply h-2.5 w-2.5 rounded-full;
+    }
+
+    .admin-documents-type-legend strong {
+        @apply block truncate font-mono text-[0.66rem] font-semibold uppercase text-stone-700 dark:text-gray-200;
+        letter-spacing: 0;
+    }
+
+    .admin-documents-type-legend em {
+        @apply mt-0.5 block text-[0.6rem] not-italic font-semibold uppercase text-stone-400 dark:text-gray-500;
+        letter-spacing: 0;
+    }
+
+    .admin-documents-type-legend b,
+    .admin-documents-pipeline-summary b {
+        @apply font-mono text-xs font-semibold text-stone-900 dark:text-gray-100;
+        font-variant-numeric: tabular-nums;
     }
 
     .admin-documents-status-list {
@@ -1223,6 +1252,39 @@
     .admin-documents-status-list em {
         @apply mt-0.5 block text-[0.62rem] not-italic text-stone-400 dark:text-gray-500;
     }
+
+    .admin-documents-pipeline-summary {
+        @apply grid gap-2 sm:grid-cols-5;
+    }
+
+    .admin-documents-pipeline-summary__item {
+        @apply grid min-h-[5rem] grid-cols-[auto_1fr] gap-x-2 rounded-lg border border-stone-100 bg-stone-50/45 p-3 dark:border-gray-800 dark:bg-gray-950/40;
+    }
+
+    .admin-documents-pipeline-summary__item > span {
+        @apply mt-1.5 h-2 w-2 rounded-full bg-stone-400;
+    }
+
+    .admin-documents-pipeline-summary__item div {
+        @apply min-w-0;
+    }
+
+    .admin-documents-pipeline-summary__item strong {
+        @apply block truncate text-xs font-semibold text-stone-900 dark:text-gray-100;
+    }
+
+    .admin-documents-pipeline-summary__item em {
+        @apply mt-0.5 block text-[0.62rem] not-italic leading-snug text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-documents-pipeline-summary__item b {
+        @apply col-span-2 mt-2 text-lg leading-none;
+    }
+
+    .admin-documents-pipeline-summary__item--primary > span { @apply bg-ista-primary dark:bg-amber-300; }
+    .admin-documents-pipeline-summary__item--success > span { @apply bg-emerald-500; }
+    .admin-documents-pipeline-summary__item--warning > span { @apply bg-amber-500; }
+    .admin-documents-pipeline-summary__item--danger > span { @apply bg-rose-500; }
 
     .admin-documents-status-dot {
         @apply h-2 w-2 flex-none rounded-full;
@@ -3133,6 +3195,8 @@
         color: #94a3b8;
         -webkit-text-fill-color: #94a3b8;
     }
+}
+
     .admin-ai-config-alert {
         @apply mb-3 rounded-lg border px-4 py-3 text-sm font-semibold;
     }
@@ -3404,7 +3468,6 @@
     .admin-knowledge-upload-modal__footer {
         @apply flex flex-wrap items-center justify-end gap-2 border-t border-stone-100 pt-4 dark:border-gray-800;
     }
-}
 
 /* Dynamic admin modifiers are composed in Blade, so keep these outside @layer
    to prevent Tailwind from pruning production-critical color states. */

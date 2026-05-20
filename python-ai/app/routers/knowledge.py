@@ -72,6 +72,7 @@ def _process_knowledge_document(
         user_id=KNOWLEDGE_USER_ID,
         document_id=document_id,
         metadata_overrides=overrides,
+        return_metrics=True,
     )
 
 
@@ -114,7 +115,7 @@ def upload_knowledge(
     try:
         _stream_upload_with_limit(file, temp_file_path)
 
-        success, message = _process_knowledge_document(
+        success, message, metrics = _process_knowledge_document(
             temp_file_path,
             safe_filename,
             document_id=document_id,
@@ -132,6 +133,7 @@ def upload_knowledge(
                 "scope": scope or DEFAULT_SCOPE,
                 "audience": audience or DEFAULT_AUDIENCE,
                 "document_id": document_id,
+                **metrics,
             }
 
         raise HTTPException(status_code=500, detail=message)

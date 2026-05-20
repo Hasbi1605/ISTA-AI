@@ -114,7 +114,8 @@
     $pipelineMeta = function ($doc) use ($stageState): array {
         $status = (string) ($doc?->status ?? 'pending');
         $previewStatus = (string) ($doc?->preview_status ?? 'pending');
-        $chunks = (int) ($doc?->chunks_count ?? 0);
+        $chunks = (int) ($doc?->display_chunk_count ?? $doc?->chunks_count ?? 0);
+        $chunkKnown = (bool) ($doc?->chunk_count_known ?? false);
         $progress = match ($status) {
             'ready' => 100,
             'processing' => $previewStatus === 'ready' ? 72 : 55,
@@ -129,7 +130,8 @@
             default => 'Queued',
         };
         $embeddingStatus = match (true) {
-            $status === 'ready' && $chunks > 0 => 'Indexed',
+            $status === 'ready' && $chunkKnown && $chunks > 0 => 'Indexed',
+            $status === 'ready' && ! $chunkKnown => 'Belum tersinkron',
             $status === 'ready' && $chunks === 0 => 'Index kosong',
             $status === 'processing' => 'Indexing',
             $status === 'error' => 'Failed',
@@ -137,6 +139,7 @@
         };
         $chunkStatus = match (true) {
             $chunks > 0 => number_format($chunks) . ' chunk siap',
+            ! $chunkKnown => 'Belum tersinkron',
             $status === 'error' => 'Belum ada chunk',
             default => 'Index kosong',
         };
@@ -148,6 +151,7 @@
             'embedding_status' => $embeddingStatus,
             'chunk_status' => $chunkStatus,
             'chunk_count' => $chunks,
+            'chunk_known' => $chunkKnown,
             'stages' => [
                 ['key' => 'uploaded', 'label' => 'Uploaded', 'state' => $stageState($status, $previewStatus, 'uploaded', $chunks)],
                 ['key' => 'parsed', 'label' => 'Parsed', 'state' => $stageState($status, $previewStatus, 'parsed', $chunks)],
@@ -162,6 +166,32 @@
     $processingCount = (int) (($statusCounts['pending'] ?? 0) + ($statusCounts['processing'] ?? 0));
     $failedCount = (int) ($statusCounts['error'] ?? 0);
     $sizeLabel = $formatBytes((int) $totalSizeBytes);
+    $typeColors = [
+        'pdf' => '#ff2056',
+        'csv' => '#16a34a',
+        'xlsx' => '#22c55e',
+        'docx' => '#2b7fff',
+        'txt' => '#64748b',
+        'image' => '#fd9a00',
+        'file' => '#78716c',
+    ];
+    $totalMime = max(1, array_sum($mimeCounts));
+    $donutCursor = 0;
+    $donutSegments = [];
+    foreach ($mimeCounts as $mime => $count) {
+        $mimeMeta = $fileTypeMeta((object) ['mime_type' => $mime, 'original_name' => '']);
+        $start = $donutCursor;
+        $donutCursor += ($count / $totalMime) * 100;
+        $donutSegments[] = ($typeColors[$mimeMeta['key']] ?? $typeColors['file']) . ' ' . $start . '% ' . $donutCursor . '%';
+    }
+    $donutGradient = $donutSegments === [] ? 'conic-gradient(#e7e5e4 0 100%)' : 'conic-gradient(' . implode(', ', $donutSegments) . ')';
+    $pipelineSummary = [
+        ['label' => 'Uploaded', 'value' => $totalDocs, 'tone' => 'primary', 'description' => 'File diterima'],
+        ['label' => 'Processing', 'value' => $processingCount, 'tone' => 'warning', 'description' => 'Parsing / indexing'],
+        ['label' => 'Indexed', 'value' => $readyCount, 'tone' => 'success', 'description' => 'Vector siap'],
+        ['label' => 'Ready', 'value' => $readyCount, 'tone' => 'success', 'description' => 'Bisa dipakai AI'],
+        ['label' => 'Failed', 'value' => $failedCount, 'tone' => 'danger', 'description' => 'Perlu dicek'],
+    ];
 
     $documentCards = [
         [
@@ -290,171 +320,167 @@
         </div>
     </section>
 
-    <div class="admin-documents-content-grid">
-        <section class="admin-documents-table-panel admin-section">
-            <header class="admin-documents-table-panel__header">
+    <div class="admin-documents-insight-grid">
+        <section class="admin-documents-distribution-panel admin-section">
+            <header class="admin-documents-distribution-panel__header">
                 <div>
-                    <h3>Dokumen Terbaru</h3>
-                    <p>Maksimum {{ $documentsPerPage }} baris pada filter aktif.</p>
+                    <h3>Distribusi Tipe</h3>
+                    <p>Berdasarkan filter aktif.</p>
                 </div>
             </header>
 
-            <div class="admin-documents-table-panel__body">
-                @if ($documents->isEmpty())
-                    <x-admin.empty-state
-                        title="Belum ada dokumen"
-                        description="Tidak ada dokumen yang cocok dengan filter saat ini." />
+            <div class="admin-documents-distribution-panel__body">
+                @if (empty($mimeCounts))
+                    <x-admin.empty-state title="Tidak ada data" />
                 @else
-                    <x-admin.table
-                        class="admin-documents-table"
-                        :columns="[
-                            ['key' => 'file', 'label' => 'File', 'width' => '34%'],
-                            ['key' => 'owner', 'label' => 'User', 'width' => '21%'],
-                            ['key' => 'size', 'label' => 'Size', 'align' => 'right', 'width' => '10%'],
-                            ['key' => 'status', 'label' => 'Status', 'width' => '12%'],
-                            ['key' => 'chunks', 'label' => 'Chunks', 'align' => 'center', 'width' => '8%'],
-                            ['key' => 'uploaded', 'label' => 'Waktu', 'align' => 'right', 'width' => '9%'],
-                            ['key' => 'action', 'label' => 'Aksi', 'align' => 'right', 'width' => '6%'],
-                        ]">
-                        @foreach ($documents as $doc)
-                            @php
-                                $typeMeta = $fileTypeMeta($doc);
-                                $status = $statusMeta($doc->status);
-                            @endphp
-                            <tr>
-                                <td class="admin-table__td">
-                                    <div class="admin-documents-file-cell">
-                                        <x-admin.document-icon :type="$typeMeta['key']" :label="$typeMeta['label']" />
-                                        <div class="min-w-0">
-                                            <span class="admin-documents-file-cell__name" title="{{ $doc->original_name }}">
-                                                {{ \Illuminate\Support\Str::limit((string) $doc->original_name, 54, '...') }}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="admin-table__td">
-                                    <div class="admin-documents-user-row">
-                                        <span class="admin-documents-avatar" aria-hidden="true">{{ $initials($doc->user?->name, $doc->user?->email) }}</span>
-                                        <div class="admin-documents-user-cell">
-                                            <span class="admin-documents-user-cell__name">{{ $doc->user?->name ?? 'Sistem' }}</span>
-                                            <span class="admin-documents-user-cell__email">{{ $doc->user?->email ?? '-' }}</span>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="admin-table__td" data-align="right">
-                                    <span class="admin-documents-number">{{ $doc->formatted_size }}</span>
-                                </td>
-                                <td class="admin-table__td">
-                                    <span class="admin-status-chip admin-status-chip--{{ $status['tone'] }}">
-                                        <span aria-hidden="true"></span>
-                                        {{ $status['label'] }}
-                                    </span>
-                                </td>
-                                <td class="admin-table__td" data-align="center">
-                                    <span class="admin-documents-number">{{ number_format((int) ($doc->chunks_count ?? 0)) }}</span>
-                                </td>
-                                <td class="admin-table__td" data-align="right">
-                                    <span class="admin-documents-muted" title="{{ $doc->created_at?->toDateTimeString() }}">{{ $doc->created_at?->diffForHumans() }}</span>
-                                </td>
-                                <td class="admin-table__td" data-align="right">
-                                    <button type="button" wire:click="showDetail({{ $doc->id }})" class="admin-documents-detail-button">
-                                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12z"/>
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 9.25a2.75 2.75 0 110 5.5 2.75 2.75 0 010-5.5z"/>
-                                        </svg>
-                                        Detail
-                                    </button>
-                                </td>
-                            </tr>
-                        @endforeach
-                    </x-admin.table>
-
-                    <div class="admin-documents-table-footer">
-                        @if ($documents->hasPages())
-                            <div class="admin-documents-pagination">
-                                {{ $documents->links('admin.pagination') }}
-                            </div>
-                        @else
-                            {{ $documents->links('admin.pagination') }}
-                        @endif
-                    </div>
-                @endif
-            </div>
-        </section>
-
-        <div class="admin-documents-side-grid">
-            <section class="admin-documents-distribution-panel admin-section">
-                <header class="admin-documents-distribution-panel__header">
-                    <div>
-                        <h3>Distribusi Tipe</h3>
-                        <p>Berdasarkan filter aktif.</p>
-                    </div>
-                </header>
-
-                <div class="admin-documents-distribution-panel__body">
-                    @if (empty($mimeCounts))
-                        <x-admin.empty-state title="Tidak ada data" />
-                    @else
-                        @php $totalMime = max(1, array_sum($mimeCounts)); @endphp
-                        <ul class="admin-documents-distribution-list" role="list">
+                    <div class="admin-documents-type-donut-card">
+                        <div class="admin-documents-type-donut" style="--document-donut: {{ $donutGradient }};">
+                            <span>{{ number_format(array_sum($mimeCounts)) }}</span>
+                            <em>file</em>
+                        </div>
+                        <ul class="admin-documents-type-legend" role="list">
                             @foreach ($mimeCounts as $mime => $count)
                                 @php
                                     $mimeMeta = $fileTypeMeta((object) ['mime_type' => $mime, 'original_name' => '']);
                                     $pct = (int) round(($count / $totalMime) * 100);
+                                    $typeColor = $typeColors[$mimeMeta['key']] ?? $typeColors['file'];
                                 @endphp
                                 <li>
-                                    <div class="admin-documents-distribution-list__top">
-                                        <span title="{{ $mime }}">{{ $mimeMeta['label'] }}</span>
-                                        <strong>{{ number_format($count) }}</strong>
-                                    </div>
-                                    <div class="admin-documents-distribution-bar" aria-hidden="true">
-                                        <span style="width: {{ $pct }}%"></span>
-                                    </div>
-                                    <div class="admin-documents-distribution-list__meta">
-                                        <span>{{ $pct }}%</span>
-                                        <span>{{ number_format($count) }} file</span>
-                                    </div>
-                                </li>
-                            @endforeach
-                        </ul>
-                    @endif
-                </div>
-            </section>
-
-            <section class="admin-documents-distribution-panel admin-section">
-                <header class="admin-documents-distribution-panel__header">
-                    <div>
-                        <h3>Status Pipeline</h3>
-                        <p>Uploaded, parsed, indexed, ready.</p>
-                    </div>
-                </header>
-
-                <div class="admin-documents-distribution-panel__body">
-                    @if (empty($statusCounts))
-                        <x-admin.empty-state title="Tidak ada status" />
-                    @else
-                        @php $totalStatus = max(1, array_sum($statusCounts)); @endphp
-                        <ul class="admin-documents-status-list" role="list">
-                            @foreach ($statusCounts as $statusName => $count)
-                                @php
-                                    $pct = (int) round(($count / $totalStatus) * 100);
-                                    $statusItem = $statusMeta($statusName);
-                                @endphp
-                                <li>
-                                    <span class="admin-documents-status-dot admin-documents-status-dot--{{ $statusItem['tone'] }}" aria-hidden="true"></span>
+                                    <span style="background: {{ $typeColor }}" aria-hidden="true"></span>
                                     <div>
-                                        <strong>{{ $statusItem['label'] }}</strong>
-                                        <em>{{ $pct }}% dari dokumen</em>
+                                        <strong title="{{ $mime }}">{{ $mimeMeta['label'] }}</strong>
+                                        <em>{{ $pct }}%</em>
                                     </div>
                                     <b>{{ number_format($count) }}</b>
                                 </li>
                             @endforeach
                         </ul>
+                    </div>
+                @endif
+            </div>
+        </section>
+
+        <section class="admin-documents-distribution-panel admin-section">
+            <header class="admin-documents-distribution-panel__header">
+                <div>
+                    <h3>Status Pipeline</h3>
+                    <p>Ringkasan uploaded → parsed → indexed → ready.</p>
+                </div>
+            </header>
+
+            <div class="admin-documents-distribution-panel__body">
+                <ol class="admin-documents-pipeline-summary" role="list">
+                    @foreach ($pipelineSummary as $step)
+                        <li class="admin-documents-pipeline-summary__item admin-documents-pipeline-summary__item--{{ $step['tone'] }}">
+                            <span aria-hidden="true"></span>
+                            <div>
+                                <strong>{{ $step['label'] }}</strong>
+                                <em>{{ $step['description'] }}</em>
+                            </div>
+                            <b>{{ number_format($step['value']) }}</b>
+                        </li>
+                    @endforeach
+                </ol>
+            </div>
+        </section>
+    </div>
+
+    <section class="admin-documents-table-panel admin-section">
+        <header class="admin-documents-table-panel__header">
+            <div>
+                <h3>Dokumen Terbaru</h3>
+                <p>Maksimum {{ $documentsPerPage }} baris pada filter aktif.</p>
+            </div>
+        </header>
+
+        <div class="admin-documents-table-panel__body">
+            @if ($documents->isEmpty())
+                <x-admin.empty-state
+                    title="Belum ada dokumen"
+                    description="Tidak ada dokumen yang cocok dengan filter saat ini." />
+            @else
+                <x-admin.table
+                    class="admin-documents-table"
+                    :columns="[
+                        ['key' => 'file', 'label' => 'File', 'width' => '34%'],
+                        ['key' => 'owner', 'label' => 'User', 'width' => '21%'],
+                        ['key' => 'size', 'label' => 'Size', 'align' => 'right', 'width' => '10%'],
+                        ['key' => 'status', 'label' => 'Status', 'width' => '12%'],
+                        ['key' => 'chunks', 'label' => 'Chunks', 'align' => 'center', 'width' => '8%'],
+                        ['key' => 'uploaded', 'label' => 'Waktu', 'align' => 'right', 'width' => '9%'],
+                        ['key' => 'action', 'label' => 'Aksi', 'align' => 'right', 'width' => '6%'],
+                    ]">
+                    @foreach ($documents as $doc)
+                        @php
+                            $typeMeta = $fileTypeMeta($doc);
+                            $status = $statusMeta($doc->status);
+                            $chunkKnown = (bool) ($doc->chunk_count_known ?? false);
+                            $chunkCount = (int) ($doc->display_chunk_count ?? $doc->chunks_count ?? 0);
+                        @endphp
+                        <tr>
+                            <td class="admin-table__td">
+                                <div class="admin-documents-file-cell">
+                                    <x-admin.document-icon :type="$typeMeta['key']" :label="$typeMeta['label']" />
+                                    <div class="min-w-0">
+                                        <span class="admin-documents-file-cell__name" title="{{ $doc->original_name }}">
+                                            {{ \Illuminate\Support\Str::limit((string) $doc->original_name, 54, '...') }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="admin-table__td">
+                                <div class="admin-documents-user-row">
+                                    <span class="admin-documents-avatar" aria-hidden="true">{{ $initials($doc->user?->name, $doc->user?->email) }}</span>
+                                    <div class="admin-documents-user-cell">
+                                        <span class="admin-documents-user-cell__name">{{ $doc->user?->name ?? 'Sistem' }}</span>
+                                        <span class="admin-documents-user-cell__email">{{ $doc->user?->email ?? '-' }}</span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="admin-table__td" data-align="right">
+                                <span class="admin-documents-number">{{ $doc->formatted_size }}</span>
+                            </td>
+                            <td class="admin-table__td">
+                                <span class="admin-status-chip admin-status-chip--{{ $status['tone'] }}">
+                                    <span aria-hidden="true"></span>
+                                    {{ $status['label'] }}
+                                </span>
+                            </td>
+                            <td class="admin-table__td" data-align="center">
+                                @if ($chunkKnown)
+                                    <span class="admin-documents-number">{{ number_format($chunkCount) }}</span>
+                                @else
+                                    <span class="admin-documents-unsynced" title="Dokumen lama belum punya metadata chunk tersinkron. Reprocess dokumen untuk mengisi angka ini.">—</span>
+                                @endif
+                            </td>
+                            <td class="admin-table__td" data-align="right">
+                                <span class="admin-documents-muted" title="{{ $doc->created_at?->toDateTimeString() }}">{{ $doc->created_at?->diffForHumans() }}</span>
+                            </td>
+                            <td class="admin-table__td" data-align="right">
+                                <button type="button" wire:click="showDetail({{ $doc->id }})" class="admin-documents-detail-button">
+                                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12z"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 9.25a2.75 2.75 0 110 5.5 2.75 2.75 0 010-5.5z"/>
+                                    </svg>
+                                    Detail
+                                </button>
+                            </td>
+                        </tr>
+                    @endforeach
+                </x-admin.table>
+
+                <div class="admin-documents-table-footer">
+                    @if ($documents->hasPages())
+                        <div class="admin-documents-pagination">
+                            {{ $documents->links('admin.pagination') }}
+                        </div>
+                    @else
+                        {{ $documents->links('admin.pagination') }}
                     @endif
                 </div>
-            </section>
+            @endif
         </div>
-    </div>
+    </section>
 
     @if ($selectedDocument)
         @php
@@ -462,6 +488,8 @@
             $selectedStatus = $statusMeta($selectedDocument->status);
             $selectedPipeline = $pipelineMeta($selectedDocument);
             $selectedSource = $sourceLabel($selectedDocument->source_provider);
+            $selectedChunkKnown = (bool) ($selectedDocument->chunk_count_known ?? false);
+            $selectedChunkCount = (int) ($selectedDocument->display_chunk_count ?? $selectedDocument->chunks_count ?? 0);
         @endphp
         <div class="admin-documents-modal" role="dialog" aria-modal="true" aria-labelledby="admin-document-detail-title">
             <button type="button" class="admin-documents-modal__backdrop" wire:click="closeDetail" aria-label="Tutup detail dokumen"></button>
@@ -505,7 +533,7 @@
                         </div>
                         <div>
                             <span>Chunks</span>
-                            <strong>{{ number_format((int) ($selectedDocument->chunks_count ?? 0)) }}</strong>
+                            <strong>{{ $selectedChunkKnown ? number_format($selectedChunkCount) : '—' }}</strong>
                             <em>{{ $selectedPipeline['chunk_status'] }}</em>
                         </div>
                         <div>
@@ -563,8 +591,12 @@
                                 </div>
                             @endif
                             <div>
-                                <dt>Updated</dt>
-                                <dd>{{ $selectedDocument->updated_at?->toDateTimeString() ?? '-' }}</dd>
+                                <dt>Indexed</dt>
+                                <dd>{{ $selectedDocument->indexed_at?->toDateTimeString() ?? 'Belum tersinkron' }}</dd>
+                            </div>
+                            <div>
+                                <dt>Embedding</dt>
+                                <dd>{{ $selectedDocument->embedding_provider ?: 'Belum tercatat' }}</dd>
                             </div>
                         </dl>
                     </section>

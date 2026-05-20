@@ -71,7 +71,12 @@ class ReprocessDocuments extends Command
         $this->line("Queueing: [{$document->id}] {$document->original_name}");
         
         // Reset status to pending
-        $document->update(['status' => 'pending']);
+        $document->update([
+            'status' => 'pending',
+            'indexed_chunk_count' => null,
+            'embedding_provider' => null,
+            'indexed_at' => null,
+        ]);
         
         // Dispatch the job
         $lifecycleService->dispatchProcessing($document);

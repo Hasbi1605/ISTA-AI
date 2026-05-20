@@ -23,6 +23,8 @@ class AdminUsage extends Component
 
     public string $endDate = '';
 
+    public bool $showLifecycleEvents = false;
+
     /**
      * @var array<string, array<int, string>>
      */
@@ -31,6 +33,7 @@ class AdminUsage extends Component
         'status' => ['except' => ''],
         'startDate' => ['except' => ''],
         'endDate' => ['except' => ''],
+        'showLifecycleEvents' => ['except' => false],
     ];
 
     public function updatingFeature(): void
@@ -53,9 +56,14 @@ class AdminUsage extends Component
         $this->resetPage();
     }
 
+    public function updatingShowLifecycleEvents(): void
+    {
+        $this->resetPage();
+    }
+
     public function resetFilters(): void
     {
-        $this->reset(['feature', 'status', 'startDate', 'endDate']);
+        $this->reset(['feature', 'status', 'startDate', 'endDate', 'showLifecycleEvents']);
         $this->resetPage();
     }
 
@@ -68,7 +76,13 @@ class AdminUsage extends Component
             'end_date' => $this->endDate ?: null,
         ];
 
-        $events = $metrics->usageEventsListing($filters, self::EVENTS_PER_PAGE, $this->getPage());
+        $listingFilters = $filters;
+        $hideLifecycleEvents = ! $this->showLifecycleEvents && $this->status === '';
+        if ($hideLifecycleEvents) {
+            $listingFilters['exclude_lifecycle'] = true;
+        }
+
+        $events = $metrics->usageEventsListing($listingFilters, self::EVENTS_PER_PAGE, $this->getPage());
         $totals = $metrics->usageEventSummary($filters);
 
         // Normalize dates safely. Malformed query strings are dropped here so
@@ -88,6 +102,7 @@ class AdminUsage extends Component
         return view('livewire.admin.admin-usage', [
             'events' => $events,
             'eventsPerPage' => self::EVENTS_PER_PAGE,
+            'hideLifecycleEvents' => $hideLifecycleEvents,
             'distribution' => $distribution,
             'totals' => $totals,
             'featureOptions' => $this->featureOptions(),

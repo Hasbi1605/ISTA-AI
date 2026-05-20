@@ -23,7 +23,7 @@ def _parse_result_payload(stdout: str) -> Dict[str, Any]:
     raise ValueError("Subprocess did not return a valid JSON payload.")
 
 
-def run_document_process(file_path: str, filename: str, user_id: str, document_id: str = "") -> Tuple[bool, str]:
+def run_document_process(file_path: str, filename: str, user_id: str, document_id: str = "") -> Tuple[bool, str, Dict[str, Any]]:
     timeout_seconds = get_env_int("DOCUMENT_PROCESS_SUBPROCESS_TIMEOUT", DEFAULT_DOCUMENT_PROCESS_SUBPROCESS_TIMEOUT)
     app_dir = os.path.dirname(os.path.dirname(__file__))
 
@@ -47,9 +47,15 @@ def run_document_process(file_path: str, filename: str, user_id: str, document_i
 
     try:
         payload = _parse_result_payload(completed.stdout)
-        return bool(payload["success"]), str(payload["message"])
+        metrics = {
+            key: payload[key]
+            for key in ("chunk_count", "successful_chunks", "failed_chunks", "embedding_provider")
+            if key in payload
+        }
+
+        return bool(payload["success"]), str(payload["message"]), metrics
     except Exception:
         stderr_excerpt = (completed.stderr or "").strip()[-1500:]
         stdout_excerpt = (completed.stdout or "").strip()[-1500:]
         detail = stderr_excerpt or stdout_excerpt or f"Subprocess exit code {completed.returncode}"
-        return False, f"Pemrosesan dokumen gagal: {detail}"
+        return False, f"Pemrosesan dokumen gagal: {detail}", {}

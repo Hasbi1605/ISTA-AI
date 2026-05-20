@@ -807,6 +807,9 @@ class AdminMetricsService
                 'status',
                 'preview_html_path',
                 'preview_status',
+                'indexed_chunk_count',
+                'embedding_provider',
+                'indexed_at',
                 'created_at',
                 'updated_at',
             ])
@@ -814,6 +817,10 @@ class AdminMetricsService
             ->withCount('chunks')
             ->orderByDesc('created_at')
             ->paginate($perPage, ['*'], 'page', $page);
+
+        $rows->setCollection(
+            $rows->getCollection()->map(fn (Document $document) => $this->attachDocumentIndexAttributes($document))
+        );
 
         $statusCounts = (clone $query)
             ->selectRaw('status, COUNT(*) as total')
@@ -845,7 +852,7 @@ class AdminMetricsService
             return null;
         }
 
-        return Document::query()
+        $document = Document::query()
             ->select([
                 'id',
                 'user_id',
@@ -860,12 +867,29 @@ class AdminMetricsService
                 'status',
                 'preview_html_path',
                 'preview_status',
+                'indexed_chunk_count',
+                'embedding_provider',
+                'indexed_at',
                 'created_at',
                 'updated_at',
             ])
             ->with('user:id,name,email')
             ->withCount('chunks')
             ->find($documentId);
+
+        return $document instanceof Document ? $this->attachDocumentIndexAttributes($document) : null;
+    }
+
+    private function attachDocumentIndexAttributes(Document $document): Document
+    {
+        $legacyChunkCount = (int) ($document->getAttribute('chunks_count') ?? 0);
+        $indexedChunkCount = $document->indexed_chunk_count;
+        $known = $indexedChunkCount !== null || $legacyChunkCount > 0;
+
+        $document->setAttribute('display_chunk_count', $indexedChunkCount ?? $legacyChunkCount);
+        $document->setAttribute('chunk_count_known', $known);
+
+        return $document;
     }
 
     public function documentOwnerOptions(int $limit = 100): Collection
@@ -944,6 +968,10 @@ class AdminMetricsService
 
         if (! empty($filters['action'])) {
             $query->where('action', $filters['action']);
+        }
+
+        if (! empty($filters['exclude_lifecycle'])) {
+            $query->where('action', '!=', AIUsageEvent::ACTION_STARTED);
         }
 
         if (! empty($filters['user_id'])) {

@@ -223,6 +223,29 @@ class AdminMonitoringDashboardTest extends TestCase
         Carbon::setTestNow();
     }
 
+    public function test_admin_usage_hides_started_lifecycle_events_by_default(): void
+    {
+        $now = Carbon::parse('2026-05-18 12:00:00');
+        Carbon::setTestNow($now);
+
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $user = User::factory()->create(['role' => User::ROLE_USER]);
+
+        $this->makeEvent($user->id, AIUsageEvent::FEATURE_CHAT, AIUsageEvent::ACTION_STARTED, AIUsageEvent::STATUS_PENDING, $now->copy()->subMinute(), 'req-started');
+        $this->makeEvent($user->id, AIUsageEvent::FEATURE_CHAT, AIUsageEvent::ACTION_COMPLETED, AIUsageEvent::STATUS_SUCCESS, $now->copy()->subMinutes(2), 'req-completed');
+
+        $this->actingAs($admin);
+
+        Livewire::test(AdminUsage::class)
+            ->assertSee('started disembunyikan', false)
+            ->assertDontSee('STARTED', false)
+            ->assertSee('COMPLETED', false)
+            ->set('showLifecycleEvents', true)
+            ->assertSee('STARTED', false);
+
+        Carbon::setTestNow();
+    }
+
     public function test_admin_usage_paginates_event_table_at_five_rows(): void
     {
         $now = Carbon::parse('2026-05-18 12:00:00');
@@ -417,6 +440,8 @@ class AdminMonitoringDashboardTest extends TestCase
         $response->assertSee('Maksimum 10 baris', false);
         $response->assertSee('Distribusi Tipe', false);
         $response->assertSee('Status Pipeline', false);
+        $response->assertSee('admin-documents-type-donut', false);
+        $response->assertSee('admin-documents-pipeline-summary', false);
         $response->assertSee('PDF', false);
         $response->assertSee('Dokumen Terbaru', false);
         $response->assertSee('Chunks', false);
@@ -520,6 +545,9 @@ class AdminMonitoringDashboardTest extends TestCase
             'source_provider' => 'google_drive',
             'source_external_id' => 'drive-document-id',
             'source_synced_at' => Carbon::parse('2026-05-18 08:00:00'),
+            'indexed_chunk_count' => 2,
+            'embedding_provider' => 'openai',
+            'indexed_at' => Carbon::parse('2026-05-18 08:05:00'),
         ]);
 
         DocumentChunk::create([
@@ -544,10 +572,14 @@ class AdminMonitoringDashboardTest extends TestCase
             ->assertSee('Original file')
             ->assertSee('Uploaded')
             ->assertSee('Source')
-            ->assertSee('Updated')
+            ->assertSee('Source ID')
+            ->assertSee('drive-document-id')
             ->assertSee('Chunks')
             ->assertSee('2')
             ->assertSee('Indexed')
+            ->assertSee('Embedding')
+            ->assertSee('openai')
+            ->assertSee('2026-05-18 08:05:00')
             ->assertSee('GOOGLE DRIVE', false)
             ->assertDontSee('Stored file')
             ->assertDontSee('Hidden chunk content must not be rendered.', false);
@@ -567,6 +599,8 @@ class AdminMonitoringDashboardTest extends TestCase
             'preview_status' => Document::PREVIEW_STATUS_READY,
             'mime_type' => 'application/pdf',
             'file_size_bytes' => 4096,
+            'indexed_chunk_count' => 0,
+            'indexed_at' => Carbon::parse('2026-05-18 08:00:00'),
         ]);
 
         $this->actingAs($admin);

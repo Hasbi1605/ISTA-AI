@@ -26,13 +26,19 @@ def test_knowledge_process_calls_rag_with_global_internal_metadata(monkeypatch):
 
     captured = {}
 
-    def fake_process_document(file_path, filename, user_id, document_id, metadata_overrides=None):
+    def fake_process_document(file_path, filename, user_id, document_id, metadata_overrides=None, return_metrics=False):
         captured["file_path"] = file_path
         captured["filename"] = filename
         captured["user_id"] = user_id
         captured["document_id"] = document_id
         captured["overrides"] = dict(metadata_overrides or {})
-        return True, "Knowledge ingested"
+        captured["return_metrics"] = return_metrics
+        return True, "Knowledge ingested", {
+            "chunk_count": 4,
+            "successful_chunks": 4,
+            "failed_chunks": 0,
+            "embedding_provider": "text-embedding",
+        }
 
     monkeypatch.setattr(rag_ingest, "process_document", fake_process_document)
 
@@ -57,10 +63,13 @@ def test_knowledge_process_calls_rag_with_global_internal_metadata(monkeypatch):
     assert body["scope"] == "global_internal"
     assert body["audience"] == "all_users"
     assert body["document_id"] == "42"
+    assert body["chunk_count"] == 4
+    assert body["embedding_provider"] == "text-embedding"
 
     assert captured["filename"] == "sop.pdf"
     assert captured["user_id"] == knowledge_module.KNOWLEDGE_USER_ID
     assert captured["document_id"] == "42"
+    assert captured["return_metrics"] is True
     assert captured["overrides"] == {
         "scope": "global_internal",
         "audience": "all_users",
@@ -101,7 +110,7 @@ def test_knowledge_delete_uses_knowledge_user_id(monkeypatch):
 def test_knowledge_process_requires_document_id(monkeypatch):
     from app.services import rag_ingest
 
-    monkeypatch.setattr(rag_ingest, "process_document", lambda *a, **kw: (True, "ok"))
+    monkeypatch.setattr(rag_ingest, "process_document", lambda *a, **kw: (True, "ok", {}))
 
     client = _build_client(monkeypatch)
 
@@ -126,7 +135,7 @@ def test_knowledge_process_requires_document_id(monkeypatch):
 def test_knowledge_process_rejects_unsupported_extension(monkeypatch):
     from app.services import rag_ingest
 
-    monkeypatch.setattr(rag_ingest, "process_document", lambda *a, **kw: (True, "ok"))
+    monkeypatch.setattr(rag_ingest, "process_document", lambda *a, **kw: (True, "ok", {}))
 
     client = _build_client(monkeypatch)
 

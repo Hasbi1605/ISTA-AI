@@ -226,8 +226,12 @@
                                     <button type="button"
                                             wire:click="deleteUser({{ $user->id }})"
                                             wire:confirm="Hapus akun user {{ $user->email }}? Percakapan, memo, dokumen, file, dan vector dokumen milik user ini akan ikut dibersihkan."
-                                            class="admin-users-delete-button">
-                                        Delete
+                                            class="admin-users-delete-button"
+                                            title="Hapus akun"
+                                            aria-label="Hapus akun {{ $user->email }}">
+                                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M6 7h12M9 7V5.5A1.5 1.5 0 0110.5 4h3A1.5 1.5 0 0115 5.5V7m-7.5 0l.7 11.2A2 2 0 0010.2 20h3.6a2 2 0 002-1.8L16.5 7M10 11v5M14 11v5"/>
+                                        </svg>
                                     </button>
                                 @else
                                     <span class="admin-users-muted">-</span>

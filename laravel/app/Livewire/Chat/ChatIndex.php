@@ -319,6 +319,9 @@ class ChatIndex extends Component
                 'status' => 'pending',
                 'preview_status' => Document::PREVIEW_STATUS_PENDING,
                 'preview_html_path' => null,
+                'indexed_chunk_count' => null,
+                'embedding_provider' => null,
+                'indexed_at' => null,
             ])->save();
             $documentLifecycleService->dispatchProcessing($document);
             $this->selectedDocuments = $this->chatDocumentStateService()->removeDocumentIds($this->selectedDocuments, (int) $documentId);

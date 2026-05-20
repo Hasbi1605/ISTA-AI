@@ -8,15 +8,17 @@ logging.basicConfig(level=logging.INFO)
 def run_process_task(file_path: str, filename: str, user_id: str, document_id: str = "") -> int:
     from app.services.rag_ingest import process_document
 
-    success, message = process_document(
+    success, message, metrics = process_document(
         file_path,
         filename,
         user_id=user_id,
         document_id=document_id if document_id else None,
+        return_metrics=True,
     )
     print(json.dumps({
         "success": bool(success),
         "message": message,
+        **metrics,
     }), flush=True)
     return 0 if success else 1
 

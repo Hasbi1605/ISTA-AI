@@ -23,6 +23,9 @@ class Document extends Model
         'source_synced_at',
         'preview_html_path',
         'preview_status',
+        'indexed_chunk_count',
+        'embedding_provider',
+        'indexed_at',
         'mime_type',
         'file_size_bytes',
         'status',
@@ -73,6 +76,8 @@ class Document extends Model
         return [
             'file_size_bytes' => 'integer',
             'source_synced_at' => 'datetime',
+            'indexed_chunk_count' => 'integer',
+            'indexed_at' => 'datetime',
         ];
     }
 

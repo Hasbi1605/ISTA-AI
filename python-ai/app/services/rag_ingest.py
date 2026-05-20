@@ -96,7 +96,14 @@ def process_document(
     user_id: str = "unknown",
     document_id: str | None = None,
     metadata_overrides: dict | None = None,
+    return_metrics: bool = False,
 ):
+    def _result(success: bool, message: str, metrics: dict | None = None):
+        if return_metrics:
+            return success, message, (metrics or {})
+
+        return success, message
+
     try:
         logger.info("=== Processing document: %s ===", filename)
         logger.info("File path: %s", file_path)
@@ -327,7 +334,7 @@ def process_document(
                         "Delete existing vectors before re-ingesting.",
                         document_id, _existing_model, provider_name,
                     )
-                    return (
+                    return _result(
                         False,
                         f"Embedding provider mismatch: existing='{_existing_model}' vs current='{provider_name}'. "
                         "Delete existing vectors for this document before re-ingesting to avoid mixing incompatible embedding spaces.",
@@ -508,8 +515,19 @@ def process_document(
         logger.info(f"Total tokens processed: ~{estimated_tokens:,}")
         logger.info(f"{'='*60}")
 
+        metrics = {
+            "chunk_count": len(chunks),
+            "successful_chunks": successful_chunks,
+            "failed_chunks": failed_chunks,
+            "embedding_provider": provider_name,
+        }
+
         if failed_chunks > 0:
-            return False, f"Ingest partial: {failed_chunks}/{len(chunks)} chunks gagal saat embedding."
+            return _result(
+                False,
+                f"Ingest partial: {failed_chunks}/{len(chunks)} chunks gagal saat embedding.",
+                metrics,
+            )
 
         # ── PDR parent upsert (deferred until child ingest succeeds) ─────────
         # Parents are written HERE — after all child vectors are durably stored.
@@ -584,11 +602,15 @@ def process_document(
             except Exception as _pcleanup_err:
                 logger.warning("Post-ingest parent cleanup failed: %s", _pcleanup_err)
 
-        return True, "Document processed successfully dengan Token-Aware Chunking & Aggressive Batching."
+        return _result(
+            True,
+            "Document processed successfully dengan Token-Aware Chunking & Aggressive Batching.",
+            metrics,
+        )
 
     except Exception as e:
         logger.error(f"❌ Error processing document '{filename}': {type(e).__name__}: {str(e)}")
-        return False, str(e)
+        return _result(False, str(e))
 
 
 def delete_document_vectors(

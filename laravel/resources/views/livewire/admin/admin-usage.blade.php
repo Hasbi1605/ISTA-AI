@@ -108,6 +108,10 @@
         <div class="admin-usage-filter-panel__header">
             <h3>Filter</h3>
             <div class="admin-usage-reset-group">
+                <label class="admin-usage-lifecycle-toggle">
+                    <input type="checkbox" wire:model.live="showLifecycleEvents">
+                    <span>Tampilkan started</span>
+                </label>
                 <button type="button" wire:click="resetFilters" class="admin-usage-reset-button">
                     <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M4 4v6h6M20 20v-6h-6M5.5 14a7 7 0 0012 3M18.5 10a7 7 0 00-12-3"/>
@@ -155,7 +159,9 @@
             <header class="admin-usage-table-panel__header">
                 <div>
                     <h3>Event Terbaru</h3>
-                    <p>Menampilkan {{ $eventsPerPage }} event per halaman pada filter aktif.</p>
+                    <p>
+                        Menampilkan {{ $eventsPerPage }} event per halaman{{ $hideLifecycleEvents ? ', event started disembunyikan.' : ' pada filter aktif.' }}
+                    </p>
                 </div>
             </header>
 

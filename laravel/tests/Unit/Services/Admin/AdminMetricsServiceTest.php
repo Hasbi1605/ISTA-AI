@@ -584,6 +584,9 @@ class AdminMetricsServiceTest extends TestCase
             'status' => 'ready',
             'mime_type' => 'application/pdf',
             'file_size_bytes' => 1024,
+            'indexed_chunk_count' => 8,
+            'embedding_provider' => 'text-embedding-3-small',
+            'indexed_at' => now(),
         ]);
 
         DocumentChunk::create([
@@ -616,6 +619,9 @@ class AdminMetricsServiceTest extends TestCase
         ]);
 
         $this->assertSame(1, $readyPayload['rows']->count());
-        $this->assertSame(1, $readyPayload['rows']->getCollection()->first()->chunks_count);
+        $readyRow = $readyPayload['rows']->getCollection()->first();
+        $this->assertSame(1, $readyRow->chunks_count);
+        $this->assertSame(8, $readyRow->display_chunk_count);
+        $this->assertTrue($readyRow->chunk_count_known);
     }
 }

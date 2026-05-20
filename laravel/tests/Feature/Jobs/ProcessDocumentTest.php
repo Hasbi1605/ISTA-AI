@@ -51,13 +51,23 @@ class ProcessDocumentTest extends TestCase
         ]);
 
         Http::fake([
-            '*' => Http::response(['message' => 'success'], 200),
+            '*' => Http::response([
+                'message' => 'success',
+                'chunk_count' => 12,
+                'successful_chunks' => 12,
+                'failed_chunks' => 0,
+                'embedding_provider' => 'text-embedding-3-small',
+            ], 200),
         ]);
 
         $job = new ProcessDocument($document);
         $job->handle();
 
-        $this->assertEquals('ready', $document->fresh()->status);
+        $freshDocument = $document->fresh();
+        $this->assertEquals('ready', $freshDocument->status);
+        $this->assertSame(12, $freshDocument->indexed_chunk_count);
+        $this->assertSame('text-embedding-3-small', $freshDocument->embedding_provider);
+        $this->assertNotNull($freshDocument->indexed_at);
         Http::assertSent(function ($request) {
             return $request->url() === 'http://python-ai-docs:8002/api/documents/process'
                 && $request->hasHeader('Authorization', 'Bearer internal-token')

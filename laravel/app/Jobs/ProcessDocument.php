@@ -99,7 +99,12 @@ class ProcessDocument implements ShouldQueue
         // reprocess reset the status to `pending`.
         $claimedFromPending = Document::where('id', $fresh->id)
             ->where('status', 'pending')
-            ->update(['status' => 'processing']);
+            ->update([
+                'status' => 'processing',
+                'indexed_chunk_count' => null,
+                'embedding_provider' => null,
+                'indexed_at' => null,
+            ]);
 
         if ($claimedFromPending > 0) {
             // Fresh claim: register our token so subsequent steps and failed()
@@ -173,6 +178,12 @@ class ProcessDocument implements ShouldQueue
         }
 
         if ($response->successful()) {
+            $payload = $response->json() ?? [];
+            $chunkCount = isset($payload['chunk_count']) ? max(0, (int) $payload['chunk_count']) : null;
+            $embeddingProvider = is_string($payload['embedding_provider'] ?? null)
+                ? Str::limit((string) $payload['embedding_provider'], 191, '')
+                : null;
+
             $freshDocument = $this->document->fresh();
             if ($freshDocument === null) {
                 try {
@@ -212,9 +223,22 @@ class ProcessDocument implements ShouldQueue
             }
 
             // 4. Update status to ready (atomic guard: only if still processing)
+            $readyUpdate = [
+                'status' => 'ready',
+                'indexed_at' => now(),
+            ];
+
+            if ($chunkCount !== null) {
+                $readyUpdate['indexed_chunk_count'] = $chunkCount;
+            }
+
+            if ($embeddingProvider !== null && $embeddingProvider !== '') {
+                $readyUpdate['embedding_provider'] = $embeddingProvider;
+            }
+
             $saved = Document::where('id', $freshDocument->id)
                 ->where('status', 'processing')
-                ->update(['status' => 'ready']);
+                ->update($readyUpdate);
 
             if ($saved === 0) {
                 // Guard B: document escaped 'processing' (reprocess reset it to

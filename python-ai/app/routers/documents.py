@@ -125,7 +125,7 @@ def upload_document(
                     )
                 buffer.write(chunk_data)
 
-        success, message = run_document_process(
+        success, message, metrics = run_document_process(
             temp_file_path,
             safe_filename,
             user_id,
@@ -133,7 +133,12 @@ def upload_document(
         )
 
         if success:
-            return {"status": "success", "message": message, "filename": safe_filename}
+            return {
+                "status": "success",
+                "message": message,
+                "filename": safe_filename,
+                **metrics,
+            }
 
         raise HTTPException(status_code=500, detail=message)
 
