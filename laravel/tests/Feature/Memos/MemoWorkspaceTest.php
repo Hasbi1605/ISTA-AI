@@ -312,6 +312,44 @@ class MemoWorkspaceTest extends TestCase
             ->assertDontSee('wire:click="generateConfiguredMemo"', false);
     }
 
+    public function test_configuration_generate_button_uses_context_specific_loading_label(): void
+    {
+        $user = User::factory()->create(['email_verified_at' => now()]);
+
+        Livewire::actingAs($user)
+            ->test(MemoWorkspace::class)
+            ->assertSee('data-memo-config-processing-label', false)
+            ->assertSee('Memproses...', false)
+            ->assertDontSee('data-memo-config-saving-label', false);
+
+        $memo = Memo::create([
+            'user_id' => $user->id,
+            'title' => 'Memo Revisi Konfigurasi',
+            'memo_type' => 'memo_internal',
+            'file_path' => 'memos/'.$user->id.'/memo-revisi-konfigurasi.docx',
+            'status' => Memo::STATUS_GENERATED,
+            'configuration' => [
+                'number' => 'EVAL-26/IST/YK/05/2026',
+                'recipient' => 'Kepala Unit Layanan',
+                'sender' => 'Kepala Istana Kepresidenan Yogyakarta',
+                'subject' => 'Memo Revisi Konfigurasi',
+                'date' => '20 Mei 2026',
+                'content' => 'Isi memo revisi.',
+                'signatory' => 'Deni Mulyana',
+                'page_size' => 'auto',
+                'page_size_mode' => 'auto',
+            ],
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(MemoWorkspace::class)
+            ->call('loadMemo', $memo->id)
+            ->set('showMemoConfiguration', true)
+            ->assertSee('data-memo-config-saving-label', false)
+            ->assertSee('Menyimpan perubahan...', false)
+            ->assertDontSee('data-memo-config-processing-label', false);
+    }
+
     public function test_generated_memo_chat_thread_is_restored_when_loading_memo_history(): void
     {
         Storage::fake('local');

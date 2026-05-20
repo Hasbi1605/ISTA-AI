@@ -330,15 +330,19 @@
                         wire:target="generateConfiguredMemo,generateFromChat"
                         :disabled="memoSyncLoading || $wire.isGenerating"
                         class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-ista-primary px-4 text-[13px] font-semibold text-white shadow-sm transition hover:bg-ista-dark active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50">
-                    <span x-show="memoSyncLoading" x-cloak class="inline-flex items-center gap-2">
-                        <span class="h-3.5 w-3.5 rounded-full border-2 border-white/70 border-t-transparent animate-spin" aria-hidden="true"></span>
-                        <span>Menyimpan perubahan...</span>
-                    </span>
-                    <span x-show="!memoSyncLoading" wire:loading.remove wire:target="generateConfiguredMemo,generateFromChat">{{ $activeMemoId ? 'Buat ulang dari konfigurasi' : 'Buat memo' }}</span>
-                    <span x-show="!memoSyncLoading" wire:loading.inline-flex wire:target="generateConfiguredMemo,generateFromChat" class="items-center gap-2">
-                        <span class="h-3.5 w-3.5 rounded-full border-2 border-white/70 border-t-transparent animate-spin" aria-hidden="true"></span>
-                        <span>Memproses...</span>
-                    </span>
+                    @if ($activeMemoId)
+                        <span data-memo-config-saving-label x-show="memoSyncLoading" x-cloak class="inline-flex items-center gap-2">
+                            <span class="h-3.5 w-3.5 rounded-full border-2 border-white/70 border-t-transparent animate-spin" aria-hidden="true"></span>
+                            <span>Menyimpan perubahan...</span>
+                        </span>
+                        <span data-memo-config-idle-label x-show="!memoSyncLoading">Buat ulang dari konfigurasi</span>
+                    @else
+                        <span data-memo-config-idle-label wire:loading.remove wire:target="generateConfiguredMemo,generateFromChat">Buat memo</span>
+                        <span data-memo-config-processing-label wire:loading.inline-flex wire:target="generateConfiguredMemo,generateFromChat" class="items-center gap-2">
+                            <span class="h-3.5 w-3.5 rounded-full border-2 border-white/70 border-t-transparent animate-spin" aria-hidden="true"></span>
+                            <span>Memproses...</span>
+                        </span>
+                    @endif
                 </button>
             </div>
         @elseif ($activeMemoId)
