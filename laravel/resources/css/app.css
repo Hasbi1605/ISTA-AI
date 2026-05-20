@@ -1718,6 +1718,10 @@
         @apply space-y-3 px-4 pb-4 pt-3;
     }
 
+    .admin-knowledge-upload-form--busy {
+        @apply cursor-wait;
+    }
+
     .admin-knowledge-upload-note {
         @apply text-[0.72rem] text-stone-500 dark:text-gray-400;
     }
@@ -3462,6 +3466,34 @@
 
     .admin-knowledge-dropzone em {
         @apply text-[0.72rem] not-italic text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-knowledge-upload-progress {
+        @apply hidden items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-left text-amber-900 dark:border-amber-300/20 dark:bg-amber-300/10 dark:text-amber-100;
+    }
+
+    .admin-knowledge-upload-progress--processing {
+        @apply border-ista-primary/20 bg-ista-primary/5 text-ista-primary dark:border-amber-300/20 dark:bg-amber-300/10 dark:text-amber-100;
+    }
+
+    .admin-knowledge-upload-progress__spinner {
+        @apply mt-0.5 h-4 w-4 flex-none animate-spin rounded-full border-2 border-current border-t-transparent;
+    }
+
+    .admin-knowledge-upload-progress strong {
+        @apply block text-[0.76rem] font-semibold;
+    }
+
+    .admin-knowledge-upload-progress em {
+        @apply mt-0.5 block text-[0.7rem] not-italic opacity-80;
+    }
+
+    .admin-knowledge-upload-button__loading {
+        @apply items-center gap-2;
+    }
+
+    .admin-knowledge-upload-button__spinner {
+        @apply h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent;
     }
 
     .admin-knowledge-upload-modal__footer {

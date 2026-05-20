@@ -52,6 +52,25 @@ class AdminKnowledgeManagementTest extends TestCase
         );
     }
 
+    public function test_upload_modal_exposes_clear_loading_and_processing_feedback(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+
+        $this->actingAs($admin);
+
+        Livewire::test(\App\Livewire\Admin\AdminKnowledge::class)
+            ->call('openUploadModal')
+            ->assertSee('Mengirim file knowledge')
+            ->assertSee('Menjadwalkan processing')
+            ->assertSee('Dokumen akan muncul sebagai Processing')
+            ->assertSee('Processing...');
+
+        $css = file_get_contents(resource_path('css/app.css'));
+
+        $this->assertStringContainsString('.admin-knowledge-upload-progress', $css);
+        $this->assertStringContainsString('.admin-knowledge-upload-button__spinner', $css);
+    }
+
     public function test_regular_user_cannot_access_knowledge_page(): void
     {
         $user = User::factory()->create(['role' => User::ROLE_USER]);

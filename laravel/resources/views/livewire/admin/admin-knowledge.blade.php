@@ -398,7 +398,12 @@
 
     @if ($showUploadModal)
         <div class="admin-knowledge-upload-modal" role="dialog" aria-modal="true" aria-labelledby="knowledge-upload-title">
-            <button type="button" class="admin-knowledge-upload-modal__backdrop" wire:click="closeUploadModal" aria-label="Tutup upload knowledge"></button>
+            <button type="button"
+                    class="admin-knowledge-upload-modal__backdrop"
+                    wire:click="closeUploadModal"
+                    wire:loading.attr="disabled"
+                    wire:target="upload,file"
+                    aria-label="Tutup upload knowledge"></button>
 
             <section class="admin-knowledge-upload-modal__panel">
                 <header class="admin-knowledge-upload-modal__header">
@@ -406,14 +411,22 @@
                         <p>Knowledge upload</p>
                         <h3 id="knowledge-upload-title">Upload knowledge</h3>
                     </div>
-                    <button type="button" wire:click="closeUploadModal" class="admin-knowledge-upload-modal__close" aria-label="Tutup upload knowledge">
+                    <button type="button"
+                            wire:click="closeUploadModal"
+                            wire:loading.attr="disabled"
+                            wire:target="upload,file"
+                            class="admin-knowledge-upload-modal__close"
+                            aria-label="Tutup upload knowledge">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M6 6l12 12M18 6L6 18"/>
                         </svg>
                     </button>
                 </header>
 
-                <form wire:submit.prevent="upload" class="admin-knowledge-upload-form">
+                <form wire:submit.prevent="upload"
+                      wire:loading.class="admin-knowledge-upload-form--busy"
+                      wire:target="upload,file"
+                      class="admin-knowledge-upload-form">
                     <label class="admin-knowledge-filter">
                         <span>Judul opsional</span>
                         <input type="text" wire:model.defer="title" placeholder="Contoh: SOP Penerimaan Tamu" class="admin-knowledge-control" />
@@ -452,16 +465,42 @@
                         <em>Format: {{ implode(', ', $allowedExtensions) }}. File akan masuk pipeline processing.</em>
                     </label>
                     @error('file') <span class="admin-knowledge-error">{{ $message }}</span> @enderror
-                    <div wire:loading wire:target="file" class="admin-knowledge-upload-note">Meng-upload file...</div>
+
+                    <div wire:loading.flex wire:target="file" class="admin-knowledge-upload-progress" role="status" aria-live="polite">
+                        <span class="admin-knowledge-upload-progress__spinner" aria-hidden="true"></span>
+                        <span>
+                            <strong>Mengirim file knowledge...</strong>
+                            <em>Biarkan modal terbuka sampai file selesai diterima.</em>
+                        </span>
+                    </div>
+
+                    <div wire:loading.flex wire:target="upload" class="admin-knowledge-upload-progress admin-knowledge-upload-progress--processing" role="status" aria-live="polite">
+                        <span class="admin-knowledge-upload-progress__spinner" aria-hidden="true"></span>
+                        <span>
+                            <strong>Menjadwalkan processing...</strong>
+                            <em>Dokumen akan muncul sebagai Processing setelah berhasil masuk antrean.</em>
+                        </span>
+                    </div>
 
                     <footer class="admin-knowledge-upload-modal__footer">
-                        <button type="button" wire:click="closeUploadModal" class="admin-knowledge-secondary-button">Batal</button>
+                        <button type="button"
+                                wire:click="closeUploadModal"
+                                wire:loading.attr="disabled"
+                                wire:target="upload,file"
+                                class="admin-knowledge-secondary-button">Batal</button>
                         <button type="submit"
                                 class="admin-knowledge-primary-button"
                                 wire:loading.attr="disabled"
                                 wire:target="upload,file">
-                            <span wire:loading.remove wire:target="upload">Upload Knowledge</span>
-                            <span wire:loading wire:target="upload">Memproses...</span>
+                            <span wire:loading.remove wire:target="upload,file">Upload Knowledge</span>
+                            <span wire:loading.flex wire:target="file" class="admin-knowledge-upload-button__loading">
+                                <span class="admin-knowledge-upload-button__spinner" aria-hidden="true"></span>
+                                Mengirim...
+                            </span>
+                            <span wire:loading.flex wire:target="upload" class="admin-knowledge-upload-button__loading">
+                                <span class="admin-knowledge-upload-button__spinner" aria-hidden="true"></span>
+                                Processing...
+                            </span>
                         </button>
                     </footer>
                 </form>
