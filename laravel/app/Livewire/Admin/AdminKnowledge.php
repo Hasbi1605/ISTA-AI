@@ -37,6 +37,8 @@ class AdminKnowledge extends Component
 
     public bool $showUploadModal = false;
 
+    public bool $isUploading = false;
+
     public ?int $recentUploadDocumentId = null;
 
     /**
@@ -82,6 +84,10 @@ class AdminKnowledge extends Component
 
     public function closeUploadModal(): void
     {
+        if ($this->isUploading) {
+            return;
+        }
+
         $this->resetValidation();
         $this->showUploadModal = false;
     }
@@ -103,63 +109,75 @@ class AdminKnowledge extends Component
 
     public function upload(KnowledgeLifecycleService $lifecycle): void
     {
-        $this->validate([
-            'file' => [
-                'required',
-                'file',
-                'max:'.KnowledgeLifecycleService::MAX_DOCUMENT_SIZE_KILOBYTES,
-                'extensions:'.implode(',', KnowledgeLifecycleService::ALLOWED_EXTENSIONS),
-            ],
-            'title' => ['nullable', 'string', 'max:191'],
-            'newSourceName' => ['required_without:sourceId', 'nullable', 'string', 'max:191'],
-            'sourceId' => ['nullable', 'integer', 'exists:knowledge_sources,id'],
-            'notes' => ['nullable', 'string', 'max:2000'],
-        ], [
-            'file.required' => 'Pilih file knowledge terlebih dahulu.',
-            'file.file' => 'Lampiran knowledge harus berupa file.',
-            'file.max' => 'Ukuran file knowledge tidak boleh lebih dari 50 MB.',
-            'file.extensions' => 'Format file tidak didukung. Gunakan PDF, DOCX, XLSX, atau CSV.',
-            'newSourceName.required_without' => 'Pilih source existing atau isi source baru.',
-        ]);
-
-        $admin = auth()->user();
-
-        if ($admin === null) {
-            $this->addError('file', 'Sesi admin tidak valid. Silakan login ulang.');
-
+        if ($this->isUploading) {
             return;
         }
 
-        $sourceArg = $this->resolveSourceArgument();
+        $this->isUploading = true;
+        $this->resetErrorBag('upload');
 
         try {
-            $document = $lifecycle->upload($this->file, $admin, [
-                'title' => $this->title ?: null,
-                'knowledge_source_id' => $sourceArg,
-                'notes' => $this->notes ?: null,
+            $this->validate([
+                'file' => [
+                    'required',
+                    'file',
+                    'max:'.KnowledgeLifecycleService::MAX_DOCUMENT_SIZE_KILOBYTES,
+                    'extensions:'.implode(',', KnowledgeLifecycleService::ALLOWED_EXTENSIONS),
+                ],
+                'title' => ['nullable', 'string', 'max:191'],
+                'newSourceName' => ['required_without:sourceId', 'nullable', 'string', 'max:191'],
+                'sourceId' => ['nullable', 'integer', 'exists:knowledge_sources,id'],
+                'notes' => ['nullable', 'string', 'max:2000'],
+            ], [
+                'file.required' => 'Pilih file knowledge terlebih dahulu.',
+                'file.file' => 'Lampiran knowledge harus berupa file.',
+                'file.max' => 'Ukuran file knowledge tidak boleh lebih dari 50 MB.',
+                'file.extensions' => 'Format file tidak didukung. Gunakan PDF, DOCX, XLSX, atau CSV.',
+                'newSourceName.required_without' => 'Pilih source existing atau isi source baru.',
             ]);
-        } catch (ValidationException $e) {
-            foreach ($e->errors() as $field => $messages) {
-                foreach ((array) $messages as $message) {
-                    $this->addError($field, $message);
-                }
+
+            $admin = auth()->user();
+
+            if ($admin === null) {
+                $this->addError('file', 'Sesi admin tidak valid. Silakan login ulang.');
+
+                return;
             }
 
-            return;
-        } catch (\Throwable $e) {
-            report($e);
-            $this->addError('upload', UserFacingError::message($e, 'Upload knowledge gagal. Periksa file dan coba lagi.'));
+            $sourceArg = $this->resolveSourceArgument();
 
-            return;
+            try {
+                $document = $lifecycle->upload($this->file, $admin, [
+                    'title' => $this->title ?: null,
+                    'knowledge_source_id' => $sourceArg,
+                    'notes' => $this->notes ?: null,
+                ]);
+            } catch (ValidationException $e) {
+                foreach ($e->errors() as $field => $messages) {
+                    foreach ((array) $messages as $message) {
+                        $this->addError($field, $message);
+                    }
+                }
+
+                return;
+            } catch (\Throwable $e) {
+                report($e);
+                $this->addError('upload', UserFacingError::message($e, 'Upload knowledge gagal. Periksa file dan coba lagi.'));
+
+                return;
+            }
+
+            $this->reset(['file', 'title', 'newSourceName', 'sourceId', 'notes', 'search', 'status', 'sourceFilter']);
+            $this->resetValidation();
+            $this->resetPage();
+            $this->recentUploadDocumentId = (int) $document->id;
+            $this->showUploadModal = false;
+            $this->dispatch('knowledge-uploaded');
+            session()->flash('knowledge_status', 'Dokumen knowledge berhasil di-upload dan sedang diproses.');
+        } finally {
+            $this->isUploading = false;
+            $this->dispatch('knowledge-upload-finished');
         }
-
-        $this->reset(['file', 'title', 'newSourceName', 'sourceId', 'notes', 'search', 'status', 'sourceFilter']);
-        $this->resetValidation();
-        $this->resetPage();
-        $this->recentUploadDocumentId = (int) $document->id;
-        $this->showUploadModal = false;
-        $this->dispatch('knowledge-uploaded');
-        session()->flash('knowledge_status', 'Dokumen knowledge berhasil di-upload dan sedang diproses.');
     }
 
     public function activate(int $documentId, KnowledgeLifecycleService $lifecycle): void

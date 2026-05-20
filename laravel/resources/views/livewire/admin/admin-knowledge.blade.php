@@ -404,10 +404,48 @@
     </div>
 
     @if ($showUploadModal)
-        <div class="admin-knowledge-upload-modal" role="dialog" aria-modal="true" aria-labelledby="knowledge-upload-title">
+        <div class="admin-knowledge-upload-modal"
+             data-upload-can-submit="{{ $uploadCanSubmit ? 'true' : 'false' }}"
+             x-data="{
+                fileBusy: false,
+                uploadBusy: @js($isUploading),
+                get isBusy() {
+                    return this.fileBusy || this.uploadBusy;
+                },
+                canSubmit() {
+                    return this.$el.dataset.uploadCanSubmit === 'true';
+                },
+                submitKnowledgeUpload() {
+                    if (this.uploadBusy || ! this.canSubmit()) {
+                        return;
+                    }
+
+                    this.uploadBusy = true;
+
+                    try {
+                        Promise.resolve($wire.upload())
+                            .catch(() => {})
+                            .finally(() => {
+                                this.uploadBusy = false;
+                            });
+                    } catch (error) {
+                        this.uploadBusy = false;
+                    }
+                },
+             }"
+             x-on:livewire-upload-start="fileBusy = true"
+             x-on:livewire-upload-finish="fileBusy = false"
+             x-on:livewire-upload-error="fileBusy = false"
+             x-on:livewire-upload-cancel="fileBusy = false"
+             x-on:knowledge-upload-finished.window="uploadBusy = false"
+             x-bind:aria-busy="isBusy ? 'true' : 'false'"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="knowledge-upload-title">
             <button type="button"
                     class="admin-knowledge-upload-modal__backdrop"
                     wire:click="closeUploadModal"
+                    x-bind:disabled="isBusy"
                     wire:loading.attr="disabled"
                     wire:target="upload,file"
                     aria-label="Tutup upload knowledge"></button>
@@ -420,6 +458,7 @@
                     </div>
                     <button type="button"
                             wire:click="closeUploadModal"
+                            x-bind:disabled="isBusy"
                             wire:loading.attr="disabled"
                             wire:target="upload,file"
                             class="admin-knowledge-upload-modal__close"
@@ -430,8 +469,9 @@
                     </button>
                 </header>
 
-                <form wire:submit.prevent="upload"
+                <form x-on:submit.prevent="submitKnowledgeUpload()"
                       wire:loading.class="admin-knowledge-upload-form--busy"
+                      x-bind:class="{ 'admin-knowledge-upload-form--busy': isBusy }"
                       wire:target="upload,file"
                       class="admin-knowledge-upload-form">
                     @if ($uploadErrorMessages->isNotEmpty())
@@ -449,6 +489,7 @@
                         <span>Judul opsional</span>
                         <input type="text"
                                wire:model.defer="title"
+                               x-bind:disabled="isBusy"
                                wire:loading.attr="disabled"
                                wire:target="upload,file"
                                placeholder="Contoh: SOP Penerimaan Tamu"
@@ -460,6 +501,7 @@
                         <label class="admin-knowledge-filter">
                             <span>Source existing</span>
                             <select wire:model.live="sourceId"
+                                    x-bind:disabled="isBusy"
                                     wire:loading.attr="disabled"
                                     wire:target="upload,file"
                                     class="admin-knowledge-control">
@@ -475,6 +517,7 @@
                             <span>Atau source baru</span>
                             <input type="text"
                                    wire:model.live.debounce.300ms="newSourceName"
+                                   x-bind:disabled="isBusy"
                                    wire:loading.attr="disabled"
                                    wire:target="upload,file"
                                    placeholder="Contoh: Aturan internal"
@@ -489,6 +532,7 @@
                     <label class="admin-knowledge-filter">
                         <span>Catatan internal</span>
                         <textarea wire:model.defer="notes"
+                                  x-bind:disabled="isBusy"
                                   wire:loading.attr="disabled"
                                   wire:target="upload,file"
                                   rows="3"
@@ -499,9 +543,11 @@
 
                     <label class="admin-knowledge-dropzone @error('file') admin-knowledge-dropzone--error @enderror"
                            wire:loading.class="admin-knowledge-dropzone--disabled"
+                           x-bind:class="{ 'admin-knowledge-dropzone--disabled': isBusy }"
                            wire:target="upload,file">
                         <input type="file"
                                wire:model="file"
+                               x-bind:disabled="isBusy"
                                wire:loading.attr="disabled"
                                wire:target="upload,file"
                                accept=".pdf,.docx,.xlsx,.csv"
@@ -512,7 +558,7 @@
                         @error('file') <b>{{ $message }}</b> @enderror
                     </label>
 
-                    <div wire:loading.flex wire:target="file" class="admin-knowledge-upload-progress" role="status" aria-live="polite">
+                    <div wire:loading.flex wire:target="file" x-bind:class="{ 'admin-knowledge-upload-progress--visible': fileBusy }" class="admin-knowledge-upload-progress" role="status" aria-live="polite">
                         <span class="admin-knowledge-upload-progress__spinner" aria-hidden="true"></span>
                         <span>
                             <strong>Mengirim file knowledge...</strong>
@@ -520,7 +566,7 @@
                         </span>
                     </div>
 
-                    <div wire:loading.flex wire:target="upload" class="admin-knowledge-upload-progress admin-knowledge-upload-progress--processing" role="status" aria-live="polite">
+                    <div wire:loading.flex wire:target="upload" x-bind:class="{ 'admin-knowledge-upload-progress--visible': uploadBusy }" class="admin-knowledge-upload-progress admin-knowledge-upload-progress--processing" role="status" aria-live="polite">
                         <span class="admin-knowledge-upload-progress__spinner" aria-hidden="true"></span>
                         <span>
                             <strong>Menjadwalkan processing...</strong>
@@ -531,20 +577,21 @@
                     <footer class="admin-knowledge-upload-modal__footer">
                         <button type="button"
                                 wire:click="closeUploadModal"
+                                x-bind:disabled="isBusy"
                                 wire:loading.attr="disabled"
                                 wire:target="upload,file"
                                 class="admin-knowledge-secondary-button">Batal</button>
                         <button type="submit"
                                 class="admin-knowledge-primary-button"
-                                @disabled(! $uploadCanSubmit)
+                                x-bind:disabled="isBusy || ! canSubmit()"
                                 wire:loading.attr="disabled"
                                 wire:target="upload,file">
-                            <span wire:loading.remove wire:target="upload,file">Upload Knowledge</span>
-                            <span wire:loading.flex wire:target="file" class="admin-knowledge-upload-button__loading">
+                            <span x-show="! isBusy">Upload Knowledge</span>
+                            <span x-show="fileBusy && ! uploadBusy" x-cloak class="admin-knowledge-upload-button__loading">
                                 <span class="admin-knowledge-upload-button__spinner" aria-hidden="true"></span>
                                 Mengirim...
                             </span>
-                            <span wire:loading.flex wire:target="upload" class="admin-knowledge-upload-button__loading">
+                            <span x-show="uploadBusy" x-cloak class="admin-knowledge-upload-button__loading">
                                 <span class="admin-knowledge-upload-button__spinner" aria-hidden="true"></span>
                                 Processing...
                             </span>

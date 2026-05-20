@@ -72,6 +72,33 @@ class AdminKnowledgeManagementTest extends TestCase
         $this->assertStringContainsString('.admin-knowledge-upload-button__spinner', $css);
     }
 
+    public function test_upload_modal_submit_uses_explicit_action_and_client_lock(): void
+    {
+        $blade = file_get_contents(resource_path('views/livewire/admin/admin-knowledge.blade.php'));
+        $css = file_get_contents(resource_path('css/app.css'));
+
+        $this->assertStringContainsString('x-on:submit.prevent="submitKnowledgeUpload()"', $blade);
+        $this->assertStringContainsString('Promise.resolve($wire.upload())', $blade);
+        $this->assertStringContainsString('data-upload-can-submit="{{ $uploadCanSubmit ? \'true\' : \'false\' }}"', $blade);
+        $this->assertStringContainsString('x-bind:disabled="isBusy || ! canSubmit()"', $blade);
+        $this->assertStringContainsString('x-bind:disabled="isBusy"', $blade);
+        $this->assertStringContainsString("x-bind:class=\"{ 'admin-knowledge-dropzone--disabled': isBusy }\"", $blade);
+        $this->assertStringContainsString('.admin-knowledge-upload-progress--visible', $css);
+    }
+
+    public function test_upload_modal_cannot_close_while_uploading(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+
+        $this->actingAs($admin);
+
+        Livewire::test(AdminKnowledge::class)
+            ->call('openUploadModal')
+            ->set('isUploading', true)
+            ->call('closeUploadModal')
+            ->assertSet('showUploadModal', true);
+    }
+
     public function test_upload_requires_file_and_source_before_processing(): void
     {
         Storage::fake('local');
@@ -85,6 +112,8 @@ class AdminKnowledgeManagementTest extends TestCase
             ->call('openUploadModal')
             ->call('upload')
             ->assertHasErrors(['file', 'newSourceName'])
+            ->assertSet('isUploading', false)
+            ->assertSet('showUploadModal', true)
             ->assertSee('Upload knowledge belum bisa diproses')
             ->assertSee('Pilih file knowledge terlebih dahulu')
             ->assertSee('Pilih source existing atau isi source baru');
@@ -127,6 +156,7 @@ class AdminKnowledgeManagementTest extends TestCase
             ->assertSet('search', '')
             ->assertSet('status', '')
             ->assertSet('sourceFilter', '')
+            ->assertSet('isUploading', false)
             ->assertSee('SOP Penerimaan Tamu')
             ->assertSee('admin-knowledge-table__row--recent', false);
 
@@ -189,6 +219,7 @@ class AdminKnowledgeManagementTest extends TestCase
             ->set('file', $file)
             ->call('upload')
             ->assertHasErrors(['file'])
+            ->assertSet('isUploading', false)
             ->assertSet('showUploadModal', true)
             ->assertSee('Upload knowledge belum bisa diproses')
             ->assertSee('Tipe file tidak didukung')
