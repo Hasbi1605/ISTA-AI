@@ -73,12 +73,29 @@ class AdminKnowledge extends Component
 
     public function openUploadModal(): void
     {
+        $this->resetValidation();
         $this->showUploadModal = true;
     }
 
     public function closeUploadModal(): void
     {
+        $this->resetValidation();
         $this->showUploadModal = false;
+    }
+
+    public function updatedFile(): void
+    {
+        $this->resetValidation('file');
+    }
+
+    public function updatedSourceId(): void
+    {
+        $this->resetValidation(['sourceId', 'newSourceName']);
+    }
+
+    public function updatedNewSourceName(): void
+    {
+        $this->resetValidation(['sourceId', 'newSourceName']);
     }
 
     public function upload(KnowledgeLifecycleService $lifecycle): void
@@ -92,9 +109,12 @@ class AdminKnowledge extends Component
                 'mimetypes:'.implode(',', KnowledgeLifecycleService::ALLOWED_MIME_TYPES),
             ],
             'title' => ['nullable', 'string', 'max:191'],
-            'newSourceName' => ['nullable', 'string', 'max:191'],
+            'newSourceName' => ['required_without:sourceId', 'nullable', 'string', 'max:191'],
             'sourceId' => ['nullable', 'integer', 'exists:knowledge_sources,id'],
             'notes' => ['nullable', 'string', 'max:2000'],
+        ], [
+            'file.required' => 'Pilih file knowledge terlebih dahulu.',
+            'newSourceName.required_without' => 'Pilih source existing atau isi source baru.',
         ]);
 
         $admin = auth()->user();

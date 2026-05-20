@@ -117,6 +117,9 @@
     $uploadedFileName = is_object($file) && method_exists($file, 'getClientOriginalName')
         ? $file->getClientOriginalName()
         : 'Pilih file PDF, DOCX, XLSX, atau CSV';
+    $uploadHasFile = is_object($file);
+    $uploadHasSource = filled($sourceId) || trim((string) $newSourceName) !== '';
+    $uploadCanSubmit = $uploadHasFile && $uploadHasSource;
 
     $totalDocs = array_sum($statusCounts);
     $activeCount = (int) ($statusCounts['active'] ?? 0);
@@ -427,6 +430,12 @@
                       wire:loading.class="admin-knowledge-upload-form--busy"
                       wire:target="upload,file"
                       class="admin-knowledge-upload-form">
+                    @if ($errors->has('file') || $errors->has('newSourceName') || $errors->has('sourceId'))
+                        <div class="admin-knowledge-upload-validation" role="alert">
+                            Lengkapi source dan file knowledge sebelum upload.
+                        </div>
+                    @endif
+
                     <label class="admin-knowledge-filter">
                         <span>Judul opsional</span>
                         <input type="text" wire:model.defer="title" placeholder="Contoh: SOP Penerimaan Tamu" class="admin-knowledge-control" />
@@ -435,8 +444,8 @@
 
                     <div class="admin-knowledge-upload-grid">
                         <label class="admin-knowledge-filter">
-                            <span>Source existing</span>
-                            <select wire:model.defer="sourceId" class="admin-knowledge-control">
+                            <span>Source existing <em class="admin-knowledge-required">Wajib pilih salah satu</em></span>
+                            <select wire:model.live="sourceId" class="admin-knowledge-control">
                                 <option value="">Pilih source</option>
                                 @foreach ($sources as $source)
                                     <option value="{{ $source->id }}">{{ $source->name }}</option>
@@ -446,8 +455,8 @@
                         </label>
 
                         <label class="admin-knowledge-filter">
-                            <span>Atau source baru</span>
-                            <input type="text" wire:model.defer="newSourceName" placeholder="Contoh: Aturan internal" class="admin-knowledge-control" />
+                            <span>Atau source baru <em class="admin-knowledge-required">Wajib pilih salah satu</em></span>
+                            <input type="text" wire:model.live.debounce.300ms="newSourceName" placeholder="Contoh: Aturan internal" class="admin-knowledge-control" />
                             @error('newSourceName') <span class="admin-knowledge-error">{{ $message }}</span> @enderror
                         </label>
                     </div>
@@ -458,9 +467,9 @@
                         @error('notes') <span class="admin-knowledge-error">{{ $message }}</span> @enderror
                     </label>
 
-                    <label class="admin-knowledge-dropzone">
+                    <label class="admin-knowledge-dropzone @error('file') admin-knowledge-dropzone--error @enderror">
                         <input type="file" wire:model="file" accept=".pdf,.docx,.xlsx,.csv" class="sr-only" />
-                        <span>File knowledge</span>
+                        <span>File knowledge <em class="admin-knowledge-required">Wajib</em></span>
                         <strong>{{ $uploadedFileName }}</strong>
                         <em>Format: {{ implode(', ', $allowedExtensions) }}. File akan masuk pipeline processing.</em>
                     </label>
@@ -490,6 +499,7 @@
                                 class="admin-knowledge-secondary-button">Batal</button>
                         <button type="submit"
                                 class="admin-knowledge-primary-button"
+                                @disabled(! $uploadCanSubmit)
                                 wire:loading.attr="disabled"
                                 wire:target="upload,file">
                             <span wire:loading.remove wire:target="upload,file">Upload Knowledge</span>
@@ -502,6 +512,9 @@
                                 Processing...
                             </span>
                         </button>
+                        @unless ($uploadCanSubmit)
+                            <p class="admin-knowledge-upload-submit-note">Pilih source dan file untuk mengaktifkan tombol upload.</p>
+                        @endunless
                     </footer>
                 </form>
             </section>

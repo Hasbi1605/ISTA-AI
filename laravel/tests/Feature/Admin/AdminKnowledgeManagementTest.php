@@ -63,12 +63,34 @@ class AdminKnowledgeManagementTest extends TestCase
             ->assertSee('Mengirim file knowledge')
             ->assertSee('Menjadwalkan processing')
             ->assertSee('Dokumen akan muncul sebagai Processing')
+            ->assertSee('Pilih source dan file untuk mengaktifkan tombol upload')
             ->assertSee('Processing...');
 
         $css = file_get_contents(resource_path('css/app.css'));
 
         $this->assertStringContainsString('.admin-knowledge-upload-progress', $css);
         $this->assertStringContainsString('.admin-knowledge-upload-button__spinner', $css);
+    }
+
+    public function test_upload_requires_file_and_source_before_processing(): void
+    {
+        Storage::fake('local');
+        Queue::fake();
+
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+
+        $this->actingAs($admin);
+
+        Livewire::test(\App\Livewire\Admin\AdminKnowledge::class)
+            ->call('openUploadModal')
+            ->call('upload')
+            ->assertHasErrors(['file', 'newSourceName'])
+            ->assertSee('Lengkapi source dan file knowledge sebelum upload')
+            ->assertSee('Pilih file knowledge terlebih dahulu')
+            ->assertSee('Pilih source existing atau isi source baru');
+
+        $this->assertDatabaseCount('knowledge_documents', 0);
+        Queue::assertNothingPushed();
     }
 
     public function test_regular_user_cannot_access_knowledge_page(): void
@@ -135,6 +157,7 @@ class AdminKnowledgeManagementTest extends TestCase
         $this->actingAs($admin);
 
         Livewire::test(\App\Livewire\Admin\AdminKnowledge::class)
+            ->set('newSourceName', 'SOP Internal')
             ->set('file', $file)
             ->call('upload')
             ->assertHasErrors(['file']);
@@ -154,6 +177,7 @@ class AdminKnowledgeManagementTest extends TestCase
         $this->actingAs($admin);
 
         Livewire::test(\App\Livewire\Admin\AdminKnowledge::class)
+            ->set('newSourceName', 'SOP Internal')
             ->set('file', $file)
             ->call('upload')
             ->assertHasErrors(['file']);

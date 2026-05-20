@@ -1722,6 +1722,15 @@
         @apply cursor-wait;
     }
 
+    .admin-knowledge-required {
+        @apply ml-1 text-[0.6rem] not-italic font-semibold normal-case text-rose-500 dark:text-rose-300;
+        letter-spacing: 0;
+    }
+
+    .admin-knowledge-upload-validation {
+        @apply rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-[0.76rem] font-semibold text-rose-700 dark:border-rose-300/20 dark:bg-rose-300/10 dark:text-rose-100;
+    }
+
     .admin-knowledge-upload-note {
         @apply text-[0.72rem] text-stone-500 dark:text-gray-400;
     }
@@ -3455,6 +3464,10 @@
         @apply flex cursor-pointer flex-col gap-1.5 rounded-xl border border-dashed border-stone-300 bg-stone-50/60 px-4 py-5 text-center transition hover:border-ista-primary/35 hover:bg-ista-primary/5 focus-within:border-ista-primary focus-within:ring-2 focus-within:ring-ista-primary/15 dark:border-gray-700 dark:bg-gray-900/50 dark:hover:border-amber-300/35 dark:hover:bg-amber-300/10;
     }
 
+    .admin-knowledge-dropzone--error {
+        @apply border-rose-300 bg-rose-50/70 hover:border-rose-400 hover:bg-rose-50 dark:border-rose-300/30 dark:bg-rose-300/10 dark:hover:border-rose-300/50 dark:hover:bg-rose-300/10;
+    }
+
     .admin-knowledge-dropzone span {
         @apply text-[0.6rem] font-bold uppercase text-stone-500 dark:text-gray-400;
         letter-spacing: 0;
@@ -3498,6 +3511,10 @@
 
     .admin-knowledge-upload-modal__footer {
         @apply flex flex-wrap items-center justify-end gap-2 border-t border-stone-100 pt-4 dark:border-gray-800;
+    }
+
+    .admin-knowledge-upload-submit-note {
+        @apply basis-full text-right text-[0.68rem] font-medium text-stone-500 dark:text-gray-400;
     }
 
 /* Dynamic admin modifiers are composed in Blade, so keep these outside @layer
