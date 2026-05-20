@@ -47,9 +47,16 @@
     $featureLabel = fn (?string $feature): string => $featureOptions[$feature] ?? strtoupper(str_replace('_', '.', (string) ($feature ?: '—')));
     $formatModelLabel = function ($event): array {
         $metadata = is_array($event->metadata) ? $event->metadata : [];
-        $label = trim((string) ($metadata['model_label'] ?? $metadata['model_name'] ?? ''));
-        $name = trim((string) ($metadata['model_name'] ?? ''));
-        $provider = trim((string) ($metadata['model_provider'] ?? ''));
+        $subjectEmbeddingProvider = '';
+        $subject = $event->relationLoaded('subject') ? $event->subject : null;
+
+        if ($subject instanceof \App\Models\Document) {
+            $subjectEmbeddingProvider = trim((string) $subject->embedding_provider);
+        }
+
+        $label = trim((string) ($metadata['model_label'] ?? $metadata['model_name'] ?? $metadata['embedding_provider'] ?? $subjectEmbeddingProvider));
+        $name = trim((string) ($metadata['model_name'] ?? $metadata['embedding_provider'] ?? $subjectEmbeddingProvider));
+        $provider = trim((string) ($metadata['model_provider'] ?? ($subjectEmbeddingProvider !== '' ? 'embedding' : '')));
 
         if ($label === '') {
             return [

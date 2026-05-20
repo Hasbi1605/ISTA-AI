@@ -3410,21 +3410,16 @@
         @apply mt-0.5 block text-[0.66rem] not-italic leading-relaxed text-stone-500 dark:text-gray-400;
     }
 
-    .admin-knowledge-upload-modal,
-    .admin-knowledge-upload-modal__backdrop {
-        @apply fixed inset-0 z-50;
-    }
-
     .admin-knowledge-upload-modal {
-        @apply flex items-center justify-center p-4;
+        @apply fixed inset-0 z-50 flex items-center justify-center p-4;
     }
 
     .admin-knowledge-upload-modal__backdrop {
-        @apply bg-stone-950/35 backdrop-blur-sm dark:bg-black/55;
+        @apply absolute inset-0 bg-stone-950/35 backdrop-blur-sm dark:bg-black/55;
     }
 
     .admin-knowledge-upload-modal__panel {
-        @apply relative z-10 flex max-h-[min(92vh,46rem)] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-stone-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-950;
+        @apply relative flex max-h-[min(92vh,46rem)] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-stone-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-950;
     }
 
     .admin-knowledge-upload-modal__header {

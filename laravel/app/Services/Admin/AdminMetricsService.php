@@ -342,7 +342,7 @@ class AdminMetricsService
         $perPage = max(1, min($perPage, self::RECENT_ROWS_LIMIT));
 
         return $this->applyEventFilters(AIUsageEvent::query(), $filters)
-            ->with('user:id,name,email,role')
+            ->with(['user:id,name,email,role', 'subject'])
             ->orderByDesc('created_at')
             ->paginate($perPage, ['*'], 'page', $page);
     }

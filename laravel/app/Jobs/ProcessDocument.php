@@ -2,7 +2,9 @@
 
 namespace App\Jobs;
 
+use App\Models\AIUsageEvent;
 use App\Models\Document;
+use App\Services\Admin\AIUsageEventService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
@@ -136,11 +138,36 @@ class ProcessDocument implements ShouldQueue
             // Token matches (or cache expired for a retry) → continue.
         }
 
+        $usageEvents = app(AIUsageEventService::class);
+        $usageStartedAt = microtime(true);
+        $usageRequestId = $usageEvents->newRequestId();
+        $usageMetadata = $this->documentProcessingMetadata();
+
+        $usageEvents->started(
+            feature: AIUsageEvent::FEATURE_DOCUMENT_PROCESSING,
+            userId: (int) $this->document->user_id,
+            metadata: $usageMetadata,
+            requestId: $usageRequestId,
+            subject: $this->document,
+        );
+
         // 2. Prepare file. The local disk is rooted at storage/app/private.
         $filePath = Storage::disk('local')->path($this->document->file_path);
 
         if (! file_exists($filePath)) {
             $this->updateStatusIfClaimOwned('error');
+            $usageEvents->failed(
+                feature: AIUsageEvent::FEATURE_DOCUMENT_PROCESSING,
+                userId: (int) $this->document->user_id,
+                metadata: [
+                    ...$usageMetadata,
+                    'reason' => 'file_not_found',
+                ],
+                requestId: $usageRequestId,
+                latencyMs: $usageEvents->latencyMsSince($usageStartedAt),
+                errorCode: 'file_not_found',
+                subject: $this->document,
+            );
             logger()->error("Document processing failed for ID {$this->document->id}: File not found at {$this->document->file_path}");
 
             return;
@@ -149,6 +176,18 @@ class ProcessDocument implements ShouldQueue
         $fileHandle = fopen($filePath, 'rb');
         if ($fileHandle === false) {
             $this->updateStatusIfClaimOwned('error');
+            $usageEvents->failed(
+                feature: AIUsageEvent::FEATURE_DOCUMENT_PROCESSING,
+                userId: (int) $this->document->user_id,
+                metadata: [
+                    ...$usageMetadata,
+                    'reason' => 'file_unreadable',
+                ],
+                requestId: $usageRequestId,
+                latencyMs: $usageEvents->latencyMsSince($usageStartedAt),
+                errorCode: 'file_unreadable',
+                subject: $this->document,
+            );
             logger()->error("Document processing failed for ID {$this->document->id}: unable to read file");
 
             return;
@@ -259,6 +298,19 @@ class ProcessDocument implements ShouldQueue
 
             $this->document = $freshDocument;
 
+            $usageEvents->completed(
+                feature: AIUsageEvent::FEATURE_DOCUMENT_PROCESSING,
+                userId: (int) $freshDocument->user_id,
+                metadata: [
+                    ...$this->documentProcessingMetadata($freshDocument),
+                    'outcome' => 'indexed',
+                    ...$usageEvents->embeddingModelMetadata($embeddingProvider),
+                ],
+                requestId: $usageRequestId,
+                latencyMs: $usageEvents->latencyMsSince($usageStartedAt),
+                subject: $freshDocument,
+            );
+
             // 5. Dispatch preview rendering job as a fallback if the
             // eager upload-time dispatch has not already completed it.
             try {
@@ -299,6 +351,20 @@ class ProcessDocument implements ShouldQueue
             ->whereKey($this->document->id)
             ->whereIn('status', ['pending', 'processing'])
             ->update(['status' => 'error']);
+
+        $usageEvents = app(AIUsageEventService::class);
+
+        $usageEvents->failed(
+            feature: AIUsageEvent::FEATURE_DOCUMENT_PROCESSING,
+            userId: (int) $this->document->user_id,
+            metadata: [
+                ...$this->documentProcessingMetadata(),
+                'reason' => 'job_failed',
+            ],
+            requestId: $usageEvents->newRequestId(),
+            errorCode: 'job_failed',
+            subject: $this->document,
+        );
 
         logger()->error("Document processing permanently failed for ID {$this->document->id}: ".$exception->getMessage());
     }
@@ -341,5 +407,31 @@ class ProcessDocument implements ShouldQueue
         if (! $response->successful() && $response->status() !== 404) {
             throw new \RuntimeException('Vector deletion failed: '.$response->body());
         }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function documentProcessingMetadata(?Document $document = null): array
+    {
+        $document ??= $this->document;
+        $extension = strtolower((string) pathinfo((string) $document->original_name, PATHINFO_EXTENSION));
+        $sourceProvider = trim((string) $document->source_provider);
+
+        $metadata = [
+            'document_id' => (int) $document->id,
+            'document_extension' => $extension,
+            'mime_type' => $document->mime_type,
+            'file_size_bytes' => $document->file_size_bytes,
+            'origin' => $sourceProvider !== '' ? 'cloud' : 'local',
+            'job_class' => self::class,
+            'job_attempts' => $this->attempts(),
+        ];
+
+        if ($sourceProvider !== '') {
+            $metadata['provider'] = $sourceProvider;
+        }
+
+        return $metadata;
     }
 }

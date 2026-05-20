@@ -161,6 +161,19 @@ class AIUsageEventServiceTest extends TestCase
         $this->assertSame('github_models', $clean['model_provider']);
     }
 
+    public function test_embedding_model_metadata_is_allowed_for_document_processing_events(): void
+    {
+        $service = app(AIUsageEventService::class);
+
+        $metadata = $service->embeddingModelMetadata('text-embedding-3-small');
+        $clean = $service->sanitizeMetadata($metadata);
+
+        $this->assertSame('text-embedding-3-small', $clean['model_label']);
+        $this->assertSame('text-embedding-3-small', $clean['model_name']);
+        $this->assertSame('embedding', $clean['model_provider']);
+        $this->assertSame('text-embedding-3-small', $clean['embedding_provider']);
+    }
+
     public function test_knowledge_metadata_is_allowed_without_raw_content(): void
     {
         $service = app(AIUsageEventService::class);

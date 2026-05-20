@@ -223,6 +223,51 @@ class AdminMonitoringDashboardTest extends TestCase
         Carbon::setTestNow();
     }
 
+    public function test_admin_usage_shows_document_embedding_provider_from_upload_subject(): void
+    {
+        $now = Carbon::parse('2026-05-18 12:00:00');
+        Carbon::setTestNow($now);
+
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $user = User::factory()->create(['role' => User::ROLE_USER]);
+        $document = Document::create([
+            'user_id' => $user->id,
+            'filename' => 'referensi.pdf',
+            'original_name' => 'referensi.pdf',
+            'file_path' => 'docs/referensi.pdf',
+            'status' => 'ready',
+            'mime_type' => 'application/pdf',
+            'file_size_bytes' => 1024,
+            'embedding_provider' => 'text-embedding-3-small',
+            'indexed_at' => $now,
+        ]);
+
+        $event = $this->makeEvent(
+            $user->id,
+            AIUsageEvent::FEATURE_DOCUMENT_UPLOAD,
+            AIUsageEvent::ACTION_COMPLETED,
+            AIUsageEvent::STATUS_SUCCESS,
+            $now,
+            'req-upload',
+            120,
+            null,
+            ['document_id' => $document->id],
+        );
+
+        $event->forceFill([
+            'subject_id' => $document->id,
+            'subject_type' => Document::class,
+        ])->save();
+
+        $this->actingAs($admin);
+
+        Livewire::test(AdminUsage::class)
+            ->assertSee('Upload Dokumen')
+            ->assertSee('text-embedding-3-small', false);
+
+        Carbon::setTestNow();
+    }
+
     public function test_admin_usage_hides_started_lifecycle_events_by_default(): void
     {
         $now = Carbon::parse('2026-05-18 12:00:00');

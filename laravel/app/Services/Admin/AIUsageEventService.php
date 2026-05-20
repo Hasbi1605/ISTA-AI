@@ -81,6 +81,7 @@ class AIUsageEventService
         'model_label',
         'model_name',
         'model_provider',
+        'embedding_provider',
         'subject_label',
         'subject_kind',
     ];
@@ -231,6 +232,28 @@ class AIUsageEventService
         }
 
         return $metadata;
+    }
+
+    /**
+     * Convert the document embedding provider returned by the Python ingest
+     * service into model metadata used by the admin usage table.
+     *
+     * @return array<string, string>
+     */
+    public function embeddingModelMetadata(?string $embeddingProvider): array
+    {
+        $label = trim((string) $embeddingProvider);
+
+        if ($label === '') {
+            return [];
+        }
+
+        return [
+            'model_label' => $label,
+            'model_name' => $label,
+            'model_provider' => 'embedding',
+            'embedding_provider' => $label,
+        ];
     }
 
     /**

@@ -4,6 +4,7 @@ namespace Tests\Feature\Jobs;
 
 use App\Jobs\ProcessDocument;
 use App\Jobs\RenderDocumentPreview;
+use App\Models\AIUsageEvent;
 use App\Models\Document;
 use App\Models\User;
 use App\Services\Documents\DocumentPreviewRenderer;
@@ -68,6 +69,18 @@ class ProcessDocumentTest extends TestCase
         $this->assertSame(12, $freshDocument->indexed_chunk_count);
         $this->assertSame('text-embedding-3-small', $freshDocument->embedding_provider);
         $this->assertNotNull($freshDocument->indexed_at);
+
+        $event = AIUsageEvent::query()
+            ->where('feature', AIUsageEvent::FEATURE_DOCUMENT_PROCESSING)
+            ->where('action', AIUsageEvent::ACTION_COMPLETED)
+            ->where('subject_id', $document->id)
+            ->first();
+
+        $this->assertNotNull($event);
+        $this->assertSame(AIUsageEvent::STATUS_SUCCESS, $event->status);
+        $this->assertSame('text-embedding-3-small', $event->metadata['model_label'] ?? null);
+        $this->assertSame('text-embedding-3-small', $event->metadata['embedding_provider'] ?? null);
+
         Http::assertSent(function ($request) {
             return $request->url() === 'http://python-ai-docs:8002/api/documents/process'
                 && $request->hasHeader('Authorization', 'Bearer internal-token')

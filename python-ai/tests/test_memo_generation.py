@@ -79,6 +79,29 @@ def test_generate_memo_docx_forwards_runtime_config_to_default_generator(monkeyp
     assert captured["runtime_config"] == runtime_config
     assert "Rapat Koordinasi" in captured["messages"][0]["content"]
 
+
+def test_generate_memo_docx_captures_model_label_from_stream_marker():
+    draft = generate_memo_docx(
+        "memo_internal",
+        "Rapat Koordinasi",
+        "Buat memo singkat terkait rapat koordinasi.",
+        text_generator=lambda prompt: "[MODEL:GPT-4.1 Mini (Primary)]\nMohon unit terkait menyiapkan bahan rapat koordinasi.",
+        configuration={
+            "number": "EVAL-08/IST/YK/05/2026",
+            "recipient": "Kepala Unit Layanan",
+            "sender": "Kepala Istana Kepresidenan Yogyakarta",
+            "subject": "Rapat Koordinasi",
+            "date": "19 Mei 2026",
+            "signatory": "Deni Mulyana",
+        },
+    )
+
+    document = Document(BytesIO(draft.content))
+
+    assert draft.model_label == "GPT-4.1 Mini (Primary)"
+    assert "[MODEL:" not in _all_document_text(document)
+
+
 def _has_table_containing(document, text):
     try:
         _find_table_containing(document, text)
@@ -2069,6 +2092,7 @@ def test_generate_memo_endpoint_accepts_full_laravel_configuration_context(monke
             content=b"docx-bytes",
             searchable_text="Memo panjang",
             page_size="folio",
+            model_label="GPT-4.1 Mini (Primary)",
         )
 
     monkeypatch.setattr("app.routers.memos.generate_memo_docx", fake_generate_memo_docx)
@@ -2088,6 +2112,7 @@ def test_generate_memo_endpoint_accepts_full_laravel_configuration_context(monke
     assert response.status_code == 200
     assert captured["context"] == context
     assert response.headers["X-Memo-Page-Size"] == "folio"
+    assert response.headers["X-AI-Model-Label"] == "GPT-4.1 Mini (Primary)"
 
 
 def test_generate_memo_endpoint_handles_unicode_searchable_text(monkeypatch):

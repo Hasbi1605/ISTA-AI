@@ -34,6 +34,24 @@ class AdminKnowledgeManagementTest extends TestCase
         $response->assertSee('Admin only', false);
     }
 
+    public function test_upload_modal_backdrop_stays_behind_panel(): void
+    {
+        $css = file_get_contents(resource_path('css/app.css'));
+
+        $this->assertStringContainsString(
+            ".admin-knowledge-upload-modal {\n        @apply fixed inset-0 z-50 flex items-center justify-center p-4;\n    }",
+            $css
+        );
+        $this->assertStringContainsString(
+            ".admin-knowledge-upload-modal__backdrop {\n        @apply absolute inset-0 bg-stone-950/35 backdrop-blur-sm dark:bg-black/55;\n    }",
+            $css
+        );
+        $this->assertStringNotContainsString(
+            ".admin-knowledge-upload-modal,\n    .admin-knowledge-upload-modal__backdrop {\n        @apply fixed inset-0 z-50;\n    }",
+            $css
+        );
+    }
+
     public function test_regular_user_cannot_access_knowledge_page(): void
     {
         $user = User::factory()->create(['role' => User::ROLE_USER]);

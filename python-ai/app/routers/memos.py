@@ -38,14 +38,20 @@ def generate_memo_body(request: GenerateMemoRequest):
         draft.searchable_text[:2000].encode("utf-8")
     ).decode("ascii")
 
+    headers = {
+        "Content-Disposition": f'attachment; filename="{draft.filename}"',
+        "X-Memo-Searchable-Text-B64": searchable_text,
+        "X-Memo-Page-Size": draft.page_size,
+        "X-Content-Type-Options": "nosniff",
+        "Cache-Control": "no-store",
+    }
+
+    model_label = " ".join((draft.model_label or "").split())[:191]
+    if model_label:
+        headers["X-AI-Model-Label"] = model_label
+
     return Response(
         content=draft.content,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        headers={
-            "Content-Disposition": f'attachment; filename="{draft.filename}"',
-            "X-Memo-Searchable-Text-B64": searchable_text,
-            "X-Memo-Page-Size": draft.page_size,
-            "X-Content-Type-Options": "nosniff",
-            "Cache-Control": "no-store",
-        },
+        headers=headers,
     )

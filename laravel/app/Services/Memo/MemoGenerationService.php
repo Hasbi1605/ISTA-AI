@@ -44,11 +44,13 @@ class MemoGenerationService
         $startedAt = microtime(true);
         $requestId = $usageEvents->newRequestId();
         $configMetadata = $this->aiConfigUsageMetadata();
+        $modelMetadata = [];
         $configuration = $this->normalizeConfiguration($configuration);
         $sourceDocumentCount = count(array_unique(array_map('intval', $sourceDocumentIds)));
 
         try {
             $draft = $this->requestDraft($memoType, $title, $context, $configuration);
+            $modelMetadata = $usageEvents->modelMetadata($draft['model_label'] ?? null);
         } catch (Throwable $e) {
             $usageEvents->failed(
                 feature: AIUsageEvent::FEATURE_MEMO_GENERATION,
@@ -103,6 +105,7 @@ class MemoGenerationService
                     'page_size' => $configuration['page_size'] ?? null,
                     'reason' => 'persist_failed',
                     ...$configMetadata,
+                    ...$modelMetadata,
                 ],
                 requestId: $requestId,
                 latencyMs: $usageEvents->latencyMsSince($startedAt),
@@ -123,6 +126,7 @@ class MemoGenerationService
                 'has_documents' => $sourceDocumentCount > 0,
                 'page_size' => $configuration['page_size'] ?? null,
                 ...$configMetadata,
+                ...$modelMetadata,
             ],
             requestId: $requestId,
             latencyMs: $usageEvents->latencyMsSince($startedAt),
@@ -138,6 +142,7 @@ class MemoGenerationService
         $startedAt = microtime(true);
         $requestId = $usageEvents->newRequestId();
         $configMetadata = $this->aiConfigUsageMetadata();
+        $modelMetadata = [];
 
         if ($revisionInstruction !== null && trim($revisionInstruction) !== '') {
             $configuration['revision_instruction'] = $revisionInstruction;
@@ -148,6 +153,7 @@ class MemoGenerationService
 
         try {
             $draft = $this->requestDraft($memo->memo_type, $title, $context, $configuration);
+            $modelMetadata = $usageEvents->modelMetadata($draft['model_label'] ?? null);
         } catch (Throwable $e) {
             $usageEvents->failed(
                 feature: AIUsageEvent::FEATURE_MEMO_REVISION,
@@ -200,6 +206,7 @@ class MemoGenerationService
                     'memo_type' => (string) $memo->memo_type,
                     'reason' => 'persist_failed',
                     ...$configMetadata,
+                    ...$modelMetadata,
                 ],
                 requestId: $requestId,
                 latencyMs: $usageEvents->latencyMsSince($startedAt),
@@ -219,6 +226,7 @@ class MemoGenerationService
                 'memo_version' => (int) $version->version_number,
                 'page_size' => $configuration['page_size'] ?? null,
                 ...$configMetadata,
+                ...$modelMetadata,
             ],
             requestId: $requestId,
             latencyMs: $usageEvents->latencyMsSince($startedAt),
@@ -234,6 +242,7 @@ class MemoGenerationService
         $startedAt = microtime(true);
         $requestId = $usageEvents->newRequestId();
         $configMetadata = $this->aiConfigUsageMetadata();
+        $modelMetadata = [];
 
         if ($revisionInstruction !== null && trim($revisionInstruction) !== '') {
             $configuration['revision_instruction'] = $revisionInstruction;
@@ -247,6 +256,7 @@ class MemoGenerationService
 
         try {
             $draft = $this->requestDraft($memo->memo_type, $title, $body, $requestConfiguration);
+            $modelMetadata = $usageEvents->modelMetadata($draft['model_label'] ?? null);
         } catch (Throwable $e) {
             $usageEvents->failed(
                 feature: AIUsageEvent::FEATURE_MEMO_REVISION,
@@ -301,6 +311,7 @@ class MemoGenerationService
                     'reason' => 'persist_failed',
                     'origin' => 'body_override',
                     ...$configMetadata,
+                    ...$modelMetadata,
                 ],
                 requestId: $requestId,
                 latencyMs: $usageEvents->latencyMsSince($startedAt),
@@ -321,6 +332,7 @@ class MemoGenerationService
                 'page_size' => $storedConfiguration['page_size'] ?? null,
                 'origin' => 'body_override',
                 ...$configMetadata,
+                ...$modelMetadata,
             ],
             requestId: $requestId,
             latencyMs: $usageEvents->latencyMsSince($startedAt),
@@ -358,7 +370,7 @@ class MemoGenerationService
 
     /**
      * @param  array<string, string>  $configuration
-     * @return array{content: string, searchable_text: string, page_size: string|null}
+     * @return array{content: string, searchable_text: string, page_size: string|null, model_label: string|null}
      */
     protected function requestDraft(string $memoType, string $title, string $context, array $configuration): array
     {
@@ -392,7 +404,16 @@ class MemoGenerationService
                 $context,
             ),
             'page_size' => $this->normalizeResolvedPageSize($response->header('X-Memo-Page-Size')),
+            'model_label' => $this->normalizeModelLabel($response->header('X-AI-Model-Label')),
         ];
+    }
+
+    protected function normalizeModelLabel(?string $label): ?string
+    {
+        $clean = preg_replace('/[\r\n]+/', ' ', (string) $label);
+        $clean = trim((string) $clean);
+
+        return $clean !== '' ? Str::limit($clean, 191, '') : null;
     }
 
     /**

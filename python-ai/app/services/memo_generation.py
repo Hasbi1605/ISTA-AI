@@ -146,6 +146,7 @@ class MemoDraft:
     content: bytes
     searchable_text: str
     page_size: str
+    model_label: str = ""
 
 
 def normalize_memo_type(memo_type: str) -> str:
@@ -240,6 +241,7 @@ def generate_memo_docx(
     )
     prompt = build_memo_prompt(normalized_type, clean_title, clean_context, config)
     raw_body = config["body_override"] or generator(prompt)
+    model_label = _extract_model_label(raw_body)
     body = _sanitize_memo_body(_normalize_generated_text(raw_body), config)
     body = _enforce_revision_constraints(body, config)
     body = _preserve_configured_numbered_items(body, config)
@@ -262,6 +264,7 @@ def generate_memo_docx(
         content=buffer.getvalue(),
         searchable_text=searchable_text,
         page_size=config["page_size"],
+        model_label=model_label,
     )
 
 
@@ -2528,6 +2531,14 @@ def _normalize_generated_text(text: str) -> str:
     if not clean:
         raise ValueError("AI tidak menghasilkan isi memo.")
     return clean
+
+
+def _extract_model_label(text: str) -> str:
+    match = re.match(r"^\s*\[MODEL:(?P<label>[^\]\r\n]{1,200})\]\s*", text or "", flags=re.IGNORECASE)
+    if not match:
+        return ""
+
+    return re.sub(r"\s+", " ", match.group("label")).strip()
 
 
 def _looks_like_ai_unavailable_message(text: str) -> bool:

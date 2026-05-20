@@ -591,6 +591,7 @@ class AIUsageEventTrackingTest extends TestCase
             '*/api/memos/generate-body' => Http::response($this->validMemoDocxBytes(), 200, [
                 'X-Memo-Searchable-Text-B64' => base64_encode('Memo valid'),
                 'X-Memo-Page-Size' => 'letter',
+                'X-AI-Model-Label' => 'GPT-4.1 Mini (Primary)',
             ]),
         ]);
 
@@ -625,6 +626,8 @@ class AIUsageEventTrackingTest extends TestCase
         $this->assertSame(Memo::class, $event->subject_type);
         $this->assertSame('memo_internal', $event->metadata['memo_type'] ?? null);
         $this->assertSame(1, $event->metadata['memo_version'] ?? null);
+        $this->assertSame('GPT-4.1 Mini (Primary)', $event->metadata['model_label'] ?? null);
+        $this->assertSame('openai/gpt-4.1-mini', $event->metadata['model_name'] ?? null);
     }
 
     public function test_memo_generation_records_failed_event_on_corrupt_docx(): void
