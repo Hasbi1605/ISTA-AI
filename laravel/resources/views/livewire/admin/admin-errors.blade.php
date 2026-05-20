@@ -12,33 +12,40 @@
     $failedErrors = (int) ($errorSummary['error'] ?? 0);
     $blockedErrors = (int) ($errorSummary['blocked'] ?? 0);
     $uniqueCodes = (int) ($errorSummary['unique_codes'] ?? 0);
+    $statusDescription = function (int $value, string $label, string $empty) use ($formatPct, $totalErrors): string {
+        if ($value <= 0) {
+            return $empty;
+        }
+
+        return $formatPct($value, $totalErrors) . ' ' . $label;
+    };
 
     $errorCards = [
         [
             'label' => 'Total Issue',
             'value' => $totalErrors,
-            'description' => 'Error dan blocked terfilter',
+            'description' => $totalErrors > 0 ? 'Issue terfilter' : 'Tidak ada issue',
             'tone' => 'primary',
             'icon' => 'M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z',
         ],
         [
             'label' => 'Error',
             'value' => $failedErrors,
-            'description' => $formatPct($failedErrors, $totalErrors) . ' dari issue',
-            'tone' => 'danger',
+            'description' => $statusDescription($failedErrors, 'error', 'Tidak ada error'),
+            'tone' => $failedErrors > 0 ? 'danger' : 'neutral',
             'icon' => 'M6 18L18 6M6 6l12 12',
         ],
         [
             'label' => 'Blocked',
             'value' => $blockedErrors,
-            'description' => $formatPct($blockedErrors, $totalErrors) . ' dari issue',
-            'tone' => 'warning',
+            'description' => $statusDescription($blockedErrors, 'blocked', 'Tidak ada blocked'),
+            'tone' => $blockedErrors > 0 ? 'warning' : 'neutral',
             'icon' => 'M12 3l7.5 4.5v5.25c0 4.5-3.075 7.55-7.5 8.25-4.425-.7-7.5-3.75-7.5-8.25V7.5L12 3zm-3.5 9h7',
         ],
         [
             'label' => 'Kode Unik',
             'value' => $uniqueCodes,
-            'description' => 'Error code tersanitasi',
+            'description' => $uniqueCodes > 0 ? 'Kode tersanitasi' : 'Tidak ada kode',
             'tone' => 'neutral',
             'icon' => 'M7 8h10M7 12h10M7 16h7M5 4h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z',
         ],

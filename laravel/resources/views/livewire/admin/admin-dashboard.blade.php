@@ -36,10 +36,12 @@
     $failedToday = (int) ($kpis['ai_failed_today'] ?? 0);
     $successRate = $requestsToday > 0 ? ($successToday / $requestsToday) * 100 : 0;
     $errorRate = $requestsToday > 0 ? ($failedToday / $requestsToday) * 100 : 0;
-    $avgLatencyMs = $kpis['avg_latency_ms_today'] ?? null;
-    $avgLatencyLabel = $avgLatencyMs !== null ? $formatSeconds($avgLatencyMs) : '-';
     $onlineUsers = (int) ($kpis['online_users'] ?? 0);
-    $activeUsersToday = (int) ($kpis['active_users_today'] ?? 0);
+    $documentsReady = (int) ($kpis['documents_ready'] ?? 0);
+    $documentsProcessing = (int) ($kpis['documents_processing'] ?? 0);
+    $documentsFailed = (int) ($kpis['documents_failed'] ?? 0);
+    $documentsTotal = $documentsReady + $documentsProcessing + $documentsFailed;
+    $memoToday = (int) ($kpis['memos_today'] ?? 0);
     $totalErrorsRange = (int) collect($series)->sum('failed');
     $seriesTotal = (int) collect($series)->sum('total');
     $chartMax = max(1, (int) ($maxSeriesValue ?? 1));
@@ -81,14 +83,25 @@
     $errorRateTrendText = $trendLabel($errorRateTrend, 'kemarin');
     $errorsSevenDayTrendText = $trendLabel($errorsSevenDayTrend, '7 hari lalu');
     $errorRateSevenDayTrendText = $trendLabel($errorRateSevenDayTrend, '7 hari lalu');
+    $onlineUsersLabel = $onlineUsers > 0 ? $formatInt($onlineUsers) . ' online' : 'Tidak ada online';
+    $aiUsageLabel = $requestsToday > 0 ? $formatPct($successRate) . ' sukses' : 'Belum ada request';
+    $documentsLabel = match (true) {
+        $documentsFailed > 0 => $formatInt($documentsFailed) . ' gagal',
+        $documentsProcessing > 0 => $formatInt($documentsProcessing) . ' diproses',
+        $documentsTotal > 0 && $documentsReady === $documentsTotal => 'Semua ready',
+        $documentsReady > 0 => $formatInt($documentsReady) . ' ready',
+        default => 'Belum ada dokumen',
+    };
+    $conversationLabel = $memoToday > 0 ? $formatInt($memoToday) . ' memo hari ini' : 'Tidak ada memo';
 
     $overviewCards = [
         [
             'title' => 'Users',
             'value' => $formatInt($kpis['total_users'] ?? 0),
             'label' => 'Total user',
-            'meta' => $formatInt($onlineUsers) . ' online',
-            'support' => $formatInt($activeUsersToday) . ' aktif hari ini',
+            'meta' => $onlineUsersLabel,
+            'meta_tone' => $onlineUsers > 0 ? 'success' : 'neutral',
+            'support' => null,
             'tone' => 'primary',
             'route' => route('admin.users'),
             'icon' => 'M15.75 7.5a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.5 20.25a7.5 7.5 0 0115 0',
@@ -97,19 +110,21 @@
             'title' => 'AI Usage',
             'value' => $formatInt($requestsToday),
             'label' => 'Request hari ini',
-            'meta' => $formatPct($successRate) . ' sukses',
-            'support' => 'Latensi ' . $avgLatencyLabel,
+            'meta' => $aiUsageLabel,
+            'meta_tone' => $requestsToday > 0 ? 'success' : 'neutral',
+            'support' => null,
             'tone' => 'gold',
             'route' => route('admin.usage'),
             'icon' => 'M12 3l1.65 4.7L18 9.5l-4.35 1.8L12 16l-1.65-4.7L6 9.5l4.35-1.8L12 3zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z',
         ],
         [
             'title' => 'Documents',
-            'value' => $formatInt($kpis['documents_ready'] ?? 0),
+            'value' => $formatInt($documentsReady),
             'label' => 'Dokumen ready',
-            'meta' => $formatInt($kpis['documents_processing'] ?? 0) . ' processing',
-            'support' => $formatInt($kpis['documents_failed'] ?? 0) . ' failed',
-            'tone' => 'success',
+            'meta' => $documentsLabel,
+            'meta_tone' => $documentsFailed > 0 ? 'danger' : ($documentsProcessing > 0 ? 'warning' : ($documentsReady > 0 ? 'success' : 'neutral')),
+            'support' => null,
+            'tone' => $documentsFailed > 0 ? 'danger' : ($documentsProcessing > 0 ? 'warning' : 'success'),
             'route' => route('admin.documents'),
             'icon' => 'M8 3.75h6.25L19 8.5v11.75H8A3 3 0 015 17.25V6.75a3 3 0 013-3zM14 3.75V8.5H19M9 13h6M9 16h5',
         ],
@@ -117,9 +132,10 @@
             'title' => 'Percakapan & Memo',
             'value' => $formatInt($kpis['conversations_today'] ?? 0),
             'label' => 'Percakapan baru',
-            'meta' => $formatInt($kpis['memos_today'] ?? 0) . ' memo hari ini',
-            'support' => $formatInt($kpis['memos_week'] ?? 0) . ' memo / 7 hari',
-            'tone' => 'warning',
+            'meta' => $conversationLabel,
+            'meta_tone' => 'neutral',
+            'support' => null,
+            'tone' => 'primary',
             'route' => route('admin.usage'),
             'icon' => 'M4.5 6.75A3.75 3.75 0 018.25 3h7.5a3.75 3.75 0 013.75 3.75v5A3.75 3.75 0 0115.75 15H11l-4.5 4.5V15A3.75 3.75 0 014.5 11.25v-4.5z',
         ],
@@ -205,8 +221,10 @@
                     <p>{{ $card['label'] }}</p>
                     <strong>{{ $card['value'] }}</strong>
                     <div>
-                        <em>{{ $card['meta'] }}</em>
-                        <em>{{ $card['support'] }}</em>
+                        <em class="admin-summary-card__meta--{{ $card['meta_tone'] ?? 'neutral' }}">{{ $card['meta'] }}</em>
+                        @if (! empty($card['support']))
+                            <em>{{ $card['support'] }}</em>
+                        @endif
                     </div>
                 </div>
             </a>

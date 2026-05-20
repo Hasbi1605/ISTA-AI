@@ -12,33 +12,42 @@
     $onlineUsers = (int) ($presenceSummary['online'] ?? 0);
     $idleUsers = (int) ($presenceSummary['idle'] ?? 0);
     $offlineUsers = (int) ($presenceSummary['offline'] ?? 0);
+    $statusDescription = function (int $value, string $label, string $empty) use ($formatPct, $totalUsers): string {
+        if ($value <= 0) {
+            return $empty;
+        }
+
+        return $formatPct($value, $totalUsers) . ' ' . $label;
+    };
 
     $presenceCards = [
         [
             'label' => 'Total User',
             'value' => $totalUsers,
-            'description' => 'Semua user terdaftar',
+            'description' => $totalUsers > 0 ? 'User terdaftar' : 'Belum ada user',
             'tone' => 'primary',
             'icon' => 'M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-5.13a4 4 0 11-8 0 4 4 0 018 0zm6 0a4 4 0 11-8 0 4 4 0 018 0z',
         ],
         [
             'label' => 'Online',
             'value' => $onlineUsers,
-            'description' => $formatPct($onlineUsers, $totalUsers) . ' dari total user',
-            'tone' => 'success',
+            'description' => $statusDescription($onlineUsers, 'online', 'Tidak ada online'),
+            'tone' => $onlineUsers > 0 ? 'success' : 'neutral',
             'icon' => 'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
         ],
         [
             'label' => 'Idle',
             'value' => $idleUsers,
-            'description' => $formatPct($idleUsers, $totalUsers) . ' dari total user',
-            'tone' => 'warning',
+            'description' => $statusDescription($idleUsers, 'idle', 'Tidak ada idle'),
+            'tone' => $idleUsers > 0 ? 'warning' : 'neutral',
             'icon' => 'M12 6v6l3 2M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
         ],
         [
             'label' => 'Offline',
             'value' => $offlineUsers,
-            'description' => $formatPct($offlineUsers, $totalUsers) . ' dari total user',
+            'description' => $totalUsers > 0 && $offlineUsers === $totalUsers
+                ? 'Semua offline'
+                : $statusDescription($offlineUsers, 'offline', 'Tidak ada offline'),
             'tone' => 'neutral',
             'icon' => 'M18.364 18.364A9 9 0 015.636 5.636m12.728 12.728A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636',
         ],

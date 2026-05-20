@@ -12,34 +12,41 @@
     $successEvents = (int) ($totals['success'] ?? 0);
     $pendingEvents = (int) ($totals['pending'] ?? 0);
     $failedEvents = (int) ($totals['failed'] ?? 0);
+    $statusDescription = function (int $value, string $label, string $empty) use ($formatPct, $totalEvents): string {
+        if ($value <= 0) {
+            return $empty;
+        }
+
+        return $formatPct($value, $totalEvents) . ' ' . $label;
+    };
 
     $usageCards = [
         [
             'label' => 'Total Event',
             'value' => $totalEvents,
-            'description' => 'Metadata event terfilter',
+            'description' => $totalEvents > 0 ? 'Event terfilter' : 'Belum ada event',
             'tone' => 'primary',
             'icon' => 'M4 19V10m5 9V5m5 14v-7m5 7V8M3 19h18',
         ],
         [
             'label' => 'Sukses',
             'value' => $successEvents,
-            'description' => $formatPct($successEvents, $totalEvents) . ' success rate',
-            'tone' => 'success',
+            'description' => $statusDescription($successEvents, 'sukses', 'Tidak ada sukses'),
+            'tone' => $successEvents > 0 ? 'success' : 'neutral',
             'icon' => 'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
         ],
         [
             'label' => 'Pending',
             'value' => $pendingEvents,
-            'description' => $formatPct($pendingEvents, $totalEvents) . ' masih diproses',
-            'tone' => 'warning',
+            'description' => $statusDescription($pendingEvents, 'pending', 'Tidak ada pending'),
+            'tone' => $pendingEvents > 0 ? 'warning' : 'neutral',
             'icon' => 'M12 6v6l3 2M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
         ],
         [
             'label' => 'Gagal',
             'value' => $failedEvents,
-            'description' => $formatPct($failedEvents, $totalEvents) . ' error / blocked',
-            'tone' => 'danger',
+            'description' => $statusDescription($failedEvents, 'gagal', 'Tidak ada gagal'),
+            'tone' => $failedEvents > 0 ? 'danger' : 'neutral',
             'icon' => 'M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z',
         ],
     ];

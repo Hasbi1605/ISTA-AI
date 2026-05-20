@@ -2941,10 +2941,10 @@
         @apply text-[0.68rem] not-italic text-stone-500 dark:text-gray-500;
     }
 
-    .admin-summary-card--primary .admin-summary-card__body em:first-child { @apply text-emerald-600 dark:text-emerald-400; }
-    .admin-summary-card--gold .admin-summary-card__body em:first-child { @apply text-ista-primary dark:text-amber-300; }
-    .admin-summary-card--success .admin-summary-card__body em:first-child { @apply text-amber-600 dark:text-amber-400; }
-    .admin-summary-card--warning .admin-summary-card__body em:first-child { @apply text-amber-600 dark:text-amber-300; }
+    .admin-summary-card__meta--success { @apply text-emerald-600 dark:text-emerald-400; }
+    .admin-summary-card__meta--warning { @apply text-amber-600 dark:text-amber-300; }
+    .admin-summary-card__meta--danger { @apply text-rose-600 dark:text-rose-400; }
+    .admin-summary-card__meta--neutral { @apply text-stone-500 dark:text-gray-500; }
 
     .admin-overview-main-grid {
         @apply mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.42fr)_minmax(20rem,0.78fr)];

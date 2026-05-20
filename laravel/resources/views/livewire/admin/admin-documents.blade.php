@@ -166,6 +166,13 @@
     $processingCount = (int) (($statusCounts['pending'] ?? 0) + ($statusCounts['processing'] ?? 0));
     $failedCount = (int) ($statusCounts['error'] ?? 0);
     $sizeLabel = $formatBytes((int) $totalSizeBytes);
+    $statusDescription = function (int $value, string $label, string $empty) use ($formatPct, $totalDocs): string {
+        if ($value <= 0) {
+            return $empty;
+        }
+
+        return $formatPct($value, $totalDocs) . ' ' . $label;
+    };
     $typeColors = [
         'pdf' => '#ff2056',
         'csv' => '#16a34a',
@@ -197,29 +204,29 @@
         [
             'label' => 'Total Dokumen',
             'value' => $totalDocs,
-            'description' => $sizeLabel . ' total ukuran',
+            'description' => $totalDocs > 0 ? $sizeLabel : 'Belum ada dokumen',
             'tone' => 'primary',
             'icon' => 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.5L19 9.5V19a2 2 0 01-2 2z',
         ],
         [
             'label' => 'Ready',
             'value' => $readyCount,
-            'description' => $formatPct($readyCount, $totalDocs) . ' siap dipakai',
-            'tone' => 'success',
+            'description' => $statusDescription($readyCount, 'ready', 'Belum ada ready'),
+            'tone' => $readyCount > 0 ? 'success' : 'neutral',
             'icon' => 'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
         ],
         [
             'label' => 'Diproses',
             'value' => $processingCount,
-            'description' => $formatPct($processingCount, $totalDocs) . ' pending / processing',
-            'tone' => 'warning',
+            'description' => $statusDescription($processingCount, 'diproses', 'Tidak ada proses'),
+            'tone' => $processingCount > 0 ? 'warning' : 'neutral',
             'icon' => 'M12 6v6l3 2M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
         ],
         [
             'label' => 'Failed',
             'value' => $failedCount,
-            'description' => $formatPct($failedCount, $totalDocs) . ' perlu dicek',
-            'tone' => 'danger',
+            'description' => $statusDescription($failedCount, 'gagal', 'Tidak ada gagal'),
+            'tone' => $failedCount > 0 ? 'danger' : 'neutral',
             'icon' => 'M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z',
         ],
     ];
