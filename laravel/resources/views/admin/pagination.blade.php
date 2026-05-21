@@ -55,7 +55,7 @@
         }
     @endphp
 
-    <nav class="admin-pagination" role="navigation" aria-label="Pagination">
+    <nav class="admin-pagination" role="navigation" aria-label="Pagination" wire:key="admin-pagination-{{ $pageName }}-{{ $currentPage }}-{{ $totalPages }}-{{ $paginator->firstItem() }}-{{ $paginator->lastItem() }}">
         <p class="admin-pagination__summary">
             Menampilkan {{ number_format($paginator->firstItem() ?? 0) }}-{{ number_format($paginator->lastItem() ?? 0) }}
             dari {{ number_format($paginator->total()) }}

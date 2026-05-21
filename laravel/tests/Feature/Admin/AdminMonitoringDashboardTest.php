@@ -330,6 +330,41 @@ class AdminMonitoringDashboardTest extends TestCase
         Carbon::setTestNow();
     }
 
+    public function test_admin_usage_pagination_keeps_full_controls_after_livewire_page_change(): void
+    {
+        $now = Carbon::parse('2026-05-18 12:00:00');
+        Carbon::setTestNow($now);
+
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $user = User::factory()->create(['role' => User::ROLE_USER]);
+
+        for ($index = 1; $index <= 66; $index++) {
+            $this->makeEvent(
+                $user->id,
+                AIUsageEvent::FEATURE_CHAT,
+                AIUsageEvent::ACTION_COMPLETED,
+                AIUsageEvent::STATUS_SUCCESS,
+                $now->copy()->subMinutes($index),
+                'req-usage-window-'.$index,
+            );
+        }
+
+        $this->actingAs($admin);
+
+        Livewire::test(AdminUsage::class)
+            ->assertSee('Menampilkan 1-5', false)
+            ->assertSee('gotoPage(14, \'page\')', false)
+            ->call('gotoPage', 3)
+            ->assertSee('Menampilkan 11-15', false)
+            ->assertSee('admin-usage-pagination-3-14-66-11-15', false)
+            ->assertSee('admin-pagination-page-3-14-11-15', false)
+            ->assertSee('gotoPage(4, \'page\')', false)
+            ->assertSee('gotoPage(14, \'page\')', false)
+            ->assertSee('nextPage(\'page\')', false);
+
+        Carbon::setTestNow();
+    }
+
     public function test_admin_usage_end_date_filter_includes_the_full_selected_day(): void
     {
         $now = Carbon::parse('2026-05-20 12:00:00');
