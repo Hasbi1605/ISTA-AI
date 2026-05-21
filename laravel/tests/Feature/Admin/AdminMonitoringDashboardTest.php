@@ -2,8 +2,8 @@
 
 namespace Tests\Feature\Admin;
 
-use App\Livewire\Admin\AdminErrors;
 use App\Livewire\Admin\AdminDocuments;
+use App\Livewire\Admin\AdminErrors;
 use App\Livewire\Admin\AdminUsage;
 use App\Livewire\Admin\AdminUsers;
 use App\Models\AIUsageEvent;
@@ -283,9 +283,13 @@ class AdminMonitoringDashboardTest extends TestCase
 
         Livewire::test(AdminUsage::class)
             ->assertSee('started disembunyikan', false)
+            ->assertSee('100% sukses', false)
+            ->assertSee('Tidak ada pending', false)
             ->assertDontSee('STARTED', false)
             ->assertSee('COMPLETED', false)
             ->set('showLifecycleEvents', true)
+            ->assertSee('50% sukses', false)
+            ->assertSee('50% pending', false)
             ->assertSee('STARTED', false);
 
         Carbon::setTestNow();
@@ -300,7 +304,7 @@ class AdminMonitoringDashboardTest extends TestCase
         for ($index = 1; $index <= 6; $index++) {
             $rowUser = User::factory()->create([
                 'role' => User::ROLE_USER,
-                'email' => 'usage-row-' . $index . '@example.test',
+                'email' => 'usage-row-'.$index.'@example.test',
             ]);
 
             $this->makeEvent(
@@ -309,7 +313,7 @@ class AdminMonitoringDashboardTest extends TestCase
                 AIUsageEvent::ACTION_COMPLETED,
                 AIUsageEvent::STATUS_SUCCESS,
                 $now->copy()->subMinutes($index),
-                'req-page-' . $index,
+                'req-page-'.$index,
             );
         }
 
@@ -424,7 +428,7 @@ class AdminMonitoringDashboardTest extends TestCase
         for ($index = 1; $index <= 6; $index++) {
             $rowUser = User::factory()->create([
                 'role' => User::ROLE_USER,
-                'email' => 'error-row-' . $index . '@example.test',
+                'email' => 'error-row-'.$index.'@example.test',
             ]);
 
             $this->makeEvent(
@@ -433,9 +437,9 @@ class AdminMonitoringDashboardTest extends TestCase
                 AIUsageEvent::ACTION_FAILED,
                 AIUsageEvent::STATUS_ERROR,
                 $now->copy()->subMinutes($index),
-                'req-error-' . $index,
+                'req-error-'.$index,
                 null,
-                'error_code_' . $index,
+                'error_code_'.$index,
             );
         }
 
@@ -667,9 +671,9 @@ class AdminMonitoringDashboardTest extends TestCase
         for ($index = 1; $index <= 11; $index++) {
             $document = Document::create([
                 'user_id' => $owner->id,
-                'filename' => 'document-row-' . $index . '.pdf',
-                'original_name' => 'document-row-' . $index . '.pdf',
-                'file_path' => 'docs/document-row-' . $index . '.pdf',
+                'filename' => 'document-row-'.$index.'.pdf',
+                'original_name' => 'document-row-'.$index.'.pdf',
+                'file_path' => 'docs/document-row-'.$index.'.pdf',
                 'status' => 'ready',
                 'mime_type' => 'application/pdf',
                 'file_size_bytes' => 1024,

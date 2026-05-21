@@ -83,7 +83,7 @@ class AdminUsage extends Component
         }
 
         $events = $metrics->usageEventsListing($listingFilters, self::EVENTS_PER_PAGE, $this->getPage());
-        $totals = $metrics->usageEventSummary($filters);
+        $totals = $metrics->usageEventSummary($listingFilters);
 
         // Normalize dates safely. Malformed query strings are dropped here so
         // the dashboard never throws a 500 on unparseable input. Default

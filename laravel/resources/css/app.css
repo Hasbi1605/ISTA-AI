@@ -328,20 +328,20 @@
     .admin-status-chip--neutral > span { @apply bg-stone-400 dark:bg-gray-500; }
 
     .admin-pagination {
-        @apply flex w-full flex-wrap items-center justify-between gap-3 text-[0.72rem] text-stone-500 dark:text-gray-400;
+        @apply flex w-full flex-wrap items-center gap-3 text-[0.72rem] text-stone-500 dark:text-gray-400;
     }
 
     .admin-pagination__summary {
-        @apply font-medium;
+        @apply min-w-0 flex-1 font-medium;
         font-variant-numeric: tabular-nums;
     }
 
     .admin-pagination__nav {
-        @apply flex flex-wrap items-center justify-end gap-1.5;
+        @apply ml-auto flex min-w-0 max-w-full flex-wrap items-center justify-end gap-1.5;
     }
 
     .admin-pagination__button {
-        @apply inline-flex h-7 min-w-7 items-center justify-center rounded-md border border-stone-200 bg-white px-2 text-[0.68rem] font-semibold text-stone-600 transition hover:border-ista-primary/40 hover:bg-ista-primary/5 hover:text-ista-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/25 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300 dark:hover:border-amber-300/40 dark:hover:bg-amber-300/10 dark:hover:text-amber-300;
+        @apply inline-flex h-7 min-w-7 shrink-0 items-center justify-center rounded-md border border-stone-200 bg-white px-2 text-[0.68rem] font-semibold text-stone-600 transition hover:border-ista-primary/40 hover:bg-ista-primary/5 hover:text-ista-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/25 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300 dark:hover:border-amber-300/40 dark:hover:bg-amber-300/10 dark:hover:text-amber-300;
         font-variant-numeric: tabular-nums;
     }
 
@@ -354,7 +354,7 @@
     }
 
     .admin-pagination__ellipsis {
-        @apply inline-flex h-7 min-w-7 items-center justify-center text-stone-400 dark:text-gray-500;
+        @apply inline-flex h-7 min-w-7 shrink-0 items-center justify-center text-stone-400 dark:text-gray-500;
     }
 
     .admin-empty-state {
@@ -778,21 +778,21 @@
     }
 
     .admin-usage-content-grid {
-        @apply mt-3 grid gap-3 xl:grid-cols-[minmax(0,1.85fr)_minmax(18rem,0.7fr)];
+        @apply mt-3 grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1.85fr)_minmax(18rem,0.7fr)];
     }
 
     .admin-usage-table-panel,
     .admin-usage-distribution-panel {
-        @apply overflow-hidden rounded-lg;
+        @apply min-w-0 overflow-hidden rounded-lg;
     }
 
     .admin-usage-table-panel__body,
     .admin-usage-distribution-panel__body {
-        @apply px-3.5 pb-3.5 pt-3;
+        @apply min-w-0 px-3.5 pb-3.5 pt-3;
     }
 
     .admin-usage-table {
-        @apply rounded-lg;
+        @apply min-w-0 rounded-lg;
     }
 
     .admin-usage-table .admin-table__th {
@@ -850,7 +850,7 @@
     }
 
     .admin-usage-pagination {
-        @apply mt-3 border-t border-stone-100 pt-3 dark:border-gray-800;
+        @apply mt-3 min-w-0 overflow-visible border-t border-stone-100 pt-3 dark:border-gray-800;
     }
 
     .admin-usage-distribution-list {
