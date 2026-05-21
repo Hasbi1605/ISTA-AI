@@ -2,13 +2,11 @@
 
 namespace App\Services\Memo;
 
-use App\Models\AIPromptProfile;
 use App\Models\AIUsageEvent;
 use App\Models\Memo;
 use App\Models\MemoVersion;
 use App\Models\User;
 use App\Services\Admin\AIUsageEventService;
-use App\Services\AI\AIConfigurationResolver;
 use App\Services\OnlyOffice\DocxValidator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -43,7 +41,6 @@ class MemoGenerationService
         $usageEvents = app(AIUsageEventService::class);
         $startedAt = microtime(true);
         $requestId = $usageEvents->newRequestId();
-        $configMetadata = $this->aiConfigUsageMetadata();
         $modelMetadata = [];
         $configuration = $this->normalizeConfiguration($configuration);
         $sourceDocumentCount = count(array_unique(array_map('intval', $sourceDocumentIds)));
@@ -60,7 +57,6 @@ class MemoGenerationService
                     'document_count' => $sourceDocumentCount,
                     'has_documents' => $sourceDocumentCount > 0,
                     'reason' => 'draft_request_failed',
-                    ...$configMetadata,
                 ],
                 requestId: $requestId,
                 latencyMs: $usageEvents->latencyMsSince($startedAt),
@@ -104,7 +100,6 @@ class MemoGenerationService
                     'has_documents' => $sourceDocumentCount > 0,
                     'page_size' => $configuration['page_size'] ?? null,
                     'reason' => 'persist_failed',
-                    ...$configMetadata,
                     ...$modelMetadata,
                 ],
                 requestId: $requestId,
@@ -125,7 +120,6 @@ class MemoGenerationService
                 'document_count' => $sourceDocumentCount,
                 'has_documents' => $sourceDocumentCount > 0,
                 'page_size' => $configuration['page_size'] ?? null,
-                ...$configMetadata,
                 ...$modelMetadata,
             ],
             requestId: $requestId,
@@ -141,7 +135,6 @@ class MemoGenerationService
         $usageEvents = app(AIUsageEventService::class);
         $startedAt = microtime(true);
         $requestId = $usageEvents->newRequestId();
-        $configMetadata = $this->aiConfigUsageMetadata();
         $modelMetadata = [];
 
         if ($revisionInstruction !== null && trim($revisionInstruction) !== '') {
@@ -162,7 +155,6 @@ class MemoGenerationService
                     'memo_id' => (int) $memo->id,
                     'memo_type' => (string) $memo->memo_type,
                     'reason' => 'draft_request_failed',
-                    ...$configMetadata,
                 ],
                 requestId: $requestId,
                 latencyMs: $usageEvents->latencyMsSince($startedAt),
@@ -205,7 +197,6 @@ class MemoGenerationService
                     'memo_id' => (int) $memo->id,
                     'memo_type' => (string) $memo->memo_type,
                     'reason' => 'persist_failed',
-                    ...$configMetadata,
                     ...$modelMetadata,
                 ],
                 requestId: $requestId,
@@ -225,7 +216,6 @@ class MemoGenerationService
                 'memo_type' => (string) $memo->memo_type,
                 'memo_version' => (int) $version->version_number,
                 'page_size' => $configuration['page_size'] ?? null,
-                ...$configMetadata,
                 ...$modelMetadata,
             ],
             requestId: $requestId,
@@ -241,7 +231,6 @@ class MemoGenerationService
         $usageEvents = app(AIUsageEventService::class);
         $startedAt = microtime(true);
         $requestId = $usageEvents->newRequestId();
-        $configMetadata = $this->aiConfigUsageMetadata();
         $modelMetadata = [];
 
         if ($revisionInstruction !== null && trim($revisionInstruction) !== '') {
@@ -266,7 +255,6 @@ class MemoGenerationService
                     'memo_type' => (string) $memo->memo_type,
                     'reason' => 'draft_request_failed',
                     'origin' => 'body_override',
-                    ...$configMetadata,
                 ],
                 requestId: $requestId,
                 latencyMs: $usageEvents->latencyMsSince($startedAt),
@@ -310,7 +298,6 @@ class MemoGenerationService
                     'memo_type' => (string) $memo->memo_type,
                     'reason' => 'persist_failed',
                     'origin' => 'body_override',
-                    ...$configMetadata,
                     ...$modelMetadata,
                 ],
                 requestId: $requestId,
@@ -331,7 +318,6 @@ class MemoGenerationService
                 'memo_version' => (int) $version->version_number,
                 'page_size' => $storedConfiguration['page_size'] ?? null,
                 'origin' => 'body_override',
-                ...$configMetadata,
                 ...$modelMetadata,
             ],
             requestId: $requestId,
@@ -380,10 +366,6 @@ class MemoGenerationService
             'context' => $context,
             'configuration' => $configuration,
         ];
-        $runtimeConfig = $this->aiConfigRuntimePayload();
-        if ($runtimeConfig !== []) {
-            $payload['runtime_config'] = $runtimeConfig;
-        }
 
         $response = Http::withToken($this->token ?: '')
             ->accept('application/vnd.openxmlformats-officedocument.wordprocessingml.document')
@@ -414,30 +396,6 @@ class MemoGenerationService
         $clean = trim((string) $clean);
 
         return $clean !== '' ? Str::limit($clean, 191, '') : null;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function aiConfigRuntimePayload(): array
-    {
-        try {
-            return app(AIConfigurationResolver::class)->runtimePayload(AIPromptProfile::FEATURE_MEMO_GENERATION);
-        } catch (Throwable) {
-            return [];
-        }
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function aiConfigUsageMetadata(): array
-    {
-        try {
-            return app(AIConfigurationResolver::class)->usageMetadataForFeature(AIPromptProfile::FEATURE_MEMO_GENERATION);
-        } catch (Throwable) {
-            return [];
-        }
     }
 
     /**

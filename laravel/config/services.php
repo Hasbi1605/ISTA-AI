@@ -54,60 +54,6 @@ return [
         'read_timeout' => env('AI_DOCUMENT_SERVICE_READ_TIMEOUT', env('AI_SERVICE_READ_TIMEOUT', 120)),
     ],
 
-    'ai_config' => [
-        'db_enabled' => env('AI_CONFIG_DB_ENABLED', false),
-        'model_catalog' => [
-            [
-                'label' => 'GPT-4.1',
-                'provider' => 'litellm',
-                'model_name' => 'openai/gpt-4.1',
-                'api_key_env' => 'GITHUB_TOKEN',
-                'base_url' => 'https://models.github.ai/inference',
-            ],
-            [
-                'label' => 'GPT-4.1 Mini',
-                'provider' => 'litellm',
-                'model_name' => 'openai/gpt-4.1-mini',
-                'api_key_env' => 'GITHUB_TOKEN',
-                'base_url' => 'https://models.github.ai/inference',
-            ],
-            [
-                'label' => 'GPT-4o',
-                'provider' => 'litellm',
-                'model_name' => 'openai/gpt-4o',
-                'api_key_env' => 'GITHUB_TOKEN',
-                'base_url' => 'https://models.github.ai/inference',
-            ],
-            [
-                'label' => 'Llama 3.3 70B (Groq)',
-                'provider' => 'litellm',
-                'model_name' => 'groq/llama-3.3-70b-versatile',
-                'api_key_env' => 'GROQ_API_KEY',
-            ],
-            [
-                'label' => 'Mistral Medium 3',
-                'provider' => 'litellm',
-                'model_name' => 'mistral-ai/mistral-medium-2505',
-                'api_key_env' => 'GITHUB_TOKEN',
-                'base_url' => 'https://models.github.ai/inference',
-            ],
-            [
-                'label' => 'GPT-OSS 120B (Bedrock)',
-                'provider' => 'bedrock_converse',
-                'model_name' => 'openai.gpt-oss-120b-1:0',
-                'api_key_env' => 'AWS_BEARER_TOKEN_BEDROCK',
-                'region' => 'us-east-1',
-            ],
-            [
-                'label' => 'GLM 4.7 Flash (Bedrock)',
-                'provider' => 'bedrock_converse',
-                'model_name' => 'zai.glm-4.7-flash',
-                'api_key_env' => 'AWS_BEARER_TOKEN_BEDROCK',
-                'region' => 'us-east-1',
-            ],
-        ],
-    ],
-
     'onlyoffice' => [
         'public_url' => env('ONLYOFFICE_PUBLIC_URL', 'http://127.0.0.1:8080'),
         'internal_url' => env('ONLYOFFICE_INTERNAL_URL', 'http://onlyoffice'),

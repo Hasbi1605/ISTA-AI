@@ -12,7 +12,7 @@ use Tests\TestCase;
 
 class AIServiceTest extends TestCase
 {
-    public function test_ai_service_normalizes_quoted_runtime_config_values(): void
+    public function test_ai_service_normalizes_quoted_service_config_values(): void
     {
         config()->set('services.ai_service.url', ' "http://python-ai:8001/" ');
         config()->set('services.ai_document_service.url', " 'http://python-ai-docs:8002/' ");

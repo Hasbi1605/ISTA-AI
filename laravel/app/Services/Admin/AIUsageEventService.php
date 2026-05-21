@@ -61,9 +61,6 @@ class AIUsageEventService
         'knowledge_chunk_count',
         'knowledge_source_count',
         'knowledge_source_ids',
-        'prompt_profile_id',
-        'model_config_id',
-        'ai_config_runtime',
         'has_documents',
         'has_attachment',
         'attachment_extension',
@@ -108,9 +105,7 @@ class AIUsageEventService
         'searchable_text',
     ];
 
-    private const FORBIDDEN_KEY_EXCEPTIONS = [
-        'prompt_profile_id',
-    ];
+    private const FORBIDDEN_KEY_EXCEPTIONS = [];
 
     /**
      * Record that an AI feature has started running for a user.

@@ -53,7 +53,7 @@ class AdminAccessTest extends TestCase
         $response->assertSee('Ringkasan Operasional', false);
     }
 
-    public function test_admin_is_forbidden_from_super_admin_only_routes(): void
+    public function test_removed_ai_configuration_route_returns_not_found_for_admin(): void
     {
         $admin = User::factory()->create([
             'role' => User::ROLE_ADMIN,
@@ -61,10 +61,10 @@ class AdminAccessTest extends TestCase
 
         $response = $this->actingAs($admin)->get('/admin/ai-config');
 
-        $response->assertStatus(403);
+        $response->assertStatus(404);
     }
 
-    public function test_super_admin_can_access_ai_configuration(): void
+    public function test_removed_ai_configuration_route_returns_not_found_for_super_admin(): void
     {
         $superAdmin = User::factory()->create([
             'role' => User::ROLE_SUPER_ADMIN,
@@ -72,12 +72,7 @@ class AdminAccessTest extends TestCase
 
         $response = $this->actingAs($superAdmin)->get('/admin/ai-config');
 
-        $response->assertStatus(200);
-        $response->assertSee('AI Configuration', false);
-        $response->assertSee('Akses terbatas', false);
-        $response->assertSee('Model Config', false);
-        $response->assertSee('Prompt Profiles', false);
-        $response->assertDontSee('Placeholder', false);
+        $response->assertStatus(404);
     }
 
     public function test_unverified_user_is_redirected_for_admin_routes(): void

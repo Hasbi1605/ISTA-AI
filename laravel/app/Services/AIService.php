@@ -2,8 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\AIPromptProfile;
-use App\Services\AI\AIConfigurationResolver;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
 use Illuminate\Support\Facades\Log;
@@ -94,11 +92,6 @@ class AIService
             $payload['user_id'] = $user_id;
         }
 
-        $runtimeConfig = $this->runtimeConfigForChat($document_filenames, $force_web_search);
-        if ($runtimeConfig !== []) {
-            $payload['runtime_config'] = $runtimeConfig;
-        }
-
         for ($attempt = 1; $attempt <= $this->maxRetries; $attempt++) {
             try {
                 $headers = [
@@ -164,42 +157,6 @@ class AIService
     }
 
     /**
-     * @return array<string, mixed>
-     */
-    private function runtimeConfigForChat(?array $documentFilenames, bool $forceWebSearch): array
-    {
-        try {
-            $resolver = app(AIConfigurationResolver::class);
-            $feature = $resolver->featureFromChatRequest($documentFilenames, $forceWebSearch);
-
-            return $this->runtimeConfigForFeature($feature);
-        } catch (\Throwable $e) {
-            Log::warning('AIService: failed to resolve DB AI configuration, using env/yaml fallback', [
-                'message' => $this->sanitizeLogMessage($e->getMessage()),
-            ]);
-
-            return [];
-        }
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function runtimeConfigForFeature(string $feature): array
-    {
-        try {
-            return app(AIConfigurationResolver::class)->runtimePayload($feature);
-        } catch (\Throwable $e) {
-            Log::warning('AIService: failed to resolve feature DB AI configuration, using env/yaml fallback', [
-                'feature' => $feature,
-                'message' => $this->sanitizeLogMessage($e->getMessage()),
-            ]);
-
-            return [];
-        }
-    }
-
-    /**
      * Summarize a document.
      *
      * @param  string|null  $user_id  User ID for authorization
@@ -214,11 +171,6 @@ class AIService
 
             if ($documentId !== '') {
                 $payload['document_id'] = $documentId;
-            }
-
-            $runtimeConfig = $this->runtimeConfigForFeature(AIPromptProfile::FEATURE_DOCUMENT_RAG);
-            if ($runtimeConfig !== []) {
-                $payload['runtime_config'] = $runtimeConfig;
             }
 
             $response = $this->client->post($this->documentBaseUrl.'/api/documents/summarize', [

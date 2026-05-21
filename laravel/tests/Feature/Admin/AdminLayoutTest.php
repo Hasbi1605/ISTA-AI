@@ -44,7 +44,7 @@ class AdminLayoutTest extends TestCase
         $response->assertSee('admin-filter', false);
     }
 
-    public function test_super_admin_sees_ai_config_link_in_admin_sidebar(): void
+    public function test_super_admin_sees_account_management_without_ai_config_link(): void
     {
         $superAdmin = User::factory()->create([
             'role' => User::ROLE_SUPER_ADMIN,
@@ -53,8 +53,8 @@ class AdminLayoutTest extends TestCase
         $response = $this->actingAs($superAdmin)->get('/admin');
 
         $response->assertStatus(200);
-        $response->assertSee('AI Configuration', false);
-        $response->assertSee('Hanya super admin', false);
+        $response->assertSee('Account Management', false);
+        $response->assertDontSee('AI Configuration', false);
     }
 
     public function test_admin_does_not_see_ai_config_link_in_admin_sidebar(): void
@@ -122,19 +122,4 @@ class AdminLayoutTest extends TestCase
         $response->assertDontSee('Logout', false);
     }
 
-    public function test_ai_configuration_renders_consistent_admin_surface(): void
-    {
-        $superAdmin = User::factory()->create([
-            'role' => User::ROLE_SUPER_ADMIN,
-        ]);
-
-        $response = $this->actingAs($superAdmin)->get('/admin/ai-config');
-
-        $response->assertStatus(200);
-        $response->assertSee('admin-ai-config-page', false);
-        $response->assertSee('admin-ai-config-kpi-card', false);
-        $response->assertSee('admin-ai-config-kpi-card__icon', false);
-        $response->assertSee('Prompt Profile', false);
-        $response->assertSee('Audit Log', false);
-    }
 }
