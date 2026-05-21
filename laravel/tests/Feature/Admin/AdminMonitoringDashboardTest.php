@@ -691,7 +691,7 @@ class AdminMonitoringDashboardTest extends TestCase
             ->assertSee('Maksimum 10 baris')
             ->assertSee('Menampilkan', false)
             ->assertSee('dari 11', false)
-            ->assertSee('admin-pagination__button--active', false)
+            ->assertSee('admin-pagination__link--active', false)
             ->assertDontSee('Showing', false)
             ->assertSee('document-row-1.pdf', false)
             ->assertDontSee('document-row-11.pdf', false)

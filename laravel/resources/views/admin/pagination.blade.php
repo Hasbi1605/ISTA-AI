@@ -2,6 +2,7 @@
     @php
         $totalPages = $paginator->lastPage();
         $currentPage = $paginator->currentPage();
+        $pageName = $paginator->getPageName();
         $paginationItems = [];
 
         if ($totalPages <= 7) {
@@ -61,50 +62,66 @@
         </p>
 
         <div class="admin-pagination__nav">
+            <ul class="pagination admin-pagination__list">
             @if ($paginator->onFirstPage())
-                <span class="admin-pagination__button admin-pagination__button--disabled" aria-disabled="true" aria-label="Halaman sebelumnya">‹</span>
+                <li class="page-item admin-pagination__item disabled" aria-disabled="true" aria-label="Halaman sebelumnya" wire:key="admin-pagination-{{ $pageName }}-previous-disabled">
+                    <span class="page-link admin-pagination__link admin-pagination__link--disabled" aria-hidden="true">‹</span>
+                </li>
             @else
-                <button type="button"
-                        class="admin-pagination__button"
-                        wire:click="previousPage('{{ $paginator->getPageName() }}')"
-                        wire:loading.attr="disabled"
-                        rel="prev"
-                        aria-label="Halaman sebelumnya">
-                    ‹
-                </button>
+                <li class="page-item admin-pagination__item" wire:key="admin-pagination-{{ $pageName }}-previous">
+                    <button type="button"
+                            class="page-link admin-pagination__link"
+                            wire:click="previousPage('{{ $pageName }}')"
+                            wire:loading.attr="disabled"
+                            rel="prev"
+                            aria-label="Halaman sebelumnya">
+                        ‹
+                    </button>
+                </li>
             @endif
 
-            @foreach ($paginationItems as $item)
+            @foreach ($paginationItems as $index => $item)
                 @if ($item === 'ellipsis')
-                    <span class="admin-pagination__ellipsis" aria-hidden="true">&hellip;</span>
+                    <li class="page-item admin-pagination__item disabled" aria-disabled="true" wire:key="admin-pagination-{{ $pageName }}-ellipsis-{{ $index }}">
+                        <span class="page-link admin-pagination__link admin-pagination__link--ellipsis" aria-hidden="true">&hellip;</span>
+                    </li>
                     @continue
                 @endif
 
                 @if ($item == $currentPage)
-                    <span class="admin-pagination__button admin-pagination__button--active" aria-current="page">{{ $item }}</span>
+                    <li class="page-item admin-pagination__item active" aria-current="page" wire:key="admin-pagination-{{ $pageName }}-page-{{ $item }}">
+                        <span class="page-link admin-pagination__link admin-pagination__link--active">{{ $item }}</span>
+                    </li>
                 @else
-                    <button type="button"
-                            class="admin-pagination__button"
-                            wire:click="gotoPage({{ $item }}, '{{ $paginator->getPageName() }}')"
-                            wire:loading.attr="disabled"
-                            aria-label="Ke halaman {{ $item }}">
-                        {{ $item }}
-                    </button>
+                    <li class="page-item admin-pagination__item" wire:key="admin-pagination-{{ $pageName }}-page-{{ $item }}">
+                        <button type="button"
+                                class="page-link admin-pagination__link"
+                                wire:click="gotoPage({{ $item }}, '{{ $pageName }}')"
+                                wire:loading.attr="disabled"
+                                aria-label="Ke halaman {{ $item }}">
+                            {{ $item }}
+                        </button>
+                    </li>
                 @endif
             @endforeach
 
             @if ($paginator->hasMorePages())
-                <button type="button"
-                        class="admin-pagination__button"
-                        wire:click="nextPage('{{ $paginator->getPageName() }}')"
-                        wire:loading.attr="disabled"
-                        rel="next"
-                        aria-label="Halaman berikutnya">
-                    ›
-                </button>
+                <li class="page-item admin-pagination__item" wire:key="admin-pagination-{{ $pageName }}-next">
+                    <button type="button"
+                            class="page-link admin-pagination__link"
+                            wire:click="nextPage('{{ $pageName }}')"
+                            wire:loading.attr="disabled"
+                            rel="next"
+                            aria-label="Halaman berikutnya">
+                        ›
+                    </button>
+                </li>
             @else
-                <span class="admin-pagination__button admin-pagination__button--disabled" aria-disabled="true" aria-label="Halaman berikutnya">›</span>
+                <li class="page-item admin-pagination__item disabled" aria-disabled="true" aria-label="Halaman berikutnya" wire:key="admin-pagination-{{ $pageName }}-next-disabled">
+                    <span class="page-link admin-pagination__link admin-pagination__link--disabled" aria-hidden="true">›</span>
+                </li>
             @endif
+            </ul>
         </div>
     </nav>
 @else

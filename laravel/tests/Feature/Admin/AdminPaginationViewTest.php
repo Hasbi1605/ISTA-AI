@@ -11,24 +11,26 @@ class AdminPaginationViewTest extends TestCase
     {
         $html = $this->renderPagination(total: 30, perPage: 5, currentPage: 1);
 
-        $this->assertStringContainsString('aria-current="page">1</span>', $html);
+        $this->assertStringContainsString('class="pagination admin-pagination__list"', $html);
+        $this->assertStringContainsString('class="page-item admin-pagination__item active"', $html);
+        $this->assertStringContainsString('class="page-link admin-pagination__link admin-pagination__link--active">1</span>', $html);
         $this->assertStringContainsString("gotoPage(2, 'page')", $html);
         $this->assertStringContainsString("gotoPage(3, 'page')", $html);
         $this->assertStringContainsString("gotoPage(4, 'page')", $html);
         $this->assertStringContainsString("gotoPage(5, 'page')", $html);
         $this->assertStringContainsString("gotoPage(6, 'page')", $html);
-        $this->assertStringNotContainsString('admin-pagination__ellipsis', $html);
+        $this->assertStringNotContainsString('admin-pagination__link--ellipsis', $html);
     }
 
     public function test_admin_pagination_uses_ellipsis_for_large_lists_near_the_start(): void
     {
         $html = $this->renderPagination(total: 150, perPage: 5, currentPage: 1);
 
-        $this->assertStringContainsString('aria-current="page">1</span>', $html);
+        $this->assertStringContainsString('class="page-link admin-pagination__link admin-pagination__link--active">1</span>', $html);
         $this->assertStringContainsString("gotoPage(2, 'page')", $html);
         $this->assertStringContainsString("gotoPage(3, 'page')", $html);
         $this->assertStringContainsString("gotoPage(30, 'page')", $html);
-        $this->assertSame(1, substr_count($html, 'admin-pagination__ellipsis'));
+        $this->assertSame(1, substr_count($html, 'admin-pagination__link--ellipsis'));
         $this->assertStringNotContainsString("gotoPage(4, 'page')", $html);
     }
 
@@ -38,10 +40,10 @@ class AdminPaginationViewTest extends TestCase
 
         $this->assertStringContainsString("gotoPage(1, 'page')", $html);
         $this->assertStringContainsString("gotoPage(7, 'page')", $html);
-        $this->assertStringContainsString('aria-current="page">8</span>', $html);
+        $this->assertStringContainsString('class="page-link admin-pagination__link admin-pagination__link--active">8</span>', $html);
         $this->assertStringContainsString("gotoPage(9, 'page')", $html);
         $this->assertStringContainsString("gotoPage(30, 'page')", $html);
-        $this->assertSame(2, substr_count($html, 'admin-pagination__ellipsis'));
+        $this->assertSame(2, substr_count($html, 'admin-pagination__link--ellipsis'));
         $this->assertStringNotContainsString("gotoPage(2, 'page')", $html);
         $this->assertStringNotContainsString("gotoPage(6, 'page')", $html);
         $this->assertStringNotContainsString("gotoPage(10, 'page')", $html);
@@ -55,10 +57,11 @@ class AdminPaginationViewTest extends TestCase
         $this->assertStringContainsString("gotoPage(1, 'page')", $html);
         $this->assertStringContainsString("gotoPage(2, 'page')", $html);
         $this->assertStringContainsString("gotoPage(3, 'page')", $html);
-        $this->assertStringContainsString('aria-current="page">4</span>', $html);
+        $this->assertStringContainsString('class="page-link admin-pagination__link admin-pagination__link--active">4</span>', $html);
         $this->assertStringContainsString("gotoPage(5, 'page')", $html);
         $this->assertStringContainsString("gotoPage(10, 'page')", $html);
-        $this->assertSame(1, substr_count($html, 'admin-pagination__ellipsis'));
+        $this->assertSame(1, substr_count($html, 'admin-pagination__link--ellipsis'));
+        $this->assertStringContainsString('wire:key="admin-pagination-page-page-4"', $html);
     }
 
     public function test_admin_pagination_summary_is_correct_on_last_partial_page(): void
@@ -70,8 +73,9 @@ class AdminPaginationViewTest extends TestCase
         $this->assertStringContainsString("gotoPage(1, 'page')", $html);
         $this->assertStringContainsString("gotoPage(8, 'page')", $html);
         $this->assertStringContainsString("gotoPage(9, 'page')", $html);
-        $this->assertStringContainsString('aria-current="page">10</span>', $html);
-        $this->assertStringContainsString('aria-label="Halaman berikutnya">›</span>', $html);
+        $this->assertStringContainsString('class="page-link admin-pagination__link admin-pagination__link--active">10</span>', $html);
+        $this->assertStringContainsString('aria-label="Halaman berikutnya"', $html);
+        $this->assertStringContainsString('admin-pagination__link--disabled', $html);
     }
 
     private function renderPagination(int $total, int $perPage, int $currentPage): string
