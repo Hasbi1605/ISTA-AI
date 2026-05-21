@@ -151,6 +151,62 @@ Aturan:
     "fallback": {
         "document_not_found": "Saya belum menemukan informasi tersebut pada dokumen yang sedang aktif. Jika Anda berkenan, saya bisa melanjutkan dengan web search atau pengetahuan umum.",
         "document_error": "Saya belum bisa membaca konteks dari dokumen yang dipilih saat ini. Jika Anda berkenan, saya bisa melanjutkan dengan web search atau pengetahuan umum.",
+    },
+    "memo_generation": {
+        "body": """Tulis isi memorandum resmi dalam Bahasa Indonesia dengan gaya naskah dinas.
+Jenis: {memo_type_label}
+Nomor: {number}
+Yth.: {recipient}
+Dari: {sender}
+Hal: {subject}
+Tanggal: {date}
+
+Konteks/dasar:
+{basis}
+
+Isi atau poin wajib:
+{content_source}
+
+{revision_section}Arahan tambahan:
+{additional_instruction}
+
+Aturan keluaran:
+- Tulis hanya isi utama memo, tanpa kop, nomor, Yth., Dari, Hal, Tanggal, tanda tangan, tembusan, atau footer.
+- Gunakan paragraf formal yang singkat, jelas, dan mengikuti contoh memorandum manual.
+- Gunakan rumusan naskah dinas yang hemat, misalnya 'Sehubungan hal tersebut, dapat kami sampaikan sebagai berikut.' bila sesuai konteks.
+- Hindari frasa generik atau terlalu operasional seperti 'beberapa hal yang perlu diperhatikan' bila data dapat langsung disampaikan.
+- Jika ada beberapa butir keputusan/permohonan, gunakan daftar bernomor 1., 2., 3.
+- Jika input sudah memakai penomoran 1., 2., 3., pertahankan nomor dan urutan tersebut; jangan ubah menjadi Pertama/Kedua/Ketiga.
+- Awali dengan dasar atau tindak lanjut bila konteks menyediakannya.
+- Jangan mengarang nama orang, NIP, jabatan, nomor kontak, unit kerja, atau PIC bila tidak tertulis eksplisit di konfigurasi.
+- Instruksi revisi dan arahan tambahan adalah kontrol kerja, bukan bagian naskah; jangan salin frasa seperti 'jangan diubah', 'metadata jangan berubah', atau 'perbaiki typo'.
+- Perlakukan kata seperti baseline, uji, skenario evaluasi, dan auto format sebagai instruksi internal; jangan salin ke naskah memo.
+- Jangan menulis blok Tembusan karena tembusan diambil dari konfigurasi.
+- Jangan mencantumkan sumber, URL, JSON, kutipan tool, atau blok [SOURCES: ...] dalam naskah memo.
+- Untuk data PIC/pegawai, tulis setiap label dari konfigurasi sebagai baris terpisah; jangan menggabungkan nama, NIP, jabatan, unit kerja, keperluan, jadwal, atau nomor kontak ke dalam paragraf naratif.
+- Untuk detail kegiatan seperti hari/tanggal, pukul, dan tempat, tulis setiap label sebagai baris terpisah seperti naskah dinas resmi.
+- Jika field Penutup berisi teks, jangan ubah atau hilangkan kalimat penutup tersebut.
+{revision_rules}- Jangan gunakan markdown, tabel, salam pembuka, atau salam penutup.
+{closing_rule}"""
+    },
+    "knowledge_internal": {
+        "answer": """Anda adalah ISTA AI, asisten internal Istana Kepresidenan Yogyakarta.
+Gunakan pengetahuan internal berikut hanya jika relevan dengan pertanyaan user.
+Jika informasi belum cukup tersedia di pengetahuan internal, sampaikan dengan jujur bahwa data belum tersedia dan arahkan user menghubungi unit terkait.
+Jangan mengarang prosedur, jadwal, kebijakan, atau informasi internal yang tidak ada pada konteks.
+
+KONTEKS PENGETAHUAN INTERNAL:
+{context_str}
+
+PERTANYAAN USER:
+{question}
+"""
+    },
+    "hyde": {
+        "query": (
+            "Buat jawaban hipotetis singkat 2-3 kalimat untuk pertanyaan berikut. "
+            "Padat, faktual, gunakan kosakata yang relevan dengan topik."
+        ),
     }
 }
 
@@ -360,4 +416,31 @@ def get_document_error_prompt() -> str:
         ['prompts', 'fallback', 'document_error'],
         ['fallback', 'document_error'],
         "Document error prompt empty, using default fallback",
+    )
+
+
+def get_memo_generation_prompt() -> str:
+    """Get official memo generation prompt template."""
+    return _get_prompt_with_fallback(
+        ['prompts', 'memo_generation', 'body'],
+        ['memo_generation', 'body'],
+        "Memo generation prompt empty, using default fallback",
+    )
+
+
+def get_knowledge_internal_prompt() -> str:
+    """Get internal knowledge answer prompt template."""
+    return _get_prompt_with_fallback(
+        ['prompts', 'knowledge_internal', 'answer'],
+        ['knowledge_internal', 'answer'],
+        "Knowledge internal prompt empty, using default fallback",
+    )
+
+
+def get_hyde_query_prompt() -> str:
+    """Get HyDE query expansion prompt."""
+    return _get_prompt_with_fallback(
+        ['prompts', 'hyde', 'query'],
+        ['hyde', 'query'],
+        "HyDE query prompt empty, using default fallback",
     )

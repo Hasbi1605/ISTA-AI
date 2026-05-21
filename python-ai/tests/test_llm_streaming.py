@@ -143,6 +143,43 @@ def test_llm_manager_uses_runtime_model_list_and_prompt(monkeypatch):
     assert captured["messages"][0]["role"] == "system"
     assert "Prompt runtime aktif." in captured["messages"][0]["content"]
 
+def test_llm_manager_keeps_full_runtime_model_route(monkeypatch):
+    import app.llm_manager as manager
+
+    captured = {}
+    runtime_models = [
+        {
+            "label": f"Runtime {idx}",
+            "provider": "litellm",
+            "model_name": f"openai/model-{idx}",
+            "api_key_env": "GITHUB_TOKEN",
+        }
+        for idx in range(5)
+    ]
+
+    monkeypatch.setattr(
+        manager,
+        "get_context_for_query",
+        lambda *args, **kwargs: {"search_context": "", "search_results": []},
+    )
+
+    def fake_stream(messages, model_list, sources=None, logger=None):
+        captured["model_list"] = model_list
+        yield "ok"
+
+    monkeypatch.setattr(manager, "_shared_stream_with_cascade", fake_stream)
+
+    output = list(
+        manager.get_llm_stream(
+            [{"role": "user", "content": "Halo"}],
+            allow_auto_realtime_web=False,
+            runtime_config={"chat_models": runtime_models},
+        )
+    )
+
+    assert output == ["ok"]
+    assert [model["label"] for model in captured["model_list"]] == [f"Runtime {idx}" for idx in range(5)]
+
 
 def test_llm_manager_prepends_runtime_prompt_for_rag_sources(monkeypatch):
     import app.llm_manager as manager

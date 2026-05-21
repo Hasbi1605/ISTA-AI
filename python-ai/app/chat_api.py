@@ -9,6 +9,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from app.api_shared import HealthResponse, build_health_payload, build_ready_payload, verify_token
+from app.runtime_config import runtime_int, runtime_prompt
 from app.services.latency_logger import LatencyTracker
 
 # Load .env from the project root (python-ai/.env)
@@ -69,7 +70,11 @@ def _get_latest_user_query(messages: List[Dict[str, str]]) -> str:
     return ""
 
 
-def _document_permission_message() -> str:
+def _document_permission_message(runtime_config: Optional[Dict[str, Any]] = None) -> str:
+    prompt = runtime_prompt(runtime_config, "rag", "no_answer") or runtime_prompt(runtime_config, "fallback", "document_not_found")
+    if prompt:
+        return prompt
+
     try:
         prompt = _get_rag_no_answer_prompt()
         if prompt:
@@ -83,7 +88,11 @@ def _document_permission_message() -> str:
     )
 
 
-def _document_context_error_message() -> str:
+def _document_context_error_message(runtime_config: Optional[Dict[str, Any]] = None) -> str:
+    prompt = runtime_prompt(runtime_config, "fallback", "document_error")
+    if prompt:
+        return prompt
+
     try:
         prompt = _get_document_error_prompt()
         if prompt:
@@ -150,6 +159,28 @@ def _get_knowledge_helpers():
         build_knowledge_prompt,
     )
 
+def _runtime_rag_top_k(request: ChatRequest) -> int:
+    return runtime_int(
+        request.runtime_config,
+        "retrieval",
+        "rag_top_k",
+        default=runtime_int(request.runtime_config, "retrieval_top_k", default=_get_rag_top_k(), minimum=1, maximum=8),
+        minimum=1,
+        maximum=8,
+    )
+
+def _build_rag_prompt_with_runtime(build_rag_prompt, query: str, chunks, web_context: str, request: ChatRequest):
+    try:
+        return build_rag_prompt(query, chunks, web_context=web_context, runtime_config=request.runtime_config)
+    except TypeError:
+        return build_rag_prompt(query, chunks, web_context=web_context)
+
+def _build_knowledge_prompt_with_runtime(build_knowledge_prompt, query: str, chunks, request: ChatRequest):
+    try:
+        return build_knowledge_prompt(query, chunks, runtime_config=request.runtime_config)
+    except TypeError:
+        return build_knowledge_prompt(query, chunks)
+
 
 @app.get("/api/health", response_model=HealthResponse)
 async def health_check():
@@ -208,7 +239,7 @@ async def chat_stream(request: ChatRequest, http_request: Request):
                 search_relevant_chunks,
                 query,
                 request.document_filenames,
-                _get_rag_top_k(),
+                _runtime_rag_top_k(request),
                 request.user_id,
                 request.document_ids,
                 tracker.request_id,
@@ -226,6 +257,7 @@ async def chat_stream(request: ChatRequest, http_request: Request):
                     True,
                     explicit_web_request,
                     tracker.request_id,
+                    request.runtime_config,
                 )
                 tracker.end("web_search", extra={"reason": reason_code})
                 web_context = context_data.get("search_context", "") if isinstance(context_data, dict) else ""
@@ -235,7 +267,7 @@ async def chat_stream(request: ChatRequest, http_request: Request):
                 search_relevant_chunks,
                 query,
                 request.document_filenames,
-                _get_rag_top_k(),
+                _runtime_rag_top_k(request),
                 request.user_id,
                 request.document_ids,
                 tracker.request_id,
@@ -244,7 +276,7 @@ async def chat_stream(request: ChatRequest, http_request: Request):
             web_context = ""
 
         if success and chunks:
-            rag_prompt, sources = build_rag_prompt(query, chunks, web_context=web_context)
+            rag_prompt, sources = _build_rag_prompt_with_runtime(build_rag_prompt, query, chunks, web_context, request)
 
             messages_with_rag = [{"role": "system", "content": rag_prompt}] + request.messages
             tracker.end_total("request_routed", extra={"mode": "rag_with_sources"})
@@ -284,7 +316,7 @@ async def chat_stream(request: ChatRequest, http_request: Request):
             tracker.end_total("request_routed", extra={"mode": "doc_not_found"})
 
             def document_not_found_stream():
-                yield _document_permission_message()
+                yield _document_permission_message(request.runtime_config)
 
             return StreamingResponse(document_not_found_stream(), media_type="text/event-stream")
 
@@ -310,7 +342,7 @@ async def chat_stream(request: ChatRequest, http_request: Request):
         tracker.end_total("request_routed", extra={"mode": "doc_error"})
 
         def document_error_stream():
-            yield ERROR_SENTINEL + _document_context_error_message()
+            yield ERROR_SENTINEL + _document_context_error_message(request.runtime_config)
 
         return StreamingResponse(document_error_stream(), media_type="text/event-stream")
 
@@ -332,7 +364,7 @@ async def chat_stream(request: ChatRequest, http_request: Request):
             tracker.end("knowledge_retrieval", extra={"chunks": len(chunks), "success": success})
 
             if success and chunks:
-                knowledge_prompt, sources = build_knowledge_prompt(query, chunks)
+                knowledge_prompt, sources = _build_knowledge_prompt_with_runtime(build_knowledge_prompt, query, chunks, request)
                 messages_with_knowledge = [{"role": "system", "content": knowledge_prompt}] + request.messages
                 tracker.end_total("request_routed", extra={"mode": "knowledge_internal"})
 

@@ -13,6 +13,7 @@ from app.config_loader import (
     get_summarize_single_prompt,
 )
 from app.document_runner import run_document_process
+from app.runtime_config import render_prompt_template, runtime_prompt
 from app.services.document_content import extract_document_content_html
 from app.services.document_export import export_content
 from app.services.table_extraction import extract_tables_from_file
@@ -182,16 +183,16 @@ class ExportRequest(BaseModel):
     file_name: str | None = None
 
 
-def _render_prompt(template: str, **kwargs) -> str:
-    rendered = template.format(**kwargs)
+def _render_prompt(template: str, fallback_template: str = "", **kwargs) -> str:
+    rendered = render_prompt_template(template, fallback_template, **kwargs)
     if not rendered.strip():
         raise RuntimeError("Prompt summarization kosong setelah dirender")
     return rendered
 
 
-def _render_prompt_or_http_exception(template: str, **kwargs) -> str:
+def _render_prompt_or_http_exception(template: str, fallback_template: str = "", **kwargs) -> str:
     try:
-        return _render_prompt(template, **kwargs)
+        return _render_prompt(template, fallback_template, **kwargs)
     except (RuntimeError, KeyError, IndexError) as exc:
         raise HTTPException(status_code=500, detail=f"Gagal merender prompt: {exc}") from exc
 
@@ -311,6 +312,7 @@ def summarize_document_endpoint(request: SummarizeRequest):
 
     if len(batches) == 1:
         summarize_prompt = _render_prompt_or_http_exception(
+            runtime_prompt(request.runtime_config, "summarization", "single"),
             get_summarize_single_prompt(),
             document=batches[0] or "",
         )
@@ -330,6 +332,7 @@ def summarize_document_endpoint(request: SummarizeRequest):
     partial_summaries = []
     for i, batch in enumerate(batches):
         partial_prompt = _render_prompt_or_http_exception(
+            runtime_prompt(request.runtime_config, "summarization", "partial"),
             get_summarize_partial_prompt(),
             batch=batch or "",
             part_number=i + 1,
@@ -344,6 +347,7 @@ def summarize_document_endpoint(request: SummarizeRequest):
     combined_summaries = "\n\n".join([f"Ringkasan Bagian {i + 1}:\n{s}" for i, s in enumerate(partial_summaries)])
 
     final_prompt = _render_prompt_or_http_exception(
+        runtime_prompt(request.runtime_config, "summarization", "final"),
         get_summarize_final_prompt(),
         combined_summaries=combined_summaries,
     )

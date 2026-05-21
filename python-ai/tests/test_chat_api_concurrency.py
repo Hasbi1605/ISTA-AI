@@ -189,6 +189,57 @@ def test_request_id_propagated_to_search_relevant_chunks(monkeypatch):
     assert captured.get("request_id") == "rid-propagation-test", (
         f"request_id tidak dipropagasi ke search_relevant_chunks, got: {captured.get('request_id')}"
     )
+def test_runtime_config_overrides_rag_top_k_and_prompt(monkeypatch):
+    captured = {}
+
+    req = chat_api.ChatRequest(
+        messages=[{"role": "user", "content": "apa isi dokumen"}],
+        document_filenames=["doc.pdf"],
+        user_id="u1",
+        runtime_config={
+            "retrieval": {"rag_top_k": 4},
+            "prompts": {"rag": {"document": "RUNTIME RAG {context_str} {web_section} {question}"}},
+        },
+    )
+
+    def fake_policy_helpers():
+        return (
+            lambda q: False,
+            lambda **kwargs: (False, "DOC_NO_WEB", "low"),
+            lambda *args, **kwargs: {"search_context": ""},
+        )
+
+    def fake_streamers():
+        def _stream(*args, **kwargs):
+            yield "ok"
+
+        def _with_sources(messages, sources, runtime_config=None):
+            captured["messages"] = messages
+            captured["runtime_config"] = runtime_config
+            yield "ok"
+
+        return _stream, _with_sources
+
+    def fake_doc_helpers():
+        def search_relevant_chunks(query, filenames, top_k, user_id, document_ids=None, request_id=None):
+            captured["top_k"] = top_k
+            return ([{"filename": "doc.pdf", "content": "DOC", "chunk_index": 0, "score": 0.9}], True)
+
+        from app.services.rag_prompt import build_rag_prompt
+
+        return search_relevant_chunks, build_rag_prompt
+
+    monkeypatch.setattr(chat_api, "StreamingResponse", _DummyStreamingResponse)
+    monkeypatch.setattr(chat_api, "_get_rag_policy_helpers", fake_policy_helpers)
+    monkeypatch.setattr(chat_api, "_get_chat_streamers", fake_streamers)
+    monkeypatch.setattr(chat_api, "_get_rag_document_helpers", fake_doc_helpers)
+
+    response = asyncio.run(chat_api.chat_stream(req, _make_fake_http_request("rid-runtime-rag")))
+    _collect_stream(response.body_iterator)
+
+    assert captured["top_k"] == 4
+    assert captured["messages"][0]["content"].startswith("RUNTIME RAG")
+    assert captured["runtime_config"] == req.runtime_config
 
 
 def test_request_id_propagated_to_get_context_for_query(monkeypatch):

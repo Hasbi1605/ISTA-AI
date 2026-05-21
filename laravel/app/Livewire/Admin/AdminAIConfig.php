@@ -6,7 +6,7 @@ use App\Models\AIConfigAudit;
 use App\Models\AIModelConfig;
 use App\Models\AIPromptProfile;
 use App\Services\AI\AIConfigurationManagementService;
-use App\Services\AI\AIConfigurationPlaygroundService;
+use App\Services\AI\AIConfigurationDefaults;
 use App\Services\AI\AIConfigurationResolver;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
@@ -37,6 +37,9 @@ class AdminAIConfig extends Component
 
     public string $fallbackModelSelection = '';
 
+    /** @var array<int, string> */
+    public array $modelRouteSelections = [];
+
     public ?float $modelTemperature = 0.2;
 
     public ?int $modelMaxTokens = 1024;
@@ -44,13 +47,6 @@ class AdminAIConfig extends Component
     public ?int $modelTimeoutSeconds = 60;
 
     public ?int $modelRetrievalTopK = 3;
-
-    public string $playgroundFeature = AIPromptProfile::FEATURE_CHAT;
-
-    public string $playgroundInput = 'Contoh pertanyaan untuk validasi konfigurasi.';
-
-    /** @var array<string, mixed>|null */
-    public ?array $playgroundResult = null;
 
     public ?string $flashMessage = null;
 
@@ -63,11 +59,13 @@ class AdminAIConfig extends Component
         }
 
         $this->syncFeatureFields($this->configFeature);
+        $this->syncModelRouteFromFeature($this->configFeature);
     }
 
     public function updatedConfigFeature(string $feature): void
     {
         $this->syncFeatureFields($feature);
+        $this->syncModelRouteFromFeature($feature);
     }
 
     public function savePromptDraft(AIConfigurationManagementService $service): void
@@ -94,6 +92,15 @@ class AdminAIConfig extends Component
         $this->flashMessage = "Draft prompt v{$profile->version} berhasil dibuat.";
     }
 
+    public function loadDefaultPrompt(AIConfigurationResolver $resolver): void
+    {
+        $definition = $resolver->defaultPromptDefinition($this->promptFeature);
+
+        $this->promptName = $definition['name'].' copy';
+        $this->promptBody = $definition['body'];
+        $this->flashMessage = 'Prompt baseline dimuat ke editor. Simpan sebagai draft sebelum aktivasi.';
+    }
+
     public function activatePrompt(int $profileId, AIConfigurationManagementService $service): void
     {
         $profile = AIPromptProfile::query()->findOrFail($profileId);
@@ -113,21 +120,23 @@ class AdminAIConfig extends Component
         $validated = $this->validate([
             'modelFeature' => ['required', 'in:'.implode(',', AIPromptProfile::FEATURES)],
             'modelName' => ['required', 'string', 'max:120'],
-            'modelSelection' => ['required', 'string', 'max:260'],
+            'modelRouteSelections' => ['required', 'array', 'min:1', 'max:24'],
+            'modelRouteSelections.*' => ['required', 'string', 'max:320'],
+            'modelSelection' => ['nullable', 'string', 'max:320'],
             'fallbackModelSelection' => ['nullable', 'string', 'max:260'],
             'modelTemperature' => ['nullable', 'numeric', 'min:0', 'max:2'],
             'modelMaxTokens' => ['nullable', 'integer', 'min:128', 'max:8192'],
             'modelTimeoutSeconds' => ['nullable', 'integer', 'min:5', 'max:180'],
             'modelRetrievalTopK' => ['nullable', 'integer', 'min:1', 'max:8'],
         ]);
-        [$provider, $modelName] = $this->parseModelSelection($validated['modelSelection']);
-        [$fallbackProvider, $fallbackModelName] = $this->parseModelSelection($validated['fallbackModelSelection'] ?? '');
-
-        if ($fallbackModelName !== null && $fallbackProvider !== $provider) {
-            $this->addError('fallbackModelSelection', 'Fallback model harus memakai provider yang sama dengan model utama.');
+        $route = $this->cleanModelRoute($validated['modelRouteSelections']);
+        if ($route === []) {
+            $this->addError('modelRoute', 'Pilih minimal satu model untuk route.');
 
             return;
         }
+
+        [$provider, $modelName] = $this->parseModelSelection($route[0]);
 
         try {
             $config = $service->createModelDraft(auth()->user(), [
@@ -135,7 +144,8 @@ class AdminAIConfig extends Component
                 'name' => $validated['modelName'],
                 'provider' => $provider,
                 'model_name' => $modelName,
-                'fallback_model_name' => $fallbackModelName,
+                'fallback_model_name' => null,
+                'model_route' => $route,
                 'temperature' => $validated['modelTemperature'] ?? null,
                 'max_tokens' => $validated['modelMaxTokens'] ?? null,
                 'timeout_seconds' => $validated['modelTimeoutSeconds'] ?? null,
@@ -150,7 +160,10 @@ class AdminAIConfig extends Component
         $this->modelName = '';
         $this->modelProvider = $provider;
         $this->modelModelName = $modelName;
-        $this->fallbackModelName = $fallbackModelName ?? '';
+        $this->modelSelection = $route[0] ?? $this->modelSelection;
+        $this->fallbackModelName = '';
+        $this->fallbackModelSelection = $route[1] ?? '';
+        $this->modelRouteSelections = $route;
         $this->flashMessage = "Draft model v{$config->version} berhasil dibuat.";
     }
 
@@ -168,19 +181,42 @@ class AdminAIConfig extends Component
         $this->flashMessage = "Model {$config->name} diarsipkan.";
     }
 
-    public function runPlayground(AIConfigurationPlaygroundService $service): void
+    public function moveModelRoute(int $index, int $direction): void
     {
-        $validated = $this->validate([
-            'playgroundFeature' => ['required', 'in:'.implode(',', AIPromptProfile::FEATURES)],
-            'playgroundInput' => ['required', 'string', 'max:2000'],
-        ]);
+        $target = $index + $direction;
+        if (! isset($this->modelRouteSelections[$index], $this->modelRouteSelections[$target])) {
+            return;
+        }
 
-        $this->playgroundResult = $service->preview(
-            auth()->user(),
-            $validated['playgroundFeature'],
-            $validated['playgroundInput'],
-        );
-        $this->flashMessage = 'Playground preview selesai.';
+        [$this->modelRouteSelections[$index], $this->modelRouteSelections[$target]] = [
+            $this->modelRouteSelections[$target],
+            $this->modelRouteSelections[$index],
+        ];
+        $this->modelRouteSelections = array_values($this->modelRouteSelections);
+    }
+
+    public function removeModelRoute(int $index): void
+    {
+        unset($this->modelRouteSelections[$index]);
+        $this->modelRouteSelections = array_values($this->modelRouteSelections);
+    }
+
+    public function addModelRoute(AIConfigurationResolver $resolver): void
+    {
+        foreach ($resolver->modelCatalog() as $model) {
+            $key = $model['catalog_key'] ?? null;
+            if (is_string($key) && ! in_array($key, $this->modelRouteSelections, true)) {
+                $this->modelRouteSelections[] = $key;
+
+                return;
+            }
+        }
+    }
+
+    public function resetModelRoute(AIConfigurationResolver $resolver): void
+    {
+        $this->modelRouteSelections = $resolver->defaultModelRoute($this->modelFeature);
+        $this->flashMessage = 'Route model dikembalikan ke baseline sistem saat ini.';
     }
 
     public function clearFlash(): void
@@ -199,6 +235,12 @@ class AdminAIConfig extends Component
             'runtimeEnabled' => $resolver->runtimeEnabled(),
             'featureOptions' => $this->featureOptions(),
             'modelCatalog' => $resolver->modelCatalog(),
+            'embeddingCatalog' => $resolver->embeddingCatalog(),
+            'credentialStatuses' => $resolver->credentialStatuses(),
+            'retrievalDefaults' => $resolver->retrievalDefaults(),
+            'promptLibrary' => $resolver->promptLibrary(),
+            'defaultPrompt' => $resolver->defaultPromptDefinition($feature),
+            'effectiveModelRoute' => $resolver->effectiveModelRoute($feature),
             'activePrompt' => $resolver->activePrompt($feature),
             'activeModel' => $resolver->activeModelConfig($feature),
             'promptProfiles' => AIPromptProfile::query()
@@ -228,33 +270,28 @@ class AdminAIConfig extends Component
      */
     private function featureOptions(): array
     {
-        return [
-            AIPromptProfile::FEATURE_CHAT => 'Chat',
-            AIPromptProfile::FEATURE_DOCUMENT_RAG => 'Document RAG',
-            AIPromptProfile::FEATURE_WEB_SEARCH => 'Web Search',
-            AIPromptProfile::FEATURE_MEMO_GENERATION => 'Memo Generation',
-            AIPromptProfile::FEATURE_KNOWLEDGE_INTERNAL => 'Knowledge Internal',
-        ];
+        return AIConfigurationDefaults::featureLabels();
     }
 
     /**
-     * @return array{0: string|null, 1: string|null}
+     * @return array{0: string|null, 1: string|null, 2: string|null}
      */
     private function parseModelSelection(?string $selection): array
     {
         $selection = trim((string) $selection);
         if ($selection === '') {
-            return [null, null];
+            return [null, null, null];
         }
 
-        $parts = explode('|', $selection, 2);
-        if (count($parts) !== 2) {
-            return [null, $selection];
+        $parts = explode('|', $selection, 3);
+        if (count($parts) < 2) {
+            return [null, $selection, null];
         }
 
         return [
             trim($parts[0]) !== '' ? trim($parts[0]) : null,
             trim($parts[1]) !== '' ? trim($parts[1]) : null,
+            isset($parts[2]) && trim($parts[2]) !== '' ? trim($parts[2]) : null,
         ];
     }
 
@@ -267,6 +304,42 @@ class AdminAIConfig extends Component
 
         $this->promptFeature = $feature;
         $this->modelFeature = $feature;
-        $this->playgroundFeature = $feature;
+    }
+
+    private function syncModelRouteFromFeature(string $feature): void
+    {
+        $resolver = app(AIConfigurationResolver::class);
+        $model = $resolver->activeModelConfig($feature);
+        $route = data_get($model?->metadata, 'model_route');
+
+        $this->modelRouteSelections = is_array($route) && $route !== []
+            ? array_values(array_filter($route, 'is_string'))
+            : $resolver->defaultModelRoute($feature);
+
+        $this->modelSelection = $this->modelRouteSelections[0] ?? $this->modelSelection;
+        $this->fallbackModelSelection = $this->modelRouteSelections[1] ?? '';
+    }
+
+    /**
+     * @param  array<int, mixed>  $route
+     * @return array<int, string>
+     */
+    private function cleanModelRoute(array $route): array
+    {
+        $clean = [];
+        foreach ($route as $entry) {
+            if (! is_string($entry)) {
+                continue;
+            }
+
+            $entry = trim($entry);
+            if ($entry === '' || in_array($entry, $clean, true)) {
+                continue;
+            }
+
+            $clean[] = $entry;
+        }
+
+        return $clean;
     }
 }

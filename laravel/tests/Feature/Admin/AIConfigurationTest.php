@@ -58,6 +58,53 @@ class AIConfigurationTest extends TestCase
         $this->assertStringNotContainsString('secret-value', json_encode($payload));
     }
 
+    public function test_default_catalog_exposes_existing_runtime_route_and_prompt_library(): void
+    {
+        $resolver = app(AIConfigurationResolver::class);
+
+        $catalog = $resolver->modelCatalog();
+        $catalogKeys = array_column($catalog, 'catalog_key');
+
+        $this->assertGreaterThanOrEqual(17, count($catalog));
+        $this->assertContains('litellm|openai/gpt-4.1|GITHUB_TOKEN', $catalogKeys);
+        $this->assertContains('litellm|openai/gpt-4.1|GITHUB_TOKEN_2', $catalogKeys);
+        $this->assertContains('bedrock_converse|amazon.nova-micro-v1:0|AWS_BEARER_TOKEN_BEDROCK', $catalogKeys);
+        $this->assertArrayHasKey('memo_generation.body', $resolver->promptLibrary());
+        $this->assertArrayHasKey('knowledge_internal.answer', $resolver->promptLibrary());
+    }
+
+    public function test_model_draft_can_store_ordered_multi_model_route(): void
+    {
+        $this->enableRuntimeCatalog();
+        $actor = User::factory()->create();
+        $service = app(AIConfigurationManagementService::class);
+        $route = [
+            'litellm|openai/gpt-4.1|GITHUB_TOKEN_2',
+            'litellm|openai/gpt-4.1|GITHUB_TOKEN',
+            'bedrock_converse|amazon.nova-micro-v1:0|AWS_BEARER_TOKEN_BEDROCK',
+        ];
+
+        $config = $service->createModelDraft($actor, [
+            'feature' => AIPromptProfile::FEATURE_CHAT,
+            'name' => 'Route test',
+            'model_route' => $route,
+            'temperature' => 0.2,
+            'max_tokens' => 1024,
+            'timeout_seconds' => 60,
+            'retrieval_top_k' => 4,
+        ]);
+        $service->activateModel($actor, $config);
+
+        $payload = app(AIConfigurationResolver::class)->runtimePayload(AIPromptProfile::FEATURE_CHAT);
+
+        $this->assertSame($route, $config->metadata['model_route']);
+        $this->assertSame('GITHUB_TOKEN_2', $payload['chat_models'][0]['api_key_env']);
+        $this->assertSame('GITHUB_TOKEN', $payload['chat_models'][1]['api_key_env']);
+        $this->assertSame('bedrock_converse', $payload['chat_models'][2]['provider']);
+        $this->assertSame(4, $payload['retrieval']['rag_top_k']);
+        $this->assertStringNotContainsString('secret-value', json_encode($payload));
+    }
+
     public function test_management_service_versions_activation_and_rollback_with_audit(): void
     {
         $this->enableRuntimeCatalog();

@@ -12,6 +12,9 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Inches, Pt, RGBColor
 
+from app.config_loader import get_memo_generation_prompt
+from app.runtime_config import render_prompt_template, runtime_prompt
+
 
 SUPPORTED_MEMO_TYPES = {
     "memo_internal": "Memo Internal",
@@ -161,6 +164,7 @@ def build_memo_prompt(
     title: str,
     context: str,
     configuration: Mapping[str, Any] | None = None,
+    runtime_config: Mapping[str, Any] | None = None,
 ) -> str:
     label = SUPPORTED_MEMO_TYPES[normalize_memo_type(memo_type)]
     config = _normalize_configuration(configuration, title, context)
@@ -183,40 +187,25 @@ def build_memo_prompt(
         else ""
     )
 
-    return (
-        "Tulis isi memorandum resmi dalam Bahasa Indonesia dengan gaya naskah dinas.\n"
-        f"Jenis: {label}\n"
-        f"Nomor: {config['number']}\n"
-        f"Yth.: {config['recipient']}\n"
-        f"Dari: {config['sender']}\n"
-        f"Hal: {config['subject']}\n"
-        f"Tanggal: {config['date']}\n\n"
-        "Konteks/dasar:\n"
-        f"{config['basis'] or '-'}\n\n"
-        "Isi atau poin wajib:\n"
-        f"{content_source}\n\n"
-        f"{revision_section}"
-        "Arahan tambahan:\n"
-        f"{config['additional_instruction'] or '-'}\n\n"
-        "Aturan keluaran:\n"
-        "- Tulis hanya isi utama memo, tanpa kop, nomor, Yth., Dari, Hal, Tanggal, tanda tangan, tembusan, atau footer.\n"
-        "- Gunakan paragraf formal yang singkat, jelas, dan mengikuti contoh memorandum manual.\n"
-        "- Gunakan rumusan naskah dinas yang hemat, misalnya 'Sehubungan hal tersebut, dapat kami sampaikan sebagai berikut.' bila sesuai konteks.\n"
-        "- Hindari frasa generik atau terlalu operasional seperti 'beberapa hal yang perlu diperhatikan' bila data dapat langsung disampaikan.\n"
-        "- Jika ada beberapa butir keputusan/permohonan, gunakan daftar bernomor 1., 2., 3.\n"
-        "- Jika input sudah memakai penomoran 1., 2., 3., pertahankan nomor dan urutan tersebut; jangan ubah menjadi Pertama/Kedua/Ketiga.\n"
-        "- Awali dengan dasar atau tindak lanjut bila konteks menyediakannya.\n"
-        "- Jangan mengarang nama orang, NIP, jabatan, nomor kontak, unit kerja, atau PIC bila tidak tertulis eksplisit di konfigurasi.\n"
-        "- Instruksi revisi dan arahan tambahan adalah kontrol kerja, bukan bagian naskah; jangan salin frasa seperti 'jangan diubah', 'metadata jangan berubah', atau 'perbaiki typo'.\n"
-        "- Perlakukan kata seperti baseline, uji, skenario evaluasi, dan auto format sebagai instruksi internal; jangan salin ke naskah memo.\n"
-        "- Jangan menulis blok Tembusan karena tembusan diambil dari konfigurasi.\n"
-        "- Jangan mencantumkan sumber, URL, JSON, kutipan tool, atau blok [SOURCES: ...] dalam naskah memo.\n"
-        "- Untuk data PIC/pegawai, tulis setiap label dari konfigurasi sebagai baris terpisah; jangan menggabungkan nama, NIP, jabatan, unit kerja, keperluan, jadwal, atau nomor kontak ke dalam paragraf naratif.\n"
-        "- Untuk detail kegiatan seperti hari/tanggal, pukul, dan tempat, tulis setiap label sebagai baris terpisah seperti naskah dinas resmi.\n"
-        "- Jika field Penutup berisi teks, jangan ubah atau hilangkan kalimat penutup tersebut.\n"
-        f"{revision_rules}"
-        "- Jangan gunakan markdown, tabel, salam pembuka, atau salam penutup.\n"
-        f"{closing_rule}"
+    template_values = {
+        "memo_type_label": label,
+        "number": config["number"],
+        "recipient": config["recipient"],
+        "sender": config["sender"],
+        "subject": config["subject"],
+        "date": config["date"],
+        "basis": config["basis"] or "-",
+        "content_source": content_source,
+        "revision_section": revision_section,
+        "additional_instruction": config["additional_instruction"] or "-",
+        "revision_rules": revision_rules,
+        "closing_rule": closing_rule,
+    }
+    runtime_template = runtime_prompt(runtime_config, "memo_generation", "body")
+    return render_prompt_template(
+        runtime_template,
+        get_memo_generation_prompt(),
+        **template_values,
     )
 
 
@@ -239,7 +228,7 @@ def generate_memo_docx(
     generator = text_generator or (
         lambda prompt: _default_text_generator(prompt, runtime_config=runtime_config)
     )
-    prompt = build_memo_prompt(normalized_type, clean_title, clean_context, config)
+    prompt = build_memo_prompt(normalized_type, clean_title, clean_context, config, runtime_config=runtime_config)
     raw_body = config["body_override"] or generator(prompt)
     model_label = _extract_model_label(raw_body)
     body = _sanitize_memo_body(_normalize_generated_text(raw_body), config)

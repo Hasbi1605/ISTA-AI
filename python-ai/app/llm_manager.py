@@ -2,6 +2,7 @@ import logging
 from typing import Any, Dict, Generator, List
 
 from app.env_utils import get_env
+from app.runtime_config import runtime_prompt
 from app.services.llm_streaming import (
     build_enhanced_messages,
     compose_enhanced_system_prompt,
@@ -89,7 +90,7 @@ def _runtime_models(runtime_config: Dict[str, Any] | None) -> List[Dict]:
         return []
 
     safe_models: List[Dict] = []
-    for model in models[:3]:
+    for model in models[:24]:
         if not isinstance(model, dict):
             continue
 
@@ -199,6 +200,7 @@ def get_llm_stream(
                 documents_active=documents_active,
                 explicit_web_request=explicit_web_request,
                 request_id=request_id,
+                runtime_config=runtime_config,
             )
             search_context = context_data.get("search_context", "")
             web_sources = extract_web_sources(context_data)
@@ -208,7 +210,10 @@ def get_llm_stream(
     if search_context:
         if CONFIG_AVAILABLE:
             try:
-                assertive_instruction = get_assertive_instruction()
+                assertive_instruction = (
+                    runtime_prompt(runtime_config, "web_search", "assertive_instruction")
+                    or get_assertive_instruction()
+                )
             except Exception:
                 assertive_instruction = ""
         else:

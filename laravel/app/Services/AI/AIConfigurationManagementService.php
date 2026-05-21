@@ -101,6 +101,7 @@ class AIConfigurationManagementService
         $provider = (string) ($data['provider'] ?? '');
         $modelName = (string) ($data['model_name'] ?? '');
         $fallbackModelName = trim((string) ($data['fallback_model_name'] ?? ''));
+        $modelRoute = $this->normalizeModelRoute($data['model_route'] ?? []);
         $temperature = $this->nullableFloat($data['temperature'] ?? null, 0, 2, 'modelTemperature');
         $maxTokens = $this->nullableInt($data['max_tokens'] ?? null, 128, 8192, 'modelMaxTokens');
         $timeoutSeconds = $this->nullableInt($data['timeout_seconds'] ?? null, 5, 180, 'modelTimeoutSeconds');
@@ -110,12 +111,30 @@ class AIConfigurationManagementService
             throw ValidationException::withMessages(['modelFeature' => 'Feature model tidak valid.']);
         }
 
+        if ($modelRoute !== []) {
+            $first = $this->resolver->modelCatalogEntryByKey($modelRoute[0]);
+            if ($first === null) {
+                throw ValidationException::withMessages(['modelRoute' => 'Route model tidak valid.']);
+            }
+
+            $provider = (string) ($first['provider'] ?? $provider);
+            $modelName = (string) ($first['model_name'] ?? $modelName);
+            $fallback = isset($modelRoute[1]) ? $this->resolver->modelCatalogEntryByKey($modelRoute[1]) : null;
+            $fallbackModelName = is_array($fallback) ? (string) ($fallback['model_name'] ?? '') : $fallbackModelName;
+        }
+
         if (! $this->resolver->isAllowedModel($provider, $modelName)) {
             throw ValidationException::withMessages(['modelName' => 'Model utama tidak ada di allowlist server.']);
         }
 
-        if ($fallbackModelName !== '' && ! $this->resolver->isAllowedModel($provider, $fallbackModelName)) {
+        if ($modelRoute === [] && $fallbackModelName !== '' && ! $this->resolver->isAllowedModel($provider, $fallbackModelName)) {
             throw ValidationException::withMessages(['fallbackModelName' => 'Fallback model tidak ada di allowlist server.']);
+        }
+
+        $metadata = ['source' => 'admin_ui'];
+        if ($modelRoute !== []) {
+            $metadata['model_route'] = $modelRoute;
+            $metadata['route_count'] = count($modelRoute);
         }
 
         $config = AIModelConfig::create([
@@ -132,7 +151,7 @@ class AIConfigurationManagementService
             'version' => $this->nextModelVersion($feature),
             'parent_id' => $this->latestModelId($feature),
             'created_by' => $actor->id,
-            'metadata' => ['source' => 'admin_ui'],
+            'metadata' => $metadata,
         ]);
 
         $this->audits->record($actor, $config, AIConfigAudit::ACTION_CREATED, after: $config->toArray());
@@ -202,6 +221,39 @@ class AIConfigurationManagementService
     private function latestModelId(string $feature): ?int
     {
         return AIModelConfig::query()->where('feature', $feature)->latest('version')->value('id');
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function normalizeModelRoute(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        $route = [];
+        foreach ($value as $entry) {
+            if (! is_string($entry)) {
+                continue;
+            }
+
+            $entry = trim($entry);
+            if ($entry === '' || in_array($entry, $route, true)) {
+                continue;
+            }
+
+            if ($this->resolver->modelCatalogEntryByKey($entry) === null) {
+                throw ValidationException::withMessages(['modelRoute' => 'Route berisi model yang tidak tersedia di katalog server.']);
+            }
+
+            $route[] = $entry;
+            if (count($route) >= 24) {
+                break;
+            }
+        }
+
+        return $route;
     }
 
     private function nullableFloat(mixed $value, float $min, float $max, string $field): ?float

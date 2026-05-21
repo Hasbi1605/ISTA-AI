@@ -1,6 +1,7 @@
 from typing import Dict, List, Tuple
 
 from app.config_loader import get_rag_prompt
+from app.runtime_config import render_prompt_template, runtime_prompt
 
 
 def build_rag_prompt(
@@ -8,6 +9,7 @@ def build_rag_prompt(
     chunks: List[Dict],
     include_sources: bool = True,
     web_context: str = "",
+    runtime_config: Dict | None = None,
 ) -> Tuple[str, List[Dict]]:
     if not chunks:
         return question, []
@@ -36,8 +38,9 @@ KONTEKS WEB TERBARU:
 {web_context}
 """
 
-    rag_prompt_template = get_rag_prompt()
-    rag_prompt = rag_prompt_template.format(
+    rag_prompt = render_prompt_template(
+        runtime_prompt(runtime_config, "rag", "document"),
+        get_rag_prompt(),
         context_str=context_str or "",
         web_section=web_section or "",
         question=question or "",

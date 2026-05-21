@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import List, Tuple, Dict, Optional
 
 from app.env_utils import get_env_bool, get_env_int
+from app.runtime_config import nested_value, runtime_int
 from app.services.rag_config import (
     EXPLICIT_WEB_PATTERNS,
     REALTIME_HIGH_PATTERNS,
@@ -278,6 +279,7 @@ def get_context_for_query(
     documents_active: bool = False,
     explicit_web_request: bool = False,
     request_id: Optional[str] = None,
+    runtime_config: Optional[Dict] = None,
 ) -> Dict:
     tracker = LatencyTracker(request_id=request_id)
     langsearch = get_langsearch_service()
@@ -344,9 +346,10 @@ def get_context_for_query(
         try:
             from app.config_loader import get_rerank_config as _get_rc
             _rc = _get_rc()
-            rerank_enabled = _rc.get('enabled', True)
-            web_candidates = int(_rc.get('web_candidates', 10))
-            web_top_n      = int(_rc.get('web_top_n', 5))
+            runtime_rerank = nested_value(runtime_config, "retrieval", "semantic_rerank", default={})
+            rerank_enabled = runtime_rerank.get('enabled', _rc.get('enabled', True)) if isinstance(runtime_rerank, dict) else _rc.get('enabled', True)
+            web_candidates = runtime_int(runtime_config, "retrieval", "semantic_rerank", "web_candidates", default=int(_rc.get('web_candidates', 10)), minimum=1, maximum=50)
+            web_top_n      = runtime_int(runtime_config, "retrieval", "semantic_rerank", "web_top_n", default=int(_rc.get('web_top_n', 5)), minimum=1, maximum=10)
         except Exception:
             rerank_enabled = get_env_bool("LANGSEARCH_RERANK_ENABLED", True)
             web_candidates = get_env_int("LANGSEARCH_RERANK_WEB_CANDIDATES", 10)
@@ -402,9 +405,9 @@ def get_context_for_query(
     has_search = len(search_results) > 0
 
     if has_search:
-        search_context = langsearch.build_search_context(search_results)
+        search_context = langsearch.build_search_context(search_results, runtime_config=runtime_config)
     elif should_search and hasattr(langsearch, "build_no_results_context"):
-        search_context = langsearch.build_no_results_context()
+        search_context = langsearch.build_no_results_context(runtime_config=runtime_config)
     else:
         search_context = ""
     score_signal = extract_match_score_signal(query, search_results)

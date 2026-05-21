@@ -9,6 +9,7 @@ from collections import OrderedDict
 
 from app.config_loader import get_web_search_context_prompt
 from app.env_utils import get_env, get_env_int
+from app.runtime_config import render_prompt_template, runtime_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -194,7 +195,7 @@ class LangSearchService:
         
         return formatted_results
     
-    def build_search_context(self, results: List[Dict]) -> str:
+    def build_search_context(self, results: List[Dict], runtime_config: Optional[Dict] = None) -> str:
         """
         Build formatted string dari search results untuk inject ke system prompt.
         
@@ -209,7 +210,8 @@ class LangSearchService:
         
         current_date = datetime.now().strftime("%A, %d %B %Y")
         
-        template = get_web_search_context_prompt()
+        template = runtime_prompt(runtime_config, "web_search", "context")
+        fallback_template = get_web_search_context_prompt()
         
         results_formatted = []
         for idx, result in enumerate(results, 1):
@@ -230,12 +232,14 @@ Ringkasan: {snippet}"""
         
         results_str = "\n\n".join(results_formatted)
         
-        return template.format(
+        return render_prompt_template(
+            template,
+            fallback_template,
             current_date=current_date,
             results=results_str
         )
 
-    def build_no_results_context(self) -> str:
+    def build_no_results_context(self, runtime_config: Optional[Dict] = None) -> str:
         """
         Build web context when search was requested but no result is available.
 
@@ -243,9 +247,12 @@ Ringkasan: {snippet}"""
         pengetahuan umum tanpa sumber.
         """
         current_date = datetime.now().strftime("%A, %d %B %Y")
-        template = get_web_search_context_prompt()
+        template = runtime_prompt(runtime_config, "web_search", "context")
+        fallback_template = get_web_search_context_prompt()
 
-        return template.format(
+        return render_prompt_template(
+            template,
+            fallback_template,
             current_date=current_date,
             results=(
                 "Tidak ada hasil pencarian web yang cukup untuk menjawab "

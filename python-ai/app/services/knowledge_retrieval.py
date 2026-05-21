@@ -7,7 +7,9 @@ from typing import Any, Dict, List, Tuple
 
 from langchain_chroma import Chroma
 
+from app.config_loader import get_knowledge_internal_prompt
 from app.env_utils import get_env_bool, get_env_float, get_env_int
+from app.runtime_config import render_prompt_template, runtime_prompt
 from app.services.rag_config import CHROMA_PATH, VECTOR_COLLECTION_NAME
 from app.services.rag_embeddings import get_embeddings_with_fallback
 from app.services.rag_hybrid import _exclude_parent_search_results
@@ -203,7 +205,11 @@ def search_internal_knowledge(
         return [], False
 
 
-def build_knowledge_prompt(question: str, chunks: List[Dict[str, Any]]) -> Tuple[str, List[Dict[str, Any]]]:
+def build_knowledge_prompt(
+    question: str,
+    chunks: List[Dict[str, Any]],
+    runtime_config: Dict[str, Any] | None = None,
+) -> Tuple[str, List[Dict[str, Any]]]:
     if not chunks:
         return question, []
 
@@ -228,16 +234,11 @@ def build_knowledge_prompt(question: str, chunks: List[Dict[str, Any]]) -> Tuple
         sources.append(source)
 
     context_str = "\n".join(context_parts).strip()
-    prompt = f"""Anda adalah ISTA AI, asisten internal Istana Kepresidenan Yogyakarta.
-Gunakan pengetahuan internal berikut hanya jika relevan dengan pertanyaan user.
-Jika informasi belum cukup tersedia di pengetahuan internal, sampaikan dengan jujur bahwa data belum tersedia dan arahkan user menghubungi unit terkait.
-Jangan mengarang prosedur, jadwal, kebijakan, atau informasi internal yang tidak ada pada konteks.
-
-KONTEKS PENGETAHUAN INTERNAL:
-{context_str}
-
-PERTANYAAN USER:
-{question}
-"""
+    prompt = render_prompt_template(
+        runtime_prompt(runtime_config, "knowledge_internal", "answer"),
+        get_knowledge_internal_prompt(),
+        context_str=context_str,
+        question=question,
+    )
 
     return prompt, sources

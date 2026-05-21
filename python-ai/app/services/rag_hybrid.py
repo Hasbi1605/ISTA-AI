@@ -59,8 +59,9 @@ def _generate_hyde_query(original_query: str, timeout: int = 5, max_tokens: int 
 
     try:
         import litellm
-        from app.config_loader import get_chat_models
+        from app.config_loader import get_chat_models, get_hyde_config, get_hyde_query_prompt
         models = get_chat_models()
+        hyde_prompt = get_hyde_query_prompt()
 
         def _hyde_priority(m: dict) -> int:
             name = m.get('model_name', '').lower()
@@ -75,7 +76,6 @@ def _generate_hyde_query(original_query: str, timeout: int = 5, max_tokens: int 
         # Tuning #192: max_attempts 2→1 agar HyDE gagal cepat dan fallback ke query asli.
         # Dengan timeout=3s dan 2 attempts, worst case = 6s. Dengan 1 attempt = 3s max.
         # Rollback: ubah retrieval.hyde.max_attempts di ai_config.yaml ke 2
-        from app.config_loader import get_hyde_config
         max_attempts = get_hyde_config().get('max_attempts', 1)
         attempts = 0
 
@@ -94,10 +94,7 @@ def _generate_hyde_query(original_query: str, timeout: int = 5, max_tokens: int 
                 'messages': [
                     {
                         'role': 'system',
-                        'content': (
-                            'Buat jawaban hipotetis singkat 2-3 kalimat untuk pertanyaan berikut. '
-                            'Padat, faktual, gunakan kosakata yang relevan dengan topik.'
-                        )
+                        'content': hyde_prompt,
                     },
                     {'role': 'user', 'content': query_for_hyde}
                 ],

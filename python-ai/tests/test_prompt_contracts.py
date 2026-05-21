@@ -152,6 +152,21 @@ def test_summarization_prompts_use_work_ready_sections():
     assert "Tindak lanjut/catatan:" in final
 
 
+def test_operational_prompts_are_loaded_from_yaml():
+    from app import config_loader
+
+    memo = config_loader.get_memo_generation_prompt()
+    knowledge = config_loader.get_knowledge_internal_prompt()
+    hyde = config_loader.get_hyde_query_prompt()
+
+    assert "Tulis isi memorandum resmi" in memo
+    assert "{memo_type_label}" in memo
+    assert "{closing_rule}" in memo
+    assert "KONTEKS PENGETAHUAN INTERNAL" in knowledge
+    assert "{context_str}" in knowledge
+    assert "jawaban hipotetis singkat" in hyde
+
+
 def test_document_fallback_prompts_are_configured_for_user_facing_copy():
     from app import config_loader
 
@@ -185,3 +200,48 @@ def test_build_rag_prompt_embeds_web_section_with_new_heading():
     assert "KONTEKS WEB TERBARU:" in prompt
     assert "memo-rapat.pdf" in prompt
     assert len(sources) == 1
+
+def test_runtime_prompt_template_falls_back_when_placeholder_is_invalid():
+    from app.runtime_config import render_prompt_template
+    from app.services.rag_retrieval import build_rag_prompt
+
+    rendered = render_prompt_template("Halo {missing}", "Halo {name}", name="ISTA")
+    prompt, _sources = build_rag_prompt(
+        question="Apa isi dokumen ini?",
+        chunks=[
+            {
+                "filename": "memo-rapat.pdf",
+                "content": "Dokumen ini membahas agenda rapat mingguan.",
+                "chunk_index": 0,
+                "score": 0.97,
+            }
+        ],
+        runtime_config={"prompts": {"rag": {"document": "Prompt rusak {placeholder_tidak_ada}"}}},
+    )
+
+    assert rendered == "Halo ISTA"
+    assert "KONTEKS DOKUMEN AKTIF" in prompt
+    assert "Prompt rusak" not in prompt
+
+
+def test_memo_prompt_uses_config_loader_template():
+    from app.services.memo_generation import build_memo_prompt
+
+    prompt = build_memo_prompt(
+        "memo_internal",
+        "Agenda Rapat",
+        "Bahas agenda rapat mingguan.",
+        {
+            "number": "B-1/TEST/05/2026",
+            "recipient": "Kepala Unit",
+            "sender": "Kepala Istana",
+            "subject": "Agenda Rapat",
+            "date": "21 Mei 2026",
+            "content": "Bahas agenda rapat mingguan.",
+        },
+    )
+
+    assert "Tulis isi memorandum resmi" in prompt
+    assert "Jenis: Memo Internal" in prompt
+    assert "Nomor: B-1/TEST/05/2026" in prompt
+    assert "{memo_type_label}" not in prompt

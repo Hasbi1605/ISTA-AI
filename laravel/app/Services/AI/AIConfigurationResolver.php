@@ -76,7 +76,7 @@ PROMPT;
         $prompt = $this->activePrompt($feature);
         if ($prompt !== null && trim($prompt->system_prompt) !== '') {
             $payload['prompt_profile_id'] = (int) $prompt->id;
-            $payload['system_prompt'] = $this->composeSystemPrompt($prompt->system_prompt);
+            $payload = array_replace_recursive($payload, $this->runtimePromptPayload($feature, $prompt->system_prompt));
         }
 
         $modelConfig = $this->activeModelConfig($feature);
@@ -87,6 +87,7 @@ PROMPT;
                 $payload['chat_models'] = $models;
                 if ($modelConfig->retrieval_top_k !== null) {
                     $payload['retrieval_top_k'] = max(1, min(8, (int) $modelConfig->retrieval_top_k));
+                    $payload['retrieval']['rag_top_k'] = $payload['retrieval_top_k'];
                 }
             }
         }
@@ -128,13 +129,17 @@ PROMPT;
     {
         $catalog = config('services.ai_config.model_catalog', []);
 
-        return is_array($catalog) ? array_values($catalog) : [];
+        return AIConfigurationDefaults::mergeModelCatalog(is_array($catalog) ? array_values($catalog) : []);
     }
 
-    public function modelCatalogEntry(string $provider, string $modelName): ?array
+    public function modelCatalogEntry(string $provider, string $modelName, ?string $apiKeyEnv = null): ?array
     {
         foreach ($this->modelCatalog() as $entry) {
-            if (($entry['provider'] ?? null) === $provider && ($entry['model_name'] ?? null) === $modelName) {
+            if (($entry['provider'] ?? null) !== $provider || ($entry['model_name'] ?? null) !== $modelName) {
+                continue;
+            }
+
+            if ($apiKeyEnv === null || ($entry['api_key_env'] ?? null) === $apiKeyEnv) {
                 return $entry;
             }
         }
@@ -142,9 +147,84 @@ PROMPT;
         return null;
     }
 
-    public function isAllowedModel(string $provider, string $modelName): bool
+    public function modelCatalogEntryByKey(string $catalogKey): ?array
     {
-        return $this->modelCatalogEntry($provider, $modelName) !== null;
+        foreach ($this->modelCatalog() as $entry) {
+            if (($entry['catalog_key'] ?? null) === $catalogKey) {
+                return $entry;
+            }
+        }
+
+        return null;
+    }
+
+    public function isAllowedModel(string $provider, string $modelName, ?string $apiKeyEnv = null): bool
+    {
+        return $this->modelCatalogEntry($provider, $modelName, $apiKeyEnv) !== null;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function defaultModelRoute(string $feature): array
+    {
+        if (! in_array($feature, AIPromptProfile::FEATURES, true)) {
+            return [];
+        }
+
+        return AIConfigurationDefaults::defaultModelRoute();
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function effectiveModelRoute(string $feature): array
+    {
+        $model = $this->activeModelConfig($feature);
+
+        return $model !== null && $this->runtimeModels($model) !== []
+            ? $this->runtimeModels($model)
+            : $this->runtimeModelsFromRouteKeys($this->defaultModelRoute($feature), 'Default route');
+    }
+
+    /**
+     * @return array{name: string, path: string, body: string}
+     */
+    public function defaultPromptDefinition(string $feature): array
+    {
+        return AIConfigurationDefaults::promptDefinitionForFeature($feature);
+    }
+
+    /**
+     * @return array<string, array{name: string, path: string, body: string}>
+     */
+    public function promptLibrary(): array
+    {
+        return AIConfigurationDefaults::promptLibrary();
+    }
+
+    /**
+     * @return array<int, array{alias: string, configured: bool, source: string}>
+     */
+    public function credentialStatuses(): array
+    {
+        return AIConfigurationDefaults::credentialStatuses();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function retrievalDefaults(): array
+    {
+        return AIConfigurationDefaults::retrievalDefaults();
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function embeddingCatalog(): array
+    {
+        return AIConfigurationDefaults::embeddingCatalog();
     }
 
     private function composeSystemPrompt(string $systemPrompt): string
@@ -153,10 +233,62 @@ PROMPT;
     }
 
     /**
+     * @return array<string, mixed>
+     */
+    private function runtimePromptPayload(string $feature, string $prompt): array
+    {
+        $prompt = $this->composeSystemPrompt($prompt);
+
+        return match ($feature) {
+            AIPromptProfile::FEATURE_DOCUMENT_RAG => [
+                'prompts' => [
+                    'rag' => [
+                        'document' => $prompt,
+                    ],
+                ],
+            ],
+            AIPromptProfile::FEATURE_WEB_SEARCH => [
+                'prompts' => [
+                    'web_search' => [
+                        'assertive_instruction' => $prompt,
+                    ],
+                ],
+            ],
+            AIPromptProfile::FEATURE_MEMO_GENERATION => [
+                'prompts' => [
+                    'memo_generation' => [
+                        'body' => $prompt,
+                    ],
+                ],
+            ],
+            AIPromptProfile::FEATURE_KNOWLEDGE_INTERNAL => [
+                'prompts' => [
+                    'knowledge_internal' => [
+                        'answer' => $prompt,
+                    ],
+                ],
+            ],
+            default => [
+                'system_prompt' => $prompt,
+                'prompts' => [
+                    'system' => [
+                        'default' => $prompt,
+                    ],
+                ],
+            ],
+        };
+    }
+
+    /**
      * @return array<int, array<string, mixed>>
      */
     private function runtimeModels(AIModelConfig $config): array
     {
+        $routeKeys = data_get($config->metadata, 'model_route');
+        if (is_array($routeKeys) && $routeKeys !== []) {
+            return $this->runtimeModelsFromRouteKeys($routeKeys, $config->name, $config);
+        }
+
         $models = [];
         $primary = $this->buildRuntimeModel($config, $config->model_name);
         if ($primary !== null) {
@@ -175,6 +307,32 @@ PROMPT;
     }
 
     /**
+     * @param  array<int, mixed>  $routeKeys
+     * @return array<int, array<string, mixed>>
+     */
+    private function runtimeModelsFromRouteKeys(array $routeKeys, string $routeName, ?AIModelConfig $config = null): array
+    {
+        $models = [];
+        foreach ($routeKeys as $routeKey) {
+            if (! is_string($routeKey)) {
+                continue;
+            }
+
+            $catalog = $this->modelCatalogEntryByKey($routeKey);
+            if ($catalog === null) {
+                continue;
+            }
+
+            $runtime = $this->buildRuntimeModelFromCatalog($catalog, $routeName, $config);
+            if ($runtime !== null) {
+                $models[] = $runtime;
+            }
+        }
+
+        return $models;
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     private function buildRuntimeModel(AIModelConfig $config, string $modelName): ?array
@@ -184,6 +342,15 @@ PROMPT;
             return null;
         }
 
+        return $this->buildRuntimeModelFromCatalog($catalog, $config->name, $config);
+    }
+
+    /**
+     * @param  array<string, mixed>  $catalog
+     * @return array<string, mixed>|null
+     */
+    private function buildRuntimeModelFromCatalog(array $catalog, string $routeName, ?AIModelConfig $config = null): ?array
+    {
         $runtime = Arr::only($catalog, [
             'label',
             'provider',
@@ -193,17 +360,29 @@ PROMPT;
             'region',
         ]);
 
-        $runtime['label'] = $config->name.' · '.($catalog['label'] ?? $modelName);
+        $runtime['label'] = $routeName.' · '.($catalog['label'] ?? ($catalog['model_name'] ?? 'model'));
 
-        if ($config->temperature !== null) {
+        if (array_key_exists('temperature', $catalog)) {
+            $runtime['temperature'] = (float) $catalog['temperature'];
+        }
+
+        if (array_key_exists('max_tokens', $catalog)) {
+            $runtime['max_tokens'] = (int) $catalog['max_tokens'];
+        }
+
+        if (array_key_exists('timeout', $catalog)) {
+            $runtime['timeout'] = (int) $catalog['timeout'];
+        }
+
+        if ($config?->temperature !== null) {
             $runtime['temperature'] = max(0, min(2, (float) $config->temperature));
         }
 
-        if ($config->max_tokens !== null) {
+        if ($config?->max_tokens !== null) {
             $runtime['max_tokens'] = max(128, min(8192, (int) $config->max_tokens));
         }
 
-        if ($config->timeout_seconds !== null) {
+        if ($config?->timeout_seconds !== null) {
             $runtime['timeout'] = max(5, min(180, (int) $config->timeout_seconds));
         }
 
