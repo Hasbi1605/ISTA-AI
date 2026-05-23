@@ -477,13 +477,9 @@
                 </x-admin.table>
 
                 <div class="admin-documents-table-footer">
-                    @if ($documents->hasPages())
-                        <div class="admin-documents-pagination">
-                            {{ $documents->links('admin.pagination') }}
-                        </div>
-                    @else
+                    <div class="admin-documents-pagination" wire:key="admin-documents-pagination-{{ $documents->currentPage() }}-{{ $documents->lastPage() }}-{{ $documents->total() }}-{{ $documents->firstItem() }}-{{ $documents->lastItem() }}">
                         {{ $documents->links('admin.pagination') }}
-                    @endif
+                    </div>
                 </div>
             @endif
         </div>

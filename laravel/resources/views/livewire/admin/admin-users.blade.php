@@ -251,7 +251,7 @@
                 </x-admin.table>
 
                 @if ($users->hasPages())
-                    <div class="admin-users-pagination">
+                    <div class="admin-users-pagination" wire:key="admin-users-pagination-{{ $users->currentPage() }}-{{ $users->lastPage() }}-{{ $users->total() }}-{{ $users->firstItem() }}-{{ $users->lastItem() }}">
                         {{ $users->links('admin.pagination') }}
                     </div>
                 @endif

@@ -268,7 +268,7 @@
                 </x-admin.table>
 
                 @if ($accounts->hasPages())
-                    <div class="admin-accounts-pagination">
+                    <div class="admin-accounts-pagination" wire:key="admin-accounts-pagination-{{ $accounts->currentPage() }}-{{ $accounts->lastPage() }}-{{ $accounts->total() }}-{{ $accounts->firstItem() }}-{{ $accounts->lastItem() }}">
                         {{ $accounts->links('admin.pagination') }}
                     </div>
                 @endif

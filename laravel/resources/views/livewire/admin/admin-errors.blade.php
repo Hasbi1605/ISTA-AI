@@ -214,7 +214,7 @@
                     </x-admin.table>
 
                     @if ($errors->hasPages())
-                        <div class="admin-errors-pagination">
+                        <div class="admin-errors-pagination" wire:key="admin-errors-pagination-{{ $errors->currentPage() }}-{{ $errors->lastPage() }}-{{ $errors->total() }}-{{ $errors->firstItem() }}-{{ $errors->lastItem() }}">
                             {{ $errors->links('admin.pagination') }}
                         </div>
                     @endif

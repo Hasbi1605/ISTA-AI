@@ -148,6 +148,30 @@ class AdminKnowledgeManagementTest extends TestCase
             ->assertDontSee('Status pipeline akan tersinkron otomatis.');
     }
 
+    public function test_admin_knowledge_pagination_keeps_full_controls_after_livewire_page_change(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+
+        for ($index = 1; $index <= 11; $index++) {
+            $this->makeKnowledgeDocument([
+                'title' => 'Knowledge Row '.$index,
+                'original_name' => 'knowledge-row-'.$index.'.pdf',
+                'filename' => 'knowledge-row-'.$index.'.pdf',
+                'file_path' => 'knowledge/'.$index.'/knowledge-row-'.$index.'.pdf',
+                'status' => KnowledgeDocument::STATUS_ACTIVE,
+            ]);
+        }
+
+        $this->actingAs($admin);
+
+        Livewire::test(AdminKnowledge::class)
+            ->assertSee('admin-knowledge-pagination-1-2-11-1-10', false)
+            ->call('gotoPage', 2)
+            ->assertSee('admin-knowledge-pagination-2-2-11-11-11', false)
+            ->assertSee('admin-pagination-page-2-2-11-11', false)
+            ->assertSee('previousPage(\'page\')', false);
+    }
+
     public function test_knowledge_pipeline_polling_pauses_while_upload_modal_is_open(): void
     {
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);

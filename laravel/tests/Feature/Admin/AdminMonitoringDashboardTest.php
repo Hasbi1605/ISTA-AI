@@ -187,6 +187,37 @@ class AdminMonitoringDashboardTest extends TestCase
             ->assertStatus(404);
     }
 
+    public function test_admin_users_pagination_keeps_full_controls_after_livewire_page_change(): void
+    {
+        $now = Carbon::parse('2026-05-18 12:00:00');
+        Carbon::setTestNow($now);
+
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+
+        for ($index = 1; $index <= 31; $index++) {
+            User::factory()->create([
+                'role' => User::ROLE_USER,
+                'name' => 'User Page '.$index,
+                'email' => 'user-page-'.$index.'@example.test',
+                'last_seen_at' => $now->copy()->subMinutes($index),
+            ]);
+        }
+
+        $this->actingAs($admin);
+
+        Livewire::test(AdminUsers::class)
+            ->assertSee('user-page-1@example.test', false)
+            ->assertDontSee('user-page-16@example.test', false)
+            ->call('gotoPage', 2)
+            ->assertSee('user-page-16@example.test', false)
+            ->assertSee('admin-users-pagination-2-3-31-16-30', false)
+            ->assertSee('admin-pagination-page-2-3-16-30', false)
+            ->assertSee('gotoPage(3, \'page\')', false)
+            ->assertDontSee('user-page-1@example.test', false);
+
+        Carbon::setTestNow();
+    }
+
     public function test_admin_usage_filter_by_feature(): void
     {
         $now = Carbon::parse('2026-05-18 12:00:00');
@@ -486,6 +517,8 @@ class AdminMonitoringDashboardTest extends TestCase
             ->assertDontSee('error-row-6@example.test', false)
             ->call('gotoPage', 2)
             ->assertSee('error-row-6@example.test', false)
+            ->assertSee('admin-errors-pagination-2-2-6-6-6', false)
+            ->assertSee('admin-pagination-page-2-2-6-6', false)
             ->assertDontSee('error-row-1@example.test', false);
 
         Carbon::setTestNow();
@@ -732,6 +765,8 @@ class AdminMonitoringDashboardTest extends TestCase
             ->assertDontSee('document-row-11.pdf', false)
             ->call('gotoPage', 2)
             ->assertSee('document-row-11.pdf', false)
+            ->assertSee('admin-documents-pagination-2-2-11-11-11', false)
+            ->assertSee('admin-pagination-page-2-2-11-11', false)
             ->assertDontSee('document-row-1.pdf', false);
 
         Carbon::setTestNow();

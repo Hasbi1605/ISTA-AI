@@ -401,7 +401,9 @@
                         </x-admin.table>
 
                         <div class="admin-documents-table-footer">
-                            {{ $documents->links('admin.pagination') }}
+                            <div class="admin-documents-pagination admin-knowledge-pagination" wire:key="admin-knowledge-pagination-{{ $documents->currentPage() }}-{{ $documents->lastPage() }}-{{ $documents->total() }}-{{ $documents->firstItem() }}-{{ $documents->lastItem() }}">
+                                {{ $documents->links('admin.pagination') }}
+                            </div>
                         </div>
                     @endif
                 </div>

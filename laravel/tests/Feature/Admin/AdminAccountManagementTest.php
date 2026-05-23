@@ -2,12 +2,15 @@
 
 namespace Tests\Feature\Admin;
 
+use App\Livewire\Admin\AdminAccounts;
 use App\Models\AdminAccountAudit;
 use App\Models\User;
 use App\Services\Admin\AdminAccountManagementService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use Livewire\Livewire;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
 
 class AdminAccountManagementTest extends TestCase
@@ -44,6 +47,33 @@ class AdminAccountManagementTest extends TestCase
         $response = $this->actingAs($admin)->get('/admin/accounts');
 
         $response->assertStatus(403);
+    }
+
+    public function test_account_management_pagination_keeps_full_controls_after_livewire_page_change(): void
+    {
+        $superAdmin = User::factory()->create([
+            'role' => User::ROLE_SUPER_ADMIN,
+            'is_active' => true,
+        ]);
+
+        for ($index = 1; $index <= 30; $index++) {
+            User::factory()->create([
+                'role' => User::ROLE_ADMIN,
+                'is_active' => true,
+                'name' => 'Admin Page '.$index,
+                'email' => 'admin-page-'.$index.'@example.test',
+            ]);
+        }
+
+        Livewire::actingAs($superAdmin)
+            ->test(AdminAccounts::class)
+            ->assertSee('admin-page-30@example.test', false)
+            ->assertDontSee('admin-page-15@example.test', false)
+            ->call('gotoPage', 2)
+            ->assertSee('admin-page-15@example.test', false)
+            ->assertSee('admin-accounts-pagination-2-3-31-16-30', false)
+            ->assertSee('admin-pagination-page-2-3-16-30', false)
+            ->assertDontSee('admin-page-30@example.test', false);
     }
 
     public function test_regular_user_cannot_access_account_management_page(): void
@@ -231,7 +261,7 @@ class AdminAccountManagementTest extends TestCase
         ]);
         $target = User::factory()->create(['role' => User::ROLE_ADMIN]);
 
-        $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+        $this->expectException(HttpException::class);
         $service->update($admin, $target, ['name' => 'X']);
     }
 
@@ -292,7 +322,7 @@ class AdminAccountManagementTest extends TestCase
         ]);
         $regular = User::factory()->create(['role' => User::ROLE_USER]);
 
-        $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+        $this->expectException(HttpException::class);
 
         $service->update($superAdmin, $regular, [
             'name' => 'Hacked',
@@ -313,7 +343,7 @@ class AdminAccountManagementTest extends TestCase
             'is_active' => false,
         ]);
 
-        $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+        $this->expectException(HttpException::class);
 
         $service->activate($superAdmin, $regular);
     }
@@ -330,7 +360,7 @@ class AdminAccountManagementTest extends TestCase
             'is_active' => true,
         ]);
 
-        $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+        $this->expectException(HttpException::class);
 
         $service->deactivate($superAdmin, $regular);
     }
@@ -344,7 +374,7 @@ class AdminAccountManagementTest extends TestCase
         ]);
         $regular = User::factory()->create(['role' => User::ROLE_USER]);
 
-        $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+        $this->expectException(HttpException::class);
 
         $service->resetPassword($superAdmin, $regular, 'temp-pass-1234');
     }
@@ -357,8 +387,8 @@ class AdminAccountManagementTest extends TestCase
         ]);
         $regular = User::factory()->create(['role' => User::ROLE_USER]);
 
-        \Livewire\Livewire::actingAs($superAdmin)
-            ->test(\App\Livewire\Admin\AdminAccounts::class)
+        Livewire::actingAs($superAdmin)
+            ->test(AdminAccounts::class)
             ->call('startEdit', $regular->id)
             ->assertStatus(404);
     }
@@ -374,8 +404,8 @@ class AdminAccountManagementTest extends TestCase
             'is_active' => false,
         ]);
 
-        \Livewire\Livewire::actingAs($superAdmin)
-            ->test(\App\Livewire\Admin\AdminAccounts::class)
+        Livewire::actingAs($superAdmin)
+            ->test(AdminAccounts::class)
             ->call('activate', $regular->id)
             ->assertStatus(404);
 
@@ -394,8 +424,8 @@ class AdminAccountManagementTest extends TestCase
             'is_active' => true,
         ]);
 
-        \Livewire\Livewire::actingAs($superAdmin)
-            ->test(\App\Livewire\Admin\AdminAccounts::class)
+        Livewire::actingAs($superAdmin)
+            ->test(AdminAccounts::class)
             ->call('startDeactivate', $regular->id)
             ->assertStatus(404);
     }
@@ -409,8 +439,8 @@ class AdminAccountManagementTest extends TestCase
         $regular = User::factory()->create(['role' => User::ROLE_USER]);
         $originalPasswordHash = $regular->password;
 
-        \Livewire\Livewire::actingAs($superAdmin)
-            ->test(\App\Livewire\Admin\AdminAccounts::class)
+        Livewire::actingAs($superAdmin)
+            ->test(AdminAccounts::class)
             ->call('startResetPassword', $regular->id)
             ->assertStatus(404);
 
