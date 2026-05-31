@@ -12,15 +12,34 @@ laravel/app/.!*.DS_Store
 
 # Security and Best Practices Exclusions
 .env
+.env.*
+!.env.example
+!.env.*.example
+!*.env.example
 .env.droplet
 /.env.droplet
 /.env.production
 /.env.staging
+*.local.env
+*.production.env
+*.staging.env
+*.backup
+*.bak
 vendor/
 node_modules/
 __pycache__/
 chroma_data/
 JSONdrive/
 *.sqlite
+*.sqlite-*
+*.db
+*.sql
+*.pem
+*.key
+*.p12
+*.pfx
+*service-account*.json
+*credentials*.json
+*client_secret*.json
 .github/
 .vscode/

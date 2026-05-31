@@ -1,8 +1,11 @@
 import os
+from pathlib import Path
+
 import requests
 from dotenv import load_dotenv
 
-load_dotenv("/Users/macbookair/Magang-Istana/python-ai/.env")
+ENV_PATH = Path(__file__).resolve().parents[1] / "python-ai" / ".env"
+load_dotenv(ENV_PATH)
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
 API_URL = "https://models.github.ai/inference/embeddings"

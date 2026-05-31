@@ -1,121 +1,142 @@
-# ISTA AI - Architecture Overview
+# ISTA AI
 
-Ini adalah repositori inti untuk subsistem kognitif **ISTA AI**, yang berfungsi ganda sebagai *mesin obrolan pintar (Chat)* dan *mesin pencari dokumen (RAG - Retrieval Augmented Generation)*.
+ISTA AI is an open-source reference implementation for a private-document AI assistant. It combines a Laravel web application with Python AI services for chat, document ingestion, retrieval-augmented generation (RAG), document export, and operational admin workflows.
 
-Arsitektur saat ini telah berevolusi menjadi arsitektur tingkat *Enterprise* dengan skema **Dual-Node Load Balancing** dan **Search-Aware Filtering** untuk memaksimalkan ketersediaan, kecepatan, dan efisiensi kuota.
+The project is designed for teams that need a self-hosted assistant over private documents while keeping storage, access control, and document processing explicit. This public repository contains source code, configuration templates, and documentation only. Do not commit production documents, database dumps, API keys, service account files, or Chroma vector data.
 
-## 🚀 Update Tahap 5: Stabilitas Ingest Dokumen Panjang
+## What It Does
 
-**Status:** ✅ Implemented (April 2026)
+- Chat assistant with streaming responses and conversation history.
+- Document upload, extraction, chunking, embedding, and retrieval.
+- Token-aware chunking for long PDFs and office documents.
+- ChromaDB-backed vector search with per-user document metadata.
+- Web search augmentation for questions that need current external context.
+- Memo/document generation and export workflows.
+- Google Drive import/export integration for controlled office document flows.
+- OnlyOffice integration for editing generated DOCX files through signed URLs.
+- Admin dashboards for usage, documents, users, errors, and knowledge management.
 
-Sistem RAG telah diupgrade dengan teknologi **Token-Aware Chunking** dan **Aggressive Batching** untuk mengatasi masalah crash dan lambatnya pemrosesan dokumen besar:
+## Architecture
 
-- **Token-Aware Recursive Chunking:** Menggunakan tiktoken (cl100k_base) untuk chunking berbasis token, bukan karakter
-- **Aggressive Batching:** 200 chunks per batch (20x lebih cepat dari sebelumnya)
-- **4-Tier Cascading Fallback:** Total kapasitas 2 Million TPM (4 × 500K TPM)
-- **Circuit Breaker:** Automatic failover saat rate limit dengan exponential backoff
-- **Performa:** Dokumen 150 halaman dari ~15 menit → ~1.5 menit (10x faster)
+ISTA AI runs as a hybrid stack:
 
-📖 **Detail lengkap:** Lihat [CHANGELOG_TAHAP5.md](python-ai/CHANGELOG_TAHAP5.md)
+- `laravel/`: web UI, authentication, authorization, uploads, document metadata, admin UI, queues, and OnlyOffice callbacks.
+- `python-ai/`: chat service, document processing service, RAG pipeline, model routing, embeddings, summarization, and export helpers.
+- `docs/`: production, deployment, testing, privacy, and maintenance notes.
+- `deploy/`: deployment templates such as Caddy and environment examples.
+- `benchmarks/`: manual benchmark scripts for provider and RAG checks.
+- `issue/`: implementation plans and review notes used by the maintainer workflow.
 
-## 🌟 High-Level Flow Architecture (Update: 2026)
+Core data stores and runtime services:
 
-### 1. Chat Generation (LLM Manager)
-**File Utama:** `app/llm_manager.py`
-Sistem akan memproses percakapan dengan metode **Failover Load Balancer** berjenjang:
-1. **[Primary Node] GPT-5 Chat via GitHub Models (`GITHUB_TOKEN`)**
-   Otomatis memproses seluruh obrolan menggunakan kecerdasan GPT-5 terbaru. Cepat dan ideal untuk penalaran RAG.
-2. **[Backup Node] GPT-5 Chat via GitHub Models (`GITHUB_TOKEN_2`)**
-   *Auto-Failover* peluru perak. Jika Token Utama terkena *Rate Limit* atau *Server Down*, sistem secara cerdas menangkap *RateLimitError* dari `litellm` tanpa jeda (*zero retry timeout*), dan mengoper beban ke Token Cadangan secara instan. User tidak menyadari adanya perpindahan.
-3. **[Tertiary Node] Gemini 3 Flash / Llama 3.3**
-   Digunakan jika kedua GitHub token lumpuh total (Misal: GitHub Models sedang down secara global).
+- MySQL for application data.
+- Redis for queue/cache operations.
+- ChromaDB for local vector indexes.
+- OnlyOffice Document Server for DOCX editing.
+- External AI/search providers configured through environment variables and `python-ai/config/ai_config.yaml`.
 
-### 2. Embeddings & Document Vectoring (RAG Service)
-**File Utama:** `app/services/rag_service.py`
+## Repository Layout
 
-Saat user mengunggah PDF, ISTA AI mengubah dokumen fisik menjadi data vektor numerik tingkat tinggi (3072 dimensi).
+```text
+.
+├── laravel/                  # Laravel app, routes, controllers, jobs, tests
+├── python-ai/                # FastAPI AI services, RAG, prompts, tests
+├── docs/                     # Deployment, privacy, testing, maintenance docs
+├── deploy/                   # Production deployment templates
+├── benchmarks/               # Manual provider/RAG benchmark utilities
+├── issue/                    # Planning and implementation notes
+├── docker-compose.yml        # Local multi-service stack
+├── docker-compose.production.yml
+└── .env.droplet.example      # Redacted production env key template
+```
 
-**Update Tahap 5 - Token-Aware Chunking:**
-1. **Mesin Pemotong:** RecursiveCharacterTextSplitter dengan tiktoken (cl100k_base)
-   - Chunk size: 1500 tokens (optimal untuk text-embedding-3-large)
-   - Overlap: 150 tokens (mempertahankan konteks)
-   - Prioritas semantic boundaries: paragraf → kalimat → kata
-   
-2. **Mesin Embedding:** 4-Tier Cascading System
-   - **Tier 1:** text-embedding-3-large (Primary) - 500K TPM, 3072 dim
-   - **Tier 2:** text-embedding-3-large (Backup) - 500K TPM, 3072 dim
-   - **Tier 3:** text-embedding-3-small (Fallback 1) - 500K TPM, 1536 dim
-   - **Tier 4:** text-embedding-3-small (Fallback 2) - 500K TPM, 1536 dim
-   - **Total Capacity:** 2 Million TPM
-   
-3. **Mesin Penyimpan:** **ChromaDB** (Database Vektor Lokal `chroma_data/`)
+## Security and Privacy
 
-4. **Aggressive Batching:** 200 chunks per batch dengan 0.5s delay
-   - Dapat memproses ~300,000 tokens per batch
-   - Circuit breaker untuk automatic failover saat rate limit
-   - Exponential backoff retry logic
+Before running ISTA AI with real data, read [docs/data-flow-privacy.md](docs/data-flow-privacy.md). The system can send selected prompts, chat history, document chunks, and search queries to configured external providers. Production usage needs a clear data classification policy.
 
-**Performa:**
-- Dokumen 50 halaman: ~30 detik (sebelumnya ~5 menit)
-- Dokumen 150 halaman: ~1.5 menit (sebelumnya ~15 menit)
-- Dokumen 500 halaman: ~5 menit (sebelumnya crash/timeout)
+Important rules:
 
-**Peringatan Penting:** Embeddings hanya mengandalkan API GitHub Models *tanpa* *fallback* eksternal (seperti Gemini atau open-source lainnya). Ini secara sengaja diinjeksi untuk menghindari **Dimension Mismatch** (Perbedaan dimensi vektor) jika sewaktu-waktu embedding melompat ke penyedia lain yang memiliki struktur data yang berbeda. Jika GitHub down, proses unggah sementara ikut tertunda demi menyelamatkan integritas database vektor.
+- Keep real `.env` files local only.
+- Keep `laravel/database/*.sqlite`, database dumps, Chroma data, service account JSON files, and private keys out of git.
+- Rotate secrets immediately if they were ever shared outside a trusted local machine.
+- Use strong unique values for `AI_SERVICE_TOKEN`, OnlyOffice secrets, database passwords, OAuth secrets, and provider API keys.
+- Use signed URLs, private disks, and server-side authorization for document access.
 
-### 3. Smart Search & Fallback (LangSearch)
-**File Utama:** `app/services/langsearch_service.py`
-Sistem RAG menggunakan pendekatan campuran (*Hybrid/Search-First Strategy*):
-1. **Anti-Greeting Filter:** Sebelum melempar pencarian ke *Web Search*, `rag_service` mem-filter pertanyaan. Jika teks hanyalah sapaan pendek (`hai`, `halo`, `siapa kamu`, `terima kasih`), sistem *Skip Web Search*, tidak membuang kuota, dan langsung diarahkan ke GPT-5 untuk mode interaksi *"Chitchat"* manusiawi.
-2. **Web Search Augmentation (Tavily):** Apabila pertanyaan membutuhkan pencarian atau kompleks, sistem memanggil *LangSearch* untuk menarik 5 artikel terbaru dari internet (Live Data), kemudian memprioritaskan gabungan dari Live Data + Dokumen Internal untuk di-injeksikan kepada GPT-5. Pengetahuan tidak pernah kuno.
+Security reporting instructions are in [SECURITY.md](SECURITY.md).
 
----
+## Environment Files
 
-Dengan ketiga ekosistem di atas, ISTA AI memiliki sifat yang sangat Tangguh (anti-Down), Ekosistem RAG yang presisi (anti-Mismatch), dan berbudaya sapaan cepat tanpa membuang uang/berceramah (Web Search Filter).
+Tracked examples intentionally contain placeholders only:
 
-## Google Drive Kantor
+- `.env.droplet.example`
+- `deploy/digitalocean.env.example`
+- `laravel/.env.example`
+- `python-ai/.env.example`
 
-Tahap 7 menambahkan integrasi Google Drive kantor terpusat untuk import dan export dokumen.
+Create local env files from those templates and replace placeholders with real values on your own machine or deployment platform. Real env files are ignored by git.
 
-### Setup singkat
+## Local Development
 
-#### Jalur utama upload: OAuth pusat
+Requirements depend on the area you want to run:
 
-Gunakan jalur ini jika hasil ekspor ISTA AI akan disimpan ke **My Drive** satu akun kantor yang sama untuk semua user.
+- PHP 8.2+
+- Composer
+- Node.js and npm
+- Python 3.13-compatible environment for the current service stack
+- MySQL, Redis, and ChromaDB, or Docker Compose
 
-1. Aktifkan Google Drive API di Google Cloud Console.
-2. Buat OAuth Client jenis **Web application**.
-3. Isi redirect URI produksi:
-   - `https://ista-ai.app/chat/google-drive/oauth/callback`
-4. Isi environment server:
-   - `GOOGLE_DRIVE_ROOT_FOLDER_ID`
-   - `GOOGLE_DRIVE_UPLOAD_FOLDER_NAME` jika ingin folder default khusus
-   - `GOOGLE_DRIVE_OAUTH_CLIENT_ID`
-   - `GOOGLE_DRIVE_OAUTH_CLIENT_SECRET`
-   - `GOOGLE_DRIVE_OAUTH_REDIRECT_URI`
-   - `GOOGLE_DRIVE_OAUTH_SETUP_KEY`
-5. Deploy env dan jalankan migration:
-   - `php artisan migrate --force`
-6. Login ke ISTA AI, lalu hubungkan akun Google pusat sekali melalui:
-   - `/chat/google-drive/oauth/connect?setup_key=<GOOGLE_DRIVE_OAUTH_SETUP_KEY>`
-7. Setelah callback berhasil, semua user bisa upload dari `/chat` ke akun Drive pusat yang sama tanpa login Google per user.
+Typical Laravel setup:
 
-#### Jalur browse/import: service account atau Shared Drive
+```bash
+cd laravel
+composer install
+cp .env.example .env
+php artisan key:generate
+php artisan migrate
+npm install
+npm run build
+php artisan serve
+```
 
-Jalur ini dipakai untuk membaca folder kantor dari tombol Google Drive di `/chat`, dan tetap bisa dipakai sebagai fallback bila organisasi memilih Shared Drive.
+Typical Python setup:
 
-1. Buat service account dan unduh key JSON-nya.
-2. Share folder root kantor atau Shared Drive yang dipakai ISTA AI ke email service account tersebut.
-3. Isi environment server:
-   - `GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON` atau `GOOGLE_DRIVE_SERVICE_ACCOUNT_PATH`
-   - `GOOGLE_DRIVE_ROOT_FOLDER_ID`
-   - `GOOGLE_DRIVE_SHARED_DRIVE_ID` jika memakai Shared Drive
-   - `GOOGLE_DRIVE_IMPERSONATED_USER_EMAIL` jika memakai domain-wide delegation
-4. Folder/file yang bisa di-browse, diunduh, dan dijadikan target upload dibatasi server-side agar tetap berada di bawah `GOOGLE_DRIVE_ROOT_FOLDER_ID`.
+```bash
+cd python-ai
+source venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --host 127.0.0.1 --port 8001
+```
 
-### Perilaku MVP
+For production and Docker-oriented setup, use the guides in `docs/` and `deploy/` instead of copying local development defaults.
 
-- File binary PDF, DOCX, XLSX, dan CSV dari folder kantor yang diizinkan bisa di-browse dari modal chat dan diproses ke pipeline ISTA AI.
-- Import Google Drive mengikuti batas ukuran yang sama dengan upload manual: maksimal 50 MB.
-- Jawaban AI dan hasil export dokumen bisa disimpan kembali ke Google Drive kantor.
-- Secret service account tidak disimpan di database dan tidak ditampilkan di UI.
-- Token OAuth pusat disimpan terenkripsi di database dan hanya dibuat lewat route setup teknis di bawah `/chat/google-drive/oauth/*`.
+## Testing
+
+Laravel:
+
+```bash
+cd laravel && php artisan test
+```
+
+Python:
+
+```bash
+cd python-ai && source venv/bin/activate && pytest
+```
+
+See [docs/testing-guide.md](docs/testing-guide.md) for the maintainer verification workflow.
+
+## Contributing
+
+Contributions are welcome when they keep the system safer, easier to run, and easier to review. Start with [CONTRIBUTING.md](CONTRIBUTING.md), keep changes scoped, and include relevant verification results.
+
+Good first contribution areas:
+
+- Documentation improvements.
+- Test coverage for RAG, document export, auth, and admin flows.
+- Safer defaults for deployment templates.
+- Observability, logging, and maintenance improvements.
+- Accessibility and responsive UI fixes.
+
+## License
+
+ISTA AI is released under the MIT License. See [LICENSE](LICENSE).
