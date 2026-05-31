@@ -41,5 +41,9 @@ JSONdrive/
 *service-account*.json
 *credentials*.json
 *client_secret*.json
-.github/
+# Track GitHub community templates, keep other local GitHub helper files private.
+.github/*
+!.github/ISSUE_TEMPLATE/
+!.github/ISSUE_TEMPLATE/*.md
+!.github/PULL_REQUEST_TEMPLATE.md
 .vscode/
