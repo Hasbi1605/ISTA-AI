@@ -16,6 +16,10 @@ The project is designed for teams that need a self-hosted assistant over private
 - OnlyOffice integration for editing generated DOCX files through signed URLs.
 - Admin dashboards for usage, documents, users, errors, and knowledge management.
 
+## Deployment Status
+
+ISTA AI is actively deployed in a production environment. Access is restricted because the system is designed for private-document workflows; production data, user accounts, and operational credentials are not part of this repository.
+
 ## Architecture
 
 ISTA AI runs as a hybrid stack:
