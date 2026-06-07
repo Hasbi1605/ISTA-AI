@@ -10,20 +10,6 @@ Repo ini menggunakan workflow berbasis plan, implementasi bertahap, verifikasi w
 - Jangan melakukan refactor besar kecuali memang diminta atau benar-benar diperlukan.
 - Jika ada ketidakpastian, nyatakan asumsi secara eksplisit.
 
-## Routing Model dan Sub-Agent
-- Default orchestrator/reviewer adalah model terkuat yang tersedia, saat ini diasumsikan `gpt-5.5`, terutama untuk planning, analisis arsitektur, debugging yang ambigu, review akhir, keputusan merge, dan verifikasi risiko.
-- Gunakan model yang lebih murah hanya untuk pekerjaan yang terpisah, jelas, dan berisiko rendah. Penghematan biaya tidak boleh mengalahkan akurasi, keamanan, atau verifikasi.
-- `gpt-5.4-mini` cocok untuk eksplorasi ringan, membaca file, merangkum log, dokumentasi kecil, pencarian pola, atau perubahan mekanis sederhana.
-- `gpt-5.3-codex` cocok untuk implementasi kode yang sudah punya scope dan plan jelas, terutama patch terarah setelah kontrak perilaku dan test target diketahui.
-- `gpt-5.4` cocok untuk implementasi menengah ketika `gpt-5.3-codex` terlalu sempit tetapi `gpt-5.5` belum diperlukan.
-- Jangan downgrade model untuk perubahan auth/security, migrasi data, deploy/merge, review PR akhir, bug produksi yang belum jelas, refactor lintas modul, atau keputusan yang membutuhkan konteks besar.
-- Model utama dalam sesi interaktif tidak diasumsikan bisa berganti otomatis di tengah turn. Jika perlu model berbeda, gunakan sub-agent/worker terpisah bila runtime mendukung, atau jalankan task terpisah melalui CLI dengan override model.
-- Contoh CLI untuk task terpisah:
-  `codex exec -m gpt-5.4-mini -C /Users/macbookair/Magang-Istana "Ringkas struktur modul laravel/app/Services"`
-  `codex exec -m gpt-5.3-codex -C /Users/macbookair/Magang-Istana "Implementasikan patch sesuai issue/... dan jangan ubah file lain"`
-- Output dari model murah harus direview oleh orchestrator/reviewer model kuat sebelum dianggap selesai, terutama jika menghasilkan perubahan kode.
-- Setelah model murah melakukan implementasi, tetap jalankan verifikasi relevan dan lakukan final diff/risk review dengan model kuat.
-
 ## Workflow yang diharapkan
 1. Pahami codebase dan konteks tugas.
 2. Untuk tugas yang kompleks, buat plan tertulis dalam file `.md` di folder `issue/`.

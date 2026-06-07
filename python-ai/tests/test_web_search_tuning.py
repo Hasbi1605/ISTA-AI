@@ -49,7 +49,7 @@ class TestFreshnessAdaptif:
             def rerank_documents(self, **kwargs):
                 return None
 
-            def build_search_context(self, results):
+            def build_search_context(self, results, runtime_config=None):
                 return "context"
 
         monkeypatch.setattr(rp, "get_langsearch_service", lambda: FakeLangSearch())
@@ -85,7 +85,7 @@ class TestFreshnessAdaptif:
             def rerank_documents(self, **kwargs):
                 return None
 
-            def build_search_context(self, results):
+            def build_search_context(self, results, runtime_config=None):
                 return "context"
 
         monkeypatch.setattr(rp, "get_langsearch_service", lambda: FakeLangSearch())
@@ -122,7 +122,7 @@ class TestParalelScoreQuery:
             def rerank_documents(self, **kwargs):
                 return None
 
-            def build_search_context(self, results):
+            def build_search_context(self, results, runtime_config=None):
                 return "context"
 
         monkeypatch.setattr(rp, "get_langsearch_service", lambda: FakeLangSearch())
@@ -156,7 +156,7 @@ class TestParalelScoreQuery:
             def rerank_documents(self, **kwargs):
                 return None
 
-            def build_search_context(self, results):
+            def build_search_context(self, results, runtime_config=None):
                 return "context"
 
         monkeypatch.setattr(rp, "get_langsearch_service", lambda: FakeLangSearch())
@@ -184,7 +184,7 @@ class TestParalelScoreQuery:
             def rerank_documents(self, **kwargs):
                 return None
 
-            def build_search_context(self, results):
+            def build_search_context(self, results, runtime_config=None):
                 return " ".join(r.get("title", "") for r in results)
 
         monkeypatch.setattr(rp, "get_langsearch_service", lambda: FakeLangSearch())
@@ -215,7 +215,7 @@ class TestParalelScoreQuery:
             def rerank_documents(self, **kwargs):
                 return None
 
-            def build_search_context(self, results):
+            def build_search_context(self, results, runtime_config=None):
                 return "context"
 
         monkeypatch.setattr(rp, "get_langsearch_service", lambda: FakeLangSearch())
@@ -256,7 +256,7 @@ class TestWebSearchQueryQuality:
             def rerank_documents(self, **kwargs):
                 return None
 
-            def build_search_context(self, results):
+            def build_search_context(self, results, runtime_config=None):
                 return "context"
 
         monkeypatch.setattr(rp, "get_langsearch_service", lambda: FakeLangSearch())
@@ -276,7 +276,7 @@ class TestWebSearchQueryQuality:
             def search(self, query, freshness="oneWeek", count=5):
                 return []
 
-            def build_no_results_context(self):
+            def build_no_results_context(self, runtime_config=None):
                 return "KONTEKS WEB TERBARU\nTidak ada hasil pencarian web yang cukup."
 
         monkeypatch.setattr(rp, "get_langsearch_service", lambda: FakeLangSearch())
@@ -312,7 +312,7 @@ class TestScoreQueryWithFreshness:
             def rerank_documents(self, **kwargs):
                 return None
 
-            def build_search_context(self, results):
+            def build_search_context(self, results, runtime_config=None):
                 return "context"
 
         monkeypatch.setattr(rp, "get_langsearch_service", lambda: FakeLangSearch())

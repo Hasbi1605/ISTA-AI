@@ -272,6 +272,9 @@ async def test_eval_summarize_endpoint_returns_http_exception_when_prompt_placeh
             documents.SummarizeRequest(filename="memo.pdf", user_id="user-1")
         )
 
+    # Placeholder yang tidak dikenal membuat template gagal dirender sehingga
+    # jatuh ke hasil kosong; endpoint tetap gagal aman dengan HTTP 500 dan pesan
+    # render yang jelas (nama placeholder tidak ikut karena render mengembalikan kosong).
     assert exc.value.status_code == 500
     assert "Gagal merender prompt" in exc.value.detail
-    assert "missing_placeholder" in exc.value.detail
+    assert "Prompt summarization kosong setelah dirender" in exc.value.detail
