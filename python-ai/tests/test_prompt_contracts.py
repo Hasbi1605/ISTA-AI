@@ -89,8 +89,9 @@ def test_system_prompt_uses_ista_work_assistant_persona():
     assert "berbeda-beda setiap kali" in prompt
     # Identitas pembuat wajib menyebut Hasbi
     assert "Muhammad Hasbi Ash Shiddiqi" in prompt
-    assert "@hasbi_shdqi" in prompt
-    assert "hasbi1605.github.io" in prompt
+    # Instagram/portofolio sudah tidak dicantumkan di persona
+    assert "@hasbi_shdqi" not in prompt
+    assert "hasbi1605.github.io" not in prompt
 
 
 def test_rag_prompt_prioritizes_document_grounding_without_old_bold_rules():
