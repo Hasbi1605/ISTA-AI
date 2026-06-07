@@ -81,7 +81,13 @@ def test_system_prompt_uses_ista_work_assistant_persona():
     assert "ISTA AI" in prompt
     assert "Istana Kepresidenan Yogyakarta" in prompt
     assert "Jawab inti persoalan terlebih dahulu" in prompt
-    assert "Hindari emoji" in prompt
+    # Persona baru: gaya lebih santai dan boleh emoji secukupnya
+    assert "emoji secukupnya" in prompt
+    assert "jangan berlebihan" in prompt
+    # Identitas pembuat wajib menyebut Hasbi
+    assert "Muhammad Hasbi Ash Shiddiqi" in prompt
+    assert "@hasbi_shdqi" in prompt
+    assert "hasbi1605.github.io" in prompt
 
 
 def test_rag_prompt_prioritizes_document_grounding_without_old_bold_rules():
