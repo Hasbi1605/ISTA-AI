@@ -81,9 +81,12 @@ def test_system_prompt_uses_ista_work_assistant_persona():
     assert "ISTA AI" in prompt
     assert "Istana Kepresidenan Yogyakarta" in prompt
     assert "Jawab inti persoalan terlebih dahulu" in prompt
-    # Persona baru: gaya lebih santai dan boleh emoji secukupnya
-    assert "emoji secukupnya" in prompt
-    assert "jangan berlebihan" in prompt
+    # Persona baru: gaya santai, emoji relevan sesekali, dan format markdown ringan
+    assert "emoji yang relevan sesekali" in prompt
+    assert "markdown ringan" in prompt
+    # Pujian pembuat tidak boleh template (harus bervariasi, tanpa frasa baku)
+    assert "kata-katamu sendiri" in prompt
+    assert "berbeda-beda setiap kali" in prompt
     # Identitas pembuat wajib menyebut Hasbi
     assert "Muhammad Hasbi Ash Shiddiqi" in prompt
     assert "@hasbi_shdqi" in prompt
