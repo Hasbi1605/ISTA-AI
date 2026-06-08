@@ -375,13 +375,18 @@ class OnlyOfficeCallbackController extends Controller
                 continue;
             }
 
+            $candidateScheme = strtolower((string) ($candidate['scheme'] ?? ''));
+            $trustedScheme = strtolower((string) ($trusted['scheme'] ?? ''));
+
+            if ($candidateScheme !== $trustedScheme) {
+                continue;
+            }
+
             if (($candidate['host'] ?? null) !== ($trusted['host'] ?? null)) {
                 continue;
             }
 
-            $trustedPort = $trusted['port'] ?? null;
-
-            if ($trustedPort !== null && ($candidate['port'] ?? null) !== $trustedPort) {
+            if ($this->urlPort($candidate) !== $this->urlPort($trusted)) {
                 continue;
             }
 
@@ -389,6 +394,22 @@ class OnlyOfficeCallbackController extends Controller
         }
 
         return false;
+    }
+
+    /**
+     * @param  array<string, mixed>  $parts
+     */
+    protected function urlPort(array $parts): ?int
+    {
+        if (isset($parts['port'])) {
+            return (int) $parts['port'];
+        }
+
+        return match (strtolower((string) ($parts['scheme'] ?? ''))) {
+            'http' => 80,
+            'https' => 443,
+            default => null,
+        };
     }
 
     /**

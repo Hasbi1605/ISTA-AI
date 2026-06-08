@@ -326,6 +326,35 @@ class OnlyOfficeCallbackTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_callback_rejects_trusted_host_with_wrong_scheme(): void
+    {
+        config([
+            'services.onlyoffice.jwt_secret' => 'callback-secret',
+            'services.onlyoffice.internal_url' => 'https://onlyoffice.test',
+        ]);
+        Http::fake();
+
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        $memo = $this->createMemo($user);
+        $key = $this->callbackKey($memo);
+        $url = 'http://onlyoffice.test/file.docx';
+        $token = (new JwtSigner('callback-secret'))->sign([
+            'status' => 2,
+            'key' => $key,
+            'url' => $url,
+            'exp' => time() + 60,
+        ]);
+
+        $this->postJson(route('onlyoffice.callback', $memo), [
+            'status' => 2,
+            'key' => $key,
+            'url' => $url,
+            'token' => $token,
+        ])->assertForbidden();
+
+        Http::assertNothingSent();
+    }
+
     // -------------------------------------------------------------------------
     // Status 1: document being edited — acknowledge, no file save
     // -------------------------------------------------------------------------

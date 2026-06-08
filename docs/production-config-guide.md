@@ -17,6 +17,7 @@ File ini berada di root repo pada server production dan tidak boleh dicommit. Is
 - `PUBLIC_REGISTRATION_ENABLED` untuk membuka/menutup registrasi mandiri
 - `SECURITY_CSP_ALLOW_UNSAFE_EVAL` untuk override CSP `unsafe-eval` bila benar-benar diperlukan
 - konfigurasi OnlyOffice seperti `ONLYOFFICE_JWT_SECRET`, `ONLYOFFICE_SIGNED_URL_TTL_MINUTES`, dan `ONLYOFFICE_DOCUMENTSERVER_TAG`
+- konfigurasi Google Drive OAuth pusat seperti `GOOGLE_DRIVE_OAUTH_SETUP_KEY` dan `GOOGLE_DRIVE_OAUTH_ADMIN_EMAILS`
 
 Nilai secret wajib diganti dari contoh. Khusus `AI_SERVICE_TOKEN`, jangan gunakan placeholder `CHANGE_ME`, `change_me_internal_api_secret`, atau nilai default lama `your_internal_api_secret`; Python AI akan menolak token kosong/default/placeholder.
 
@@ -35,6 +36,8 @@ SECURITY_CSP_ALLOW_UNSAFE_EVAL=false
 ```
 
 Gunakan `true` hanya sebagai rollback sementara jika ada library frontend legacy yang terbukti membutuhkan eval.
+
+Google Drive OAuth pusat hanya bisa disambungkan oleh user Laravel dengan role admin/super-admin aktif yang juga lolos setup key dan `GOOGLE_DRIVE_OAUTH_ADMIN_EMAILS` jika allowlist email diisi. Jangan masukkan email user biasa ke allowlist ini sebagai pengganti role admin.
 
 ### `python-ai/config/ai_config.yaml`
 

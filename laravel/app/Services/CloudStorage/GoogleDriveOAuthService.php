@@ -50,14 +50,17 @@ class GoogleDriveOAuthService
      * Determine whether the given user is allowed to perform the central
      * Google Drive OAuth setup.
      *
-     * When `GOOGLE_DRIVE_OAUTH_ADMIN_EMAILS` is configured (comma-separated),
-     * only users whose email appears in that list are allowed — in every
-     * environment. When the config is absent the flow is only allowed in
-     * `local` / `testing` environments (backward-compatible default for
-     * development; fail-closed in production).
+     * The setup user must be an active Laravel admin/super-admin first. The
+     * optional email allowlist then narrows which admins may connect the shared
+     * app-wide Drive account. Without an email allowlist, the flow is only open
+     * to active admins in local/testing and remains fail-closed in production.
      */
     public function isAllowedAdminUser(User $user): bool
     {
+        if (! $user->canAccessAdmin()) {
+            return false;
+        }
+
         $adminEmails = $this->adminEmails();
 
         if (! empty($adminEmails)) {
