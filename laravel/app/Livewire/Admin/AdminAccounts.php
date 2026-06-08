@@ -3,8 +3,8 @@
 namespace App\Livewire\Admin;
 
 use App\Models\User;
+use App\Rules\NoEmailHeaderInjection;
 use App\Services\Admin\AdminAccountManagementService;
-use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -113,7 +113,7 @@ class AdminAccounts extends Component
     {
         $validated = $this->validate([
             'newName' => ['required', 'string', 'max:120'],
-            'newEmail' => ['required', 'email', 'max:255'],
+            'newEmail' => ['required', 'email', new NoEmailHeaderInjection, 'max:255'],
             'newPassword' => ['required', 'string', 'min:8', 'max:255'],
             'newRole' => ['required', 'in:admin,super_admin'],
             'newForcePasswordChange' => ['boolean'],
@@ -173,7 +173,7 @@ class AdminAccounts extends Component
 
         $validated = $this->validate([
             'editName' => ['required', 'string', 'max:120'],
-            'editEmail' => ['required', 'email', 'max:255'],
+            'editEmail' => ['required', 'email', new NoEmailHeaderInjection, 'max:255'],
             'editRole' => ['required', 'in:admin,super_admin'],
             'editForcePasswordChange' => ['boolean'],
         ], attributes: [

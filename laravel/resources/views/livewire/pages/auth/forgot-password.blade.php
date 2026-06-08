@@ -1,5 +1,6 @@
 <?php
 
+use App\Rules\NoEmailHeaderInjection;
 use App\Services\Auth\PasswordResetLinkService;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
@@ -16,7 +17,7 @@ new #[Layout('layouts.auth-canvas')] class extends Component
     public function sendPasswordResetLink(): void
     {
         $this->validate([
-            'email' => ['required', 'string', 'email'],
+            'email' => ['required', 'string', 'email', new NoEmailHeaderInjection],
         ], [], [
             'email' => 'email',
         ]);

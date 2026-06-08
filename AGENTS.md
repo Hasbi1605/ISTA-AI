@@ -124,3 +124,6 @@ Sebuah tugas dianggap selesai hanya jika:
 - branch lokal sudah kembali ke `main`
 - kondisi lokal dan remote sudah sinkron
 - untuk deploy production, hasil deploy atau command deploy yang dijalankan sudah diringkas dengan jelas
+
+## Changelog
+- 2026-06-08 — Hardening security audit: tutup public registration default production, kunci Horizon ke super-admin aktif, hilangkan `unsafe-eval` default production, mitigasi email CRLF CVE Laravel 11, update dependency Laravel/Symfony, dan test Chroma internal-only. — `laravel/`, `python-ai/tests/test_production_compose_security.py`, `docker-compose.production.yml`, `docs/production-config-guide.md` — (test: PHPUnit 580 pass; pytest 374 pass; composer audit 1 ignored mitigated; npm audit clean; pip-audit 1 Chroma no fixed version, mitigated internal-only)

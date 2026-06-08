@@ -4,8 +4,8 @@ namespace App\Services\Admin;
 
 use App\Models\AdminAccountAudit;
 use App\Models\User;
+use App\Rules\NoEmailHeaderInjection;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -15,9 +15,7 @@ use Illuminate\Validation\ValidationException;
 
 class AdminAccountManagementService
 {
-    public function __construct(private readonly AdminAccountAuditService $audit)
-    {
-    }
+    public function __construct(private readonly AdminAccountAuditService $audit) {}
 
     /**
      * Create a new admin or super admin account.
@@ -36,6 +34,12 @@ class AdminAccountManagementService
                 'name' => 'Nama wajib diisi.',
                 'email' => 'Email wajib diisi.',
                 'password' => 'Password wajib diisi.',
+            ]);
+        }
+
+        if (! filter_var($email, FILTER_VALIDATE_EMAIL) || ! NoEmailHeaderInjection::isSafe($email)) {
+            throw ValidationException::withMessages([
+                'email' => 'Email tidak valid.',
             ]);
         }
 
@@ -102,7 +106,7 @@ class AdminAccountManagementService
                 ]);
             }
 
-            if (! filter_var($newEmail, FILTER_VALIDATE_EMAIL)) {
+            if (! filter_var($newEmail, FILTER_VALIDATE_EMAIL) || ! NoEmailHeaderInjection::isSafe($newEmail)) {
                 throw ValidationException::withMessages([
                     'email' => 'Email tidak valid.',
                 ]);

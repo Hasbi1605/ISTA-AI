@@ -114,6 +114,10 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    'registration' => [
+        'enabled' => env('PUBLIC_REGISTRATION_ENABLED', env('APP_ENV') !== 'production'),
+    ],
+
     'otp_registration' => [
         'ttl_minutes' => env('AUTH_OTP_REGISTRATION_TTL_MINUTES', 60),
         'start_max_attempts' => env('AUTH_OTP_REGISTRATION_START_MAX_ATTEMPTS', 5),

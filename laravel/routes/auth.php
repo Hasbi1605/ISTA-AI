@@ -5,8 +5,14 @@ use Illuminate\Support\Facades\Route;
 use Livewire\Volt\Volt;
 
 Route::middleware('guest')->group(function () {
-    Route::redirect('register', '/login?view=register')
-        ->name('register');
+    Route::get('register', function () {
+        if (! config('auth.registration.enabled')) {
+            return redirect()->route('login')
+                ->with('status', 'Pendaftaran mandiri sedang ditutup. Hubungi admin untuk membuat akun.');
+        }
+
+        return redirect('/login?view=register');
+    })->name('register');
 
     Volt::route('login', 'pages.auth.login')
         ->name('login');

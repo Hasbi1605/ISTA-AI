@@ -34,4 +34,18 @@ class SecurityHeadersTest extends TestCase
             ->assertHeader('Content-Security-Policy', 'sandbox')
             ->assertHeader('X-Content-Type-Options', 'nosniff');
     }
+
+    public function test_content_security_policy_excludes_unsafe_eval_when_disabled(): void
+    {
+        config()->set('security.headers.content_security_policy.allow_unsafe_eval', false);
+
+        $response = $this->get(route('dashboard'));
+
+        $response->assertOk();
+
+        $csp = (string) $response->headers->get('Content-Security-Policy');
+
+        $this->assertStringContainsString("script-src 'self' 'unsafe-inline'", $csp);
+        $this->assertStringNotContainsString("'unsafe-eval'", $csp);
+    }
 }

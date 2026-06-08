@@ -2,6 +2,7 @@
 
 use App\Livewire\Forms\LoginForm;
 use App\Models\User;
+use App\Rules\NoEmailHeaderInjection;
 use App\Services\Auth\PasswordResetLinkService;
 use App\Services\Auth\PendingRegistrationWorkflowService;
 use Illuminate\Support\Facades\Auth;
@@ -43,9 +44,14 @@ new #[Layout('layouts.auth-canvas')] class extends Component
 
     public function mount(): void
     {
-        if (request()->query('view') === 'register') {
+        if (request()->query('view') === 'register' && $this->registrationEnabled()) {
             $this->view = 'register';
         }
+    }
+
+    protected function registrationEnabled(): bool
+    {
+        return (bool) config('auth.registration.enabled');
     }
 
     protected function passwordResetLinkService(): PasswordResetLinkService
@@ -60,6 +66,10 @@ new #[Layout('layouts.auth-canvas')] class extends Component
 
     public function setView(string $view): void
     {
+        if ($view === 'register' && ! $this->registrationEnabled()) {
+            $view = 'login';
+        }
+
         $this->view = $view;
         $this->resetErrorBag();
         $this->forgot_status = null;
@@ -74,7 +84,7 @@ new #[Layout('layouts.auth-canvas')] class extends Component
     public function sendPasswordResetLink(): void
     {
         $this->validate([
-            'forgot_email' => ['required', 'email'],
+            'forgot_email' => ['required', 'email', new NoEmailHeaderInjection],
         ], [], [
             'forgot_email' => 'email',
         ]);
@@ -89,7 +99,7 @@ new #[Layout('layouts.auth-canvas')] class extends Component
     public function login(): void
     {
         $this->validate([
-            'form.email' => 'required|string|email',
+            'form.email' => ['required', 'string', 'email', new NoEmailHeaderInjection],
             'form.password' => 'required|string',
         ]);
 
@@ -102,6 +112,12 @@ new #[Layout('layouts.auth-canvas')] class extends Component
 
     public function register(): void
     {
+        if (! $this->registrationEnabled()) {
+            throw ValidationException::withMessages([
+                'register_email' => 'Pendaftaran mandiri sedang ditutup. Hubungi admin untuk membuat akun.',
+            ]);
+        }
+
         $validated = $this->validate([
             'name' => ['required', 'string', 'max:255'],
             'register_email' => [
@@ -109,6 +125,7 @@ new #[Layout('layouts.auth-canvas')] class extends Component
                 'string',
                 'lowercase',
                 'email',
+                new NoEmailHeaderInjection,
                 'max:255',
                 Rule::unique(User::class, 'email')
                     ->where(fn ($query) => $query->whereNotNull('email_verified_at')),
@@ -130,6 +147,12 @@ new #[Layout('layouts.auth-canvas')] class extends Component
 
     public function resendOtp(): void
     {
+        if (! $this->registrationEnabled()) {
+            throw ValidationException::withMessages([
+                'verification_code_input' => 'Pendaftaran mandiri sedang ditutup. Hubungi admin untuk membuat akun.',
+            ]);
+        }
+
         $this->pendingRegistrationWorkflowService()->resendOtp(
             $this->pendingRegistrationToken,
             request()->ip(),
@@ -160,6 +183,12 @@ new #[Layout('layouts.auth-canvas')] class extends Component
 
     public function verifyOtp(): void
     {
+        if (! $this->registrationEnabled()) {
+            $this->addError('verification_code_input', 'Pendaftaran mandiri sedang ditutup. Hubungi admin untuk membuat akun.');
+
+            return;
+        }
+
         $this->validate([
             'verification_code_input' => ['required', 'digits:6'],
         ], [

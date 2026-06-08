@@ -44,7 +44,7 @@ class AddSecurityHeaders
             'media-src' => ["'self'"],
             'font-src' => ["'self'", 'data:', 'https://fonts.gstatic.com'],
             'style-src' => ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-            'script-src' => ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+            'script-src' => $this->scriptSources(),
             'connect-src' => ["'self'"],
             'frame-src' => ["'self'"],
             'worker-src' => ["'self'", 'blob:'],
@@ -75,6 +75,23 @@ class AddSecurityHeaders
         return collect($directives)
             ->map(fn (array $sources, string $name): string => trim($name.' '.implode(' ', array_values(array_unique($sources)))))
             ->implode('; ');
+    }
+
+    /**
+     * Livewire/Alpine still rely on inline scripts, but eval is opt-in only.
+     * Keep this narrow so production does not ship with unsafe-eval by default.
+     *
+     * @return list<string>
+     */
+    private function scriptSources(): array
+    {
+        $sources = ["'self'", "'unsafe-inline'"];
+
+        if ((bool) config('security.headers.content_security_policy.allow_unsafe_eval', false)) {
+            $sources[] = "'unsafe-eval'";
+        }
+
+        return $sources;
     }
 
     private function originFromUrl(string $url): ?string

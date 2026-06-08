@@ -30,6 +30,51 @@ class RegistrationTest extends TestCase
             ->assertSeeVolt('pages.auth.login');
     }
 
+    public function test_public_registration_can_be_disabled(): void
+    {
+        config()->set('auth.registration.enabled', false);
+        Mail::fake();
+
+        $this->get('/register')
+            ->assertRedirect(route('login'));
+
+        $this->get('/login?view=register')
+            ->assertOk()
+            ->assertDontSee('Daftar Sekarang', false)
+            ->assertDontSee('Belum punya akun? Daftar', false);
+
+        Volt::test('pages.auth.login')
+            ->set('view', 'register')
+            ->set('name', 'Blocked User')
+            ->set('register_email', 'blocked@example.com')
+            ->set('register_password', 'password')
+            ->set('register_password_confirmation', 'password')
+            ->call('register')
+            ->assertHasErrors(['register_email']);
+
+        Mail::assertQueued(VerificationCodeMail::class, 0);
+        $this->assertDatabaseMissing('users', ['email' => 'blocked@example.com']);
+    }
+
+    public function test_registration_rejects_email_header_injection_payload(): void
+    {
+        Mail::fake();
+
+        $payload = "\"victim\r\nBcc:attacker@example.com\"@example.com";
+
+        Volt::test('pages.auth.login')
+            ->set('view', 'register')
+            ->set('name', 'Header Injection User')
+            ->set('register_email', $payload)
+            ->set('register_password', 'password')
+            ->set('register_password_confirmation', 'password')
+            ->call('register')
+            ->assertHasErrors(['register_email']);
+
+        Mail::assertQueued(VerificationCodeMail::class, 0);
+        $this->assertDatabaseMissing('users', ['name' => 'Header Injection User']);
+    }
+
     public function test_register_from_login_shows_verification_phase_without_creating_active_account(): void
     {
         Mail::fake();

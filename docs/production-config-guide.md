@@ -14,9 +14,27 @@ File ini berada di root repo pada server production dan tidak boleh dicommit. Is
 - `AI_SERVICE_TOKEN`
 - API key provider AI: `GITHUB_TOKEN`, `GITHUB_TOKEN_2`, `GROQ_API_KEY`, `GEMINI_API_KEY`, `LANGSEARCH_API_KEY`
 - URL internal Laravel ke Python
+- `PUBLIC_REGISTRATION_ENABLED` untuk membuka/menutup registrasi mandiri
+- `SECURITY_CSP_ALLOW_UNSAFE_EVAL` untuk override CSP `unsafe-eval` bila benar-benar diperlukan
 - konfigurasi OnlyOffice seperti `ONLYOFFICE_JWT_SECRET`, `ONLYOFFICE_SIGNED_URL_TTL_MINUTES`, dan `ONLYOFFICE_DOCUMENTSERVER_TAG`
 
 Nilai secret wajib diganti dari contoh. Khusus `AI_SERVICE_TOKEN`, jangan gunakan placeholder `CHANGE_ME`, `change_me_internal_api_secret`, atau nilai default lama `your_internal_api_secret`; Python AI akan menolak token kosong/default/placeholder.
+
+Production default menutup registrasi mandiri:
+
+```text
+PUBLIC_REGISTRATION_ENABLED=false
+```
+
+Aktifkan hanya jika deployment memang menerima pendaftaran publik. Untuk deployment private-document internal, akun user dibuat/dikelola oleh admin.
+
+Production default juga tidak mengizinkan `unsafe-eval` di CSP:
+
+```text
+SECURITY_CSP_ALLOW_UNSAFE_EVAL=false
+```
+
+Gunakan `true` hanya sebagai rollback sementara jika ada library frontend legacy yang terbukti membutuhkan eval.
 
 ### `python-ai/config/ai_config.yaml`
 
@@ -70,6 +88,12 @@ ONLYOFFICE_SIGNED_URL_TTL_MINUTES=30
 
 Gunakan `ONLYOFFICE_SIGNED_URL_SECRET` yang berbeda dari `APP_KEY` dan `ONLYOFFICE_JWT_SECRET` untuk key separation. Nilai TTL 15-30 menit direkomendasikan untuk production. Jangan naikkan ke hitungan jam kecuali ada alasan operasional yang jelas.
 
+## ChromaDB
+
+Compose production memakai Chroma secara embedded melalui volume `chroma_data` di service Python. Tidak ada port Chroma yang dipublish ke host atau internet.
+
+Jangan menambahkan service HTTP Chroma publik tanpa autentikasi, firewall, dan review security terpisah. Jika advisory `chromadb` belum menyediakan fixed version, mitigasi aktifnya adalah memastikan Chroma tetap internal-only dan memantau update dependency sebelum upgrade.
+
 ## Runtime Decision
 
 Untuk deployment production saat ini, container Laravel tetap menjalankan `php artisan serve` di port internal 8000.
@@ -100,6 +124,8 @@ Jalankan migration dari service `laravel` yang aktif karena service profile `art
 - `.env.droplet` ada di server dan tidak masuk git.
 - `APP_DEBUG=false`.
 - `APP_URL` memakai HTTPS domain production.
+- `PUBLIC_REGISTRATION_ENABLED=false` untuk deployment private-document internal.
+- `SECURITY_CSP_ALLOW_UNSAFE_EVAL=false` kecuali ada rollback sementara yang terdokumentasi.
 - `AI_SERVICE_TOKEN` sama antara Laravel dan Python, bukan default.
 - `ONLYOFFICE_JWT_SECRET` terisi dan tidak sama dengan token lain.
 - `ONLYOFFICE_DOCUMENTSERVER_TAG` bukan `latest`.

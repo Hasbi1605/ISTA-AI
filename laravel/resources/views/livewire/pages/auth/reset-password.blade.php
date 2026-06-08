@@ -1,5 +1,6 @@
 <?php
 
+use App\Rules\NoEmailHeaderInjection;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
@@ -28,7 +29,7 @@ new #[Layout('layouts.auth-canvas')] class extends Component
     {
         $this->validate([
             'token' => ['required'],
-            'email' => ['required', 'string', 'email'],
+            'email' => ['required', 'string', 'email', new NoEmailHeaderInjection],
             'password' => ['required', 'string', 'confirmed', Rules\Password::defaults()],
         ]);
 

@@ -27,7 +27,7 @@
         <div class="relative z-20 px-12 pb-10">
             <x-auth-session-status class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700" :status="session('status')" />
 
-            @if($view === 'login')
+            @if($view === 'login' || ($view === 'register' && ! config('auth.registration.enabled')))
                 @include('livewire.pages.auth.partials.login-form')
 
                 <div class="animate-enter-4 mt-6 text-center">
@@ -38,7 +38,7 @@
                         <span>Kembali ke Beranda</span>
                     </a>
                 </div>
-            @elseif($view === 'register')
+            @elseif($view === 'register' && config('auth.registration.enabled'))
                 @include('livewire.pages.auth.partials.register-form')
                 <div class="animate-enter-4 mt-6 text-center">
                     <a href="{{ url('/') }}" class="group inline-flex items-center gap-2 text-xs font-bold text-rose-900 transition-colors hover:text-amber-600">

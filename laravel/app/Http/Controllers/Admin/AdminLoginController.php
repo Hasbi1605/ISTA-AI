@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AdminAccountAudit;
 use App\Models\User;
+use App\Rules\NoEmailHeaderInjection;
 use App\Services\Admin\AdminAccountAuditService;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Http\RedirectResponse;
@@ -23,9 +24,7 @@ class AdminLoginController extends Controller
      */
     private const GENERIC_FAILURE_MESSAGE = 'Email atau password salah, atau akun tidak dapat mengakses admin.';
 
-    public function __construct(private readonly AdminAccountAuditService $audit)
-    {
-    }
+    public function __construct(private readonly AdminAccountAuditService $audit) {}
 
     public function showLoginForm(Request $request): View|RedirectResponse
     {
@@ -39,7 +38,7 @@ class AdminLoginController extends Controller
     public function login(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'email' => ['required', 'string', 'email', 'max:255'],
+            'email' => ['required', 'string', 'email', new NoEmailHeaderInjection, 'max:255'],
             'password' => ['required', 'string'],
         ]);
 
