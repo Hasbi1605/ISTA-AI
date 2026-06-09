@@ -172,6 +172,7 @@ Chat streaming (RAG/web/knowledge/general), upload + RAG dokumen, generate memo 
 - **Laravel:** `cd laravel && php artisan test`.
 - **Python:** `cd python-ai && source venv/bin/activate && pytest`.
 - Jalankan test pada area terdampak; tambahkan test bila perilaku penting berubah tanpa coverage. Detail di `AGENTS.md` (Verifikasi wajib & Verifikasi Akhir Penuh).
+- **CI/CD:** `.github/workflows/ci-cd.yml` menjalankan Composer/npm/PHPUnit untuk `laravel/`, pytest untuk `python-ai/`, lalu pada `push main` deploy production via SSH ke git checkout server menggunakan `git pull --ff-only`, Docker Compose production, migrasi, restart service, dan smoke check internal.
 - **Production healthcheck Python:** `docker-compose.production.yml` memakai `/api/ready` untuk `python-ai` dan `python-ai-docs` agar deploy gagal cepat bila token internal atau path Chroma belum siap; `/api/health` hanya liveness ringan.
 
 ---

@@ -1,0 +1,255 @@
+name: CI/CD
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: Deploy after CI passes
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: ista-ai-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  laravel:
+    name: Laravel tests and build
+    runs-on: ubuntu-24.04
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: password
+          MYSQL_DATABASE: istanaai_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -ppassword --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    defaults:
+      run:
+        working-directory: laravel
+
+    env:
+      APP_ENV: testing
+      APP_DEBUG: "false"
+      APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      BCRYPT_ROUNDS: "4"
+      CACHE_STORE: array
+      DB_CONNECTION: mysql
+      DB_HOST: 127.0.0.1
+      DB_PORT: "3306"
+      DB_DATABASE: istanaai_test
+      DB_USERNAME: root
+      DB_PASSWORD: password
+      MAIL_MAILER: array
+      QUEUE_CONNECTION: sync
+      SESSION_DRIVER: array
+      AI_SERVICE_TOKEN: test_internal_api_secret
+      ONLYOFFICE_JWT_SECRET: test_onlyoffice_jwt_secret
+      ONLYOFFICE_SIGNED_URL_SECRET: test_onlyoffice_signed_url_secret
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          coverage: none
+          tools: composer:v2
+          extensions: bcmath, curl, fileinfo, gd, intl, mbstring, pcntl, pdo_mysql, redis, zip
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: laravel/package-lock.json
+
+      - name: Validate Composer metadata
+        run: composer validate --strict
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare Laravel environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate --ansi
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Audit PHP dependencies
+        run: composer audit
+
+      - name: Audit frontend dependencies
+        run: npm audit --audit-level=high
+
+      - name: Build frontend assets
+        run: npm run build
+
+      - name: Run Laravel test suite
+        run: php -d memory_limit=-1 vendor/bin/phpunit
+
+  python:
+    name: Python tests
+    runs-on: ubuntu-24.04
+
+    defaults:
+      run:
+        working-directory: python-ai
+
+    env:
+      AI_SERVICE_TOKEN: test_internal_api_secret
+      PYTHONUNBUFFERED: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install runtime libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            fonts-dejavu-core \
+            libcairo2 \
+            libgdk-pixbuf-2.0-0 \
+            libharfbuzz0b \
+            libpango-1.0-0 \
+            libpangoft2-1.0-0 \
+            shared-mime-info
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: python-ai/requirements.txt
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pytest
+
+      - name: Check Python dependency consistency
+        run: python -m pip check
+
+      - name: Prepare Chroma directory
+        run: mkdir -p chroma_data
+
+      - name: Run Python test suite
+        run: pytest
+
+  deploy:
+    name: Deploy production
+    runs-on: ubuntu-24.04
+    needs:
+      - laravel
+      - python
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy))
+    environment: production
+
+    env:
+      DEPLOY_HOST: ${{ secrets.ISTA_DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.ISTA_DEPLOY_USER }}
+      DEPLOY_SSH_KEY: ${{ secrets.ISTA_DEPLOY_SSH_KEY }}
+      DEPLOY_PORT: ${{ secrets.ISTA_DEPLOY_PORT || '22' }}
+      DEPLOY_PATH: ${{ secrets.ISTA_DEPLOY_PATH || '/opt/ista-ai' }}
+      DEPLOY_URL: ${{ secrets.ISTA_DEPLOY_URL }}
+      DEPLOY_KNOWN_HOSTS: ${{ secrets.ISTA_DEPLOY_KNOWN_HOSTS }}
+
+    steps:
+      - name: Validate deployment secrets
+        run: |
+          missing=0
+          for name in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing required GitHub secret for ${name}"
+              missing=1
+            fi
+          done
+          exit "${missing}"
+
+      - name: Configure SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${DEPLOY_SSH_KEY}" > ~/.ssh/ista_ai_deploy_key
+          chmod 600 ~/.ssh/ista_ai_deploy_key
+
+          if [ -n "${DEPLOY_KNOWN_HOSTS}" ]; then
+            printf '%s\n' "${DEPLOY_KNOWN_HOSTS}" > ~/.ssh/known_hosts
+          else
+            ssh-keyscan -p "${DEPLOY_PORT}" -H "${DEPLOY_HOST}" >> ~/.ssh/known_hosts
+          fi
+
+      - name: Deploy on server
+        run: |
+          remote_path="$(printf '%q' "${DEPLOY_PATH}")"
+          ssh -i ~/.ssh/ista_ai_deploy_key -p "${DEPLOY_PORT}" "${DEPLOY_USER}@${DEPLOY_HOST}" "DEPLOY_PATH=${remote_path} bash -se" <<'REMOTE'
+          set -Eeuo pipefail
+
+          cd "${DEPLOY_PATH}"
+
+          if [ ! -d .git ]; then
+            echo "Deploy path is not a git checkout: ${DEPLOY_PATH}"
+            exit 1
+          fi
+
+          if [ ! -f .env.droplet ]; then
+            echo "Missing .env.droplet in ${DEPLOY_PATH}"
+            exit 1
+          fi
+
+          git fetch origin main
+          current_branch="$(git rev-parse --abbrev-ref HEAD)"
+          if [ "${current_branch}" != "main" ]; then
+            git checkout main
+          fi
+          git pull --ff-only origin main
+
+          compose="docker compose --env-file .env.droplet -f docker-compose.production.yml"
+
+          ${compose} config >/tmp/ista-ai-compose-production.yml
+          ${compose} up -d --build --remove-orphans
+          ${compose} exec -T laravel php artisan migrate --force
+          ${compose} restart laravel horizon scheduler
+
+          for service in laravel python-ai python-ai-docs; do
+            ${compose} ps "${service}"
+          done
+
+          ${compose} exec -T laravel curl -fsS http://127.0.0.1:8000/up >/dev/null
+          ${compose} exec -T python-ai curl -fsS http://127.0.0.1:8001/api/ready >/dev/null
+          ${compose} exec -T python-ai-docs curl -fsS http://127.0.0.1:8002/api/ready >/dev/null
+          REMOTE
+
+      - name: Smoke check public URL
+        if: env.DEPLOY_URL != ''
+        run: curl -fsSIL --retry 5 --retry-delay 5 --retry-connrefused "${DEPLOY_URL%/}/up"

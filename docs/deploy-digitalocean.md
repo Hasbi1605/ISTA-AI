@@ -181,6 +181,8 @@ docker compose --env-file .env.droplet -f docker-compose.production.yml exec -T 
 docker compose --env-file .env.droplet -f docker-compose.production.yml restart laravel horizon scheduler
 ```
 
+Jika GitHub Actions CI/CD sudah dikonfigurasi, push ke branch `main` akan menjalankan test Laravel/Python lalu mengeksekusi pola deploy di atas secara otomatis melalui SSH. Lihat `docs/github-actions-cicd.md` untuk daftar secret dan perilaku workflow.
+
 ## 12. Backup Minimum
 
 - aktifkan backup droplet mingguan jika budget cukup
