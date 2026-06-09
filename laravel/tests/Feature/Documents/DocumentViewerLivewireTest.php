@@ -95,19 +95,13 @@ class DocumentViewerLivewireTest extends TestCase
             ->assertSee('data-document-export-format="csv"', false)
             ->assertSee('data-document-export-format="docx"', false)
             ->assertSee('data-document-export-format="pdf"', false)
-            ->assertSee('Simpan ke Google Drive', false)
-            ->assertSee('images/icons/google-drive.svg', false)
-            ->assertSee('Upload ke Drive', false)
-            ->assertDontSee('Upload ke GDrive Kantor', false)
             ->assertSee(':aria-label="exportLoadingLabel()"', false)
             ->assertSee('x-show="isExportLoading()"', false)
-            ->assertSee('x-show="isDriveLoading()"', false)
             ->assertSee(':disabled="isBusy()"', false)
-            ->assertSee(':disabled="isBusy() || !driveUploadAvailable"', false)
-            ->assertSee('data-document-drive-format="xlsx"', false)
-            ->assertSee('data-document-drive-format="csv"', false)
-            ->assertSee('data-document-drive-format="docx"', false)
-            ->assertSee('data-document-drive-format="pdf"', false);
+            ->assertDontSee('Simpan ke Google Drive', false)
+            ->assertDontSee('images/icons/google-drive.svg', false)
+            ->assertDontSee('Upload ke Drive', false)
+            ->assertDontSee('data-document-drive-format', false);
     }
 
     public function test_viewer_renders_export_controls_for_xlsx_document(): void

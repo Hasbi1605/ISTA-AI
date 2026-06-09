@@ -106,8 +106,6 @@ class AdminErrors extends Component
                 AIUsageEvent::FEATURE_DOCUMENT_PROCESSING => 'Proses Dokumen',
                 AIUsageEvent::FEATURE_MEMO_GENERATION => 'Memo: Generate',
                 AIUsageEvent::FEATURE_MEMO_REVISION => 'Memo: Revisi',
-                AIUsageEvent::FEATURE_GOOGLE_DRIVE_IMPORT => 'Drive Import',
-                AIUsageEvent::FEATURE_GOOGLE_DRIVE_EXPORT => 'Drive Export',
             ],
         ]);
     }

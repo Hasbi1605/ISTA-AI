@@ -2,15 +2,10 @@
 
 namespace App\Livewire\Documents;
 
-use App\Models\CloudStorageFile;
 use App\Models\Document;
-use App\Services\CloudStorage\GoogleDriveService;
-use App\Services\DocumentExportService;
 use App\Services\Documents\DocumentPreviewRenderer;
-use App\Support\UserFacingError;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Livewire\Component;
 
 class DocumentViewer extends Component
@@ -19,106 +14,16 @@ class DocumentViewer extends Component
 
     public bool $isOpen = false;
 
-    public ?array $driveUploadResult = null;
-
-    public ?string $driveUploadError = null;
-
     public function open(int $documentId): void
     {
         $this->documentId = $documentId;
         $this->isOpen = true;
-        $this->driveUploadResult = null;
-        $this->driveUploadError = null;
     }
 
     public function close(): void
     {
         $this->isOpen = false;
         $this->documentId = null;
-        $this->driveUploadResult = null;
-        $this->driveUploadError = null;
-    }
-
-    public function saveToGoogleDrive(string $targetFormat, ?string $folderExternalId = null): void
-    {
-        $allowedFormats = ['pdf', 'docx', 'xlsx', 'csv'];
-        if (! in_array(strtolower($targetFormat), $allowedFormats, true)) {
-            $this->dispatch('notify', type: 'error', message: 'Format ekspor tidak valid.');
-
-            return;
-        }
-        $targetFormat = strtolower($targetFormat);
-
-        $userId = Auth::id();
-
-        if ($userId === null) {
-            $this->driveUploadError = 'Anda harus login terlebih dahulu.';
-
-            return;
-        }
-
-        $document = $this->resolveDocument();
-
-        if ($document === null) {
-            $this->driveUploadError = 'Dokumen tidak ditemukan.';
-
-            return;
-        }
-
-        try {
-            $exportService = app(DocumentExportService::class);
-            $artifact = $exportService->exportDocument(
-                $document,
-                $targetFormat,
-                pathinfo((string) ($document->original_name ?: $document->filename), PATHINFO_FILENAME),
-            );
-
-            $tempRelativePath = 'tmp/cloud/google-drive/'.Str::uuid().'.'.strtolower(trim($targetFormat));
-            Storage::disk('local')->put($tempRelativePath, $artifact['body']);
-            $tempAbsolutePath = Storage::disk('local')->path($tempRelativePath);
-
-            try {
-                $driveService = app(GoogleDriveService::class);
-                $upload = $driveService->uploadFromPath(
-                    $tempAbsolutePath,
-                    $artifact['file_name'],
-                    $artifact['content_type'],
-                    $folderExternalId,
-                );
-
-                CloudStorageFile::updateOrCreate(
-                    [
-                        'user_id' => (int) $userId,
-                        'provider' => 'google_drive',
-                        'external_id' => $upload['external_id'],
-                    ],
-                    [
-                        'direction' => CloudStorageFile::DIRECTION_EXPORT,
-                        'local_type' => Document::class,
-                        'local_id' => $document->id,
-                        'name' => $upload['name'],
-                        'mime_type' => $upload['mime_type'],
-                        'web_view_link' => $upload['web_view_link'],
-                        'folder_external_id' => $upload['folder_external_id'],
-                        'size_bytes' => $upload['size_bytes'],
-                        'synced_at' => now(),
-                    ]
-                );
-
-                $this->driveUploadResult = [
-                    'file_name' => $upload['name'],
-                    'web_view_link' => $upload['web_view_link'],
-                    'folder_external_id' => $upload['folder_external_id'],
-                ];
-                $this->driveUploadError = null;
-            } finally {
-                Storage::disk('local')->delete($tempRelativePath);
-            }
-        } catch (\Throwable $e) {
-            report($e);
-            $this->driveUploadError = UserFacingError::message($e, 'Upload ke Google Drive gagal. Coba lagi atau hubungi admin bila berulang.');
-            $this->driveUploadResult = null;
-        }
     }
 
     public function render()
@@ -157,7 +62,6 @@ class DocumentViewer extends Component
             'streamUrl' => $streamUrl,
             'htmlUrl' => $htmlUrl,
             'pdfPreviewAvailable' => $pdfPreviewAvailable,
-            'googleDriveUploadAvailable' => app(GoogleDriveService::class)->canUploadWithConfiguredAccount(),
         ]);
     }
 

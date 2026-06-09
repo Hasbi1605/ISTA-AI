@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Storage;
 class MemoLifecycleService
 {
     /**
-     * Delete a memo and clean up all associated DOCX files and cloud storage records.
+     * Delete a memo and clean up all associated DOCX files.
      *
      * MemoVersion rows are cascade-deleted by the DB foreign key when the memo
      * is force-deleted. For soft-delete we force-delete so the cascade fires and
@@ -26,7 +26,6 @@ class MemoLifecycleService
             ->all();
 
         DB::transaction(function () use ($memo) {
-            $memo->cloudStorageFiles()->delete();
             $memo->versions()->forceDelete();
             $memo->forceDelete();
         });

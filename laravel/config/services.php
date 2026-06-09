@@ -67,18 +67,4 @@ return [
         'force_save_poll_microseconds' => env('ONLYOFFICE_FORCE_SAVE_POLL_MICROSECONDS', 250000),
     ],
 
-    'google_drive' => [
-        'service_account_json' => env('GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON'),
-        'service_account_path' => env('GOOGLE_DRIVE_SERVICE_ACCOUNT_PATH'),
-        'root_folder_id' => env('GOOGLE_DRIVE_ROOT_FOLDER_ID'),
-        'default_upload_folder_name' => env('GOOGLE_DRIVE_UPLOAD_FOLDER_NAME', 'ISTA AI'),
-        'shared_drive_id' => env('GOOGLE_DRIVE_SHARED_DRIVE_ID'),
-        'impersonated_user_email' => env('GOOGLE_DRIVE_IMPERSONATED_USER_EMAIL'),
-        'oauth_client_id' => env('GOOGLE_DRIVE_OAUTH_CLIENT_ID'),
-        'oauth_client_secret' => env('GOOGLE_DRIVE_OAUTH_CLIENT_SECRET'),
-        'oauth_redirect_uri' => env('GOOGLE_DRIVE_OAUTH_REDIRECT_URI'),
-        'oauth_setup_key' => env('GOOGLE_DRIVE_OAUTH_SETUP_KEY'),
-        'oauth_admin_emails' => env('GOOGLE_DRIVE_OAUTH_ADMIN_EMAILS'),
-    ],
-
 ];

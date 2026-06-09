@@ -3,7 +3,6 @@
 namespace App\Livewire\Chat;
 
 use App\Jobs\GenerateChatResponse;
-use App\Models\CloudStorageFile;
 use App\Models\Conversation;
 use App\Models\AIUsageEvent;
 use App\Models\Document;
@@ -13,19 +12,13 @@ use App\Services\Admin\AIUsageEventService;
 use App\Services\AIService;
 use App\Services\Chat\ChatDocumentStateService;
 use App\Services\ChatOrchestrationService;
-use App\Services\CloudStorage\GoogleDriveService;
-use App\Services\DocumentExportService;
 use App\Services\DocumentLifecycleService;
-use App\Support\SafeAssistantMarkdown;
 use App\Support\UserFacingError;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
-use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -415,194 +408,6 @@ class ChatIndex extends Component
         }
     }
 
-    #[On('google-drive-document-imported')]
-    public function refreshDocumentsAfterGoogleDriveImport(?int $documentId = null): void
-    {
-        $this->loadAvailableDocuments();
-
-        if ($documentId !== null) {
-            $document = Document::query()
-                ->whereKey((int) $documentId)
-                ->where('user_id', Auth::id())
-                ->first();
-
-            if ($document) {
-                $this->dispatch('conversation-documents-preview',
-                    ids: $this->conversationDocuments,
-                    documents: [[
-                        'id' => (int) $document->id,
-                        'name' => (string) $document->original_name,
-                        'extension' => (string) $document->extension,
-                        'status' => (string) $document->status,
-                    ]],
-                );
-            }
-        }
-
-        $this->attachmentUploadStatus = 'success';
-        $this->attachmentUploadMessage = 'File Google Drive berhasil ditambahkan dan sedang diproses.';
-
-        session()->flash('message', 'File Google Drive berhasil ditambahkan dan sedang diproses.');
-    }
-
-    /**
-     * Upload a persisted assistant answer to the office Google Drive in the requested format.
-     *
-     * @return array{ok: bool, message?: string, file_name?: string, web_view_link?: ?string, folder_external_id?: ?string}
-     */
-    public function saveAnswerToGoogleDrive(int $messageId, string $targetFormat): array
-    {
-        $userId = Auth::id();
-        $usageEvents = app(AIUsageEventService::class);
-        $startedAt = microtime(true);
-        $requestId = $usageEvents->newRequestId();
-
-        if ($userId === null) {
-            return [
-                'ok' => false,
-                'message' => 'Anda harus login terlebih dahulu.',
-            ];
-        }
-
-        $targetFormat = $this->normalizeDriveExportFormat($targetFormat);
-
-        if ($targetFormat === null) {
-            return [
-                'ok' => false,
-                'message' => 'Format upload Google Drive tidak didukung.',
-            ];
-        }
-
-        if ($this->isRateLimited('saveAnswerToGoogleDrive', 10, 60)) {
-            return [
-                'ok' => false,
-                'message' => 'Terlalu banyak permintaan ekspor Google Drive. Coba lagi sebentar.',
-            ];
-        }
-
-        $message = Message::query()
-            ->whereKey($messageId)
-            ->where('role', 'assistant')
-            ->whereHas('conversation', fn ($query) => $query->where('user_id', $userId))
-            ->first();
-
-        if ($message === null) {
-            return [
-                'ok' => false,
-                'message' => 'Jawaban AI tidak ditemukan.',
-            ];
-        }
-
-        try {
-            $contentHtml = app(SafeAssistantMarkdown::class)->toHtml($message->content);
-
-            if ($this->formatRequiresTable($targetFormat) && ! $this->contentHtmlContainsTable($contentHtml)) {
-                $usageEvents->failed(
-                    feature: AIUsageEvent::FEATURE_GOOGLE_DRIVE_EXPORT,
-                    userId: (int) $userId,
-                    metadata: [
-                        'message_id' => (int) $messageId,
-                        'target_format' => $targetFormat,
-                        'reason' => 'format_requires_table',
-                    ],
-                    requestId: $requestId,
-                    latencyMs: $usageEvents->latencyMsSince($startedAt),
-                    errorCode: 'format_requires_table',
-                    subject: $message,
-                );
-
-                return [
-                    'ok' => false,
-                    'message' => 'Format spreadsheet hanya tersedia untuk jawaban AI yang berisi tabel.',
-                ];
-            }
-
-            $exportService = app(DocumentExportService::class);
-            $artifact = $exportService->exportContent(
-                $contentHtml,
-                $targetFormat,
-                'ista-ai-jawaban-'.$message->id,
-            );
-
-            $tempRelativePath = 'tmp/cloud/google-drive/'.Str::uuid().'.'.$targetFormat;
-            Storage::disk('local')->put($tempRelativePath, $artifact['body']);
-            $tempAbsolutePath = Storage::disk('local')->path($tempRelativePath);
-
-            try {
-                $upload = app(GoogleDriveService::class)->uploadFromPath(
-                    $tempAbsolutePath,
-                    $artifact['file_name'],
-                    $artifact['content_type'],
-                    null,
-                );
-
-                CloudStorageFile::updateOrCreate(
-                    [
-                        'user_id' => (int) $userId,
-                        'provider' => 'google_drive',
-                        'external_id' => $upload['external_id'],
-                    ],
-                    [
-                        'direction' => CloudStorageFile::DIRECTION_EXPORT,
-                        'local_type' => Message::class,
-                        'local_id' => $message->id,
-                        'name' => $upload['name'],
-                        'mime_type' => $upload['mime_type'],
-                        'web_view_link' => $upload['web_view_link'],
-                        'folder_external_id' => $upload['folder_external_id'],
-                        'size_bytes' => $upload['size_bytes'],
-                        'synced_at' => now(),
-                    ]
-                );
-            } finally {
-                Storage::disk('local')->delete($tempRelativePath);
-            }
-
-            $usageEvents->completed(
-                feature: AIUsageEvent::FEATURE_GOOGLE_DRIVE_EXPORT,
-                userId: (int) $userId,
-                metadata: [
-                    'message_id' => (int) $messageId,
-                    'target_format' => $targetFormat,
-                    'provider' => 'google_drive',
-                    'mime_type' => $upload['mime_type'] ?? null,
-                    'size_bytes' => $upload['size_bytes'] ?? null,
-                ],
-                requestId: $requestId,
-                latencyMs: $usageEvents->latencyMsSince($startedAt),
-                subject: $message,
-            );
-
-            return [
-                'ok' => true,
-                'file_name' => $upload['name'],
-                'web_view_link' => $upload['web_view_link'],
-                'folder_external_id' => $upload['folder_external_id'],
-            ];
-        } catch (\Throwable $e) {
-            report($e);
-
-            $usageEvents->failed(
-                feature: AIUsageEvent::FEATURE_GOOGLE_DRIVE_EXPORT,
-                userId: (int) $userId,
-                metadata: [
-                    'message_id' => (int) $messageId,
-                    'target_format' => $targetFormat,
-                    'provider' => 'google_drive',
-                ],
-                requestId: $requestId,
-                latencyMs: $usageEvents->latencyMsSince($startedAt),
-                errorCode: 'exception',
-                subject: $message,
-            );
-
-            return [
-                'ok' => false,
-                'message' => UserFacingError::message($e, 'Upload ke Google Drive gagal. Coba lagi atau hubungi admin bila berulang.'),
-            ];
-        }
-    }
-
     public function deleteConversation($id)
     {
         $conversation = Conversation::where('id', $id)
@@ -611,15 +416,6 @@ class ChatIndex extends Component
 
         if ($conversation) {
             DB::transaction(function () use ($conversation) {
-                $messageIds = $conversation->messages()->pluck('id');
-
-                if ($messageIds->isNotEmpty()) {
-                    CloudStorageFile::query()
-                        ->where('local_type', Message::class)
-                        ->whereIn('local_id', $messageIds)
-                        ->delete();
-                }
-
                 $conversation->delete();
             });
 
@@ -883,9 +679,7 @@ class ChatIndex extends Component
 
     public function render()
     {
-        return view('livewire.chat.chat-index', [
-            'googleDriveUploadAvailable' => app(GoogleDriveService::class)->canUploadWithConfiguredAccount(),
-        ]);
+        return view('livewire.chat.chat-index');
     }
 
     private function conversationHasPendingResponse(Conversation $conversation): bool
@@ -932,25 +726,6 @@ class ChatIndex extends Component
             fn ($id) => (int) $id,
             $this->pendingConversationIds,
         )));
-    }
-
-    private function normalizeDriveExportFormat(string $targetFormat): ?string
-    {
-        $normalized = strtolower(trim($targetFormat));
-
-        return in_array($normalized, ['pdf', 'docx', 'xlsx', 'csv'], true)
-            ? $normalized
-            : null;
-    }
-
-    private function formatRequiresTable(string $targetFormat): bool
-    {
-        return in_array(strtolower(trim($targetFormat)), ['xlsx', 'csv'], true);
-    }
-
-    private function contentHtmlContainsTable(string $contentHtml): bool
-    {
-        return str_contains(Str::lower($contentHtml), '<table');
     }
 
     private function enforceRateLimit(string $action, int $maxAttempts, int $decaySeconds = 60, ?string $message = null): void

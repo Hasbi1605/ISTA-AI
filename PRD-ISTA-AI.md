@@ -79,24 +79,23 @@ WebSockets.
 | FR-U6 | Users can generate an official memorandum (`.docx`) from a structured form / chat context. |
 | FR-U7 | Users can edit a generated memo via OnlyOffice (signed URL + JWT) with force-save persistence and versioning. |
 | FR-U8 | Users can export documents/memos (HTML → PDF/DOCX) and download memo files. |
-| FR-U9 | Users can connect Google Drive (OAuth) and import files into chat/documents. |
 | FR-U10 | Chat history, conversations, and memo versions persist per user. |
 | FR-U11 | Each chat answer records an AI usage event (feature, model, latency, status). |
 
 ### 2.2 Functional Requirements — Admin
 
-| ID | Requirement |
-|----|-------------|
-| FR-A1 | Admins log in via a separate `/admin/login` flow distinct from the user login. |
-| FR-A2 | Admins must complete a forced password change when flagged before accessing the admin app. |
-| FR-A3 | Admins can view a dashboard with KPI metrics aggregated from usage data. |
-| FR-A4 | Admins can view AI usage analytics (chat, web search, document RAG, model, latency). |
-| FR-A5 | Admins can monitor failed/error AI events. |
-| FR-A6 | Admins can manage documents and view ingest-pipeline status. |
-| FR-A7 | Admins can manage users and view presence (online/last active). |
-| FR-A8 | Admins can manage the internal knowledge base (CRUD + ingest pipeline). |
-| FR-A9 | **Super Admins** can manage admin accounts (create/disable/role) with an audit trail. |
-| FR-A10 | Admin account changes are recorded in an immutable audit log (before/after snapshots). |
+| ID     | Requirement                                                                                |
+| --------| --------------------------------------------------------------------------------------------|
+| FR-A1  | Admins log in via a separate `/admin/login` flow distinct from the user login.             |
+| FR-A2  | Admins must complete a forced password change when flagged before accessing the admin app. |
+| FR-A3  | Admins can view a dashboard with KPI metrics aggregated from usage data.                   |
+| FR-A4  | Admins can view AI usage analytics (chat, web search, document RAG, model, latency).       |
+| FR-A5  | Admins can monitor failed/error AI events.                                                 |
+| FR-A6  | Admins can manage documents and view ingest-pipeline status.                               |
+| FR-A7  | Admins can manage users and view presence (online/last active).                            |
+| FR-A8  | Admins can manage the internal knowledge base (CRUD + ingest pipeline).                    |
+| FR-A9  | **Super Admins** can manage admin accounts (create/disable/role) with an audit trail.      |
+| FR-A10 | Admin account changes are recorded in an immutable audit log (before/after snapshots).     |
 
 ### 2.3 Non-Functional Requirements
 
@@ -180,10 +179,11 @@ Admins curate an internal knowledge base. Knowledge documents are ingested via t
 (scope `global_internal`, audience `all_users`). This powers internal-knowledge answers in
 general chat for all users. Reuses the document validator + ingest pipeline.
 
-### 3.6 Google Drive Integration
-OAuth connect/callback (`GoogleDriveOAuthController`) plus a `GoogleDrivePicker` Livewire
-component let users import Drive files into chat/documents and export documents back, tracked
-in `cloud_storage_files`.
+### 3.6 Google Drive Integration (removed)
+The Google Drive integration (OAuth connect/callback, the `GoogleDrivePicker`, and document
+export to Drive) has been removed entirely. Documents are now added only via local upload
+(PDF/DOCX/XLSX/CSV), and answers/documents are exported via local download. The
+`cloud_storage_files` and `google_drive_oauth_connections` tables have been dropped.
 
 ### 3.7 Admin Console
 A dedicated admin app (separate login, role-gated) with:
@@ -280,13 +280,6 @@ access.
 5. OnlyOffice posts to /onlyoffice/callback/{memo}; force-save persists changes and creates
    a new version.
 6. User downloads the memo or exports it to PDF (chat/memos/{memo}/download | export-pdf).
-```
-
-#### 4.1.7 Flow: Google Drive Import
-```
-1. User connects Google Drive via OAuth (connect → Google consent → callback).
-2. The GoogleDrivePicker lists Drive files.
-3. User selects a file → it is imported into chat/documents and tracked in cloud_storage_files.
 ```
 
 ### 4.2 Admin Flow
@@ -439,7 +432,6 @@ GET  /chat/memos/{memo}/signed-file     # signed memo file
 GET  /chat/memos/{memo}/download | /export-pdf ; POST /{memo}/force-save
 GET  /documents/{document}/content-html | /extract-tables ; POST /documents/export
 GET  /documents/{document}/preview/{status,stream,html}
-GET  /chat/google-drive/oauth/{connect,callback}
 GET/POST /admin/login ; POST /admin/logout ; GET/POST /admin/password/change
 GET  /admin , /admin/users, /admin/usage, /admin/errors, /admin/documents, /admin/knowledge
 GET  /admin/accounts                    # super admin
@@ -528,8 +520,8 @@ Document service:
 | user_id | FK → users (cascade) | |
 | filename / original_name | string | original_name unique |
 | file_path | string | private storage path |
-| source_provider | string(40) | local \| google_drive |
-| source_external_id / source_synced_at | nullable | external source metadata |
+| source_provider | string(40) | always `local` (legacy column) |
+| source_external_id / source_synced_at | nullable | legacy external source metadata |
 | preview_html_path | string nullable | rendered preview path |
 | preview_status | enum | pending \| ready \| failed |
 | indexed_chunk_count / embedding_provider / indexed_at | nullable | index metadata |
@@ -630,29 +622,6 @@ Document service:
 | last_synced_at | timestamp nullable | |
 | timestamps | | |
 
-### 6.12 `cloud_storage_files`
-| Column | Type | Notes |
-|--------|------|-------|
-| id | bigint PK | |
-| user_id | FK → users (cascade) | |
-| provider | string(40) | e.g. google_drive |
-| direction | enum | import \| export |
-| local_type / local_id | morphs | polymorphic link to document/memo |
-| external_id / name / mime_type / web_view_link / folder_external_id | | Drive metadata |
-| size_bytes / synced_at | nullable | |
-| timestamps | | index (provider, external_id) |
-
-### 6.13 `google_drive_oauth_connections`
-| Column | Type | Notes |
-|--------|------|-------|
-| id | bigint PK | |
-| provider | string unique | default google_drive |
-| account_email | string nullable | |
-| access_token / refresh_token / token_type / scope | text | tokens (private) |
-| expires_at / last_refreshed_at | timestamp nullable | |
-| connected_by_user_id | FK → users nullable | |
-| timestamps | | |
-
 ### 6.14 `admin_account_audits`
 | Column | Type | Notes |
 |--------|------|-------|
@@ -676,10 +645,8 @@ users 1───* conversations 1───* messages
 users 1───* documents 1───* document_chunks
 users 1───* memos 1───* memo_versions
 users 1───* ai_usage_events
-users 1───* cloud_storage_files
 knowledge_sources 1───* knowledge_documents 1───1 knowledge_chunks
 users (actor) 1───* admin_account_audits *───1 users (target)
-documents/memos *───* cloud_storage_files (polymorphic)
 ```
 
 ---
@@ -963,7 +930,6 @@ Format: Given / When / Then. Written to drive functional test generation.
 | Export document | `/documents/export` | POST | User |
 | Memo force-save (OnlyOffice) | `/onlyoffice/callback/{memo}` | POST | Signed/JWT |
 | Memo download / export PDF | `/chat/memos/{memo}/download` / `/export-pdf` | GET | User |
-| Google Drive connect | `/chat/google-drive/oauth/connect` | GET | User |
 | Admin login | `/admin/login` | POST | Public (guest) |
 | Admin dashboard | `/admin` | GET | Admin |
 | Admin usage | `/admin/usage` | GET | Admin |
@@ -978,7 +944,7 @@ Format: Given / When / Then. Written to drive functional test generation.
 
 | Role | Access |
 |------|--------|
-| User | Chat, documents, memos, exports, Google Drive import |
+| User | Chat, documents, memos, exports |
 | Admin | All user features + admin dashboard, usage, errors, documents, users, knowledge |
 | Super Admin | All Admin access + admin account management with audit trail |
 

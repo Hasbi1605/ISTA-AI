@@ -79,7 +79,6 @@
                                 html: @js((string) $assistantHtml),
                                 exportUrl: @js(route('documents.export')),
                                 exportFileName: @js($exportFileName),
-                                driveUploadAvailable: @js($googleDriveUploadAvailable ?? false),
                             })"
                             class="w-full max-w-[656px]"
                             >
@@ -153,7 +152,6 @@
                         html: () => streamingHtml,
                         exportUrl: @js(route('documents.export')),
                         exportFileName: () => streamedAssistantMessageId ? `ista-ai-jawaban-${streamedAssistantMessageId}` : 'ista-ai-export',
-                        driveUploadAvailable: @js($googleDriveUploadAvailable ?? false),
                     })"
                     :data-answer-message-id="streamedAssistantMessageId || null"
                     class="w-full max-w-[656px]"

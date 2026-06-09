@@ -7,7 +7,6 @@
     "license": "MIT",
     "require": {
         "php": "^8.3",
-        "google/apiclient": "^2.19",
         "laravel/framework": "^13.0",
         "laravel/horizon": "^5.45",
         "laravel/tinker": "^3.0",

@@ -175,7 +175,7 @@
                        @endforeach
                   </div>
               @else
-                  <p class="text-[12px] text-gray-400 mt-6 px-1">Belum ada dokumen. Unggah PDF/DOCX/XLSX/CSV atau pilih dari Google Drive untuk menambahkan konteks chat.</p>
+                  <p class="text-[12px] text-gray-400 mt-6 px-1">Belum ada dokumen. Unggah PDF/DOCX/XLSX/CSV untuk menambahkan konteks chat.</p>
               @endif
               </div>
           </div>

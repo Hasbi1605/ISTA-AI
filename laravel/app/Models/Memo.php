@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Memo extends Model
@@ -71,10 +70,5 @@ class Memo extends Model
     public function currentVersion(): BelongsTo
     {
         return $this->belongsTo(MemoVersion::class, 'current_version_id');
-    }
-
-    public function cloudStorageFiles(): MorphMany
-    {
-        return $this->morphMany(CloudStorageFile::class, 'local');
     }
 }

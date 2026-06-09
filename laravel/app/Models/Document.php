@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Document extends Model
 {
@@ -115,10 +114,5 @@ class Document extends Model
     public function chunks(): HasMany
     {
         return $this->hasMany(DocumentChunk::class);
-    }
-
-    public function cloudStorageFiles(): MorphMany
-    {
-        return $this->morphMany(CloudStorageFile::class, 'local');
     }
 }

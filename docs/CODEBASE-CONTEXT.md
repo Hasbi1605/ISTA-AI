@@ -43,11 +43,10 @@ maupun `channels.php`** (SSE = HTTP biasa, tanpa broadcast channel).
 - **Chat/** `ChatStreamController` — **endpoint inti SSE** `GET /chat/stream/{conversationId}`: validasi ownership, rebuild history dari DB, resolve konteks dokumen, panggil `AIService::sendChat()`, stream event `chunk/model-name/sources/final-content/message-id/done`, persist pesan assistant idempoten (single-runner claim), log `AIUsageEvent`.
 - **Documents/** `DocumentExportController` (extractContent/extractTables/export), `DocumentPreviewController` (status/stream SSE/html).
 - **Memos/** `MemoFileController` (signed/download/exportPdf/forceSave docx).
-- **CloudStorage/** `GoogleDriveOAuthController` (connect/callback).
 - **Root** `OnlyOfficeCallbackController` (`POST /onlyoffice/callback/{memo}`), `Controller` (base).
 
 ### 2.2 Livewire — "controller" UI sesungguhnya (`app/Livewire`)
-- **Chat/** `ChatIndex` (workspace chat+memo bertab, route `chat/{id?}`), `GoogleDrivePicker`.
+- **Chat/** `ChatIndex` (workspace chat+memo bertab, route `chat/{id?}`).
 - **Memos/** `MemoIndex`, `MemoWorkspace` (generate/edit memo).
 - **Documents/** `DocumentViewer`.
 - **Admin/** `AdminDashboard`, `AdminUsers`, `AdminUsage`, `AdminErrors`, `AdminDocuments`, `AdminKnowledge`, `AdminAccounts` (super-admin).
@@ -63,20 +62,19 @@ Subfolder:
 - **Admin/** `AdminMetricsService`, `AIUsageEventService`, `AdminUserManagementService`, `AdminAccountManagementService`, `AdminAccountAuditService`.
 - **Auth/** `PasswordResetLinkService`, `PendingRegistrationService`, `PendingRegistrationWorkflowService`.
 - **Chat/** `ChatDocumentStateService`.
-- **CloudStorage/** `GoogleDriveOAuthService` (setup koneksi Drive pusat wajib active admin/super-admin + setup key/allowlist email), `GoogleDriveService`.
 - **Documents/** `DocumentPreviewRenderer`, `DocumentExportHtmlSanitizer`.
 - **Knowledge/** `KnowledgeLifecycleService` (ingest KB → python `/api/knowledge`, archive/activate sync metadata Chroma via status endpoint).
 - **Memo/** `MemoGenerationService` (→ python `/api/memos/generate-body`), `MemoLifecycleService`, `MemoDocumentStructureExtractor`.
 - **OnlyOffice/** `DocumentConverter`, `DocxTextExtractor`, `DocxValidator`, `JwtSigner`, `MemoDocumentKey`, `MemoForceSaveService`, `ForceSaveException`.
 
 ### 2.4 Models / Jobs / Middleware
-- **Models:** `User`, `Conversation`, `Message`, `Document`, `DocumentChunk`, `Memo`, `MemoVersion`, `KnowledgeDocument`, `KnowledgeChunk`, `KnowledgeSource`, `CloudStorageFile`, `GoogleDriveOAuthConnection`, `AIUsageEvent`, `AdminAccountAudit`.
+- **Models:** `User`, `Conversation`, `Message`, `Document`, `DocumentChunk`, `Memo`, `MemoVersion`, `KnowledgeDocument`, `KnowledgeChunk`, `KnowledgeSource`, `AIUsageEvent`, `AdminAccountAudit`.
 - **Jobs:** `GenerateChatResponse` (jalur async chat, komplemen SSE), `ProcessDocument` (→ python `/api/documents/process`), `ProcessKnowledgeDocument` (→ `/api/knowledge/process`, memakai `processing_claim_token` agar retry lama tidak menimpa attempt baru), `RenderDocumentPreview`.
 - **Middleware:** `EnsureUserIsAdmin` (`admin`), `EnsureUserIsSuperAdmin` (`super_admin`), `EnsureAdminPasswordChanged` (`admin.password_changed`), `UpdateUserPresence`, `AddSecurityHeaders` (CSP; `unsafe-eval` opt-in via `SECURITY_CSP_ALLOW_UNSAFE_EVAL`).
 - **Events:** `BookingCreated/BookingStatusChanged/FeedbackSubmitted/ScheduleUpdated` — **sisa domain lama (booking)**, tidak terhubung ke flow chat/memo. Jangan diandalkan untuk fitur AI.
 
 ### 2.5 Routes (`routes/`) — hanya `web.php`, `auth.php`, `console.php`
-- **web.php:** dashboard `/`; `chat/{id?}` (ChatIndex); `chat/stream/{conversationId}` (SSE); `onlyoffice/callback/{memo}` (JWT + trusted OnlyOffice URL scheme/host/port); grup `chat/memos/*` (download/export-pdf/force-save/signed); legacy `memos/*` redirect ke `/chat?tab=memo`; `documents/*` (content-html, extract-tables, export, preview/*); Google Drive OAuth (auth+verified, service mewajibkan active admin/super-admin + setup key/allowlist email); admin auth (`/admin/login`, logout, password change); admin app (`auth+verified+admin+admin.password_changed`): `/admin`, `/users`, `/usage`, `/errors`, `/documents`, `/knowledge`; super-admin: `/admin/accounts`.
+- **web.php:** dashboard `/`; `chat/{id?}` (ChatIndex); `chat/stream/{conversationId}` (SSE); `onlyoffice/callback/{memo}` (JWT + trusted OnlyOffice URL scheme/host/port); grup `chat/memos/*` (download/export-pdf/force-save/signed); legacy `memos/*` redirect ke `/chat?tab=memo`; `documents/*` (content-html, extract-tables, export, preview/*); admin auth (`/admin/login`, logout, password change); admin app (`auth+verified+admin+admin.password_changed`): `/admin`, `/users`, `/usage`, `/errors`, `/documents`, `/knowledge`; super-admin: `/admin/accounts`.
 - **auth.php:** Volt pages login/forgot/reset/verify/confirm; register → redirect login register-view hanya jika `PUBLIC_REGISTRATION_ENABLED=true` (production private default tertutup).
 - **Horizon:** `/horizon` memakai middleware `web+auth+verified+super_admin+admin.password_changed` dan gate `viewHorizon`; hanya super-admin aktif yang tidak sedang wajib ganti password boleh akses.
 - **console.php:** `documents:purge-deleted --days=7` (03:00), `chat:resolve-stale-responses --minutes=10` (tiap menit).
@@ -87,7 +85,7 @@ Subfolder:
 - **views/**: `dashboard`, `profile`; `livewire/chat/*` (+partials), `livewire/memos/*`, `livewire/documents/*`, `livewire/admin/*` (dashboard/users/usage/errors/documents/knowledge/accounts), Volt auth pages, `components/admin/*` (design system: sidebar/table/tabs/kpi-card/badge/filter/empty-state), `layouts/` (app/admin/guest/auth-canvas), `emails/`.
 
 ### 2.7 Database (`laravel/database`)
-Tabel utama: `users` (+verification_code, role/presence, kolom keamanan admin), `conversations`, `messages` (+document_ids), `documents` (metadata file, preview, index, unique original_name), `document_chunks`, `memos` (+chat_messages, configuration), `memo_versions`, `cloud_storage_files`, `google_drive_oauth_connections`, `ai_usage_events`, knowledge (`knowledge_sources`/`knowledge_documents`/`knowledge_chunks`), `admin_account_audits`, `activity_log` (spatie) + cache/jobs. Migrasi lama menghapus tabel `ai_configuration` (config AI sekarang YAML-driven). Seeder: `DatabaseSeeder`; factory: `UserFactory`.
+Tabel utama: `users` (+verification_code, role/presence, kolom keamanan admin), `conversations`, `messages` (+document_ids), `documents` (metadata file, preview, index, unique original_name), `document_chunks`, `memos` (+chat_messages, configuration), `memo_versions`, `ai_usage_events`, knowledge (`knowledge_sources`/`knowledge_documents`/`knowledge_chunks`), `admin_account_audits`, `activity_log` (spatie) + cache/jobs. Migrasi lama menghapus tabel `ai_configuration` (config AI sekarang YAML-driven) serta `cloud_storage_files` dan `google_drive_oauth_connections` (integrasi Google Drive sudah dihapus total). Seeder: `DatabaseSeeder`; factory: `UserFactory`.
 
 ---
 
@@ -140,7 +138,7 @@ Tabel utama: `users` (+verification_code, role/presence, kolom keamanan admin), 
 ---
 
 ## 4. Fitur Utama
-Chat streaming (RAG/web/knowledge/general), upload + RAG dokumen, generate memo (DOCX) + edit OnlyOffice, export dokumen (HTML→PDF/docx), import Google Drive, knowledge base internal (admin). Admin: dashboard KPI, usage analytics, manajemen dokumen/user/error/knowledge, akun admin (super-admin) + audit.
+Chat streaming (RAG/web/knowledge/general), upload + RAG dokumen, generate memo (DOCX) + edit OnlyOffice, export dokumen (HTML→PDF/docx), knowledge base internal (admin). Admin: dashboard KPI, usage analytics, manajemen dokumen/user/error/knowledge, akun admin (super-admin) + audit.
 
 ---
 
@@ -151,7 +149,6 @@ Chat streaming (RAG/web/knowledge/general), upload + RAG dokumen, generate memo 
 - **Upload dokumen + RAG:** upload via sidebar chat → row `Document` + job `ProcessDocument` → python `/api/documents/process` (subprocess ingest → chunk/embed/PDR → Chroma). Dokumen aktif menyetel chat ke mode RAG. Preview via `documents/{document}/preview/*`. Summarize via `/api/documents/summarize`.
 - **Memo:** `MemoWorkspace` → `MemoGenerationService` → python `/api/memos/generate-body` (DOCX + `MemoVersion`). Edit via OnlyOffice (`OnlyOfficeCallbackController` + JWT + URL OnlyOffice trusted scheme/host/port) dengan force-save.
 - **Export:** `POST /documents/export` & memo `export-pdf`/`download` → python `/api/documents/export`.
-- **Google Drive:** OAuth connect/callback hanya boleh dilakukan active admin/super-admin yang lolos setup key/allowlist email; setelah koneksi pusat tersedia, `GoogleDrivePicker` → impor file PDF/DOCX/XLSX/CSV ke chat/dokumen untuk user. File binary lain seperti `.txt` ditandai tidak processable dan ditolak sebelum queue ingest.
 
 ### 5.2 Flow Admin (`/admin`, guard `admin`/`super_admin` + `admin.password_changed`)
 - **Usage:** analitik AI dari `ai_usage_events` (chat/web_search/document_rag, model, latensi).
@@ -181,7 +178,6 @@ Chat streaming (RAG/web/knowledge/general), upload + RAG dokumen, generate memo 
 - python-ai dilindungi bearer token (`verify_token`); jangan log isi prompt/dokumen.
 - ChromaDB dipakai embedded oleh service Python melalui volume `chroma_data`; compose production tidak mempublish port Chroma ke publik.
 - Public self-registration ditutup default di production agar knowledge/dokumen privat hanya diakses akun yang disetujui.
-- Setup Google Drive pusat wajib active admin/super-admin dan allowlist email/setup key; email allowlist saja tidak cukup.
 - Callback OnlyOffice memakai JWT ber-`exp`, key memo/version segar, anti-replay, validasi DOCX, dan URL download yang harus cocok scheme/host/port trusted.
 - Email input user-controlled memakai `App\Rules\NoEmailHeaderInjection` di auth/profile/admin untuk menolak CR/LF/control chars sebelum email dipakai di reset/register/admin account flows.
 - Token, secret OnlyOffice, kredensial DB, OAuth, API key provider → hanya di `.env` lokal/deploy, jangan commit. Jangan commit dokumen produksi, dump DB, service-account JSON, atau data Chroma.

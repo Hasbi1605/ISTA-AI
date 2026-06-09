@@ -5,14 +5,12 @@ namespace Tests\Feature\Chat;
 use App\Jobs\GenerateChatResponse;
 use App\Jobs\ProcessDocument;
 use App\Livewire\Chat\ChatIndex;
-use App\Models\CloudStorageFile;
 use App\Models\Conversation;
 use App\Models\Document;
 use App\Models\Message;
 use App\Models\User;
 use App\Services\AIService;
 use App\Services\ChatOrchestrationService;
-use App\Services\DocumentExportService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -413,41 +411,6 @@ class ChatUiTest extends TestCase
         $this->assertCount(0, Message::where('conversation_id', $conversationA->id)->get());
     }
 
-    public function test_save_answer_to_google_drive_rate_limited_returns_error_before_export_service_call(): void
-    {
-        $user = User::factory()->create();
-        $conversation = Conversation::create([
-            'user_id' => $user->id,
-            'title' => 'Drive export limiter',
-        ]);
-        $message = Message::create([
-            'conversation_id' => $conversation->id,
-            'role' => 'assistant',
-            'content' => 'Jawaban untuk diuji.',
-        ]);
-
-        $this->app->bind(DocumentExportService::class, fn () => new class extends DocumentExportService
-        {
-            public function exportContent(string $html, string $format, string $basename = 'document'): array
-            {
-                throw new \RuntimeException('DocumentExportService should not be called when rate-limited.');
-            }
-        });
-
-        $key = ChatIndex::class.':saveAnswerToGoogleDrive:user-'.$user->id.':127.0.0.1';
-        for ($i = 0; $i < 10; $i++) {
-            RateLimiter::hit($key, 60);
-        }
-
-        Livewire::actingAs($user)
-            ->test(ChatIndex::class)
-            ->call('saveAnswerToGoogleDrive', $message->id, 'pdf')
-            ->assertReturned([
-                'ok' => false,
-                'message' => 'Terlalu banyak permintaan ekspor Google Drive. Coba lagi sebentar.',
-            ]);
-    }
-
     public function test_assistant_markdown_image_is_not_rendered_as_external_image(): void
     {
         $user = User::factory()->create();
@@ -601,11 +564,6 @@ class ChatUiTest extends TestCase
             ->assertSee('data-chat-history-section=', false)
             ->assertSee('x-show="isHistorySectionOpen(', false)
             ->assertSee('sectionHasActivity(', false)
-            ->assertSee('openGoogleDrivePicker()', false)
-            ->assertSee('open-google-drive-picker', false)
-            ->assertSee('Ambil dokumen dari Google Drive Kantor', false)
-            ->assertSee('images/icons/google-drive.svg', false)
-            ->assertSee('Pilih file untuk chat', false)
             ->assertSee('chat-tab-switch', false)
             ->assertSee('activeTab === \'chat\'', false)
             ->assertDontSee('wire:click="$set(\'tab\', \'chat\')"', false)
@@ -773,42 +731,6 @@ class ChatUiTest extends TestCase
             'role' => 'assistant',
             'content' => 'Maaf, jawaban gagal diproses. Silakan coba kirim ulang.',
         ]);
-    }
-
-    public function test_delete_conversation_removes_message_cloud_storage_files(): void
-    {
-        $user = User::factory()->create();
-        $conversation = Conversation::create([
-            'user_id' => $user->id,
-            'title' => 'Conversation dengan export',
-        ]);
-        $message = Message::create([
-            'conversation_id' => $conversation->id,
-            'role' => 'assistant',
-            'content' => 'Jawaban yang pernah diexport',
-        ]);
-        CloudStorageFile::create([
-            'user_id' => $user->id,
-            'provider' => 'google_drive',
-            'direction' => CloudStorageFile::DIRECTION_EXPORT,
-            'local_type' => Message::class,
-            'local_id' => $message->id,
-            'external_id' => 'drive-message-delete-test',
-            'name' => 'jawaban.pdf',
-            'mime_type' => 'application/pdf',
-            'synced_at' => now(),
-        ]);
-
-        Livewire::actingAs($user)
-            ->test(ChatIndex::class, ['id' => $conversation->id])
-            ->call('deleteConversation', $conversation->id);
-
-        $this->assertDatabaseMissing('cloud_storage_files', [
-            'local_type' => Message::class,
-            'local_id' => $message->id,
-        ]);
-        $this->assertDatabaseMissing('messages', ['id' => $message->id]);
-        $this->assertDatabaseMissing('conversations', ['id' => $conversation->id]);
     }
 
     public function test_load_conversation_orders_messages_by_id_when_timestamps_match(): void
@@ -1148,10 +1070,9 @@ class ChatUiTest extends TestCase
             ->assertSee('Tersalin', false)
             ->assertSee('Bagikan', false)
             ->assertDontSee('text-[#25D366]', false)
-            ->assertSee('Upload ke Google Drive', false)
-            ->assertSee('images/icons/google-drive.svg', false)
-            ->assertSee('driveButtonLabel()', false)
-            ->assertSee('Upload ke Drive', false)
+            ->assertDontSee('Upload ke Google Drive', false)
+            ->assertDontSee('images/icons/google-drive.svg', false)
+            ->assertDontSee('Upload ke Drive', false)
             ->assertSee('Ekspor', false)
             ->assertSee('PDF', false)
             ->assertSee('DOCX', false)
@@ -1594,7 +1515,6 @@ class ChatUiTest extends TestCase
             ->assertSee('messageId: () => streamedAssistantMessageId', false)
             ->assertSee('html: () => streamingHtml', false)
             ->assertSee(':class="streamingText === \'\' ? \'inline-flex items-center w-auto\' : \'\'"', false)
-            ->assertSee('resolvedMessageId()', false)
             ->assertDontSee('flex flex-row items-start gap-4 px-2 sm:px-8', false)
             ->assertDontSee('x-show="modelName"', false);
     }
@@ -1691,29 +1611,6 @@ class ChatUiTest extends TestCase
         } finally {
             Carbon::setTestNow();
         }
-    }
-
-    public function test_google_drive_import_processing_document_is_not_added_as_ready_context(): void
-    {
-        $user = User::factory()->create();
-        $document = Document::create([
-            'user_id' => $user->id,
-            'filename' => 'drive-import.pdf',
-            'original_name' => 'drive-import.pdf',
-            'file_path' => 'documents/'.$user->id.'/drive-import.pdf',
-            'source_provider' => 'google_drive',
-            'source_external_id' => 'drive-import-id',
-            'source_synced_at' => now(),
-            'mime_type' => 'application/pdf',
-            'file_size_bytes' => 1234,
-            'status' => 'processing',
-        ]);
-
-        Livewire::actingAs($user)
-            ->test(ChatIndex::class)
-            ->call('refreshDocumentsAfterGoogleDriveImport', $document->id)
-            ->assertSet('conversationDocuments', [])
-            ->assertDispatched('conversation-documents-preview');
     }
 
     public function test_load_conversations_uses_id_desc_as_tiebreaker_for_same_updated_at(): void

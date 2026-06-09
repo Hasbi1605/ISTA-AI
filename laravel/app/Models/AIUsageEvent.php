@@ -42,10 +42,6 @@ class AIUsageEvent extends Model
 
     public const FEATURE_MEMO_REVISION = 'memo_revision';
 
-    public const FEATURE_GOOGLE_DRIVE_IMPORT = 'google_drive_import';
-
-    public const FEATURE_GOOGLE_DRIVE_EXPORT = 'google_drive_export';
-
     public const FEATURE_KNOWLEDGE_ADMIN = 'knowledge_admin';
 
     public const ACTION_STARTED = 'started';

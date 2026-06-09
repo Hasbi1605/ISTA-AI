@@ -2182,15 +2182,10 @@ const registerChatPageData = (Alpine) => {
         exportUrl: config.exportUrl || '',
         exportFileName: config.exportFileName || 'ista-ai-export',
         exportFileNameSource: config.exportFileName,
-        driveUploadAvailable: Boolean(config.driveUploadAvailable),
         exportMenuOpen: false,
-        driveMenuOpen: false,
         copied: false,
         exportLoading: false,
         exportError: '',
-        driveLoading: false,
-        driveError: '',
-        driveResult: null,
 
         resolvedConfigValue(value, fallback = '') {
             if (typeof value === 'function') {
@@ -2301,36 +2296,12 @@ const registerChatPageData = (Alpine) => {
             return this.copied ? 'Tersalin' : 'Salin';
         },
 
-        driveButtonLabel() {
-            if (!this.driveUploadAvailable) {
-                return 'Google Drive belum tersedia untuk jawaban ini.';
-            }
-
-            if (!this.resolvedMessageId()) {
-                return 'Jawaban belum tersimpan.';
-            }
-
-            return this.driveLoading ? 'Mengupload ke Google Drive' : 'Upload ke Google Drive';
-        },
-
         toggleExportMenu() {
             if (this.exportLoading) {
                 return;
             }
 
-            this.driveMenuOpen = false;
             this.exportMenuOpen = !this.exportMenuOpen;
-        },
-
-        toggleDriveMenu() {
-            if (this.driveLoading || !this.driveUploadAvailable) {
-                this.driveError = 'Simpan ke Google Drive belum tersedia untuk jawaban ini.';
-                return;
-            }
-
-            this.exportMenuOpen = false;
-            this.driveMenuOpen = !this.driveMenuOpen;
-            this.driveError = '';
         },
 
         async copyToClipboard() {
@@ -2460,34 +2431,6 @@ const registerChatPageData = (Alpine) => {
                     : 'Ekspor gagal. Coba lagi.';
             } finally {
                 this.exportLoading = false;
-            }
-        },
-
-        async uploadToGoogleDrive(format) {
-            const messageId = this.resolvedMessageId();
-
-            if (!messageId || this.driveLoading || !this.driveUploadAvailable) {
-                return;
-            }
-
-            this.driveMenuOpen = false;
-            this.driveLoading = true;
-            this.driveError = '';
-            this.driveResult = null;
-
-            try {
-                const result = await this.$wire.saveAnswerToGoogleDrive(messageId, format);
-
-                if (!result?.ok) {
-                    throw new Error(result?.message || 'Upload ke Google Drive gagal.');
-                }
-
-                this.driveResult = result;
-            } catch (error) {
-                console.error('Gagal mengupload jawaban AI ke Google Drive', error);
-                this.driveError = error?.message || 'Upload ke Google Drive gagal. Coba lagi.';
-            } finally {
-                this.driveLoading = false;
             }
         },
     }));
@@ -2839,10 +2782,6 @@ const registerChatPageData = (Alpine) => {
 
             input.value = '';
             input.click();
-        },
-
-        openGoogleDrivePicker() {
-            this.$dispatch('open-google-drive-picker');
         },
 
         scrollChatToBottom(smooth = false) {
@@ -3415,9 +3354,7 @@ const registerChatPageData = (Alpine) => {
         exportUrl: config.exportUrl || '',
         fileName: config.fileName || 'ista-ai-tabel-dokumen',
         preferTableExtraction: Boolean(config.preferTableExtraction),
-        driveUploadAvailable: Boolean(config.driveUploadAvailable),
         exportMenuOpen: false,
-        driveMenuOpen: false,
         loadingAction: null,
         error: '',
         contentHtml: '',
@@ -3431,16 +3368,11 @@ const registerChatPageData = (Alpine) => {
             return this.loadingAction === 'export';
         },
 
-        isDriveLoading() {
-            return this.loadingAction === 'drive';
-        },
-
         toggleMenu() {
             if (this.isBusy()) {
                 return;
             }
 
-            this.driveMenuOpen = false;
             this.exportMenuOpen = !this.exportMenuOpen;
             this.error = '';
         },
@@ -3449,32 +3381,12 @@ const registerChatPageData = (Alpine) => {
             return this.isExportLoading() ? 'Menyiapkan ekspor' : 'Ekspor';
         },
 
-        driveButtonLabel() {
-            if (!this.driveUploadAvailable) {
-                return 'Simpan ke Google Drive belum tersedia untuk dokumen ini.';
-            }
-
-            return this.isDriveLoading() ? 'Menyiapkan upload ke Google Drive' : 'Upload ke Google Drive Kantor';
-        },
-
-        toggleDriveMenu() {
-            if (this.isBusy() || !this.driveUploadAvailable) {
-                this.error = 'Simpan ke Google Drive belum tersedia untuk dokumen ini.';
-                return;
-            }
-
-            this.exportMenuOpen = false;
-            this.driveMenuOpen = !this.driveMenuOpen;
-            this.error = '';
-        },
-
         async exportTablesAs(format) {
             if (!this.exportUrl || this.isBusy()) {
                 return;
             }
 
             this.exportMenuOpen = false;
-            this.driveMenuOpen = false;
             this.loadingAction = 'export';
             this.error = '';
 
@@ -3508,26 +3420,6 @@ const registerChatPageData = (Alpine) => {
             } catch (error) {
                 console.error('Gagal mengekspor dokumen', error);
                 this.error = error?.message || 'Gagal mengekspor dokumen.';
-            } finally {
-                this.loadingAction = null;
-            }
-        },
-
-        async saveToGoogleDrive(format) {
-            if (this.isBusy() || !this.driveUploadAvailable) {
-                return;
-            }
-
-            this.exportMenuOpen = false;
-            this.driveMenuOpen = false;
-            this.loadingAction = 'drive';
-            this.error = '';
-
-            try {
-                await this.$wire.saveToGoogleDrive(format);
-            } catch (error) {
-                console.error('Gagal menyimpan dokumen ke Google Drive', error);
-                this.error = error?.message || 'Gagal menyimpan ke Google Drive.';
             } finally {
                 this.loadingAction = null;
             }

@@ -39,53 +39,6 @@
         <span class="sr-only">Bagikan ke WhatsApp</span>
     </button>
 
-    <div class="relative" x-on:click.outside="driveMenuOpen = false">
-        <button
-            type="button"
-            @click="toggleDriveMenu()"
-            :disabled="driveLoading || !driveUploadAvailable || !resolvedMessageId()"
-            :title="driveButtonLabel()"
-            :aria-label="driveButtonLabel()"
-            class="inline-flex h-8 w-8 items-center justify-center rounded-lg transition hover:bg-white/80 hover:text-stone-900 disabled:cursor-not-allowed dark:hover:bg-gray-800/80 dark:hover:text-gray-100"
-        >
-            <span x-show="driveLoading" class="h-[18px] w-[18px] rounded-full border-2 border-current border-t-transparent animate-spin" aria-hidden="true"></span>
-            <span
-                x-show="!driveLoading"
-                class="h-[18px] w-[18px] bg-current"
-                style="-webkit-mask: url('{{ $uiIcons['googleDrive'] }}') center / contain no-repeat; mask: url('{{ $uiIcons['googleDrive'] }}') center / contain no-repeat;"
-                aria-hidden="true"
-            ></span>
-            <span class="sr-only">Upload ke Google Drive</span>
-        </button>
-
-        <div
-            x-show="driveMenuOpen"
-            x-transition.opacity
-            class="absolute left-0 z-20 mt-2 w-52 overflow-hidden rounded-xl border border-stone-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-800"
-            style="display: none;"
-        >
-            <div class="border-b border-stone-200 bg-stone-50 px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-500 dark:border-gray-700 dark:bg-gray-800/80 dark:text-gray-400">
-                Upload ke Drive
-            </div>
-            <button type="button" @click="uploadToGoogleDrive('pdf')" class="flex w-full items-center justify-between px-4 py-2.5 text-left text-[12px] text-stone-700 transition hover:bg-stone-50 dark:text-gray-100 dark:hover:bg-gray-700/80">
-                <span>PDF</span>
-                <span class="text-[10px] text-[#64748B] dark:text-[#94A3B8]">Laporan</span>
-            </button>
-            <button type="button" @click="uploadToGoogleDrive('docx')" class="flex w-full items-center justify-between px-4 py-2.5 text-left text-[12px] text-stone-700 transition hover:bg-stone-50 dark:text-gray-100 dark:hover:bg-gray-700/80">
-                <span>DOCX</span>
-                <span class="text-[10px] text-[#64748B] dark:text-[#94A3B8]">Word</span>
-            </button>
-            <button type="button" @click="uploadToGoogleDrive('xlsx')" class="flex w-full items-center justify-between px-4 py-2.5 text-left text-[12px] text-stone-700 transition hover:bg-stone-50 dark:text-gray-100 dark:hover:bg-gray-700/80">
-                <span>XLSX</span>
-                <span class="text-[10px] text-[#64748B] dark:text-[#94A3B8]">Sheet</span>
-            </button>
-            <button type="button" @click="uploadToGoogleDrive('csv')" class="flex w-full items-center justify-between px-4 py-2.5 text-left text-[12px] text-stone-700 transition hover:bg-stone-50 dark:text-gray-100 dark:hover:bg-gray-700/80">
-                <span>CSV</span>
-                <span class="text-[10px] text-[#64748B] dark:text-[#94A3B8]">Tabel</span>
-            </button>
-        </div>
-    </div>
-
     <div class="relative" x-on:click.outside="exportMenuOpen = false">
         <button
             type="button"
@@ -146,14 +99,3 @@
 </div>
 
 <p x-show="exportError" x-transition.opacity class="mt-1 text-[11px] text-rose-500" x-text="exportError"></p>
-<p x-show="driveError" x-transition.opacity class="mt-1 text-[11px] text-rose-500" x-text="driveError"></p>
-<div x-show="driveResult" x-transition.opacity class="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100" style="display: none;">
-    <span class="font-medium">Tersimpan ke Google Drive</span>
-    <a x-show="driveResult?.web_view_link"
-       :href="driveResult?.web_view_link"
-       target="_blank"
-       rel="noreferrer"
-       class="font-semibold underline decoration-emerald-500/40 underline-offset-2 hover:text-emerald-900 dark:hover:text-white">
-        Buka di Drive
-    </a>
-</div>
