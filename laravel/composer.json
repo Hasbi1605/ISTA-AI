@@ -6,11 +6,11 @@
     "keywords": ["laravel", "framework"],
     "license": "MIT",
     "require": {
-        "php": "^8.2",
+        "php": "^8.3",
         "google/apiclient": "^2.19",
-        "laravel/framework": "^11.31",
+        "laravel/framework": "^13.0",
         "laravel/horizon": "^5.45",
-        "laravel/tinker": "^2.9",
+        "laravel/tinker": "^3.0",
         "livewire/livewire": "^3.6.4",
         "livewire/volt": "^1.7.0",
         "phpoffice/phpspreadsheet": "^5.7",
@@ -70,11 +70,6 @@
         "optimize-autoloader": true,
         "preferred-install": "dist",
         "sort-packages": true,
-        "audit": {
-            "ignore": {
-                "PKSA-mdq4-51ck-6kdq": "Laravel 11 has no patched release for CVE-2026-48019; app email validation adds NoEmailHeaderInjection on user-controlled email flows until Laravel 12 upgrade."
-            }
-        },
         "allow-plugins": {
             "pestphp/pest-plugin": true,
             "php-http/discovery": true
