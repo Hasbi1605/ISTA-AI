@@ -13,6 +13,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class KnowledgeLifecycleService
@@ -241,18 +242,23 @@ class KnowledgeLifecycleService
 
     public function dispatchProcessing(KnowledgeDocument $document): void
     {
+        $claimToken = Str::uuid()->toString();
+
         $document->update([
             'status' => KnowledgeDocument::STATUS_PROCESSING,
+            'processing_claim_token' => $claimToken,
             'failed_at' => null,
             'error_code' => null,
             'error_message' => null,
         ]);
 
-        ProcessKnowledgeDocument::dispatch($document);
+        ProcessKnowledgeDocument::dispatch($document->refresh(), $claimToken);
     }
 
     public function activate(KnowledgeDocument $document, User $admin): KnowledgeDocument
     {
+        $this->syncVectorStatus($document, KnowledgeDocument::STATUS_ACTIVE);
+
         $document->update([
             'status' => KnowledgeDocument::STATUS_ACTIVE,
             'archived_at' => null,
@@ -274,6 +280,8 @@ class KnowledgeLifecycleService
 
     public function archive(KnowledgeDocument $document, User $admin): KnowledgeDocument
     {
+        $this->syncVectorStatus($document, KnowledgeDocument::STATUS_ARCHIVED);
+
         $document->update([
             'status' => KnowledgeDocument::STATUS_ARCHIVED,
             'archived_at' => now(),
@@ -333,15 +341,31 @@ class KnowledgeLifecycleService
         return (bool) $deleted;
     }
 
-    public function recordProcessingSuccess(KnowledgeDocument $document, ?string $provider, ?int $chunkCount, ?int $successfulChunks, ?int $failedChunks): void
+    public function recordProcessingSuccess(KnowledgeDocument $document, ?string $provider, ?int $chunkCount, ?int $successfulChunks, ?int $failedChunks, ?string $claimToken = null): bool
     {
-        $document->update([
+        $query = KnowledgeDocument::query()->whereKey($document->id);
+
+        if ($claimToken !== null) {
+            $query->where('processing_claim_token', $claimToken)
+                ->where('status', KnowledgeDocument::STATUS_PROCESSING);
+        }
+
+        $updated = $query->update([
             'status' => KnowledgeDocument::STATUS_ACTIVE,
+            'processing_claim_token' => null,
             'processed_at' => now(),
             'failed_at' => null,
             'error_code' => null,
             'error_message' => null,
         ]);
+
+        if ($updated === 0) {
+            logger()->info('Knowledge processing success skipped: claim no longer owns document', [
+                'document_id' => $document->id,
+            ]);
+
+            return false;
+        }
 
         KnowledgeChunk::updateOrCreate(
             ['knowledge_document_id' => $document->id],
@@ -353,16 +377,69 @@ class KnowledgeLifecycleService
                 'last_synced_at' => now(),
             ]
         );
+
+        return true;
     }
 
-    public function recordProcessingFailure(KnowledgeDocument $document, string $errorCode, ?string $errorMessage = null): void
+    public function recordProcessingFailure(KnowledgeDocument $document, string $errorCode, ?string $errorMessage = null, ?string $claimToken = null): bool
     {
-        $document->update([
+        $query = KnowledgeDocument::query()
+            ->whereKey($document->id)
+            ->whereIn('status', [KnowledgeDocument::STATUS_DRAFT, KnowledgeDocument::STATUS_PROCESSING]);
+
+        if ($claimToken !== null) {
+            $query->where('processing_claim_token', $claimToken);
+        }
+
+        $updated = $query->update([
             'status' => KnowledgeDocument::STATUS_ERROR,
+            'processing_claim_token' => null,
             'failed_at' => now(),
             'error_code' => substr($errorCode, 0, 64),
             'error_message' => $errorMessage !== null ? substr($errorMessage, 0, 1000) : null,
         ]);
+
+        if ($updated === 0) {
+            logger()->info('Knowledge processing failure skipped: claim no longer owns document', [
+                'document_id' => $document->id,
+                'error_code' => $errorCode,
+            ]);
+        }
+
+        return $updated > 0;
+    }
+
+    private function syncVectorStatus(KnowledgeDocument $document, string $status): void
+    {
+        if (! $this->shouldSyncVectorStatus($document)) {
+            return;
+        }
+
+        $base = rtrim((string) config('services.ai_document_service.url', config('services.ai_service.url', 'http://127.0.0.1:8001')), '/');
+        $token = config('services.ai_document_service.token', config('services.ai_service.token'));
+        $url = $base.'/api/knowledge/'.urlencode($document->original_name).'/status';
+
+        try {
+            $response = Http::withHeaders(['Authorization' => 'Bearer '.$token])->patch($url, [
+                'document_id' => (string) $document->id,
+                'status' => $status,
+            ]);
+        } catch (\Throwable $e) {
+            throw new \RuntimeException('Gagal menyinkronkan status vector knowledge: '.$e->getMessage(), 0, $e);
+        }
+
+        if (! $response->successful()) {
+            throw new \RuntimeException('Gagal menyinkronkan status vector knowledge: '.$response->body());
+        }
+    }
+
+    private function shouldSyncVectorStatus(KnowledgeDocument $document): bool
+    {
+        if (in_array($document->status, [KnowledgeDocument::STATUS_ACTIVE, KnowledgeDocument::STATUS_ARCHIVED], true)) {
+            return true;
+        }
+
+        return $document->processed_at !== null || $document->chunks()->exists();
     }
 
     private function cleanupVectors(KnowledgeDocument $document): void

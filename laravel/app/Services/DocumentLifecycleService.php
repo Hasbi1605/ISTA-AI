@@ -61,6 +61,26 @@ class DocumentLifecycleService
             ]);
         }
 
+        if (! in_array($extension, Document::attachmentFileExtensions(), true) || ($detectedMimeType === 'text/plain' && $extension !== 'csv')) {
+            $usageEvents->failed(
+                feature: AIUsageEvent::FEATURE_DOCUMENT_UPLOAD,
+                userId: $userId,
+                metadata: [
+                    'document_extension' => $extension,
+                    'mime_type' => $detectedMimeType,
+                    'reason' => 'invalid_extension',
+                    'origin' => 'local',
+                ],
+                requestId: $requestId,
+                latencyMs: $usageEvents->latencyMsSince($startedAt),
+                errorCode: 'invalid_extension',
+            );
+
+            throw ValidationException::withMessages([
+                'file' => 'Format file tidak valid. Gunakan PDF, DOCX, XLSX, atau CSV.',
+            ]);
+        }
+
         $fileSizeBytes = $file->getSize();
 
         if ($fileSizeBytes !== null && $fileSizeBytes > self::MAX_DOCUMENT_SIZE_BYTES) {
@@ -249,6 +269,28 @@ class DocumentLifecycleService
         $sourceSyncedAt = now();
         $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION) ?: '');
 
+        if (! in_array($extension, Document::attachmentFileExtensions(), true) || ($mimeType === 'text/plain' && $extension !== 'csv')) {
+            $usageEvents->failed(
+                feature: AIUsageEvent::FEATURE_GOOGLE_DRIVE_IMPORT,
+                userId: (int) $user->id,
+                metadata: [
+                    'provider' => $provider,
+                    'mime_type' => $mimeType,
+                    'document_extension' => $extension,
+                    'reason' => 'invalid_extension',
+                ],
+                requestId: $requestId,
+                latencyMs: $usageEvents->latencyMsSince($startedAt),
+                errorCode: 'invalid_extension',
+            );
+
+            @unlink($tempPath);
+
+            throw ValidationException::withMessages([
+                'file' => 'Format file dari Google Drive tidak didukung. Gunakan PDF, DOCX, XLSX, atau CSV.',
+            ]);
+        }
+
         // Validate MIME type against the same allowlist used for manual uploads.
         // GoogleDriveService::downloadToTemp() already enforces size and rejects
         // native Google Docs formats; this adds the MIME-type gate so Drive imports
@@ -267,6 +309,8 @@ class DocumentLifecycleService
                 latencyMs: $usageEvents->latencyMsSince($startedAt),
                 errorCode: 'invalid_mime_type',
             );
+
+            @unlink($tempPath);
 
             throw ValidationException::withMessages([
                 'file' => 'Tipe file dari Google Drive tidak didukung. Gunakan PDF, DOCX, XLSX, atau CSV.',

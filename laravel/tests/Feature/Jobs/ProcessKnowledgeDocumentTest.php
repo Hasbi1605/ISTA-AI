@@ -115,6 +115,51 @@ class ProcessKnowledgeDocumentTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_stale_job_claim_does_not_overwrite_newer_processing_attempt(): void
+    {
+        Storage::fake('local');
+        Http::fake([
+            '*/api/knowledge/process' => Http::response([
+                'status' => 'success',
+                'embedding_provider' => 'fake-provider',
+                'chunk_count' => 12,
+            ], 200),
+        ]);
+
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $document = $this->makeDocument($admin, KnowledgeDocument::STATUS_PROCESSING);
+        $document->forceFill(['processing_claim_token' => 'newer-claim-token'])->save();
+        Storage::disk('local')->put($document->file_path, 'dummy content');
+
+        ProcessKnowledgeDocument::dispatchSync($document);
+
+        $document->refresh();
+        $this->assertSame(KnowledgeDocument::STATUS_PROCESSING, $document->status);
+        $this->assertSame('newer-claim-token', $document->processing_claim_token);
+        $this->assertDatabaseMissing('knowledge_chunks', ['knowledge_document_id' => $document->id]);
+        Http::assertNothingSent();
+    }
+
+    public function test_stale_failed_callback_does_not_overwrite_newer_active_document(): void
+    {
+        Storage::fake('local');
+
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $document = $this->makeDocument($admin, KnowledgeDocument::STATUS_ACTIVE);
+        $document->forceFill([
+            'processing_claim_token' => 'newer-claim-token',
+            'error_code' => null,
+            'error_message' => null,
+        ])->save();
+
+        $job = new ProcessKnowledgeDocument($document);
+        $job->failed(new \RuntimeException('old job failed after newer success'));
+
+        $document->refresh();
+        $this->assertSame(KnowledgeDocument::STATUS_ACTIVE, $document->status);
+        $this->assertNull($document->error_code);
+    }
+
     private function makeDocument(User $admin, string $status): KnowledgeDocument
     {
         $source = KnowledgeSource::create([

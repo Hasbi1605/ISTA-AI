@@ -11,6 +11,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Mockery\MockInterface;
 use Tests\TestCase;
 
@@ -61,6 +62,26 @@ class DocumentLifecycleServiceTest extends TestCase
         $this->assertSame('pending', $document->status);
 
         Queue::assertPushed(ProcessDocument::class, 1);
+    }
+
+    public function test_upload_document_rejects_plain_text_txt_before_queueing(): void
+    {
+        Storage::fake('local');
+        Queue::fake();
+
+        $user = User::factory()->create();
+
+        $this->expectException(ValidationException::class);
+
+        try {
+            app(DocumentLifecycleService::class)->uploadDocument(
+                UploadedFile::fake()->create('notes.txt', 8, 'text/plain'),
+                $user->id,
+            );
+        } finally {
+            $this->assertDatabaseCount('documents', 0);
+            Queue::assertNothingPushed();
+        }
     }
 
     public function test_summarize_document_rejects_non_ready_documents(): void

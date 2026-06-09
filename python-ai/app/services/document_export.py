@@ -133,7 +133,7 @@ def _ensure_no_external_resources(content_html: str) -> None:
                 continue
 
             for value in _iter_resource_values(attr_name, tag.attrs.get(attr_name)):
-                if _is_disallowed_reference(value):
+                if _is_disallowed_reference(value, tag_name=tag.name, attr_name=attr_name):
                     raise ValueError("Konten HTML mengandung resource eksternal yang diblokir.")
 
         style_value = tag.attrs.get("style")
@@ -172,13 +172,16 @@ def _iter_resource_values(attr_name: str, raw_value: Any) -> list[str]:
     return values
 
 
-def _is_disallowed_reference(value: str) -> bool:
+def _is_disallowed_reference(value: str, *, tag_name: str | None = None, attr_name: str | None = None) -> bool:
     trimmed = (value or "").strip()
     if not trimmed:
         return False
 
     if trimmed.startswith("#"):
         return False
+
+    if (tag_name or "").lower() == "a" and (attr_name or "").lower() == "href":
+        return not re.match(r"^(?:https?://|mailto:)", trimmed, flags=re.IGNORECASE)
 
     return True
 

@@ -19,6 +19,7 @@ import os
 import uuid
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from pydantic import BaseModel, Field
 
 from app.api_shared import verify_token
 from app.routers.documents import (
@@ -37,6 +38,12 @@ KNOWLEDGE_USER_ID = "__knowledge__"
 DEFAULT_SCOPE = "global_internal"
 DEFAULT_AUDIENCE = "all_users"
 DEFAULT_STATUS = "active"
+STATUS_UPDATES = {"active", "archived"}
+
+
+class KnowledgeStatusUpdateRequest(BaseModel):
+    document_id: str = Field(min_length=1)
+    status: str = Field(min_length=1)
 
 
 def _process_knowledge_document(
@@ -146,6 +153,37 @@ def upload_knowledge(
             os.remove(temp_file_path)
 
 
+@router.patch("/{filename}/status", dependencies=[Depends(verify_token)])
+async def update_knowledge_status(filename: str, request: KnowledgeStatusUpdateRequest):
+    status = request.status.strip().lower()
+    document_id = request.document_id.strip()
+
+    if not document_id:
+        raise HTTPException(status_code=400, detail="document_id is required to update knowledge vector status.")
+
+    if status not in STATUS_UPDATES:
+        raise HTTPException(status_code=400, detail="status must be active or archived.")
+
+    success, message, metrics = rag_ingest.update_document_vector_metadata(
+        filename,
+        user_id=KNOWLEDGE_USER_ID,
+        document_id=document_id,
+        metadata_updates={"knowledge_status": status},
+    )
+
+    if success:
+        return {
+            "status": "success",
+            "message": message,
+            "filename": filename,
+            "document_id": document_id,
+            "knowledge_status": status,
+            **metrics,
+        }
+
+    raise HTTPException(status_code=500, detail=message)
+
+
 @router.delete("/{filename}", dependencies=[Depends(verify_token)])
 async def delete_knowledge(
     filename: str,
@@ -173,6 +211,7 @@ __all__ = [
     "DEFAULT_SCOPE",
     "DEFAULT_AUDIENCE",
     "DEFAULT_STATUS",
+    "STATUS_UPDATES",
     "_process_knowledge_document",
     "_delete_knowledge_vectors",
 ]

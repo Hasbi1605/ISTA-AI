@@ -13,6 +13,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class ProcessKnowledgeDocument implements ShouldQueue
 {
@@ -26,8 +27,11 @@ class ProcessKnowledgeDocument implements ShouldQueue
 
     public bool $deleteWhenMissingModels = true;
 
-    public function __construct(public KnowledgeDocument $document)
+    protected string $claimToken;
+
+    public function __construct(public KnowledgeDocument $document, ?string $claimToken = null)
     {
+        $this->claimToken = $claimToken ?: Str::uuid()->toString();
     }
 
     public function handle(KnowledgeLifecycleService $lifecycle, AIUsageEventService $events): void
@@ -43,6 +47,17 @@ class ProcessKnowledgeDocument implements ShouldQueue
         }
 
         $this->document = $fresh;
+
+        if (! $this->claimProcessingSlot($fresh)) {
+            logger()->info('ProcessKnowledgeDocument skipped: claim superseded by newer job', [
+                'document_id' => $fresh->id,
+                'current_status' => $fresh->status,
+            ]);
+
+            return;
+        }
+
+        $fresh = $this->document;
         $startedAt = microtime(true);
         $requestId = $events->newRequestId();
 
@@ -61,8 +76,9 @@ class ProcessKnowledgeDocument implements ShouldQueue
         );
 
         if (! $fresh->file_path) {
-            $lifecycle->recordProcessingFailure($fresh, 'missing_file_path', 'file_path is empty');
-            $this->logFailure($events, $fresh, $requestId, $startedAt, 'missing_file_path');
+            if ($lifecycle->recordProcessingFailure($fresh, 'missing_file_path', 'file_path is empty', $this->claimToken)) {
+                $this->logFailure($events, $fresh, $requestId, $startedAt, 'missing_file_path');
+            }
 
             return;
         }
@@ -70,8 +86,9 @@ class ProcessKnowledgeDocument implements ShouldQueue
         $absolutePath = Storage::disk('local')->path($fresh->file_path);
 
         if (! is_string($absolutePath) || ! is_file($absolutePath)) {
-            $lifecycle->recordProcessingFailure($fresh, 'file_not_found', 'File knowledge tidak ditemukan di storage.');
-            $this->logFailure($events, $fresh, $requestId, $startedAt, 'file_not_found');
+            if ($lifecycle->recordProcessingFailure($fresh, 'file_not_found', 'File knowledge tidak ditemukan di storage.', $this->claimToken)) {
+                $this->logFailure($events, $fresh, $requestId, $startedAt, 'file_not_found');
+            }
 
             return;
         }
@@ -83,8 +100,9 @@ class ProcessKnowledgeDocument implements ShouldQueue
         $handle = @fopen($absolutePath, 'rb');
 
         if ($handle === false) {
-            $lifecycle->recordProcessingFailure($fresh, 'file_unreadable', 'File knowledge tidak dapat dibaca.');
-            $this->logFailure($events, $fresh, $requestId, $startedAt, 'file_unreadable');
+            if ($lifecycle->recordProcessingFailure($fresh, 'file_unreadable', 'File knowledge tidak dapat dibaca.', $this->claimToken)) {
+                $this->logFailure($events, $fresh, $requestId, $startedAt, 'file_unreadable');
+            }
 
             return;
         }
@@ -105,10 +123,16 @@ class ProcessKnowledgeDocument implements ShouldQueue
                 fclose($handle);
             }
 
-            $lifecycle->recordProcessingFailure($fresh, 'http_exception', $e->getMessage());
-            $this->logFailure($events, $fresh, $requestId, $startedAt, 'http_exception');
+            $recorded = $lifecycle->recordProcessingFailure($fresh, 'http_exception', $e->getMessage(), $this->claimToken);
+            if ($recorded) {
+                $this->logFailure($events, $fresh, $requestId, $startedAt, 'http_exception');
+            }
 
-            throw $e;
+            if ($recorded) {
+                throw $e;
+            }
+
+            return;
         }
 
         if (is_resource($handle)) {
@@ -116,10 +140,16 @@ class ProcessKnowledgeDocument implements ShouldQueue
         }
 
         if (! $response->successful()) {
-            $lifecycle->recordProcessingFailure($fresh, 'microservice_error', (string) $response->body());
-            $this->logFailure($events, $fresh, $requestId, $startedAt, 'microservice_error');
+            $recorded = $lifecycle->recordProcessingFailure($fresh, 'microservice_error', (string) $response->body(), $this->claimToken);
+            if ($recorded) {
+                $this->logFailure($events, $fresh, $requestId, $startedAt, 'microservice_error');
+            }
 
-            throw new \RuntimeException('Knowledge ingest microservice error: '.$response->body());
+            if ($recorded) {
+                throw new \RuntimeException('Knowledge ingest microservice error: '.$response->body());
+            }
+
+            return;
         }
 
         $payload = $response->json() ?? [];
@@ -128,7 +158,9 @@ class ProcessKnowledgeDocument implements ShouldQueue
         $successful = isset($payload['successful_chunks']) ? (int) $payload['successful_chunks'] : $chunkCount;
         $failed = isset($payload['failed_chunks']) ? (int) $payload['failed_chunks'] : 0;
 
-        $lifecycle->recordProcessingSuccess($fresh, $provider, $chunkCount, $successful, $failed);
+        if (! $lifecycle->recordProcessingSuccess($fresh, $provider, $chunkCount, $successful, $failed, $this->claimToken)) {
+            return;
+        }
 
         $events->completed(
             feature: AIUsageEvent::FEATURE_KNOWLEDGE_ADMIN,
@@ -154,7 +186,9 @@ class ProcessKnowledgeDocument implements ShouldQueue
 
         $document = $this->document->fresh() ?? $this->document;
 
-        $lifecycle->recordProcessingFailure($document, 'job_failed', $exception->getMessage());
+        if (! $lifecycle->recordProcessingFailure($document, 'job_failed', $exception->getMessage(), $this->claimToken)) {
+            return;
+        }
 
         $events->failed(
             feature: AIUsageEvent::FEATURE_KNOWLEDGE_ADMIN,
@@ -169,6 +203,31 @@ class ProcessKnowledgeDocument implements ShouldQueue
             errorCode: 'job_failed',
             subject: $document,
         );
+    }
+
+    private function claimProcessingSlot(KnowledgeDocument $document): bool
+    {
+        if ($document->processing_claim_token === $this->claimToken) {
+            return true;
+        }
+
+        if ($document->processing_claim_token !== null && $document->processing_claim_token !== '') {
+            return false;
+        }
+
+        $claimed = KnowledgeDocument::query()
+            ->whereKey($document->id)
+            ->where('status', KnowledgeDocument::STATUS_PROCESSING)
+            ->whereNull('processing_claim_token')
+            ->update(['processing_claim_token' => $this->claimToken]);
+
+        if ($claimed === 0) {
+            return false;
+        }
+
+        $this->document = $document->fresh() ?? $document;
+
+        return true;
     }
 
     private function logFailure(AIUsageEventService $events, KnowledgeDocument $document, string $requestId, float $startedAt, string $errorCode): void

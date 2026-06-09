@@ -2,6 +2,7 @@
 
 namespace App\Services\CloudStorage;
 
+use App\Models\Document;
 use Google\Client;
 use Google\Service\Drive;
 use Google\Service\Drive\DriveFile;
@@ -101,6 +102,7 @@ class GoogleDriveService
             $isFolder = $mimeType === self::GOOGLE_DRIVE_FOLDER_MIME;
             $isShortcut = $mimeType === self::GOOGLE_DRIVE_SHORTCUT_MIME;
             $isGoogleWorkspaceFile = str_starts_with($mimeType, 'application/vnd.google-apps.') && ! $isShortcut;
+            $isSupportedImportFile = $this->isSupportedImportFile((string) $file->getName(), $mimeType);
             $shortcutDetails = $file->getShortcutDetails();
             $shortcutTargetId = is_object($shortcutDetails) && method_exists($shortcutDetails, 'getTargetId')
                 ? trim((string) $shortcutDetails->getTargetId())
@@ -122,8 +124,8 @@ class GoogleDriveService
                 'is_folder' => $isFolder,
                 'is_google_workspace_file' => $isGoogleWorkspaceFile && ! $isFolder,
                 'is_shortcut' => $isShortcut,
-                'is_processable' => ! $isFolder && ! $isGoogleWorkspaceFile && ! $isShortcut,
-                'unsupported_reason' => $isShortcut ? $this->unsupportedShortcutMessage() : null,
+                'is_processable' => ! $isFolder && ! $isGoogleWorkspaceFile && ! $isShortcut && $isSupportedImportFile,
+                'unsupported_reason' => $this->unsupportedReasonForFile($isFolder, $isGoogleWorkspaceFile, $isShortcut, $isSupportedImportFile),
             ];
         }
 
@@ -154,6 +156,10 @@ class GoogleDriveService
 
         if (str_starts_with($mimeType, 'application/vnd.google-apps.')) {
             throw new RuntimeException('File Google Docs/Sheets/Slides belum didukung pada MVP ini. Gunakan PDF, DOCX, XLSX, atau CSV yang berupa file binary.');
+        }
+
+        if (! $this->isSupportedImportFile((string) $metadata->getName(), $mimeType)) {
+            throw new RuntimeException($this->unsupportedImportFileMessage());
         }
 
         $this->ensureFileSizeIsAllowed($metadata->getSize() !== null ? (int) $metadata->getSize() : null);
@@ -588,6 +594,43 @@ class GoogleDriveService
     private function unsupportedShortcutMessage(): string
     {
         return 'Shortcut Google Drive belum didukung. Buka file target langsung lalu pilih file PDF, DOCX, XLSX, atau CSV.';
+    }
+
+    private function unsupportedImportFileMessage(): string
+    {
+        return 'Format file Google Drive tidak didukung. Gunakan PDF, DOCX, XLSX, atau CSV.';
+    }
+
+    private function isSupportedImportFile(string $name, string $mimeType): bool
+    {
+        $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION) ?: '');
+
+        if (! in_array($extension, Document::attachmentFileExtensions(), true)) {
+            return false;
+        }
+
+        if (! in_array($mimeType, Document::attachmentMimeTypes(), true)) {
+            return false;
+        }
+
+        return $mimeType !== 'text/plain' || $extension === 'csv';
+    }
+
+    private function unsupportedReasonForFile(bool $isFolder, bool $isGoogleWorkspaceFile, bool $isShortcut, bool $isSupportedImportFile): ?string
+    {
+        if ($isFolder) {
+            return null;
+        }
+
+        if ($isShortcut) {
+            return $this->unsupportedShortcutMessage();
+        }
+
+        if ($isGoogleWorkspaceFile) {
+            return 'File Google Docs/Sheets/Slides belum didukung pada MVP ini. Gunakan PDF, DOCX, XLSX, atau CSV yang berupa file binary.';
+        }
+
+        return $isSupportedImportFile ? null : $this->unsupportedImportFileMessage();
     }
 
     private function writeDownloadedFileToPath(mixed $response, string $tempPath): int

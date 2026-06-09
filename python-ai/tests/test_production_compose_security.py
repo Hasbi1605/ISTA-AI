@@ -17,3 +17,12 @@ def test_production_python_services_do_not_publish_chroma_or_ai_ports():
     chroma_service = services.get("chroma") or services.get("chromadb")
     if chroma_service is not None:
         assert not chroma_service.get("ports"), "Chroma must not expose an unauthenticated HTTP port"
+
+def test_production_python_services_use_readiness_healthchecks():
+    compose = yaml.safe_load((ROOT_DIR / "docker-compose.production.yml").read_text())
+    services = compose["services"]
+
+    for service_name in ("python-ai", "python-ai-docs"):
+        command = " ".join(services[service_name]["healthcheck"]["test"])
+        assert "/api/ready" in command
+        assert "/api/health" not in command

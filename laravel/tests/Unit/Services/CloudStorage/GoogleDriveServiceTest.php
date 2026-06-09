@@ -208,6 +208,7 @@ class GoogleDriveServiceTest extends TestCase
                 'application/pdf',
                 ['root-folder-id'],
                 GoogleDriveService::MAX_IMPORT_FILE_SIZE_BYTES + 1,
+                'big-file.pdf',
             ),
         ], [
             'big-file-id' => 'should-not-download',
@@ -235,6 +236,7 @@ class GoogleDriveServiceTest extends TestCase
                 'application/pdf',
                 ['root-folder-id'],
                 null,
+                'streamed-file.pdf',
             ),
         ], [
             'streamed-file-id' => new FakeDriveBinaryResponse(new FakeDriveBodyStream(
@@ -246,6 +248,44 @@ class GoogleDriveServiceTest extends TestCase
         $this->expectExceptionMessage('Ukuran file Google Drive melebihi batas 50 MB.');
 
         $service->downloadToTemp('streamed-file-id');
+    }
+
+    public function test_list_files_marks_plain_text_txt_as_unsupported(): void
+    {
+        config([
+            'services.google_drive.root_folder_id' => 'root-folder-id',
+        ]);
+
+        $service = $this->fakeService([
+            'notes-id' => $this->fakeDriveFile('notes-id', 'text/plain', ['root-folder-id'], 1024, 'notes.txt'),
+        ]);
+
+        $item = $service->listFiles()['items'][0];
+
+        $this->assertFalse($item['is_processable']);
+        $this->assertStringContainsString('Format file Google Drive tidak didukung', $item['unsupported_reason']);
+    }
+
+    public function test_download_to_temp_rejects_plain_text_txt_before_binary_download(): void
+    {
+        config([
+            'services.google_drive.root_folder_id' => 'root-folder-id',
+        ]);
+
+        $service = $this->fakeService([
+            'notes-id' => $this->fakeDriveFile('notes-id', 'text/plain', ['root-folder-id'], 1024, 'notes.txt'),
+        ], [
+            'notes-id' => 'should-not-download',
+        ]);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Format file Google Drive tidak didukung.');
+
+        try {
+            $service->downloadToTemp('notes-id');
+        } finally {
+            $this->assertSame(0, $service->downloadRequestCount);
+        }
     }
 
     public function test_list_files_marks_google_drive_shortcuts_as_unsupported(): void
@@ -307,11 +347,11 @@ class GoogleDriveServiceTest extends TestCase
         return new GoogleDriveServiceFake($files, $downloads);
     }
 
-    private function fakeDriveFile(string $id, string $mimeType, array $parents = [], ?int $size = null): DriveFile
+    private function fakeDriveFile(string $id, string $mimeType, array $parents = [], ?int $size = null, ?string $name = null): DriveFile
     {
         return new DriveFile([
             'id' => $id,
-            'name' => $id,
+            'name' => $name ?? $id,
             'mimeType' => $mimeType,
             'parents' => $parents,
             'size' => $size,

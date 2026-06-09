@@ -102,6 +102,30 @@ def test_documents_export_route_returns_binary_download():
     assert response.headers["content-disposition"].startswith('attachment; filename="jawaban-ai.pdf"')
     assert response.content.startswith(b"%PDF")
 
+def test_export_content_allows_safe_anchor_links_in_pdf(monkeypatch):
+    captured = {}
+
+    class FakeWeasyHTML:
+        def __init__(self, *, string: str, url_fetcher=None):
+            captured["html"] = string
+            captured["url_fetcher"] = url_fetcher
+
+        def write_pdf(self) -> bytes:
+            return b"%PDF-1.4 fake"
+
+    monkeypatch.setattr("app.services.document_export.WeasyHTML", FakeWeasyHTML)
+
+    artifact = export_content(
+        '<p>Lihat <a href="https://example.com/ref">referensi</a> dan '
+        '<a href="mailto:admin@example.com">kontak</a>.</p>',
+        "pdf",
+        "safe-links",
+    )
+
+    assert artifact.content.startswith(b"%PDF")
+    assert 'href="https://example.com/ref"' in captured["html"]
+    assert 'href="mailto:admin@example.com"' in captured["html"]
+
 
 def test_export_content_rejects_external_resource_urls(monkeypatch):
     calls = {"count": 0}

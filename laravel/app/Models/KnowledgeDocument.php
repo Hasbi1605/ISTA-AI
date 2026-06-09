@@ -23,6 +23,7 @@ use Illuminate\Support\Carbon;
  * @property string $scope
  * @property string $audience
  * @property string $status
+ * @property string|null $processing_claim_token
  * @property string $vector_namespace
  * @property array<string, mixed>|null $metadata
  * @property string|null $notes
@@ -79,6 +80,7 @@ class KnowledgeDocument extends Model
         'scope',
         'audience',
         'status',
+        'processing_claim_token',
         'vector_namespace',
         'metadata',
         'notes',

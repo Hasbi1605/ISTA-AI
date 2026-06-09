@@ -75,6 +75,59 @@ def test_delete_chroma_ids_with_retry_recovers_from_transient_failure(monkeypatc
     assert success is True
     assert calls == {"count": 2, "ids": ["old-parent-1", "old-parent-2"]}
 
+def test_update_document_vector_metadata_updates_child_and_parent_collections(monkeypatch):
+    from app.services import rag_ingest
+
+    calls = []
+
+    class FakeCollection:
+        def __init__(self, collection_name):
+            self.collection_name = collection_name
+
+        def get(self, where=None, include=None):
+            calls.append({
+                "collection": self.collection_name,
+                "op": "get",
+                "where": where,
+                "include": include,
+            })
+            if "parent" in self.collection_name.lower():
+                return {"ids": ["parent-1"], "metadatas": [{"knowledge_status": "active", "chunk_type": "parent"}]}
+            return {"ids": ["child-1", "child-2"], "metadatas": [{"knowledge_status": "active"}, {"title": "SOP"}]}
+
+        def update(self, ids=None, metadatas=None):
+            calls.append({
+                "collection": self.collection_name,
+                "op": "update",
+                "ids": ids,
+                "metadatas": metadatas,
+            })
+
+    class FakeChroma:
+        def __init__(self, collection_name, **kwargs):
+            self._collection = FakeCollection(collection_name)
+
+    monkeypatch.setattr(rag_ingest, "Chroma", FakeChroma)
+
+    success, message, metrics = rag_ingest.update_document_vector_metadata(
+        "sop.pdf",
+        user_id="__knowledge__",
+        document_id="42",
+        metadata_updates={"knowledge_status": "archived"},
+    )
+
+    assert success is True, message
+    assert metrics == {"updated_vectors": 2, "updated_parent_vectors": 1}
+
+    updates = [call for call in calls if call["op"] == "update"]
+    assert updates[0]["ids"] == ["child-1", "child-2"]
+    assert updates[0]["metadatas"] == [
+        {"knowledge_status": "archived"},
+        {"title": "SOP", "knowledge_status": "archived"},
+    ]
+    assert updates[1]["ids"] == ["parent-1"]
+    assert updates[1]["metadatas"] == [{"knowledge_status": "archived", "chunk_type": "parent"}]
+
 
 def test_process_document_returns_false_on_partial_batch_failure(monkeypatch, tmp_path):
     """

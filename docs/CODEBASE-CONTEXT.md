@@ -65,13 +65,13 @@ Subfolder:
 - **Chat/** `ChatDocumentStateService`.
 - **CloudStorage/** `GoogleDriveOAuthService` (setup koneksi Drive pusat wajib active admin/super-admin + setup key/allowlist email), `GoogleDriveService`.
 - **Documents/** `DocumentPreviewRenderer`, `DocumentExportHtmlSanitizer`.
-- **Knowledge/** `KnowledgeLifecycleService` (ingest KB → python `/api/knowledge`).
+- **Knowledge/** `KnowledgeLifecycleService` (ingest KB → python `/api/knowledge`, archive/activate sync metadata Chroma via status endpoint).
 - **Memo/** `MemoGenerationService` (→ python `/api/memos/generate-body`), `MemoLifecycleService`, `MemoDocumentStructureExtractor`.
 - **OnlyOffice/** `DocumentConverter`, `DocxTextExtractor`, `DocxValidator`, `JwtSigner`, `MemoDocumentKey`, `MemoForceSaveService`, `ForceSaveException`.
 
 ### 2.4 Models / Jobs / Middleware
 - **Models:** `User`, `Conversation`, `Message`, `Document`, `DocumentChunk`, `Memo`, `MemoVersion`, `KnowledgeDocument`, `KnowledgeChunk`, `KnowledgeSource`, `CloudStorageFile`, `GoogleDriveOAuthConnection`, `AIUsageEvent`, `AdminAccountAudit`.
-- **Jobs:** `GenerateChatResponse` (jalur async chat, komplemen SSE), `ProcessDocument` (→ python `/api/documents/process`), `ProcessKnowledgeDocument` (→ `/api/knowledge/process`), `RenderDocumentPreview`.
+- **Jobs:** `GenerateChatResponse` (jalur async chat, komplemen SSE), `ProcessDocument` (→ python `/api/documents/process`), `ProcessKnowledgeDocument` (→ `/api/knowledge/process`, memakai `processing_claim_token` agar retry lama tidak menimpa attempt baru), `RenderDocumentPreview`.
 - **Middleware:** `EnsureUserIsAdmin` (`admin`), `EnsureUserIsSuperAdmin` (`super_admin`), `EnsureAdminPasswordChanged` (`admin.password_changed`), `UpdateUserPresence`, `AddSecurityHeaders` (CSP; `unsafe-eval` opt-in via `SECURITY_CSP_ALLOW_UNSAFE_EVAL`).
 - **Events:** `BookingCreated/BookingStatusChanged/FeedbackSubmitted/ScheduleUpdated` — **sisa domain lama (booking)**, tidak terhubung ke flow chat/memo. Jangan diandalkan untuk fitur AI.
 
@@ -113,7 +113,7 @@ Tabel utama: `users` (+verification_code, role/presence, kolom keamanan admin), 
 
 ### 3.2 Routers (`app/routers/`)
 - `documents.py` — `/api/documents`: `process` (upload+ingest pdf/docx/xlsx/csv, cap 50MB, safe-filename), `DELETE /{filename}`, `extract-tables`, `extract-content`, `export`, `summarize` (single vs hierarchical).
-- `knowledge.py` — `/api/knowledge`: ingest KB internal (`scope=global_internal`, `audience=all_users`, `user_id=__knowledge__`), `process` + `DELETE /{filename}`. Reuse validator + pipeline `documents.py`.
+- `knowledge.py` — `/api/knowledge`: ingest KB internal (`scope=global_internal`, `audience=all_users`, `user_id=__knowledge__`), `process`, `DELETE /{filename}`, dan `PATCH /{filename}/status` untuk sync `knowledge_status` vector child+parent tanpa reingest. Reuse validator + pipeline `documents.py`.
 - `memos.py` — `/api/memos/generate-body`: generate memorandum `.docx` (binary + header searchable-text/page-size/model-label).
 
 ### 3.3 Services RAG (`app/services/`)
@@ -151,14 +151,14 @@ Chat streaming (RAG/web/knowledge/general), upload + RAG dokumen, generate memo 
 - **Upload dokumen + RAG:** upload via sidebar chat → row `Document` + job `ProcessDocument` → python `/api/documents/process` (subprocess ingest → chunk/embed/PDR → Chroma). Dokumen aktif menyetel chat ke mode RAG. Preview via `documents/{document}/preview/*`. Summarize via `/api/documents/summarize`.
 - **Memo:** `MemoWorkspace` → `MemoGenerationService` → python `/api/memos/generate-body` (DOCX + `MemoVersion`). Edit via OnlyOffice (`OnlyOfficeCallbackController` + JWT + URL OnlyOffice trusted scheme/host/port) dengan force-save.
 - **Export:** `POST /documents/export` & memo `export-pdf`/`download` → python `/api/documents/export`.
-- **Google Drive:** OAuth connect/callback hanya boleh dilakukan active admin/super-admin yang lolos setup key/allowlist email; setelah koneksi pusat tersedia, `GoogleDrivePicker` → impor file ke chat/dokumen untuk user.
+- **Google Drive:** OAuth connect/callback hanya boleh dilakukan active admin/super-admin yang lolos setup key/allowlist email; setelah koneksi pusat tersedia, `GoogleDrivePicker` → impor file PDF/DOCX/XLSX/CSV ke chat/dokumen untuk user. File binary lain seperti `.txt` ditandai tidak processable dan ditolak sebelum queue ingest.
 
 ### 5.2 Flow Admin (`/admin`, guard `admin`/`super_admin` + `admin.password_changed`)
 - **Usage:** analitik AI dari `ai_usage_events` (chat/web_search/document_rag, model, latensi).
 - **Documents:** kelola dokumen + status pipeline ingest.
 - **Users:** manajemen user/presence. **Accounts (super-admin):** kelola akun admin + audit.
 - **Errors:** monitor event AI gagal.
-- **Knowledge:** CRUD KB internal; ingest via job `ProcessKnowledgeDocument` + `KnowledgeLifecycleService` → python `/api/knowledge` (scope global_internal); menggerakkan jawaban knowledge internal di general chat.
+- **Knowledge:** CRUD KB internal; ingest via job `ProcessKnowledgeDocument` + `KnowledgeLifecycleService` → python `/api/knowledge` (scope global_internal). Archive/activate melakukan sync `knowledge_status` di Chroma sebelum status DB berubah; stale job knowledge ditahan oleh `processing_claim_token`. Flow ini menggerakkan jawaban knowledge internal di general chat.
 - **Dashboard:** KPI via `AdminMetricsService`. Auth admin: `/admin/login` terpisah + forced password change.
 
 ### 5.3 Flow Registrasi
@@ -172,6 +172,7 @@ Chat streaming (RAG/web/knowledge/general), upload + RAG dokumen, generate memo 
 - **Laravel:** `cd laravel && php artisan test`.
 - **Python:** `cd python-ai && source venv/bin/activate && pytest`.
 - Jalankan test pada area terdampak; tambahkan test bila perilaku penting berubah tanpa coverage. Detail di `AGENTS.md` (Verifikasi wajib & Verifikasi Akhir Penuh).
+- **Production healthcheck Python:** `docker-compose.production.yml` memakai `/api/ready` untuk `python-ai` dan `python-ai-docs` agar deploy gagal cepat bila token internal atau path Chroma belum siap; `/api/health` hanya liveness ringan.
 
 ---
 

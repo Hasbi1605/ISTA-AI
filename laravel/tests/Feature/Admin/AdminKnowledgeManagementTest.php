@@ -378,6 +378,16 @@ class AdminKnowledgeManagementTest extends TestCase
     public function test_admin_can_archive_and_activate_knowledge(): void
     {
         Queue::fake();
+        Http::fake([
+            '*/api/knowledge/*/status' => Http::response([
+                'status' => 'success',
+                'updated_vectors' => 1,
+                'updated_parent_vectors' => 1,
+            ], 200),
+        ]);
+
+        config()->set('services.ai_document_service.url', 'http://python-ai:8001');
+        config()->set('services.ai_document_service.token', 'internal-token');
 
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
         $document = $this->makeKnowledgeDocument(['status' => KnowledgeDocument::STATUS_ACTIVE]);
@@ -393,6 +403,20 @@ class AdminKnowledgeManagementTest extends TestCase
             ->call('activate', $document->id);
 
         $this->assertSame(KnowledgeDocument::STATUS_ACTIVE, $document->fresh()->status);
+
+        Http::assertSent(function ($request) use ($document) {
+            return str_contains($request->url(), '/api/knowledge/sop.pdf/status')
+                && $request->method() === 'PATCH'
+                && $request['document_id'] === (string) $document->id
+                && $request['status'] === KnowledgeDocument::STATUS_ARCHIVED;
+        });
+
+        Http::assertSent(function ($request) use ($document) {
+            return str_contains($request->url(), '/api/knowledge/sop.pdf/status')
+                && $request->method() === 'PATCH'
+                && $request['document_id'] === (string) $document->id
+                && $request['status'] === KnowledgeDocument::STATUS_ACTIVE;
+        });
 
         $this->assertGreaterThanOrEqual(2, AIUsageEvent::query()
             ->where('feature', AIUsageEvent::FEATURE_KNOWLEDGE_ADMIN)

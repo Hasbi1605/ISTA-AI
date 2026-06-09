@@ -29,7 +29,6 @@ ISTA AI runs as a hybrid stack:
 - `docs/`: production, deployment, testing, privacy, and maintenance notes.
 - `deploy/`: deployment templates such as Caddy and environment examples.
 - `benchmarks/`: manual benchmark scripts for provider and RAG checks.
-- `issue/`: implementation plans and review notes used by the maintainer workflow.
 
 Core data stores and runtime services:
 
@@ -48,7 +47,6 @@ Core data stores and runtime services:
 ├── docs/                     # Deployment, privacy, testing, maintenance docs
 ├── deploy/                   # Production deployment templates
 ├── benchmarks/               # Manual provider/RAG benchmark utilities
-├── issue/                    # Planning and implementation notes
 ├── docker-compose.yml        # Local multi-service stack
 ├── docker-compose.production.yml
 └── .env.droplet.example      # Redacted production env key template
@@ -127,7 +125,7 @@ Python:
 cd python-ai && source venv/bin/activate && pytest
 ```
 
-See [docs/testing-guide.md](docs/testing-guide.md) for the maintainer verification workflow.
+Run the Laravel and Python suites before pushing changes to `main`.
 
 ## Contributing
 

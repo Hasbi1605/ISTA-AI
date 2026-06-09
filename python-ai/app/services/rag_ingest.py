@@ -680,6 +680,75 @@ def delete_document_vectors(
         return False, str(e)
 
 
+def update_document_vector_metadata(
+    filename: str,
+    user_id: str | None = None,
+    document_id: str | None = None,
+    metadata_updates: dict | None = None,
+):
+    if not user_id:
+        return False, "user_id is required to update document vector metadata.", {}
+
+    if not document_id:
+        return False, "document_id is required to update document vector metadata.", {}
+
+    updates = dict(metadata_updates or {})
+    if not updates:
+        return False, "metadata_updates is required to update document vector metadata.", {}
+
+    try:
+        where = {"$and": [{"document_id": str(document_id)}, {"user_id": str(user_id)}]}
+        vectorstore = Chroma(
+            collection_name=VECTOR_COLLECTION_NAME,
+            persist_directory=CHROMA_PATH,
+        )
+        updated_vectors = _update_collection_metadata(vectorstore._collection, where, updates)
+
+        parent_store = Chroma(
+            collection_name=PARENT_COLLECTION_NAME,
+            persist_directory=CHROMA_PATH,
+        )
+        updated_parent_vectors = _update_collection_metadata(
+            parent_store._collection,
+            {"$and": [*where["$and"], {"chunk_type": "parent"}]},
+            updates,
+        )
+
+        metrics = {
+            "updated_vectors": updated_vectors,
+            "updated_parent_vectors": updated_parent_vectors,
+        }
+        logger.info(
+            "✅ Vector metadata for %s updated for user_id=%s document_id=%s: %s",
+            filename,
+            user_id,
+            document_id,
+            metrics,
+        )
+
+        return True, f"Vector metadata for {filename} updated successfully.", metrics
+    except Exception as e:
+        logger.error(f"❌ Error updating vector metadata for {filename}: {str(e)}")
+        return False, str(e), {}
+
+def _update_collection_metadata(collection, where: dict, metadata_updates: dict) -> int:
+    results = collection.get(where=where, include=["metadatas"])
+    ids = results.get("ids", []) if isinstance(results, dict) else []
+    metadatas = results.get("metadatas", []) if isinstance(results, dict) else []
+
+    if not ids:
+        return 0
+
+    merged_metadatas = []
+    for metadata in metadatas:
+        merged = dict(metadata or {}) if isinstance(metadata, dict) else {}
+        merged.update(metadata_updates)
+        merged_metadatas.append(merged)
+
+    collection.update(ids=ids, metadatas=merged_metadatas)
+
+    return len(ids)
+
 def _delete_legacy_chunks_by_filename(
     collection,
     filename: str,

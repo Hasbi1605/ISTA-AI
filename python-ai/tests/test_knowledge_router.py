@@ -106,6 +106,41 @@ def test_knowledge_delete_uses_knowledge_user_id(monkeypatch):
     assert captured["document_id"] == "42"
     assert captured["cleanup_legacy"] is True
 
+def test_knowledge_status_update_uses_knowledge_user_id(monkeypatch):
+    from app.routers import knowledge as knowledge_module
+    from app.services import rag_ingest
+
+    captured = {}
+
+    def fake_update(filename, user_id=None, document_id=None, metadata_updates=None):
+        captured["filename"] = filename
+        captured["user_id"] = user_id
+        captured["document_id"] = document_id
+        captured["metadata_updates"] = dict(metadata_updates or {})
+        return True, "updated", {"updated_vectors": 2, "updated_parent_vectors": 1}
+
+    monkeypatch.setattr(rag_ingest, "update_document_vector_metadata", fake_update)
+
+    client = _build_client(monkeypatch)
+
+    response = client.patch(
+        "/api/knowledge/sop.pdf/status",
+        headers={"Authorization": "Bearer test-token"},
+        json={"document_id": "42", "status": "archived"},
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["status"] == "success"
+    assert body["knowledge_status"] == "archived"
+    assert body["updated_vectors"] == 2
+    assert captured == {
+        "filename": "sop.pdf",
+        "user_id": knowledge_module.KNOWLEDGE_USER_ID,
+        "document_id": "42",
+        "metadata_updates": {"knowledge_status": "archived"},
+    }
+
 
 def test_knowledge_process_requires_document_id(monkeypatch):
     from app.services import rag_ingest
