@@ -37,16 +37,16 @@ Route::get('/guest-memo', function () {
 })->name('guest-memo');
 
 Route::view('profile', 'profile')
-    ->middleware(['auth'])
+    ->middleware(['auth', 'active'])
     ->name('profile');
 
 Route::get('chat/{id?}', ChatIndex::class)
-    ->middleware(['auth', 'verified', 'throttle:30,1'])
+    ->middleware(['auth', 'active', 'verified', 'throttle:30,1'])
     ->whereNumber('id')
     ->name('chat');
 
 Route::get('chat/stream/{conversationId}', [ChatStreamController::class, 'stream'])
-    ->middleware(['auth', 'verified', 'throttle:60,1'])
+    ->middleware(['auth', 'active', 'verified', 'throttle:60,1'])
     ->whereNumber('conversationId')
     ->name('chat.stream');
 
@@ -57,7 +57,7 @@ Route::post('onlyoffice/callback/{memo}', OnlyOfficeCallbackController::class)
 Route::get('chat/memos/{memo}/signed-file', [MemoFileController::class, 'signed'])
     ->name('memos.file.signed');
 
-Route::middleware(['auth', 'verified'])
+Route::middleware(['auth', 'active', 'verified'])
     ->prefix('chat/memos')
     ->name('memos.')
     ->group(function () {
@@ -66,7 +66,7 @@ Route::middleware(['auth', 'verified'])
         Route::post('/{memo}/force-save', [MemoFileController::class, 'forceSave'])->name('force-save');
     });
 
-Route::middleware(['auth', 'verified'])
+Route::middleware(['auth', 'active', 'verified'])
     ->prefix('memos')
     ->name('memos.')
     ->group(function () {
@@ -79,7 +79,7 @@ Route::middleware(['auth', 'verified'])
             ->where('legacyMemoPath', '.*');
     });
 
-Route::middleware(['auth', 'verified'])
+Route::middleware(['auth', 'active', 'verified'])
     ->prefix('documents')
     ->name('documents.')
     ->group(function () {
@@ -92,7 +92,7 @@ Route::middleware(['auth', 'verified'])
         Route::post('/export', [DocumentExportController::class, 'export'])->middleware('throttle:10,1')->name('export');
     });
 
-Route::middleware(['auth', 'verified'])
+Route::middleware(['auth', 'active', 'verified'])
     ->prefix('documents/{document}/preview')
     ->name('documents.preview.')
     ->group(function () {

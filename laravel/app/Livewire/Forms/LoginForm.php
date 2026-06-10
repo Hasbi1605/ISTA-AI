@@ -38,12 +38,23 @@ class LoginForm extends Form
             ]);
         }
 
-        if (is_null(Auth::user()?->email_verified_at)) {
+        $user = Auth::user();
+
+        if (is_null($user?->email_verified_at)) {
             Auth::logout();
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
                 'form.email' => trans('auth.unverified'),
+            ]);
+        }
+
+        if ($user !== null && method_exists($user, 'isActive') && ! $user->isActive()) {
+            Auth::logout();
+            RateLimiter::hit($this->throttleKey());
+
+            throw ValidationException::withMessages([
+                'form.email' => 'Akun sedang dinonaktifkan. Hubungi admin.',
             ]);
         }
 

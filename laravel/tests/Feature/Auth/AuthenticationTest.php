@@ -42,6 +42,26 @@ class AuthenticationTest extends TestCase
         $this->assertAuthenticated();
     }
 
+    public function test_inactive_admin_cannot_authenticate_using_the_regular_login_screen(): void
+    {
+        $admin = User::factory()->create([
+            'role' => User::ROLE_ADMIN,
+            'is_active' => false,
+        ]);
+
+        $component = Volt::test('pages.auth.login')
+            ->set('form.email', $admin->email)
+            ->set('form.password', 'password');
+
+        $component->call('login');
+
+        $component
+            ->assertHasErrors(['form.email' => 'Akun sedang dinonaktifkan. Hubungi admin.'])
+            ->assertNoRedirect();
+
+        $this->assertGuest();
+    }
+
     public function test_users_are_redirected_to_chat_after_logging_in_from_guest_chat_flow(): void
     {
         $user = User::factory()->create();
@@ -170,6 +190,19 @@ class AuthenticationTest extends TestCase
         $response
             ->assertOk()
             ->assertSee('ISTA AI');
+    }
+
+    public function test_inactive_authenticated_admin_is_logged_out_from_chat(): void
+    {
+        $admin = User::factory()->create([
+            'role' => User::ROLE_ADMIN,
+            'is_active' => false,
+        ]);
+
+        $response = $this->actingAs($admin)->get('/chat');
+
+        $response->assertRedirect(route('login'));
+        $this->assertGuest();
     }
 
     public function test_users_can_logout(): void

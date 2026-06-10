@@ -335,7 +335,7 @@
                     <div>
                         <p class="admin-accounts-modal__eyebrow">Access Control</p>
                         <h3 id="admin-deactivate-account-title">Konfirmasi Nonaktifkan Akun</h3>
-                        <span>Akun nonaktif tidak dapat login admin.</span>
+                        <span>Akun nonaktif tidak dapat login atau mengakses aplikasi.</span>
                     </div>
                     <button type="button" wire:click="cancelDeactivate" class="admin-accounts-modal__close" aria-label="Tutup nonaktifkan akun">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
