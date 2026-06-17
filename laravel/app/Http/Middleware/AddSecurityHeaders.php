@@ -21,7 +21,7 @@ class AddSecurityHeaders
         $this->setHeaderIfMissing($response, 'X-Frame-Options', 'SAMEORIGIN');
 
         if ((bool) config('security.headers.content_security_policy.enabled', true)) {
-            $this->setHeaderIfMissing($response, 'Content-Security-Policy', $this->contentSecurityPolicy());
+            $this->setHeaderIfMissing($response, 'Content-Security-Policy', $this->contentSecurityPolicy($response));
         }
 
         return $response;
@@ -34,7 +34,7 @@ class AddSecurityHeaders
         }
     }
 
-    private function contentSecurityPolicy(): string
+    private function contentSecurityPolicy(Response $response): string
     {
         $directives = [
             'default-src' => ["'self'"],
@@ -44,7 +44,7 @@ class AddSecurityHeaders
             'media-src' => ["'self'"],
             'font-src' => ["'self'", 'data:', 'https://fonts.gstatic.com'],
             'style-src' => ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-            'script-src' => $this->scriptSources(),
+            'script-src' => $this->scriptSources($response),
             'connect-src' => ["'self'"],
             'frame-src' => ["'self'"],
             'worker-src' => ["'self'", 'blob:'],
@@ -83,15 +83,51 @@ class AddSecurityHeaders
      *
      * @return list<string>
      */
-    private function scriptSources(): array
+    private function scriptSources(Response $response): array
     {
         $sources = ["'self'", "'unsafe-inline'"];
 
-        if ((bool) config('security.headers.content_security_policy.allow_unsafe_eval', false)) {
+        if ($this->shouldAllowUnsafeEval($response)) {
             $sources[] = "'unsafe-eval'";
         }
 
         return $sources;
+    }
+
+    private function shouldAllowUnsafeEval(Response $response): bool
+    {
+        if ((bool) config('security.headers.content_security_policy.allow_unsafe_eval', false)) {
+            return true;
+        }
+
+        if (! (bool) config('security.headers.content_security_policy.allow_livewire_unsafe_eval', true)) {
+            return false;
+        }
+
+        if (! $this->isHtmlResponse($response)) {
+            return false;
+        }
+
+        $content = $response->getContent();
+
+        if (! is_string($content) || $content === '') {
+            return false;
+        }
+
+        return str_contains($content, 'wire:snapshot=')
+            || str_contains($content, 'wire:click=')
+            || str_contains($content, 'wire:submit=')
+            || str_contains($content, 'x-data=')
+            || str_contains($content, 'x-on:')
+            || str_contains($content, '@click=');
+    }
+
+    private function isHtmlResponse(Response $response): bool
+    {
+        $contentType = (string) $response->headers->get('Content-Type', '');
+
+        return $contentType === ''
+            || str_contains(strtolower($contentType), 'text/html');
     }
 
     private function originFromUrl(string $url): ?string

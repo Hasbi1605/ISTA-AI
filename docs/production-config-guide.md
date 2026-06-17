@@ -15,7 +15,8 @@ File ini berada di root repo pada server production dan tidak boleh dicommit. Is
 - API key provider AI: `GITHUB_TOKEN`, `GITHUB_TOKEN_2`, `GROQ_API_KEY`, `GEMINI_API_KEY`, `LANGSEARCH_API_KEY`
 - URL internal Laravel ke Python
 - `PUBLIC_REGISTRATION_ENABLED` untuk membuka/menutup registrasi mandiri
-- `SECURITY_CSP_ALLOW_UNSAFE_EVAL` untuk override CSP `unsafe-eval` bila benar-benar diperlukan
+- `SECURITY_CSP_ALLOW_UNSAFE_EVAL` untuk override global CSP `unsafe-eval` bila benar-benar diperlukan
+- `SECURITY_CSP_ALLOW_LIVEWIRE_UNSAFE_EVAL` untuk compatibility halaman Livewire/Alpine tanpa membuka eval pada response plain HTML
 - konfigurasi OnlyOffice seperti `ONLYOFFICE_JWT_SECRET`, `ONLYOFFICE_SIGNED_URL_TTL_MINUTES`, dan `ONLYOFFICE_DOCUMENTSERVER_TAG`
 
 Nilai secret wajib diganti dari contoh. Khusus `AI_SERVICE_TOKEN`, jangan gunakan placeholder `CHANGE_ME`, `change_me_internal_api_secret`, atau nilai default lama `your_internal_api_secret`; Python AI akan menolak token kosong/default/placeholder.
@@ -28,13 +29,14 @@ PUBLIC_REGISTRATION_ENABLED=false
 
 Aktifkan hanya jika deployment memang menerima pendaftaran publik. Untuk deployment private-document internal, akun user dibuat/dikelola oleh admin.
 
-Production default juga tidak mengizinkan `unsafe-eval` di CSP:
+Production default tidak mengizinkan `unsafe-eval` secara global:
 
 ```text
 SECURITY_CSP_ALLOW_UNSAFE_EVAL=false
+SECURITY_CSP_ALLOW_LIVEWIRE_UNSAFE_EVAL=true
 ```
 
-Gunakan `true` hanya sebagai rollback sementara jika ada library frontend legacy yang terbukti membutuhkan eval.
+`SECURITY_CSP_ALLOW_LIVEWIRE_UNSAFE_EVAL=true` tetap diperlukan selama UI utama memakai Livewire/Alpine standar. Middleware CSP hanya menambahkan `'unsafe-eval'` pada response HTML yang memuat marker Livewire/Alpine (`wire:*`/`x-*`), sehingga response plain HTML atau non-HTML tetap tidak mendapat eval. Gunakan `SECURITY_CSP_ALLOW_UNSAFE_EVAL=true` hanya sebagai rollback global sementara jika ada library frontend legacy lain yang terbukti membutuhkan eval.
 
 ### `python-ai/config/ai_config.yaml`
 
@@ -125,7 +127,8 @@ Jalankan migration dari service `laravel` yang aktif karena service profile `art
 - `APP_DEBUG=false`.
 - `APP_URL` memakai HTTPS domain production.
 - `PUBLIC_REGISTRATION_ENABLED=false` untuk deployment private-document internal.
-- `SECURITY_CSP_ALLOW_UNSAFE_EVAL=false` kecuali ada rollback sementara yang terdokumentasi.
+- `SECURITY_CSP_ALLOW_UNSAFE_EVAL=false` kecuali ada rollback global sementara yang terdokumentasi.
+- `SECURITY_CSP_ALLOW_LIVEWIRE_UNSAFE_EVAL=true` selama UI masih memakai Livewire/Alpine standar.
 - `AI_SERVICE_TOKEN` sama antara Laravel dan Python, bukan default.
 - `ONLYOFFICE_JWT_SECRET` terisi dan tidak sama dengan token lain.
 - `ONLYOFFICE_DOCUMENTSERVER_TAG` bukan `latest`.

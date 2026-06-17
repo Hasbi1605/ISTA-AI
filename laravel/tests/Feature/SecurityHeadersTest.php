@@ -38,8 +38,41 @@ class SecurityHeadersTest extends TestCase
     public function test_content_security_policy_excludes_unsafe_eval_when_disabled(): void
     {
         config()->set('security.headers.content_security_policy.allow_unsafe_eval', false);
+        config()->set('security.headers.content_security_policy.allow_livewire_unsafe_eval', false);
 
         $response = $this->get(route('dashboard'));
+
+        $response->assertOk();
+
+        $csp = (string) $response->headers->get('Content-Security-Policy');
+
+        $this->assertStringContainsString("script-src 'self' 'unsafe-inline'", $csp);
+        $this->assertStringNotContainsString("'unsafe-eval'", $csp);
+    }
+
+    public function test_livewire_login_response_keeps_unsafe_eval_when_global_eval_is_disabled(): void
+    {
+        config()->set('security.headers.content_security_policy.allow_unsafe_eval', false);
+        config()->set('security.headers.content_security_policy.allow_livewire_unsafe_eval', true);
+
+        $response = $this->get(route('login'));
+
+        $response->assertOk();
+        $response->assertSee('wire:snapshot', false);
+
+        $csp = (string) $response->headers->get('Content-Security-Policy');
+
+        $this->assertStringContainsString("script-src 'self' 'unsafe-inline' 'unsafe-eval'", $csp);
+    }
+
+    public function test_plain_html_response_can_exclude_unsafe_eval_when_global_eval_is_disabled(): void
+    {
+        config()->set('security.headers.content_security_policy.allow_unsafe_eval', false);
+        config()->set('security.headers.content_security_policy.allow_livewire_unsafe_eval', true);
+
+        Route::get('/_test/security/plain-html', fn () => response('<html><body>Plain</body></html>'));
+
+        $response = $this->get('/_test/security/plain-html');
 
         $response->assertOk();
 

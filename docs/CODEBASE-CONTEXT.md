@@ -70,7 +70,7 @@ Subfolder:
 ### 2.4 Models / Jobs / Middleware
 - **Models:** `User`, `Conversation`, `Message`, `Document`, `DocumentChunk`, `Memo`, `MemoVersion`, `KnowledgeDocument`, `KnowledgeChunk`, `KnowledgeSource`, `AIUsageEvent`, `AdminAccountAudit`.
 - **Jobs:** `GenerateChatResponse` (jalur async chat, komplemen SSE), `ProcessDocument` (→ python `/api/documents/process`), `ProcessKnowledgeDocument` (→ `/api/knowledge/process`, memakai `processing_claim_token` agar retry lama tidak menimpa attempt baru), `RenderDocumentPreview`.
-- **Middleware:** `EnsureUserIsActive` (`active`, memutus sesi akun nonaktif pada route user terautentikasi), `EnsureUserIsAdmin` (`admin`), `EnsureUserIsSuperAdmin` (`super_admin`), `EnsureAdminPasswordChanged` (`admin.password_changed`), `UpdateUserPresence`, `AddSecurityHeaders` (CSP; `unsafe-eval` opt-in via `SECURITY_CSP_ALLOW_UNSAFE_EVAL`).
+- **Middleware:** `EnsureUserIsActive` (`active`, memutus sesi akun nonaktif pada route user terautentikasi), `EnsureUserIsAdmin` (`admin`), `EnsureUserIsSuperAdmin` (`super_admin`), `EnsureAdminPasswordChanged` (`admin.password_changed`), `UpdateUserPresence`, `AddSecurityHeaders` (CSP; `unsafe-eval` global opt-in via `SECURITY_CSP_ALLOW_UNSAFE_EVAL`, plus compatibility otomatis untuk response Livewire/Alpine via `SECURITY_CSP_ALLOW_LIVEWIRE_UNSAFE_EVAL`).
 - **Events:** `BookingCreated/BookingStatusChanged/FeedbackSubmitted/ScheduleUpdated` — **sisa domain lama (booking)**, tidak terhubung ke flow chat/memo. Jangan diandalkan untuk fitur AI.
 
 ### 2.5 Routes (`routes/`) — hanya `web.php`, `auth.php`, `console.php`
