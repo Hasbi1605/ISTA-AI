@@ -126,18 +126,32 @@ class GeneratePresentation implements ShouldQueue
             return;
         }
 
+        // Buat versi PPTX baru (#226) lalu jadikan versi aktif. Versioning di-set
+        // di dalam transition yang sama agar editor OnlyOffice selalu memakai
+        // PPTX hasil generate terbaru sebagai versi aktif.
+        $versionNumber = ((int) $fresh->versions()->max('version_number')) + 1;
+        $version = \App\Models\PresentationVersion::create([
+            'presentation_id' => $fresh->id,
+            'version_number' => $versionNumber,
+            'label' => 'Versi '.$versionNumber,
+            'pptx_path' => $result['path'],
+            'status' => Presentation::STATUS_READY,
+        ]);
+
         $saved = Presentation::where('id', $fresh->id)
             ->where('status', Presentation::STATUS_PROCESSING)
             ->update([
                 'status' => Presentation::STATUS_READY,
                 'pptx_path' => $result['path'],
                 'pdf_path' => null, // invalidasi PDF lama saat PPTX di-regenerate (#224)
+                'current_version_id' => $version->id,
                 'error_message' => null,
                 'generated_at' => now(),
             ]);
 
         if ($saved === 0) {
             // Job lain sudah mengambil alih: buang artefak agar tidak orphan.
+            $version->delete();
             $this->deleteFile($result['path']);
             logger()->info('GeneratePresentation: stale — left processing state mid-flight; discarding output', [
                 'presentation_id' => $fresh->id,

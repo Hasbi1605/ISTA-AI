@@ -19,7 +19,7 @@ class PresentationFileTest extends TestCase
         $path = 'presentations/'.$user->id.'/deck.pptx';
         Storage::disk('local')->put($path, 'PK'.str_repeat('x', 200));
 
-        return Presentation::create([
+        $presentation = Presentation::create([
             'user_id' => $user->id,
             'title' => 'Paparan Resmi',
             'status' => Presentation::STATUS_READY,
@@ -27,6 +27,17 @@ class PresentationFileTest extends TestCase
             'pptx_path' => $path,
             'generated_at' => now(),
         ]);
+
+        $version = $presentation->versions()->create([
+            'version_number' => 1,
+            'label' => 'Versi 1',
+            'pptx_path' => $path,
+            'status' => Presentation::STATUS_READY,
+        ]);
+
+        $presentation->forceFill(['current_version_id' => $version->id])->save();
+
+        return $presentation->refresh();
     }
 
     private function fakeOnlyOfficeConversion(): void

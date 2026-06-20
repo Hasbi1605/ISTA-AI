@@ -34,7 +34,106 @@
             <div class="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700 dark:border-red-800/50 dark:bg-red-900/20 dark:text-red-300">{{ $message }}</div>
         @enderror
 
-        @if($subMode === 'prompy')
+        @if($editorConfig)
+            {{-- ===== EDITOR ONLYOFFICE SLIDES (#226) ===== --}}
+            <div class="mb-4 flex items-center justify-between gap-2">
+                <h3 class="text-sm font-bold text-stone-800 dark:text-gray-100">Edit Presentasi</h3>
+                <button type="button" wire:click="closeEditor"
+                    class="inline-flex items-center gap-1 rounded-lg border border-stone-200 px-3 py-1.5 text-[12px] font-semibold text-stone-600 hover:bg-stone-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">
+                    Tutup editor
+                </button>
+            </div>
+            <div
+                wire:ignore
+                wire:key="presentation-editor-{{ $editingPresentationId }}-{{ md5($editorConfig['document']['key'] ?? '') }}"
+                class="h-[70vh] min-h-[560px] overflow-hidden rounded-2xl border border-stone-200/80 dark:border-gray-700"
+                x-data="{
+                    config: @js($editorConfig),
+                    apiUrl: @js($onlyOfficeApiUrl),
+                    containerId: 'presentation-workspace-editor-{{ md5($editorConfig['document']['key'] ?? '') }}',
+                    editor: null,
+                    editorFailed: false,
+                    load() {
+                        this.editorFailed = false;
+                        this.destroy();
+                        const boot = () => {
+                            try {
+                                const container = document.getElementById(this.containerId);
+                                if (container) { container.innerHTML = ''; }
+                                const documentKey = this.config?.document?.key || this.containerId;
+                                window.presentationOnlyOfficeState = window.presentationOnlyOfficeState || {};
+                                window.presentationOnlyOfficeState[documentKey] = {
+                                    containerId: this.containerId,
+                                    dirty: false,
+                                    lastChangeAt: 0,
+                                    lastReadyAt: Date.now(),
+                                };
+                                const existingEvents = this.config.events || {};
+                                this.config.events = {
+                                    ...existingEvents,
+                                    onDocumentReady: (...args) => {
+                                        window.presentationOnlyOfficeState[documentKey] = {
+                                            ...(window.presentationOnlyOfficeState[documentKey] || {}),
+                                            containerId: this.containerId,
+                                            dirty: false,
+                                            lastReadyAt: Date.now(),
+                                        };
+                                        existingEvents.onDocumentReady?.(...args);
+                                    },
+                                    onDocumentStateChange: (event) => {
+                                        window.presentationOnlyOfficeState[documentKey] = {
+                                            ...(window.presentationOnlyOfficeState[documentKey] || {}),
+                                            containerId: this.containerId,
+                                            dirty: Boolean(event?.data),
+                                            lastChangeAt: Date.now(),
+                                        };
+                                        existingEvents.onDocumentStateChange?.(event);
+                                    },
+                                    onError: (...args) => {
+                                        window.presentationOnlyOfficeState[documentKey] = {
+                                            ...(window.presentationOnlyOfficeState[documentKey] || {}),
+                                            containerId: this.containerId,
+                                            lastErrorAt: Date.now(),
+                                        };
+                                        existingEvents.onError?.(...args);
+                                    },
+                                };
+                                this.editor = new DocsAPI.DocEditor(this.containerId, this.config);
+                            } catch (error) {
+                                console.error('OnlyOffice Slides editor gagal dimuat', error);
+                                this.editorFailed = true;
+                            }
+                        };
+                        if (window.DocsAPI) { boot(); return; }
+                        const script = document.createElement('script');
+                        script.src = this.apiUrl;
+                        script.onload = boot;
+                        script.onerror = () => { this.editorFailed = true; };
+                        document.head.appendChild(script);
+                    },
+                    destroy() {
+                        if (this.editor && typeof this.editor.destroyEditor === 'function') {
+                            this.editor.destroyEditor();
+                        }
+                        const documentKey = this.config?.document?.key || this.containerId;
+                        if (window.presentationOnlyOfficeState?.[documentKey]) {
+                            window.presentationOnlyOfficeState[documentKey].destroyedAt = Date.now();
+                        }
+                        this.editor = null;
+                    }
+                }"
+                x-init="load()"
+            >
+                <div id="presentation-workspace-editor-{{ md5($editorConfig['document']['key'] ?? '') }}" class="h-full w-full"></div>
+                <div x-show="editorFailed" x-transition class="flex h-full items-center justify-center px-6 text-center" style="display:none;">
+                    <div class="max-w-md rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+                        <p class="font-semibold">Editor presentasi belum bisa dimuat.</p>
+                        <p class="mt-2 text-sm leading-6">Periksa koneksi ke OnlyOffice, lalu coba muat ulang editor. Anda tetap bisa mengunduh PPTX/PDF dari riwayat.</p>
+                        <button type="button" @click="load()" class="mt-4 rounded-lg bg-amber-700 px-4 py-2 text-xs font-semibold text-white hover:bg-amber-800">Coba muat ulang editor</button>
+                    </div>
+                </div>
+            </div>
+        @elseif($subMode === 'prompy')
             {{-- ===== PROMPY STUDIO (placeholder, dikerjakan di child #263) ===== --}}
             <div class="mx-auto max-w-xl rounded-2xl border border-dashed border-stone-300 bg-white/60 p-8 text-center dark:border-gray-700 dark:bg-gray-800/40">
                 <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-ista-gold/15 text-ista-gold">
@@ -183,16 +282,35 @@
                                             <p class="mt-1.5 text-[11px] text-red-500">{{ $p->error_message }}</p>
                                         @endif
 
-                                        <div class="mt-2.5 flex flex-wrap items-center gap-2">
-                                            @if($p->status === \App\Models\Presentation::STATUS_READY)
-                                                <a href="{{ route('presentations.download', $p) }}"
-                                                    class="inline-flex items-center gap-1 rounded-lg bg-ista-primary/10 px-2.5 py-1 text-[11px] font-semibold text-ista-primary hover:bg-ista-primary/15">
+                                        <div class="mt-2.5 flex flex-wrap items-center gap-2"
+                                            x-data="presentationDocumentDownloads"
+                                        >
+                                            @if($p->isReady())
+                                                <button type="button" wire:click="editPresentation({{ $p->id }})"
+                                                    class="inline-flex items-center gap-1 rounded-lg bg-ista-primary px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-ista-primary/90">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                    </svg>
+                                                    Edit Presentasi
+                                                </button>
+                                                <button type="button"
+                                                    data-download-url="{{ route('presentations.download', $p) }}"
+                                                    data-force-save-url="{{ route('presentations.force-save', $p) }}"
+                                                    data-download-filename="{{ e(($p->title ?: 'presentasi').'.pptx') }}"
+                                                    @click="downloadPresentation($el.dataset.downloadUrl, 'pptx', $el.dataset.downloadFilename, $el.dataset.forceSaveUrl)"
+                                                    :disabled="downloadLoading !== null"
+                                                    class="inline-flex items-center gap-1 rounded-lg bg-ista-primary/10 px-2.5 py-1 text-[11px] font-semibold text-ista-primary hover:bg-ista-primary/15 disabled:opacity-60">
                                                     PPTX
-                                                </a>
-                                                <a href="{{ route('presentations.export.pdf', $p) }}"
-                                                    class="inline-flex items-center gap-1 rounded-lg bg-ista-primary/10 px-2.5 py-1 text-[11px] font-semibold text-ista-primary hover:bg-ista-primary/15">
+                                                </button>
+                                                <button type="button"
+                                                    data-download-url="{{ route('presentations.export.pdf', $p) }}"
+                                                    data-force-save-url="{{ route('presentations.force-save', $p) }}"
+                                                    data-download-filename="{{ e(($p->title ?: 'presentasi').'.pdf') }}"
+                                                    @click="downloadPresentation($el.dataset.downloadUrl, 'pdf', $el.dataset.downloadFilename, $el.dataset.forceSaveUrl)"
+                                                    :disabled="downloadLoading !== null"
+                                                    class="inline-flex items-center gap-1 rounded-lg bg-ista-primary/10 px-2.5 py-1 text-[11px] font-semibold text-ista-primary hover:bg-ista-primary/15 disabled:opacity-60">
                                                     PDF
-                                                </a>
+                                                </button>
                                             @endif
                                             @if(in_array($p->status, [\App\Models\Presentation::STATUS_ERROR, \App\Models\Presentation::STATUS_READY], true))
                                                 <button type="button" wire:click="retry({{ $p->id }})"

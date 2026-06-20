@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Presentation extends Model
@@ -19,11 +20,15 @@ class Presentation extends Model
 
     public const STATUS_ERROR = 'error';
 
+    /** Versi PPTX telah diedit manual via OnlyOffice Slides (#226). */
+    public const STATUS_EDITED = 'edited';
+
     public const STATUSES = [
         self::STATUS_PENDING,
         self::STATUS_PROCESSING,
         self::STATUS_READY,
         self::STATUS_ERROR,
+        self::STATUS_EDITED,
     ];
 
     protected $fillable = [
@@ -56,9 +61,19 @@ class Presentation extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function versions(): HasMany
+    {
+        return $this->hasMany(PresentationVersion::class);
+    }
+
+    public function currentVersion(): BelongsTo
+    {
+        return $this->belongsTo(PresentationVersion::class, 'current_version_id');
+    }
+
     public function isReady(): bool
     {
-        return $this->status === self::STATUS_READY;
+        return in_array($this->status, [self::STATUS_READY, self::STATUS_EDITED], true);
     }
 
     public function isOwnedBy(?User $user): bool
