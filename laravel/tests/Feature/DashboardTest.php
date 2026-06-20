@@ -65,4 +65,30 @@ class DashboardTest extends TestCase
         $response->assertSee(route('chat'), false);
         $response->assertSee(route('chat', ['tab' => 'memo']), false);
     }
+
+    public function test_authenticated_dashboard_links_to_presentation_when_feature_is_enabled(): void
+    {
+        config(['features.presentation' => true]);
+        $user = User::factory()->create(['email_verified_at' => now()]);
+
+        $response = $this->actingAs($user)->get('/');
+
+        $response->assertStatus(200);
+        $response->assertSee('Buka Presentasi', false);
+        $response->assertSee(route('chat', ['tab' => 'presentation']), false);
+        $response->assertSee('sm:grid-cols-3', false);
+    }
+
+    public function test_authenticated_dashboard_hides_presentation_when_feature_is_disabled(): void
+    {
+        config(['features.presentation' => false]);
+        $user = User::factory()->create(['email_verified_at' => now()]);
+
+        $response = $this->actingAs($user)->get('/');
+
+        $response->assertStatus(200);
+        $response->assertDontSee('Buka Presentasi', false);
+        $response->assertDontSee(route('chat', ['tab' => 'presentation']), false);
+        $response->assertSee('sm:grid-cols-2', false);
+    }
 }

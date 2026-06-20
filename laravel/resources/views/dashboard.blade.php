@@ -82,10 +82,20 @@
                     </form>
                     @endauth
 
-                    <div class="mx-auto mt-10 grid max-w-xl grid-cols-1 gap-3 sm:grid-cols-2">
+                    @php
+                        $presentationEnabled = auth()->check() && config('features.presentation');
+                    @endphp
+                    <div @class([
+                        'mx-auto mt-10 grid grid-cols-1 gap-3',
+                        'max-w-3xl sm:grid-cols-3' => $presentationEnabled,
+                        'max-w-xl sm:grid-cols-2' => ! $presentationEnabled,
+                    ])>
                         @auth
                         <a href="{{ route('chat') }}" class="rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-sm font-semibold text-stone-700 transition hover:border-ista-primary/30 hover:text-ista-primary dark:border-gray-800 dark:bg-gray-800/80 dark:text-gray-100 dark:hover:border-ista-primary/50">Buka Chat</a>
                         <a href="{{ route('chat', ['tab' => 'memo']) }}" class="rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-sm font-semibold text-stone-700 transition hover:border-ista-primary/30 hover:text-ista-primary dark:border-gray-800 dark:bg-gray-800/80 dark:text-gray-100 dark:hover:border-ista-primary/50">Buka Memo</a>
+                        @if(config('features.presentation'))
+                        <a href="{{ route('chat', ['tab' => 'presentation']) }}" class="rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-sm font-semibold text-stone-700 transition hover:border-ista-primary/30 hover:text-ista-primary dark:border-gray-800 dark:bg-gray-800/80 dark:text-gray-100 dark:hover:border-ista-primary/50">Buka Presentasi</a>
+                        @endif
                         @else
                         <a href="{{ route('guest-chat') }}" class="rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-sm font-semibold text-stone-700 transition hover:border-ista-primary/30 hover:text-ista-primary dark:border-gray-800 dark:bg-gray-800/80 dark:text-gray-100 dark:hover:border-ista-primary/50">Buka Chat</a>
                         <a href="{{ route('guest-memo') }}" class="rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-sm font-semibold text-stone-700 transition hover:border-ista-primary/30 hover:text-ista-primary dark:border-gray-800 dark:bg-gray-800/80 dark:text-gray-100 dark:hover:border-ista-primary/50">Buka Memo</a>

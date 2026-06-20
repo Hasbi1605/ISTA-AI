@@ -12,8 +12,8 @@ return [
     |
     */
 
-    // Tab Presentasi (PPTX/PDF generator) pada shell ISTA AI. Disembunyikan
-    // secara default sampai pipeline generate stabil (epic #218).
-    'presentation' => (bool) env('FEATURE_PRESENTATION', false),
+    // Tab Presentasi (PPTX/PDF generator) pada shell ISTA AI. Aktif default
+    // setelah epic #218 stabil; set FEATURE_PRESENTATION=false untuk rollback.
+    'presentation' => (bool) env('FEATURE_PRESENTATION', true),
 
 ];

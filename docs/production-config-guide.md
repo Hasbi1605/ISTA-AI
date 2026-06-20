@@ -15,6 +15,7 @@ File ini berada di root repo pada server production dan tidak boleh dicommit. Is
 - API key provider AI: `GITHUB_TOKEN`, `GITHUB_TOKEN_2`, `GROQ_API_KEY`, `GEMINI_API_KEY`, `LANGSEARCH_API_KEY`
 - URL internal Laravel ke Python
 - `PUBLIC_REGISTRATION_ENABLED` untuk membuka/menutup registrasi mandiri
+- `FEATURE_PRESENTATION` untuk menampilkan/rollback tab Presentasi dan tombol dashboard
 - `SECURITY_CSP_ALLOW_UNSAFE_EVAL` untuk override global CSP `unsafe-eval` bila benar-benar diperlukan
 - `SECURITY_CSP_ALLOW_LIVEWIRE_UNSAFE_EVAL` untuk compatibility halaman Livewire/Alpine tanpa membuka eval pada response plain HTML
 - konfigurasi OnlyOffice seperti `ONLYOFFICE_JWT_SECRET`, `ONLYOFFICE_SIGNED_URL_TTL_MINUTES`, dan `ONLYOFFICE_DOCUMENTSERVER_TAG`
@@ -28,6 +29,14 @@ PUBLIC_REGISTRATION_ENABLED=false
 ```
 
 Aktifkan hanya jika deployment memang menerima pendaftaran publik. Untuk deployment private-document internal, akun user dibuat/dikelola oleh admin.
+
+Fitur Presentasi sudah aktif default setelah epic #218 stabil:
+
+```text
+FEATURE_PRESENTATION=true
+```
+
+Set `FEATURE_PRESENTATION=false` hanya sebagai rollback sementara bila tab Presentasi perlu disembunyikan lagi tanpa revert kode.
 
 Production default tidak mengizinkan `unsafe-eval` secara global:
 
