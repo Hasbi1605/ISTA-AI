@@ -3038,6 +3038,159 @@ const registerChatPageData = (Alpine) => {
         },
     }));
 
+    Alpine.data('presentationDocumentDownloads', () => ({
+        downloadLoading: null,
+        downloadStatus: '',
+        downloadError: '',
+
+        async downloadPresentation(url, type, fallbackName, forceSaveUrl = null) {
+            if (this.downloadLoading) {
+                return;
+            }
+
+            this.downloadLoading = type;
+            this.downloadStatus = 'Menyiapkan unduhan...';
+            this.downloadError = '';
+
+            try {
+                await this.waitForPresentationEditorToSettle();
+
+                if (this.hasPresentationChangesToSync()) {
+                    this.downloadStatus = 'Menyimpan perubahan editor...';
+                    await this.forceSavePresentation(forceSaveUrl);
+                }
+
+                this.downloadStatus = type === 'pdf' ? 'Menyiapkan PDF...' : 'Menyiapkan PPTX...';
+
+                const response = await fetch(url, {
+                    cache: 'no-store',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Cache-Control': 'no-cache',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                });
+
+                if (!response.ok) {
+                    throw new Error('Download gagal');
+                }
+
+                const blob = await response.blob();
+                this.downloadBlob(blob, this.fileNameFromDisposition(
+                    response.headers.get('Content-Disposition') || '',
+                    fallbackName,
+                ));
+            } catch (error) {
+                this.downloadError = error?.message || 'Unduhan belum bisa disiapkan.';
+            } finally {
+                this.downloadLoading = null;
+                this.downloadStatus = '';
+            }
+        },
+
+        async waitForPresentationEditorToSettle() {
+            const minQuietMs = 900;
+            const maxWaitMs = 2500;
+            const startedAt = Date.now();
+
+            await this.sleep(1000);
+
+            while (Date.now() - startedAt < maxWaitMs) {
+                const state = this.latestPresentationEditorState();
+                const lastChangeAt = Number(state?.lastChangeAt || 0);
+
+                if (!lastChangeAt || Date.now() - lastChangeAt >= minQuietMs) {
+                    return;
+                }
+
+                await this.sleep(Math.min(250, minQuietMs - (Date.now() - lastChangeAt)));
+            }
+        },
+
+        latestPresentationEditorState() {
+            const states = Object.values(window.presentationOnlyOfficeState || {});
+
+            return states
+                .filter((state) => !state?.destroyedAt || Number(state.destroyedAt) < Number(state.lastReadyAt || state.lastChangeAt || 0))
+                .sort((a, b) => Number(b?.lastChangeAt || b?.lastReadyAt || 0) - Number(a?.lastChangeAt || a?.lastReadyAt || 0))[0] || null;
+        },
+
+        hasPresentationChangesToSync() {
+            const state = this.latestPresentationEditorState();
+
+            return Boolean(state?.dirty || Number(state?.lastChangeAt || 0) > 0);
+        },
+
+        sleep(ms) {
+            return new Promise((resolve) => window.setTimeout(resolve, Math.max(0, Number(ms) || 0)));
+        },
+
+        async forceSavePresentation(url) {
+            if (!url) {
+                return;
+            }
+
+            const response = await fetch(url, {
+                method: 'POST',
+                cache: 'no-store',
+                credentials: 'same-origin',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': this.getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({}),
+            });
+
+            if (!response.ok) {
+                const message = await this.errorMessage(response);
+                throw new Error(message || 'Perubahan editor belum tersimpan.');
+            }
+        },
+
+        getCsrfToken() {
+            return document.querySelector('meta[name="csrf-token"]')?.content || '';
+        },
+
+        async errorMessage(response) {
+            try {
+                const data = await response.clone().json();
+
+                return data?.message || '';
+            } catch (error) {
+                return await response.text();
+            }
+        },
+
+        fileNameFromDisposition(disposition, fallbackName) {
+            const utfMatch = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+
+            if (utfMatch) {
+                try {
+                    return decodeURIComponent(utfMatch[1]);
+                } catch (error) {
+                    return fallbackName;
+                }
+            }
+
+            const asciiMatch = disposition.match(/filename="?([^";]+)"?/i);
+
+            return asciiMatch ? asciiMatch[1] : fallbackName;
+        },
+
+        downloadBlob(blob, fileName) {
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = downloadUrl;
+            anchor.download = fileName;
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            window.URL.revokeObjectURL(downloadUrl);
+        },
+    }));
+
     Alpine.data('memoWorkspace', () => ({
         showMemoSidebar: !window.matchMedia('(max-width: 1023px)').matches,
         isMobile: window.matchMedia('(max-width: 1023px)').matches,

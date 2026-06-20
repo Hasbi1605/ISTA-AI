@@ -4,6 +4,9 @@ namespace App\Livewire\Presentations;
 
 use App\Models\Document;
 use App\Models\Presentation;
+use App\Models\PresentationVersion;
+use App\Services\OnlyOffice\JwtSigner;
+use App\Services\OnlyOffice\PresentationDocumentKey;
 use App\Services\Presentations\PresentationGenerationService;
 use App\Support\UserFacingError;
 use Illuminate\Support\Facades\Auth;
@@ -48,6 +51,13 @@ class PresentationWorkspace extends Component
     public array $selectedDocuments = [];
 
     public ?int $activePresentationId = null;
+
+    /** Presentasi yang sedang dibuka di editor OnlyOffice Slides (#226). */
+    public ?int $editingPresentationId = null;
+
+    public ?array $editorConfigCache = null;
+
+    public ?string $editorConfigCacheSignature = null;
 
     public ?string $statusMessage = null;
 
@@ -175,6 +185,151 @@ class PresentationWorkspace extends Component
         if ((int) $this->activePresentationId === (int) $presentationId) {
             $this->activePresentationId = null;
         }
+
+        if ((int) $this->editingPresentationId === (int) $presentationId) {
+            $this->closeEditor();
+        }
+    }
+
+    /**
+     * Buka presentasi siap di editor OnlyOffice Slides (#226).
+     */
+    public function editPresentation(int $presentationId): void
+    {
+        $presentation = Presentation::where('id', $presentationId)
+            ->where('user_id', Auth::id())
+            ->first();
+
+        if (! $presentation) {
+            $this->statusMessage = 'Presentasi tidak ditemukan.';
+
+            return;
+        }
+
+        if (! $presentation->isReady() || ! $presentation->pptx_path) {
+            $this->statusMessage = 'Presentasi belum siap untuk diedit.';
+
+            return;
+        }
+
+        $this->editingPresentationId = $presentation->id;
+        $this->activePresentationId = $presentation->id;
+        $this->forgetEditorConfigCache();
+    }
+
+    public function closeEditor(): void
+    {
+        $this->editingPresentationId = null;
+        $this->forgetEditorConfigCache();
+    }
+
+    /**
+     * Konfigurasi editor OnlyOffice Slides untuk presentasi aktif (documentType
+     * = "slide"). Token JWT mengikat document/callback agar tidak bisa dipalsukan.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function editorConfig(): ?array
+    {
+        if (! $this->editingPresentationId) {
+            $this->forgetEditorConfigCache();
+
+            return null;
+        }
+
+        $presentation = Presentation::with('currentVersion')
+            ->where('id', $this->editingPresentationId)
+            ->where('user_id', Auth::id())
+            ->first();
+
+        if (! $presentation || ! $presentation->isReady()) {
+            $this->forgetEditorConfigCache();
+
+            return null;
+        }
+
+        $version = $this->editorPresentationVersion($presentation);
+        $filePath = $version?->pptx_path ?: $presentation->pptx_path;
+
+        if (! $filePath) {
+            $this->forgetEditorConfigCache();
+
+            return null;
+        }
+
+        $versionId = $version?->id;
+        $cacheSignature = implode(':', [
+            Auth::id(),
+            $presentation->id,
+            $versionId ?? 'current',
+            $filePath,
+        ]);
+
+        if ($this->editorConfigCacheSignature === $cacheSignature && $this->editorConfigCache !== null) {
+            return $this->editorConfigCache;
+        }
+
+        $signer = app(JwtSigner::class);
+        $documentKeyService = app(PresentationDocumentKey::class);
+        $laravelInternalUrl = rtrim((string) config('services.onlyoffice.laravel_internal_url', config('app.url')), '/');
+        $ttlMinutes = max(1, (int) config('services.onlyoffice.signed_url_ttl_minutes', 30));
+        $documentUrl = $documentKeyService->signedFileUrl($presentation, $versionId, $ttlMinutes);
+        $callbackPath = route('presentations.onlyoffice.callback', array_filter([
+            'presentation' => $presentation->id,
+            'version_id' => $versionId,
+        ], fn ($value) => filled($value)), false);
+
+        $documentKey = $documentKeyService->forEditor($presentation, $version);
+        $config = [
+            'document' => [
+                'fileType' => 'pptx',
+                'key' => $documentKey,
+                'title' => $presentation->title.'.pptx',
+                'url' => $documentUrl,
+            ],
+            'documentType' => 'slide',
+            'editorConfig' => [
+                'callbackUrl' => $laravelInternalUrl.$callbackPath,
+                'customization' => [
+                    'forcesave' => true,
+                ],
+                'mode' => 'edit',
+                'lang' => 'id',
+                'user' => [
+                    'id' => (string) Auth::id(),
+                    'name' => $this->safeEditorUserName((string) Auth::user()?->name),
+                ],
+            ],
+            'exp' => now()->addMinutes($ttlMinutes)->getTimestamp(),
+        ];
+
+        $config['token'] = $signer->sign($config);
+
+        $this->editorConfigCacheSignature = $cacheSignature;
+        $this->editorConfigCache = $config;
+
+        return $this->editorConfigCache;
+    }
+
+    protected function editorPresentationVersion(Presentation $presentation): ?PresentationVersion
+    {
+        return $presentation->currentVersion
+            ?: $presentation->versions()->orderByDesc('version_number')->first();
+    }
+
+    protected function safeEditorUserName(string $name): string
+    {
+        $clean = preg_replace('/[<>"`]+/u', ' ', $name) ?? '';
+        $clean = preg_replace("/[^\p{L}\p{M}\p{N}\s.'-]+/u", ' ', $clean) ?? '';
+        $clean = preg_replace('/\s+/u', ' ', trim($clean)) ?? '';
+
+        return mb_substr($clean !== '' ? $clean : 'Pengguna', 0, 120);
+    }
+
+    protected function forgetEditorConfigCache(): void
+    {
+        $this->editorConfigCache = null;
+        $this->editorConfigCacheSignature = null;
     }
 
     public function render()
@@ -203,6 +358,8 @@ class PresentationWorkspace extends Component
             'hasInProgress' => $hasInProgress,
             'slideCountMin' => PresentationGenerationService::SLIDE_COUNT_MIN,
             'slideCountMax' => PresentationGenerationService::SLIDE_COUNT_MAX,
+            'editorConfig' => $this->editorConfig(),
+            'onlyOfficeApiUrl' => rtrim((string) config('services.onlyoffice.public_url', ''), '/').'/web-apps/apps/api/documents/api.js',
         ]);
     }
 
