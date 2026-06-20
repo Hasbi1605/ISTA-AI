@@ -73,6 +73,28 @@ class PresentationGenerationTest extends TestCase
         Queue::assertPushed(GeneratePresentation::class);
     }
 
+    public function test_create_and_dispatch_uses_configured_presentation_queue(): void
+    {
+        Queue::fake();
+        config([
+            'presentations.queue.connection' => 'redis',
+            'presentations.queue.name' => 'default',
+        ]);
+
+        $user = User::factory()->create();
+
+        app(PresentationGenerationService::class)->createAndDispatch($user, [
+            'title' => 'Rapat Koordinasi',
+            'visual_template' => 'modern_minimal',
+            'slide_count' => 6,
+        ]);
+
+        Queue::assertPushed(GeneratePresentation::class, function (GeneratePresentation $job) {
+            return $job->connection === 'redis'
+                && $job->queue === 'default';
+        });
+    }
+
     public function test_create_and_dispatch_filters_out_foreign_documents(): void
     {
         Queue::fake();

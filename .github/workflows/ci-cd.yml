@@ -243,11 +243,19 @@ jobs:
           ${compose} up -d --build --remove-orphans
           ${compose} exec -T laravel php artisan migrate --force
           ${compose} restart laravel horizon scheduler
+          ${compose} exec -T laravel php artisan presentations:recover-stale-renders
 
-          for service in laravel python-ai python-ai-docs; do
-            ${compose} ps "${service}"
+          running_services="$(${compose} ps --services --status running)"
+          printf '%s\n' "${running_services}"
+          for service in laravel python-ai python-ai-docs horizon scheduler; do
+            if ! printf '%s\n' "${running_services}" | grep -qx "${service}"; then
+              echo "Service is not running: ${service}"
+              ${compose} ps
+              exit 1
+            fi
           done
 
+          ${compose} exec -T laravel php artisan horizon:status
           ${compose} exec -T laravel curl -fsS http://127.0.0.1:8000/up >/dev/null
           ${compose} exec -T python-ai curl -fsS http://127.0.0.1:8001/api/ready >/dev/null
           ${compose} exec -T python-ai-docs curl -fsS http://127.0.0.1:8002/api/ready >/dev/null

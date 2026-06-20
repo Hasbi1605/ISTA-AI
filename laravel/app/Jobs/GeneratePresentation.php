@@ -42,6 +42,8 @@ class GeneratePresentation implements ShouldQueue
     {
         $this->claimToken = Str::uuid()->toString();
         $this->claimCacheKey = 'presentation_generate_claim:'.$presentation->id;
+
+        $this->configureQueue();
     }
 
     public function handle(PresentationGenerationService $service): void
@@ -222,6 +224,19 @@ class GeneratePresentation implements ShouldQueue
             }
         } catch (Throwable $e) {
             logger()->warning('GeneratePresentation: failed to delete file', ['path' => $path, 'error' => $e->getMessage()]);
+        }
+    }
+
+    protected function configureQueue(): void
+    {
+        $connection = trim((string) config('presentations.queue.connection', ''));
+        if ($connection !== '') {
+            $this->onConnection($connection);
+        }
+
+        $queue = trim((string) config('presentations.queue.name', 'default'));
+        if ($queue !== '') {
+            $this->onQueue($queue);
         }
     }
 }

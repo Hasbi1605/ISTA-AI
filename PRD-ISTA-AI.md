@@ -468,6 +468,8 @@ Document service:
 |---------|----------|----------|
 | `documents:purge-deleted --days=7` | daily 03:00 | Purges soft-deleted documents older than 7 days |
 | `chat:resolve-stale-responses --minutes=10` | every minute | Resolves stale in-progress chat responses |
+| `presentations:resolve-stale-renders --minutes=10` | every minute | Resolves stale in-progress presentation renders |
+| `presentations:recover-stale-renders` | deploy/manual | Redispatches bounded stale presentation renders after queue recovery |
 
 ---
 

@@ -6,7 +6,7 @@ Repo ini memiliki workflow `.github/workflows/ci-cd.yml` untuk menjalankan CI da
 
 1. `pull_request` ke `main` menjalankan test Laravel, build frontend, audit dependency, dan test Python.
 2. `push` ke `main` menjalankan semua check yang sama.
-3. Jika semua check lulus pada `push main`, job `Deploy production` SSH ke server, masuk ke repo production, `git pull --ff-only origin main`, rebuild Docker Compose, menjalankan migrasi, restart service runtime, lalu smoke check health internal.
+3. Jika semua check lulus pada `push main`, job `Deploy production` SSH ke server, masuk ke repo production, `git pull --ff-only origin main`, rebuild Docker Compose, menjalankan migrasi, restart service runtime, recovery terbatas render presentasi stale, verifikasi Horizon/Scheduler tetap running, lalu smoke check health internal.
 4. `workflow_dispatch` bisa menjalankan CI manual. Deploy manual hanya berjalan jika input `deploy=true` dan branch yang dipilih adalah `main`.
 
 ## Secret GitHub yang Dibutuhkan
@@ -61,6 +61,8 @@ docker compose --env-file .env.droplet -f docker-compose.production.yml config >
 docker compose --env-file .env.droplet -f docker-compose.production.yml up -d --build --remove-orphans
 docker compose --env-file .env.droplet -f docker-compose.production.yml exec -T laravel php artisan migrate --force
 docker compose --env-file .env.droplet -f docker-compose.production.yml restart laravel horizon scheduler
+docker compose --env-file .env.droplet -f docker-compose.production.yml exec -T laravel php artisan presentations:recover-stale-renders
+docker compose --env-file .env.droplet -f docker-compose.production.yml exec -T laravel php artisan horizon:status
 ```
 
 Workflow sengaja memakai `git pull --ff-only`. Jika server punya perubahan manual atau branch divergen, deploy gagal agar operator bisa mengecek state production terlebih dahulu.
