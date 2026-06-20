@@ -679,7 +679,56 @@ class ChatIndex extends Component
 
     public function render()
     {
-        return view('livewire.chat.chat-index');
+        // Normalisasi di render() menjamin tab valid setelah hidrasi #[Url]
+        // (initial load) maupun update live, sehingga panel tidak pernah kosong.
+        $this->tab = $this->normalizeTab($this->tab);
+
+        return view('livewire.chat.chat-index', [
+            'presentationEnabled' => $this->presentationEnabled(),
+        ]);
+    }
+
+    /**
+     * Tab yang valid untuk shell ISTA AI. Tab presentasi hanya tersedia bila
+     * feature flag aktif (epic #218 dirilis bertahap).
+     *
+     * @return list<string>
+     */
+    public function allowedTabs(): array
+    {
+        $tabs = ['chat', 'memo'];
+
+        if ($this->presentationEnabled()) {
+            $tabs[] = 'presentation';
+        }
+
+        return $tabs;
+    }
+
+    public function presentationEnabled(): bool
+    {
+        return (bool) config('features.presentation', false);
+    }
+
+    /**
+     * Normalisasi nilai tab dari URL/aksi user. Alias "presentasi" diterima
+     * dan dipetakan ke "presentation". Nilai tidak dikenal (atau presentasi
+     * saat flag mati) jatuh ke "chat" agar panel tidak pernah kosong.
+     */
+    public function normalizeTab(?string $tab): string
+    {
+        $tab = strtolower(trim((string) $tab));
+
+        if ($tab === 'presentasi') {
+            $tab = 'presentation';
+        }
+
+        return in_array($tab, $this->allowedTabs(), true) ? $tab : 'chat';
+    }
+
+    public function updatedTab(string $value): void
+    {
+        $this->tab = $this->normalizeTab($value);
     }
 
     private function conversationHasPendingResponse(Conversation $conversation): bool

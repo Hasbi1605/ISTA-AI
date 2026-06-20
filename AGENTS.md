@@ -19,7 +19,7 @@ python-ai, atau flow, **perbarui `docs/CODEBASE-CONTEXT.md`** pada bagian yang r
 
 ## Cara bekerja
 - Untuk tugas kompleks, mulai dengan plan singkat di percakapan sebelum menulis kode. Repo ini tidak memakai folder `issue/` atau PR flow lagi.
-- Setelah verifikasi memadai, perubahan boleh langsung di-commit ke `main`, push ke remote, lalu deploy sesuai scope tugas.
+- Setelah verifikasi memadai, perubahan boleh langsung di-commit ke `main` dan push ke remote. Setelah push berhasil, laporkan hasilnya lalu stop; jangan menunggu workflow CI/CD atau deploy production selesai kecuali user meminta eksplisit.
 - Gunakan perubahan sekecil mungkin yang menyelesaikan masalah. Jangan refactor besar
   kecuali diminta atau benar-benar diperlukan.
 - Ikuti pola yang sudah ada: thin controller, **UI interaktif di Livewire**, logika domain di
@@ -79,6 +79,8 @@ bagian "## Changelog" di bawah. Aturan:
 - Changelog ini adalah indeks ringkas semua perubahan repo.
 
 ## Changelog
+- 2026-06-20 — Fase 1 epic Presentasi (#218): tambah tab Presentasi 3-mode di shell ISTA AI di belakang feature flag `features.presentation` + normalisasi tab (alias `presentasi`, fallback `chat`), placeholder `PresentationWorkspace`, dan data model + akses presentasi (migration `presentations`, model `Presentation` dengan helper fail-closed owned+ready, `PresentationPolicy` owner/download-ready). — `laravel/config/features.php`, `laravel/app/Livewire/Chat/ChatIndex.php`, `laravel/app/Livewire/Presentations/PresentationWorkspace.php`, `laravel/resources/views/livewire/{chat/chat-index.blade.php,chat/partials/chat-memo-tab-toggle.blade.php,presentations/presentation-workspace.blade.php}`, `laravel/resources/js/chat-page.js`, `laravel/database/migrations/2026_06_20_000001_create_presentations_table.php`, `laravel/app/Models/Presentation.php`, `laravel/app/Policies/PresentationPolicy.php`, `laravel/tests/Feature/{Chat/ChatUiTest.php,Presentations/PresentationModelTest.php}`, env examples, `docs/CODEBASE-CONTEXT.md` — (test: full PHPUnit 563 pass via `php -d memory_limit=-1 vendor/bin/phpunit`; `npm run build` pass; python-ai tidak tersentuh)
+- 2026-06-18 — Menambahkan aturan workflow agar setelah push berhasil agent langsung berhenti dan tidak menunggu CI/CD atau deploy production selesai kecuali diminta eksplisit. — `AGENTS.md` — (test: n/a, dokumentasi)
 - 2026-06-18 — Memperbarui lock dependency frontend untuk menutup audit npm terbaru (`dompurify` 3.4.11, `form-data` 4.0.6, `vite` 6.4.3) agar workflow CI/CD tidak berhenti di audit frontend. — `laravel/package-lock.json` — (test: `npm audit --audit-level=high` clean; `npm run build` pass)
 - 2026-06-18 — Memperbaiki CSP production yang mematikan interaksi Livewire/Alpine di `/login` dengan compatibility `unsafe-eval` hanya untuk response HTML ber-marker Livewire/Alpine, plus test regresi header CSP login dan dokumentasi env. — `laravel/app/Http/Middleware/AddSecurityHeaders.php`, `laravel/config/security.php`, `laravel/tests/Feature/SecurityHeadersTest.php`, env examples, docs production/codebase — (test: SecurityHeadersTest 5 pass; full PHPUnit 549 pass via `php -d memory_limit=-1 vendor/bin/phpunit`; `php artisan test` terkena limit memori 128MB)
 - 2026-06-10 — Memperbaiki kegagalan CI `npm audit` dengan upgrade devDependency `concurrently` ke ^10.0.3 sehingga `shell-quote` naik ke versi patched 1.8.4. — `laravel/package.json`, `laravel/package-lock.json` — (test: npm audit --audit-level=high clean; npm run build pass; full PHPUnit 547 pass via `php -d memory_limit=-1 vendor/bin/phpunit`)

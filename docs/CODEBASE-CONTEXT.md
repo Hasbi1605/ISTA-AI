@@ -46,8 +46,9 @@ maupun `channels.php`** (SSE = HTTP biasa, tanpa broadcast channel).
 - **Root** `OnlyOfficeCallbackController` (`POST /onlyoffice/callback/{memo}`), `Controller` (base).
 
 ### 2.2 Livewire — "controller" UI sesungguhnya (`app/Livewire`)
-- **Chat/** `ChatIndex` (workspace chat+memo bertab, route `chat/{id?}`).
+- **Chat/** `ChatIndex` (workspace chat+memo+presentasi bertab, route `chat/{id?}`; toggle 3 mode dengan tab Presentasi di belakang feature flag `features.presentation`; `normalizeTab()` memetakan alias `presentasi`→`presentation` dan menormalkan nilai invalid/tab presentasi saat flag mati ke `chat`).
 - **Memos/** `MemoIndex`, `MemoWorkspace` (generate/edit memo).
+- **Presentations/** `PresentationWorkspace` (placeholder/empty-state mode Presentasi, epic #218; workspace penuh menyusul di child #223).
 - **Documents/** `DocumentViewer`.
 - **Admin/** `AdminDashboard`, `AdminUsers`, `AdminUsage`, `AdminErrors`, `AdminDocuments`, `AdminKnowledge`, `AdminAccounts` (super-admin).
 - **Forms/** `LoginForm`; **Actions/** `Logout`.
@@ -68,7 +69,8 @@ Subfolder:
 - **OnlyOffice/** `DocumentConverter`, `DocxTextExtractor`, `DocxValidator`, `JwtSigner`, `MemoDocumentKey`, `MemoForceSaveService`, `ForceSaveException`.
 
 ### 2.4 Models / Jobs / Middleware
-- **Models:** `User`, `Conversation`, `Message`, `Document`, `DocumentChunk`, `Memo`, `MemoVersion`, `KnowledgeDocument`, `KnowledgeChunk`, `KnowledgeSource`, `AIUsageEvent`, `AdminAccountAudit`.
+- **Models:** `User`, `Conversation`, `Message`, `Document`, `DocumentChunk`, `Memo`, `MemoVersion`, `Presentation` (artefak presentasi: status pending/processing/ready/error, configuration/outline/source_document_ids JSON, helper `sanitizeSourceDocumentIds()`/`sourceDocumentsOwnedAndReady()` fail-closed owned+ready), `KnowledgeDocument`, `KnowledgeChunk`, `KnowledgeSource`, `AIUsageEvent`, `AdminAccountAudit`.
+- **Policies:** `DocumentPolicy`, `MemoPolicy`, `PresentationPolicy` (owner-only view/update/delete; `download` owner + status ready) — auto-discovery Laravel.
 - **Jobs:** `GenerateChatResponse` (jalur async chat, komplemen SSE), `ProcessDocument` (→ python `/api/documents/process`), `ProcessKnowledgeDocument` (→ `/api/knowledge/process`, memakai `processing_claim_token` agar retry lama tidak menimpa attempt baru), `RenderDocumentPreview`.
 - **Middleware:** `EnsureUserIsActive` (`active`, memutus sesi akun nonaktif pada route user terautentikasi), `EnsureUserIsAdmin` (`admin`), `EnsureUserIsSuperAdmin` (`super_admin`), `EnsureAdminPasswordChanged` (`admin.password_changed`), `UpdateUserPresence`, `AddSecurityHeaders` (CSP; `unsafe-eval` global opt-in via `SECURITY_CSP_ALLOW_UNSAFE_EVAL`, plus compatibility otomatis untuk response Livewire/Alpine via `SECURITY_CSP_ALLOW_LIVEWIRE_UNSAFE_EVAL`).
 - **Events:** `BookingCreated/BookingStatusChanged/FeedbackSubmitted/ScheduleUpdated` — **sisa domain lama (booking)**, tidak terhubung ke flow chat/memo. Jangan diandalkan untuk fitur AI.
@@ -80,12 +82,12 @@ Subfolder:
 - **console.php:** `documents:purge-deleted --days=7` (03:00), `chat:resolve-stale-responses --minutes=10` (tiap menit).
 
 ### 2.6 Frontend Laravel (`resources/`)
-- **js/**: `app.js` (registrasi Alpine+Livewire), `bootstrap.js`, **`chat-page.js`** (client berat: Alpine `chatLayout` tab chat/memo + drag-drop upload, `assistantTypewriter`, `chatMessages`). **SSE**: `openChatStream(...)` membangun `/chat/stream/{id}?...` lalu `new EventSource(url)` (dilacak di `activeEventSources`), render typewriter markdown (marked + DOMPurify); koordinasi placeholder via `$wire.on` (`assistant-output`, `model-name`, `assistant-sources`, dll) + marker localStorage.
+- **js/**: `app.js` (registrasi Alpine+Livewire), `bootstrap.js`, **`chat-page.js`** (client berat: Alpine `chatLayout` tab chat/memo/presentasi (`presentationEnabled` gating tab Presentasi) + drag-drop upload, `assistantTypewriter`, `chatMessages`). **SSE**: `openChatStream(...)` membangun `/chat/stream/{id}?...` lalu `new EventSource(url)` (dilacak di `activeEventSources`), render typewriter markdown (marked + DOMPurify); koordinasi placeholder via `$wire.on` (`assistant-output`, `model-name`, `assistant-sources`, dll) + marker localStorage.
 - **css/**: `app.css`, `auth.css`.
 - **views/**: `dashboard`, `profile`; `livewire/chat/*` (+partials), `livewire/memos/*`, `livewire/documents/*`, `livewire/admin/*` (dashboard/users/usage/errors/documents/knowledge/accounts), Volt auth pages, `components/admin/*` (design system: sidebar/table/tabs/kpi-card/badge/filter/empty-state), `layouts/` (app/admin/guest/auth-canvas), `emails/`.
 
 ### 2.7 Database (`laravel/database`)
-Tabel utama: `users` (+verification_code, role/presence, kolom keamanan admin), `conversations`, `messages` (+document_ids), `documents` (metadata file, preview, index, unique original_name), `document_chunks`, `memos` (+chat_messages, configuration), `memo_versions`, `ai_usage_events`, knowledge (`knowledge_sources`/`knowledge_documents`/`knowledge_chunks`), `admin_account_audits`, `activity_log` (spatie) + cache/jobs. Migrasi lama menghapus tabel `ai_configuration` (config AI sekarang YAML-driven) serta `cloud_storage_files` dan `google_drive_oauth_connections` (integrasi Google Drive sudah dihapus total). Seeder: `DatabaseSeeder`; factory: `UserFactory`.
+Tabel utama: `users` (+verification_code, role/presence, kolom keamanan admin), `conversations`, `messages` (+document_ids), `documents` (metadata file, preview, index, unique original_name), `document_chunks`, `memos` (+chat_messages, configuration), `memo_versions`, `presentations` (artefak presentasi: status, visual_template, configuration/outline/source_document_ids JSON, pptx_path/pdf_path, generated_at, current_version_id nullable untuk fase versioning OnlyOffice, softDeletes), `ai_usage_events`, knowledge (`knowledge_sources`/`knowledge_documents`/`knowledge_chunks`), `admin_account_audits`, `activity_log` (spatie) + cache/jobs. Migrasi lama menghapus tabel `ai_configuration` (config AI sekarang YAML-driven) serta `cloud_storage_files` dan `google_drive_oauth_connections` (integrasi Google Drive sudah dihapus total). Seeder: `DatabaseSeeder`; factory: `UserFactory`.
 
 ---
 

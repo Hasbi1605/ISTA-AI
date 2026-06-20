@@ -1,4 +1,4 @@
-<div x-data="chatLayout({ activeTab: $wire.entangle('tab').live })"
+<div x-data="chatLayout({ activeTab: $wire.entangle('tab').live, presentationEnabled: @js($presentationEnabled) })"
      x-on:dragenter.window="onDragEnter($event)"
      x-on:dragover.window="onDragOver($event)"
      x-on:dragleave.window="onDragLeave($event)"
@@ -97,6 +97,13 @@
     <div x-show="activeTab === 'memo'" x-cloak class="flex w-full h-full overflow-hidden">
         <livewire:memos.memo-workspace />
     </div>
+
+    {{-- ===== PRESENTATION TAB CONTENT (feature flag, epic #218) ===== --}}
+    @if($presentationEnabled)
+    <div x-show="activeTab === 'presentation'" x-cloak class="flex w-full h-full overflow-hidden">
+        <livewire:presentations.presentation-workspace />
+    </div>
+    @endif
 
     <!-- Drag & Drop Overlay Visual -->
     <div x-show="isDraggingFile" x-cloak x-transition.opacity class="fixed inset-0 z-[60] bg-ista-primary/10 backdrop-blur-[2px] flex items-center justify-center pointer-events-none">

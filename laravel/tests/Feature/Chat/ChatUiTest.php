@@ -1750,4 +1750,93 @@ class ChatUiTest extends TestCase
             fn (GenerateChatResponse $job) => $job->conversationDocuments === [(int) $document->id]
         );
     }
+
+    public function test_presentation_tab_is_hidden_when_feature_flag_is_off(): void
+    {
+        config(['features.presentation' => false]);
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('chat'))
+            ->assertOk()
+            ->assertSee('Buka tab chat', false)
+            ->assertSee('Buka tab memo', false)
+            ->assertDontSee('Buka tab presentasi', false)
+            ->assertDontSee('presentation-mode-tab', false)
+            ->assertDontSee('presentation-mode-panel', false);
+    }
+
+    public function test_presentation_tab_is_visible_when_feature_flag_is_on(): void
+    {
+        config(['features.presentation' => true]);
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('chat'))
+            ->assertOk()
+            ->assertSee('Buka tab chat', false)
+            ->assertSee('Buka tab memo', false)
+            ->assertSee('Buka tab presentasi', false)
+            ->assertSee("activeTab === 'presentation'", false)
+            ->assertSee('presentationEnabled:', false);
+    }
+
+    public function test_tab_chat_memo_and_presentation_select_the_correct_panel(): void
+    {
+        config(['features.presentation' => true]);
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)->withQueryParams(['tab' => 'chat'])->test(ChatIndex::class)->assertSet('tab', 'chat');
+        Livewire::actingAs($user)->withQueryParams(['tab' => 'memo'])->test(ChatIndex::class)->assertSet('tab', 'memo');
+        Livewire::actingAs($user)->withQueryParams(['tab' => 'presentation'])->test(ChatIndex::class)->assertSet('tab', 'presentation');
+    }
+
+    public function test_presentation_alias_is_normalized_to_presentation_when_enabled(): void
+    {
+        config(['features.presentation' => true]);
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['tab' => 'presentasi'])
+            ->test(ChatIndex::class)
+            ->assertSet('tab', 'presentation');
+    }
+
+    public function test_presentation_tab_falls_back_to_chat_when_feature_flag_is_off(): void
+    {
+        config(['features.presentation' => false]);
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['tab' => 'presentation'])
+            ->test(ChatIndex::class)
+            ->assertSet('tab', 'chat');
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['tab' => 'presentasi'])
+            ->test(ChatIndex::class)
+            ->assertSet('tab', 'chat');
+    }
+
+    public function test_unknown_tab_value_is_normalized_to_chat(): void
+    {
+        config(['features.presentation' => true]);
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['tab' => 'bogus'])
+            ->test(ChatIndex::class)
+            ->assertSet('tab', 'chat');
+    }
+
+    public function test_setting_tab_to_presentation_while_disabled_is_normalized_back_to_chat(): void
+    {
+        config(['features.presentation' => false]);
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->test(ChatIndex::class)
+            ->set('tab', 'presentation')
+            ->assertSet('tab', 'chat');
+    }
 }

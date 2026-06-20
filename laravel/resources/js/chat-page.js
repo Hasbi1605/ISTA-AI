@@ -459,6 +459,7 @@ const registerChatPageData = (Alpine) => {
 
     Alpine.data('chatLayout', (config = {}) => ({
         activeTab: config.activeTab || 'chat',
+        presentationEnabled: config.presentationEnabled === true,
         darkMode: isDarkThemeEnabled(),
         isMobile: window.matchMedia('(max-width: 1023px)').matches,
         showLeftSidebar: !window.matchMedia('(max-width: 1023px)').matches,
@@ -496,7 +497,12 @@ const registerChatPageData = (Alpine) => {
         },
 
         setTab(tab) {
-            if (!['chat', 'memo'].includes(tab)) {
+            const allowed = ['chat', 'memo'];
+            if (this.presentationEnabled) {
+                allowed.push('presentation');
+            }
+
+            if (!allowed.includes(tab)) {
                 return;
             }
 
