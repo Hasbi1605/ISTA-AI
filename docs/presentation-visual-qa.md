@@ -6,10 +6,11 @@ fitur generator presentasi (epic #218). Berlaku untuk renderer Python
 
 ## Keputusan Baseline
 
-1. **Asset mode = `local_assets_only` (MVP).**
+1. **Asset mode = `local_assets_only` (default).**
    Seluruh elemen visual (logo emblem, ikon, bilah aksen, header/footer) digambar
    sebagai shape vektor PPTX secara deterministik. Tidak ada pengambilan gambar
-   atau ikon dari internet. Enrichment aset web ditunda ke #227.
+   atau ikon dari internet. Mode `licensed_web_assets` (#227) bersifat **opsional
+   & eksplisit**; lihat bagian "Licensed Web Asset Enrichment" di bawah.
    Konstanta acuan: `app/services/presentation_assets.py::ASSET_MODE`.
 
 2. **Model AI hanya menyusun outline, bukan keputusan desain.**
@@ -78,3 +79,48 @@ Cakupan test otomatis QA (`python-ai/tests/test_presentation_qa.py`):
 - batas bullet/slide/title + truncation ditegakkan;
 - field outline tak dikenal (warna/font) diabaikan (model tidak menyetir desain);
 - semua shape berada dalam batas kanvas 16:9 (no structural overflow).
+
+## Licensed Web Asset Enrichment (#227)
+
+Pengayaan aset web berlisensi adalah **fitur opsional** di atas baseline lokal.
+Default presentasi tetap `local_assets_only` (no-internet); mode
+`licensed_web_assets` hanya aktif bila dipilih eksplisit **dan** sebuah fetcher
+jaringan disuntikkan ke `LicensedWebAssetService`. Tanpa fetcher, tidak ada
+koneksi jaringan dan setiap kandidat aset fallback ke aset lokal.
+
+Acuan kode: `python-ai/app/services/presentation_web_assets.py`.
+
+**Provider whitelist** (tidak ada Google Images, situs berita, media sosial,
+atau scraping acak):
+
+| Key | Sumber |
+|-----|--------|
+| `openverse` | Openverse (pencarian CC) |
+| `wikimedia_commons` | Wikimedia Commons |
+
+**Kebijakan lisensi** — hanya `CC0`, `Public Domain`/`PDM`, `CC-BY`, `CC-BY-SA`
+yang lolos. Varian `NC`/`ND`/`editorial`/`all-rights-reserved` ditolak.
+
+**Metadata wajib & ditegakkan** — `provider` (harus whitelisted), `source_url`
+(harus `https` + host tepercaya provider), `license` (harus diizinkan), dan
+`attribution` (wajib ada). Kandidat yang gagal salah satu ditolak.
+
+**Cache & atribusi** — aset yang lolos disalin ke storage privat
+(`storage/presentation_assets/<provider>/<hash>.bin`, di-`.gitignore`) sebelum
+dipakai; metadata (source/license/attribution/provider/accessed_at/cache_path/
+sha256) disimpan dan dapat diretrieve/diaudit lewat `LicensedAssetMetadata` +
+`AssetAuditTrail`.
+
+**Fallback** — kegagalan provider/jaringan/validasi lisensi tidak pernah memutus
+generate; `enrich()` mengembalikan `None` (renderer memakai aset lokal) dan
+mencatat entri audit `fallback`/`rejected`.
+
+**Privasi** — audit hanya berisi metadata aset publik berlisensi; tidak ada isi
+dokumen, prompt, token, atau secret yang dicatat.
+
+Cakupan test otomatis (`python-ai/tests/test_presentation_web_assets.py`):
+default no-network, whitelist + kebijakan lisensi, penolakan metadata tak valid,
+cache + metadata retrievable, audit `used`/`rejected`/`fallback`, fallback
+provider/jaringan, guard ukuran aset, dan mode lokal tidak pernah enrich.
+Sisi Laravel (`PresentationGenerationServiceTest`): default `asset_mode` lokal,
+passthrough mode eksplisit, dan fallback nilai tak dikenal ke lokal.

@@ -9,6 +9,14 @@ from app.services.presentation_render import (
     render_presentation,
     template_choices,
 )
+from app.services.presentation_web_assets import (
+    ASSET_MODES,
+    DEFAULT_ASSET_MODE,
+    LicensedAssetCandidate,
+    LicensedWebAssetService,
+    normalize_asset_mode,
+    provider_choices,
+)
 
 router = APIRouter(prefix="/api/presentations", tags=["Presentations"])
 
@@ -23,6 +31,16 @@ class PresentationSlideInput(BaseModel):
     layout: str | None = Field(None, max_length=40)
 
 
+class LicensedAssetCandidateInput(BaseModel):
+    provider: str = Field(..., max_length=60)
+    source_url: str = Field(..., max_length=2000)
+    license: str = Field(..., max_length=120)
+    attribution: str = Field(..., max_length=400)
+    title: str | None = Field(None, max_length=300)
+    creator: str | None = Field(None, max_length=200)
+    license_url: str | None = Field(None, max_length=2000)
+
+
 class GeneratePresentationRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     visual_template: str = Field(..., min_length=1, max_length=60)
@@ -35,13 +53,23 @@ class GeneratePresentationRequest(BaseModel):
     slide_count: int | None = Field(None, ge=1, le=50)
     date: str | None = Field(None, max_length=80)
     outline: list[PresentationSlideInput] = Field(default_factory=list)
+    # Mode aset: default `local_assets_only` (no-internet). Mode
+    # `licensed_web_assets` bersifat opsional & eksplisit; tanpa fetcher
+    # jaringan tidak ada efek (fallback ke aset lokal).
+    asset_mode: str | None = Field(None, max_length=40)
+    licensed_assets: list[LicensedAssetCandidateInput] = Field(default_factory=list)
     # Passthrough konfigurasi tambahan dari Laravel (tidak dipakai renderer MVP).
     configuration: dict[str, Any] | None = None
 
 
 @router.get("/templates", dependencies=[Depends(verify_token)])
 def list_presentation_templates():
-    return {"templates": template_choices()}
+    return {
+        "templates": template_choices(),
+        "asset_modes": list(ASSET_MODES),
+        "default_asset_mode": DEFAULT_ASSET_MODE,
+        "licensed_providers": provider_choices(),
+    }
 
 
 @router.post("/generate", dependencies=[Depends(verify_token)])
@@ -50,6 +78,26 @@ def generate_presentation(request: GeneratePresentationRequest):
         {"title": slide.title, "bullets": slide.bullets, "layout": slide.layout}
         for slide in request.outline
     ]
+
+    # Pengayaan aset web berlisensi (opsional). Default `local_assets_only`:
+    # tanpa fetcher jaringan, service tidak membuka koneksi dan semua kandidat
+    # fallback ke aset lokal. Renderer di bawah tetap deterministik/no-internet.
+    asset_mode = normalize_asset_mode(request.asset_mode)
+    asset_service = LicensedWebAssetService(mode=asset_mode)
+    enriched_assets = asset_service.enrich_many(
+        [
+            LicensedAssetCandidate(
+                provider=item.provider,
+                source_url=item.source_url,
+                license=item.license,
+                attribution=item.attribution,
+                title=item.title or "",
+                creator=item.creator or "",
+                license_url=item.license_url or "",
+            )
+            for item in request.licensed_assets
+        ]
+    )
 
     try:
         render = render_presentation(
@@ -72,6 +120,10 @@ def generate_presentation(request: GeneratePresentationRequest):
         "Content-Disposition": f'attachment; filename="{render.filename}"',
         "X-Presentation-Template": render.template,
         "X-Presentation-Slide-Count": str(render.slide_count),
+        # Mode aset efektif + jumlah aset eksternal yang lolos validasi/cache.
+        # Privacy-safe (tanpa url/isi): cukup untuk audit lintas-layanan.
+        "X-Presentation-Asset-Mode": asset_mode,
+        "X-Presentation-Licensed-Assets": str(len(enriched_assets)),
         "X-Content-Type-Options": "nosniff",
         "Cache-Control": "no-store",
     }
