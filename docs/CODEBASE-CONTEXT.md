@@ -115,6 +115,7 @@ Tabel utama: `users` (+verification_code, role/presence, kolom keamanan admin), 
 - `documents.py` — `/api/documents`: `process` (upload+ingest pdf/docx/xlsx/csv, cap 50MB, safe-filename), `DELETE /{filename}`, `extract-tables`, `extract-content`, `export`, `summarize` (single vs hierarchical).
 - `knowledge.py` — `/api/knowledge`: ingest KB internal (`scope=global_internal`, `audience=all_users`, `user_id=__knowledge__`), `process`, `DELETE /{filename}`, dan `PATCH /{filename}/status` untuk sync `knowledge_status` vector child+parent tanpa reingest. Reuse validator + pipeline `documents.py`.
 - `memos.py` — `/api/memos/generate-body`: generate memorandum `.docx` (binary + header searchable-text/page-size/model-label).
+- `presentations.py` — `/api/presentations/generate` (POST, binary PPTX) + `/api/presentations/templates` (GET): renderer presentasi **deterministic** (epic #218/#221), bukan AI. Pydantic `GeneratePresentationRequest` (title, visual_template, outline[], header/footer/presenter/unit/slide_count/audience), `ValueError`→400, header `X-Presentation-Template`/`X-Presentation-Slide-Count` + `nosniff`/`no-store`.
 
 ### 3.3 Services RAG (`app/services/`)
 - `rag_service.py` — facade re-export komponen RAG.
@@ -129,13 +130,13 @@ Tabel utama: `users` (+verification_code, role/presence, kolom keamanan admin), 
 - `knowledge_retrieval.py` — `knowledge_internal_enabled`, `should_use_internal_knowledge`, `search_internal_knowledge`, `build_knowledge_prompt`.
 - `langsearch_service.py` — client LangSearch (web search + semantic rerank, cached).
 - `llm_streaming.py` — cascade streaming bersama (`stream_with_cascade`), builder pesan/system prompt, deteksi rate-limit/context-size, ekstraksi web-source.
-- `lightweight_text_splitter.py` — splitter token-aware. `document_loaders.py` — load pdf/docx/xlsx/csv→Document. `document_content.py` — dokumen→HTML (preview/export). `table_extraction.py` — ekstrak tabel. `document_export.py` — `export_content` (HTML→format target). `memo_generation.py` — `generate_memo_docx`. `latency_logger.py` — timing privacy-safe.
+- `lightweight_text_splitter.py` — splitter token-aware. `document_loaders.py` — load pdf/docx/xlsx/csv→Document. `document_content.py` — dokumen→HTML (preview/export). `table_extraction.py` — ekstrak tabel. `document_export.py` — `export_content` (HTML→format target). `memo_generation.py` — `generate_memo_docx`. `presentation_render.py` — `render_presentation` (outline→PPTX 16:9 deterministic, 5 template visual, header/footer/logo, validasi template/slide/bullet) + `presentation_assets.py` (logo emblem + registry ikon lokal, no-internet). `latency_logger.py` — timing privacy-safe.
 
 ### 3.4 Config / scripts / tests
 - `config/ai_config.yaml` — **single source of truth**: global timeout/retry; lanes (cascade chat models, reasoning null, embedding); retrieval (LangSearch search+rerank top_k=5, hybrid BM25 0.3, HyDE smart); chunking (1500/150, PDR child256/parent1500); integrations (SMTP); **prompts** (system persona ISTA AI, rag, web_search, summarization, memo_generation, knowledge_internal, hyde, fallback).
 - `scripts/benchmark_chat.py`; benchmark manual lebih luas di `/benchmarks`.
 - `tests/` (~27 file pytest): routing, chat concurrency, document export/runner, knowledge retrieval/router, langsearch cache, splitter, llm streaming, memo, prompt contracts, rag embeddings/eval/tuning, rerank skip, retrieval runner, table extraction, web search tuning.
-- `requirements.txt`: fastapi, uvicorn, pydantic 2, litellm, openai, chromadb + langchain-chroma/core, rank-bm25, tiktoken, pdfplumber/python-docx/openpyxl/pandas, weasyprint, beautifulsoup4, PyYAML.
+- `requirements.txt`: fastapi, uvicorn, pydantic 2, litellm, openai, chromadb + langchain-chroma/core, rank-bm25, tiktoken, pdfplumber/python-docx/openpyxl/pandas, python-pptx (presentasi PPTX), weasyprint, beautifulsoup4, PyYAML.
 
 ---
 
