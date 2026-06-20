@@ -36,6 +36,17 @@ ISTA AI berjalan sebagai stack hybrid:
 - File DOCX memo disimpan di Laravel storage private.
 - OnlyOffice menerima signed URL sementara untuk membaca file dan callback JWT untuk menyimpan perubahan.
 
+### Prompy Studio (#263)
+
+- Ide (Bahasa Indonesia), catatan konteks, platform, dan jenis prompt dikirim dari Laravel ke Python `/api/prompts/generate`.
+- Python memanggil LLM (provider sesuai `ai_config.yaml`) untuk menyusun teks paket prompt, lalu mengembalikan JSON (prompt utama Bahasa Inggris, variasi, negative prompt, recommended settings, catatan Bahasa Indonesia).
+- ISTA AI **tidak** memanggil platform AI eksternal (OpenAI Image, Gemini, Canva, Google Flow, dll) dan **tidak** menghasilkan gambar/video. Output hanya teks prompt untuk disalin pengguna secara manual.
+- Riwayat paket prompt disimpan di tabel `generated_prompts` milik user (private, owner-scoped).
+- Reference image (opsional, MVP) divalidasi tipe (JPG/PNG/WebP) dan ukuran (maks 5 MB), lalu disimpan di disk private (`prompt-references/{user_id}/...`). Gambar referensi tidak dikirim ke platform eksternal.
+- Bila dokumen sumber (hanya milik user + ready), reference image, atau catatan konteks dipakai, prompt ditandai `contains_internal_context=true` dan UI menampilkan peringatan konteks internal.
+- MVP tidak melakukan redaksi data sensitif otomatis; pengguna diingatkan memeriksa prompt sebelum menyalin ke platform eksternal.
+- Isi ide, catatan, paket prompt, dan reference image tidak di-log.
+
 ## Data yang Dikirim ke Provider Eksternal
 
 Provider eksternal dikendalikan oleh `python-ai/config/ai_config.yaml` dan env secret di `.env.droplet`.

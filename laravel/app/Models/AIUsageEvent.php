@@ -46,6 +46,8 @@ class AIUsageEvent extends Model
 
     public const FEATURE_PRESENTATION_GENERATION = 'presentation_generation';
 
+    public const FEATURE_PROMPT_GENERATION = 'prompt_generation';
+
     public const ACTION_STARTED = 'started';
 
     public const ACTION_COMPLETED = 'completed';
