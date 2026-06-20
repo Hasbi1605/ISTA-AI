@@ -139,10 +139,38 @@ class PresentationDocumentKey
             return false;
         }
 
-        $unsignedUrl = $request->fullUrlWithoutQuery('signature');
-        $expected = hash_hmac('sha256', $unsignedUrl, $this->signedFileUrlKey());
+        foreach ($this->signedFileSignatureCandidates($request) as $unsignedUrl) {
+            $expected = hash_hmac('sha256', $unsignedUrl, $this->signedFileUrlKey());
 
-        return hash_equals($expected, $signature);
+            if (hash_equals($expected, $signature)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Build strict signature candidates for direct app requests and internal
+     * OnlyOffice requests. Query params are canonicalized so validation is not
+     * brittle to harmless query-order changes, while the HMAC still binds path,
+     * expiry, token, version, and configured internal origin.
+     *
+     * @return list<string>
+     */
+    protected function signedFileSignatureCandidates(Request $request): array
+    {
+        $query = $request->query();
+        unset($query['signature']);
+        ksort($query);
+
+        $queryString = http_build_query($query, '', '&', PHP_QUERY_RFC3986);
+        $pathAndQuery = $request->getPathInfo().($queryString !== '' ? '?'.$queryString : '');
+
+        return array_values(array_unique([
+            $request->fullUrlWithoutQuery('signature'),
+            $this->onlyOfficeLaravelInternalUrl().$pathAndQuery,
+        ]));
     }
 
     /**

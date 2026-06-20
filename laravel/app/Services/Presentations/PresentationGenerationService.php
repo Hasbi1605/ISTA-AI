@@ -35,6 +35,23 @@ class PresentationGenerationService
 
     public const DEFAULT_SLIDE_COUNT = 8;
 
+    /**
+     * Mode aset visual (#227). Default `local_assets_only` (no-internet).
+     * `licensed_web_assets` bersifat opsional & eksplisit; pengayaan aset web
+     * berlisensi dilakukan di renderer Python dengan validasi lisensi + cache +
+     * audit, dan selalu fallback ke aset lokal bila gagal.
+     */
+    public const ASSET_MODE_LOCAL = 'local_assets_only';
+
+    public const ASSET_MODE_LICENSED = 'licensed_web_assets';
+
+    public const ASSET_MODES = [
+        self::ASSET_MODE_LOCAL,
+        self::ASSET_MODE_LICENSED,
+    ];
+
+    public const DEFAULT_ASSET_MODE = self::ASSET_MODE_LOCAL;
+
     protected string $baseUrl;
 
     protected ?string $token;
@@ -123,6 +140,7 @@ class PresentationGenerationService
             'presenter' => $configuration['presenter'] ?? null,
             'unit' => $configuration['unit'] ?? null,
             'slide_count' => $configuration['slide_count'] ?? null,
+            'asset_mode' => $this->normalizeAssetMode($configuration['asset_mode'] ?? null),
             'outline' => $outline,
         ];
 
@@ -195,8 +213,20 @@ class PresentationGenerationService
             'presenter' => $this->cleanShort($input['presenter'] ?? ''),
             'unit' => $this->cleanShort($input['unit'] ?? ''),
             'slide_count' => $slideCount,
+            'asset_mode' => $this->normalizeAssetMode($input['asset_mode'] ?? null),
             'additional_instruction' => Str::limit(trim((string) ($input['additional_instruction'] ?? '')), 2000, ''),
         ];
+    }
+
+    /**
+     * Normalisasi mode aset; nilai tak dikenal -> default lokal (no-internet).
+     */
+    public function normalizeAssetMode(mixed $value): string
+    {
+        $mode = strtolower(trim((string) $value));
+        $mode = str_replace([' ', '-'], '_', $mode);
+
+        return in_array($mode, self::ASSET_MODES, true) ? $mode : self::DEFAULT_ASSET_MODE;
     }
 
     /**

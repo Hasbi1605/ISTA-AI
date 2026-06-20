@@ -114,6 +114,57 @@ class PresentationGenerationTest extends TestCase
         $this->assertStringStartsWith('presentations/'.$user->id.'/', $presentation->pptx_path);
     }
 
+    public function test_renderer_payload_defaults_asset_mode_to_local_assets_only(): void
+    {
+        Storage::fake('local');
+        Http::fake([
+            '*/api/presentations/generate' => Http::response($this->fakePptxBytes(), 200, [
+                'X-Presentation-Template' => 'resmi_klasik',
+                'X-Presentation-Slide-Count' => '5',
+            ]),
+        ]);
+
+        $user = User::factory()->create();
+        $presentation = $this->pendingPresentation($user);
+
+        $job = new GeneratePresentation($presentation);
+        app()->call([$job, 'handle']);
+
+        Http::assertSent(function ($request) {
+            return str_ends_with($request->url(), '/api/presentations/generate')
+                && ($request['asset_mode'] ?? null) === 'local_assets_only';
+        });
+    }
+
+    public function test_renderer_payload_forwards_explicit_licensed_web_assets_mode(): void
+    {
+        Storage::fake('local');
+        Http::fake([
+            '*/api/presentations/generate' => Http::response($this->fakePptxBytes(), 200, [
+                'X-Presentation-Template' => 'resmi_klasik',
+                'X-Presentation-Slide-Count' => '5',
+            ]),
+        ]);
+
+        $user = User::factory()->create();
+        $presentation = $this->pendingPresentation($user, [
+            'configuration' => [
+                'title' => 'Paparan Uji',
+                'visual_template' => 'resmi_klasik',
+                'slide_count' => 6,
+                'asset_mode' => 'licensed_web_assets',
+            ],
+        ]);
+
+        $job = new GeneratePresentation($presentation);
+        app()->call([$job, 'handle']);
+
+        Http::assertSent(function ($request) {
+            return str_ends_with($request->url(), '/api/presentations/generate')
+                && ($request['asset_mode'] ?? null) === 'licensed_web_assets';
+        });
+    }
+
     public function test_job_marks_error_when_python_request_fails(): void
     {
         Storage::fake('local');

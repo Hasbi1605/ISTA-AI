@@ -105,4 +105,49 @@ class PresentationGenerationServiceTest extends TestCase
 
         $this->assertLessThanOrEqual(2000, mb_strlen($config['additional_instruction']));
     }
+
+    #[Test]
+    public function it_defaults_asset_mode_to_local_assets_only(): void
+    {
+        $config = $this->service()->normalizeConfiguration(['title' => 'X']);
+
+        $this->assertSame(
+            PresentationGenerationService::ASSET_MODE_LOCAL,
+            $config['asset_mode']
+        );
+        $this->assertSame('local_assets_only', $config['asset_mode']);
+    }
+
+    #[Test]
+    public function it_keeps_licensed_web_assets_mode_when_explicitly_chosen(): void
+    {
+        $config = $this->service()->normalizeConfiguration([
+            'title' => 'X',
+            'asset_mode' => 'Licensed-Web-Assets',
+        ]);
+
+        $this->assertSame(
+            PresentationGenerationService::ASSET_MODE_LICENSED,
+            $config['asset_mode']
+        );
+    }
+
+    #[Test]
+    public function it_falls_back_to_local_asset_mode_for_unknown_value(): void
+    {
+        $service = $this->service();
+
+        $this->assertSame(
+            PresentationGenerationService::ASSET_MODE_LOCAL,
+            $service->normalizeAssetMode('google_images')
+        );
+        $this->assertSame(
+            PresentationGenerationService::ASSET_MODE_LOCAL,
+            $service->normalizeAssetMode(null)
+        );
+        $this->assertSame(
+            PresentationGenerationService::ASSET_MODE_LOCAL,
+            $service->normalizeConfiguration(['title' => 'X', 'asset_mode' => 'random'])['asset_mode']
+        );
+    }
 }

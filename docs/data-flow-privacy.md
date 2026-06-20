@@ -82,6 +82,29 @@ Data yang dapat terkirim:
 - query user untuk web search
 - kandidat dokumen/chunk untuk rerank bila semantic rerank aktif
 
+### Licensed Web Asset Enrichment (presentasi, #227, opsional)
+
+Generator presentasi default berjalan `local_assets_only` (no-internet): semua
+aset visual digambar lokal. Mode opsional `licensed_web_assets` dapat mengambil
+aset berlisensi dari provider whitelist (Openverse, Wikimedia Commons) **hanya**
+bila dipilih eksplisit dan fetcher jaringan disuntikkan ke
+`LicensedWebAssetService` (`python-ai/app/services/presentation_web_assets.py`).
+
+Saat aktif, data yang dapat terkirim ke provider terbatas pada **request HTTP
+untuk URL aset** (mis. gambar berlisensi CC). Tidak ada isi dokumen, prompt,
+judul presentasi, atau identitas user yang dikirim ke provider aset.
+
+Jaminan:
+
+- Hanya provider whitelist dan lisensi reuse (`CC0`/`Public Domain`/`CC-BY`/
+  `CC-BY-SA`) yang lolos; metadata wajib (source/license/attribution) divalidasi.
+- Aset di-cache ke storage privat lokal (`storage/presentation_assets/`,
+  di-`.gitignore`) sebelum dipakai, dengan metadata atribusi yang dapat diaudit.
+- Kegagalan provider/jaringan/lisensi fallback ke aset lokal (generate tidak
+  pernah putus / tidak pernah bergantung pada internet).
+- Jejak audit hanya memuat metadata aset publik berlisensi (provider, URL,
+  lisensi, atribusi, status, cache path, accessed_at) — bukan konten/secret.
+
 ## Data yang Tidak Dikirim Langsung oleh OnlyOffice
 
 OnlyOffice Document Server pada konfigurasi ini berjalan self-hosted di container internal. User aplikasi tidak login ke akun OnlyOffice terpisah. Laravel mengirim identitas display editor (`user.id`, `user.name`) dalam config editor untuk kebutuhan editor/collaboration.
