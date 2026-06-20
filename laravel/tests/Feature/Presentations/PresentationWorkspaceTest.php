@@ -139,6 +139,66 @@ class PresentationWorkspaceTest extends TestCase
             ->assertDontSee('Punya Orang Lain');
     }
 
+    public function test_edit_presentation_builds_slides_editor_config(): void
+    {
+        config([
+            'services.onlyoffice.jwt_secret' => 'editor-secret',
+            'services.onlyoffice.public_url' => 'https://ista-ai.app',
+            'services.onlyoffice.laravel_internal_url' => 'http://laravel:8000',
+        ]);
+        \Illuminate\Support\Facades\Storage::fake('local');
+
+        $user = User::factory()->create();
+        $path = 'presentations/'.$user->id.'/deck.pptx';
+        \Illuminate\Support\Facades\Storage::disk('local')->put($path, 'PK'.str_repeat('x', 200));
+
+        $presentation = Presentation::create([
+            'user_id' => $user->id,
+            'title' => 'Paparan Edit',
+            'status' => Presentation::STATUS_READY,
+            'visual_template' => 'resmi_klasik',
+            'pptx_path' => $path,
+            'generated_at' => now(),
+        ]);
+        $version = $presentation->versions()->create([
+            'version_number' => 1,
+            'label' => 'Versi 1',
+            'pptx_path' => $path,
+            'status' => \App\Models\PresentationVersion::STATUS_GENERATED,
+        ]);
+        $presentation->forceFill(['current_version_id' => $version->id])->save();
+
+        $component = Livewire::actingAs($user)
+            ->test(PresentationWorkspace::class)
+            ->call('editPresentation', $presentation->id)
+            ->assertSet('editingPresentationId', $presentation->id);
+
+        $config = $component->instance()->editorConfig();
+
+        $this->assertIsArray($config);
+        $this->assertSame('slide', $config['documentType']);
+        $this->assertSame('pptx', $config['document']['fileType']);
+        $this->assertStringStartsWith('presentation-'.$presentation->id.'-', $config['document']['key']);
+        $this->assertStringContainsString('/onlyoffice/presentation-callback/'.$presentation->id, $config['editorConfig']['callbackUrl']);
+        $this->assertArrayHasKey('token', $config);
+    }
+
+    public function test_edit_presentation_rejects_non_ready(): void
+    {
+        $user = User::factory()->create();
+        $presentation = Presentation::create([
+            'user_id' => $user->id,
+            'title' => 'Belum Siap',
+            'status' => Presentation::STATUS_PROCESSING,
+            'visual_template' => 'resmi_klasik',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(PresentationWorkspace::class)
+            ->call('editPresentation', $presentation->id)
+            ->assertSet('editingPresentationId', null);
+    }
+
     public function test_retry_redispatches_job_for_errored_presentation(): void
     {
         Queue::fake();

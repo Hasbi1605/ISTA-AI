@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\AIUsageEvent;
 use App\Models\Presentation;
+use App\Models\PresentationVersion;
 use App\Services\Admin\AIUsageEventService;
 use App\Services\Presentations\PresentationGenerationService;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -146,6 +147,11 @@ class GeneratePresentation implements ShouldQueue
             return;
         }
 
+        // Versioning OnlyOffice (#226): setiap generate/regenerate sukses dicatat
+        // sebagai versi baru dan dijadikan versi aktif. Editan manual OnlyOffice
+        // memperbarui versi aktif ini (lihat callback presentasi).
+        $this->recordNewVersion($fresh->id, $result['path']);
+
         // Bersihkan PPTX lama bila berbeda path.
         if ($fresh->pptx_path && $fresh->pptx_path !== $result['path']) {
             $this->deleteFile($fresh->pptx_path);
@@ -181,6 +187,25 @@ class GeneratePresentation implements ShouldQueue
             ]);
 
         logger()->error("GeneratePresentation permanently failed for ID {$this->presentation->id}: ".$exception->getMessage());
+    }
+
+    /**
+     * Catat versi PPTX baru sebagai versi aktif presentasi.
+     */
+    protected function recordNewVersion(int $presentationId, string $pptxPath): void
+    {
+        $nextNumber = (int) PresentationVersion::where('presentation_id', $presentationId)
+            ->max('version_number') + 1;
+
+        $version = PresentationVersion::create([
+            'presentation_id' => $presentationId,
+            'version_number' => $nextNumber,
+            'label' => 'Versi '.$nextNumber,
+            'pptx_path' => $pptxPath,
+            'status' => PresentationVersion::STATUS_GENERATED,
+        ]);
+
+        Presentation::whereKey($presentationId)->update(['current_version_id' => $version->id]);
     }
 
     protected function markErrorIfOwned(string $message): void

@@ -14,12 +14,17 @@ class PresentationLifecycleService
      */
     public function delete(Presentation $presentation): void
     {
-        $paths = array_values(array_filter([
+        $versionPaths = $presentation->versions()->pluck('pptx_path')->all();
+
+        $paths = array_values(array_unique(array_filter([
             $presentation->pptx_path,
             $presentation->pdf_path,
-        ], fn (?string $path) => filled($path)));
+            ...$versionPaths,
+        ], fn (?string $path) => filled($path))));
 
         DB::transaction(function () use ($presentation) {
+            // FK presentation_versions.presentation_id cascadeOnDelete menghapus
+            // baris versi; file fisik dibersihkan di bawah.
             $presentation->forceDelete();
         });
 

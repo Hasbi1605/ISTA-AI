@@ -114,6 +114,31 @@ class PresentationGenerationTest extends TestCase
         $this->assertStringStartsWith('presentations/'.$user->id.'/', $presentation->pptx_path);
     }
 
+    public function test_job_records_active_version_on_success(): void
+    {
+        Storage::fake('local');
+        Http::fake([
+            '*/api/presentations/generate' => Http::response($this->fakePptxBytes(), 200, [
+                'X-Presentation-Template' => 'resmi_klasik',
+                'X-Presentation-Slide-Count' => '5',
+            ]),
+        ]);
+
+        $user = User::factory()->create();
+        $presentation = $this->pendingPresentation($user);
+
+        $job = new GeneratePresentation($presentation);
+        app()->call([$job, 'handle']);
+
+        $presentation->refresh();
+        $this->assertNotNull($presentation->current_version_id);
+        $version = $presentation->currentVersion;
+        $this->assertNotNull($version);
+        $this->assertSame(1, $version->version_number);
+        $this->assertSame($presentation->pptx_path, $version->pptx_path);
+        $this->assertSame(\App\Models\PresentationVersion::STATUS_GENERATED, $version->status);
+    }
+
     public function test_job_marks_error_when_python_request_fails(): void
     {
         Storage::fake('local');

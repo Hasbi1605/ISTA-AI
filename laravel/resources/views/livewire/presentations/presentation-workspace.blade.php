@@ -24,6 +24,70 @@
         </div>
     </div>
 
+    @if($editorConfig)
+        {{-- ===== EDITOR ONLYOFFICE SLIDES (#226) ===== --}}
+        <div class="flex flex-1 flex-col overflow-hidden">
+            <div class="flex h-[52px] flex-shrink-0 items-center justify-between border-b border-stone-200/70 px-3 dark:border-[#1E293B]/70 sm:px-6">
+                <span class="text-[13px] font-semibold text-stone-600 dark:text-gray-300">Mengedit presentasi di OnlyOffice Slides</span>
+                <button type="button" wire:click="closeEditor" wire:loading.attr="disabled" wire:target="closeEditor"
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 px-3 py-1.5 text-[12px] font-semibold text-stone-600 hover:bg-stone-100 disabled:opacity-60 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">
+                    <span wire:loading wire:target="closeEditor" class="h-3.5 w-3.5 rounded-full border-2 border-current border-t-transparent animate-spin" aria-hidden="true"></span>
+                    <span wire:loading.remove wire:target="closeEditor">Simpan &amp; tutup</span>
+                    <span wire:loading wire:target="closeEditor">Menyimpan...</span>
+                </button>
+            </div>
+            <div class="flex-1 overflow-hidden">
+                <div
+                    wire:ignore
+                    wire:key="presentation-editor-{{ $editingPresentationId }}-{{ md5($editorConfig['document']['key'] ?? '') }}"
+                    class="h-full min-h-[640px]"
+                    x-data="{
+                        config: @js($editorConfig),
+                        apiUrl: @js($onlyOfficeApiUrl),
+                        containerId: 'presentation-workspace-editor-{{ md5($editorConfig['document']['key'] ?? '') }}',
+                        editor: null,
+                        editorFailed: false,
+                        load() {
+                            this.editorFailed = false;
+                            this.destroy();
+                            const boot = () => {
+                                try {
+                                    const container = document.getElementById(this.containerId);
+                                    if (container) { container.innerHTML = ''; }
+                                    this.editor = new DocsAPI.DocEditor(this.containerId, this.config);
+                                } catch (error) {
+                                    console.error('OnlyOffice editor gagal dimuat', error);
+                                    this.editorFailed = true;
+                                }
+                            };
+                            if (window.DocsAPI) { boot(); return; }
+                            const script = document.createElement('script');
+                            script.src = this.apiUrl;
+                            script.onload = boot;
+                            script.onerror = () => { this.editorFailed = true; };
+                            document.head.appendChild(script);
+                        },
+                        destroy() {
+                            if (this.editor && typeof this.editor.destroyEditor === 'function') {
+                                this.editor.destroyEditor();
+                            }
+                            this.editor = null;
+                        }
+                    }"
+                    x-init="load()"
+                >
+                    <div id="presentation-workspace-editor-{{ md5($editorConfig['document']['key'] ?? '') }}" class="h-full min-h-[640px] w-full"></div>
+                    <div x-show="editorFailed" x-transition class="flex min-h-[640px] items-center justify-center px-6 text-center" style="display:none;">
+                        <div class="max-w-md rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+                            <p class="font-semibold">Editor presentasi belum bisa dimuat.</p>
+                            <p class="mt-2 text-sm leading-6">Periksa koneksi ke OnlyOffice, lalu coba muat ulang editor. Anda tetap bisa mengunduh PPTX/PDF dari riwayat.</p>
+                            <button type="button" @click="load()" class="mt-4 rounded-lg bg-amber-700 px-4 py-2 text-xs font-semibold text-white hover:bg-amber-800">Coba muat ulang editor</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @else
     <div class="flex-1 overflow-y-auto px-4 py-5 sm:px-6">
         @if($statusMessage)
             <div class="mb-4 rounded-xl border border-ista-primary/20 bg-ista-primary/5 px-4 py-3 text-[13px] text-ista-primary dark:border-ista-gold/20 dark:bg-gray-800/60 dark:text-amber-200">
@@ -185,6 +249,13 @@
 
                                         <div class="mt-2.5 flex flex-wrap items-center gap-2">
                                             @if($p->status === \App\Models\Presentation::STATUS_READY)
+                                                <button type="button" wire:click="editPresentation({{ $p->id }})"
+                                                    class="inline-flex items-center gap-1 rounded-lg bg-ista-primary px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-ista-primary/90">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                    </svg>
+                                                    Edit Presentasi
+                                                </button>
                                                 <a href="{{ route('presentations.download', $p) }}"
                                                     class="inline-flex items-center gap-1 rounded-lg bg-ista-primary/10 px-2.5 py-1 text-[11px] font-semibold text-ista-primary hover:bg-ista-primary/15">
                                                     PPTX
@@ -215,4 +286,5 @@
             </div>
         @endif
     </div>
+    @endif
 </div>

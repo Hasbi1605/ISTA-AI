@@ -2,8 +2,11 @@
 
 namespace Tests\Feature\Presentations;
 
+use App\Http\Controllers\Presentations\PresentationFileController;
 use App\Models\Presentation;
+use App\Models\PresentationVersion;
 use App\Models\User;
+use App\Services\OnlyOffice\PresentationDocumentKey;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\Http;
@@ -149,5 +152,82 @@ class PresentationFileTest extends TestCase
         $presentation = $this->readyPresentation($user);
 
         $this->get(route('presentations.file.signed', $presentation))->assertForbidden();
+    }
+
+    public function test_signed_file_route_serves_pptx_with_valid_signature_and_token(): void
+    {
+        Storage::fake('local');
+        config(['services.onlyoffice.laravel_internal_url' => 'http://laravel:8000']);
+
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        $presentation = $this->readyPresentation($user);
+
+        $url = app(PresentationDocumentKey::class)->signedFileUrl($presentation, null, 60);
+
+        $this->get($url)
+            ->assertOk()
+            ->assertHeader('Content-Type', PresentationFileController::PPTX_MEDIA_TYPE);
+    }
+
+    public function test_signed_file_route_rejects_signature_without_token(): void
+    {
+        Storage::fake('local');
+        config(['services.onlyoffice.laravel_internal_url' => 'http://laravel:8000']);
+
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        $presentation = $this->readyPresentation($user);
+
+        // Bangun signed URL valid lalu hapus oo_token-nya: signature tetap valid
+        // tapi token wajib hilang → harus ditolak.
+        $url = app(PresentationDocumentKey::class)->signedFileUrl($presentation, null, 60);
+        $stripped = preg_replace('/(^|[?&])oo_token=[^&]*/', '$1', $url);
+
+        $this->get($stripped)->assertForbidden();
+    }
+
+    public function test_signed_file_token_is_single_use_replay_window(): void
+    {
+        Storage::fake('local');
+        config(['services.onlyoffice.laravel_internal_url' => 'http://laravel:8000']);
+
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        $presentation = $this->readyPresentation($user);
+
+        $key = app(PresentationDocumentKey::class);
+        $token = $key->generateFileToken($presentation, null, 60);
+
+        $this->assertTrue($key->validateFileToken($token, $presentation, null));
+        // Token salah versi harus ditolak.
+        $this->assertFalse($key->validateFileToken($token, $presentation, 999));
+    }
+
+    public function test_owner_can_force_save_presentation(): void
+    {
+        config([
+            'services.onlyoffice.jwt_secret' => 'force-secret',
+            'services.onlyoffice.internal_url' => 'http://onlyoffice',
+            'services.onlyoffice.force_save_wait_seconds' => 1,
+            'services.onlyoffice.force_save_poll_microseconds' => 1000,
+        ]);
+        Storage::fake('local');
+
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        $presentation = $this->readyPresentation($user);
+        $version = $presentation->versions()->create([
+            'version_number' => 1,
+            'label' => 'Versi 1',
+            'pptx_path' => $presentation->pptx_path,
+            'status' => PresentationVersion::STATUS_GENERATED,
+        ]);
+        $presentation->forceFill(['current_version_id' => $version->id])->save();
+
+        Http::fake([
+            'http://onlyoffice/command*' => Http::response(['error' => 4], 200),
+        ]);
+
+        $this->actingAs($user)
+            ->postJson(route('presentations.force-save', $presentation))
+            ->assertOk()
+            ->assertJson(['status' => 'no_changes']);
     }
 }

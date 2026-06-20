@@ -3,6 +3,7 @@
 namespace App\Services\OnlyOffice;
 
 use App\Models\Presentation;
+use App\Models\PresentationVersion;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
@@ -12,22 +13,22 @@ use RuntimeException;
  */
 class PresentationConverter
 {
-    public function presentationToPdf(Presentation $presentation): string
+    public function presentationToPdf(Presentation $presentation, ?PresentationVersion $version = null): string
     {
-        $filePath = $presentation->pptx_path;
+        $filePath = $version?->pptx_path ?: $presentation->pptx_path;
 
         if (! $filePath) {
             throw new RuntimeException('File presentasi belum tersedia.');
         }
 
-        $key = app(PresentationDocumentKey::class)->forConversion($presentation);
+        $key = app(PresentationDocumentKey::class)->forConversion($presentation, $version);
         $payload = [
             'async' => false,
             'filetype' => 'pptx',
             'key' => $key,
             'outputtype' => 'pdf',
             'title' => $this->fileName($presentation, 'pptx'),
-            'url' => $this->presentationDocumentUrl($presentation),
+            'url' => $this->presentationDocumentUrl($presentation, $version),
             'exp' => time() + 300,
         ];
 
@@ -77,11 +78,11 @@ class PresentationConverter
         return $base.'.'.strtolower($extension);
     }
 
-    protected function presentationDocumentUrl(Presentation $presentation): string
+    protected function presentationDocumentUrl(Presentation $presentation, ?PresentationVersion $version = null): string
     {
         $ttlMinutes = max(1, (int) config('services.onlyoffice.signed_url_ttl_minutes', 30));
 
-        return app(PresentationDocumentKey::class)->signedFileUrl($presentation, $ttlMinutes);
+        return app(PresentationDocumentKey::class)->signedFileUrl($presentation, $version?->id, $ttlMinutes);
     }
 
     protected function conversionUrl(string $key): string

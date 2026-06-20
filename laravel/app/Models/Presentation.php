@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Presentation extends Model
@@ -54,6 +55,16 @@ class Presentation extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function versions(): HasMany
+    {
+        return $this->hasMany(PresentationVersion::class);
+    }
+
+    public function currentVersion(): BelongsTo
+    {
+        return $this->belongsTo(PresentationVersion::class, 'current_version_id');
     }
 
     public function isReady(): bool
