@@ -188,7 +188,7 @@ class PromptStudioTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(PrompyStudio::class)
-            ->set('idea', 'Buat poster acara kenegaraan')
+            ->set('idea', 'Buat Poster 1 Muharram 1448 H dengan nuansa warna biru, dengan elemen islami yang tidak terlalu ramai')
             ->call('selectPlatform', 'gpt_image_2')
             ->call('selectPromptType', 'poster_infographic')
             ->call('generate')
@@ -198,6 +198,7 @@ class PromptStudioTest extends TestCase
             'user_id' => $user->id,
             'platform' => 'gpt_image_2',
             'prompt_type' => 'poster_infographic',
+            'title' => 'Poster 1 Muharram 1448 H',
         ]);
     }
 
@@ -257,7 +258,7 @@ class PromptStudioTest extends TestCase
             'platform_label' => 'GPT Image 2',
             'prompt_type' => 'poster_infographic',
             'prompt_type_label' => 'Poster / Infografis',
-            'title' => 'Poster Kenegaraan',
+            'title' => 'Buat Poster 1 Muharram 1448 H dengan nuansa warna biru, dengan elemen islami yang tidak terlalu ramai',
             'idea' => 'poster',
             'package' => $this->fakePackageResponse([
                 'main_prompt' => 'A polished state ceremony poster with official red and gold accents.',
@@ -270,7 +271,12 @@ class PromptStudioTest extends TestCase
             ->assertSee('Prompt utama (EN)')
             ->assertSee('A polished state ceremony poster')
             ->assertSee('Salin semua')
-            ->assertSee('Riwayat Prompt');
+            ->assertSee('Prompt Baru')
+            ->assertSee('Cari prompt...')
+            ->assertSee('Berhasil')
+            ->assertSee('Poster 1 Muharram 1448 H')
+            ->assertDontSee('dengan nuansa warna biru')
+            ->assertSeeInOrder(['Riwayat Prompt', 'Prompt utama (EN)']);
     }
 
     public function test_select_prompt_changes_active_result_panel(): void

@@ -13,7 +13,9 @@
         </div>
     @endif
 
-    @include('livewire.presentations.partials.presentation-history-sidebar')
+    @if($subMode !== 'prompy')
+        @include('livewire.presentations.partials.presentation-history-sidebar')
+    @endif
 
     @if($subMode === 'prompy')
         <livewire:presentations.prompy-studio wire:key="prompy-studio-shell" />

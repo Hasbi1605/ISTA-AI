@@ -88,6 +88,19 @@ class PrompyStudio extends Component
         }
     }
 
+    public function startNewPrompt(): void
+    {
+        $this->idea = '';
+        $this->platform = 'generic';
+        $this->promptType = 'image';
+        $this->contextNotes = '';
+        $this->selectedDocuments = [];
+        $this->referenceImage = null;
+        $this->activePromptId = null;
+        $this->statusMessage = null;
+        $this->resetValidation();
+    }
+
     public function generate(PromptStudioService $service): void
     {
         $this->statusMessage = null;

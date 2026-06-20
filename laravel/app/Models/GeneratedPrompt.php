@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
 
 /**
  * Riwayat paket prompt Prompy Studio (epic #218, child #263).
@@ -51,6 +52,51 @@ class GeneratedPrompt extends Model
     public function isOwnedBy(?User $user): bool
     {
         return $user !== null && (int) $user->id === (int) $this->user_id;
+    }
+
+    public function displayTitle(): string
+    {
+        $title = self::compactDisplayTitle((string) ($this->title ?: $this->idea));
+
+        return $title !== '' ? $title : 'Paket Prompt';
+    }
+
+    public static function compactDisplayTitle(string $value, int $limit = 64): string
+    {
+        $clean = trim((string) preg_replace('/\s+/u', ' ', strip_tags($value)));
+        if ($clean === '') {
+            return '';
+        }
+
+        $withoutCommand = preg_replace(
+            '/^(?:tolong|mohon|buatkan|buat|bikin|hasilkan|generate|susun|rancang|desain|create|please)\s+/iu',
+            '',
+            $clean
+        ) ?: $clean;
+
+        $firstPhrase = trim((string) (preg_split('/[\r\n.!?;]+/u', $withoutCommand)[0] ?? $withoutCommand));
+        $topicParts = preg_split(
+            '/\s+(?:dengan|yang|untuk|berisi|menggunakan|memakai|nuansa|gaya|tema|bertema|agar|supaya)\s+/iu',
+            $firstPhrase,
+            2
+        );
+
+        $candidate = trim((string) ($topicParts[0] ?? $firstPhrase), " \t\n\r\0\x0B,.-:;\"'()[]{}");
+        if (mb_strlen($candidate) < 12 && mb_strlen($firstPhrase) > mb_strlen($candidate)) {
+            $candidate = trim($firstPhrase, " \t\n\r\0\x0B,.-:;\"'()[]{}");
+        }
+
+        if ($candidate === '') {
+            $candidate = $withoutCommand;
+        }
+        $candidate = Str::ucfirst($candidate);
+
+        if (mb_strlen($candidate) > $limit) {
+            $truncated = Str::limit($candidate, $limit, '');
+            $candidate = trim((string) (preg_replace('/\s+\S*$/u', '', $truncated) ?: $truncated));
+        }
+
+        return $candidate !== '' ? $candidate : Str::limit($clean, $limit, '');
     }
 
     /**

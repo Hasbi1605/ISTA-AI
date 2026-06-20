@@ -15,6 +15,8 @@
         }
     }"
 >
+    @include('livewire.presentations.partials.prompy-history-sidebar')
+
     <div
         x-show="!isMobile || presentationMobilePanel === 'config'"
         x-cloak
@@ -219,7 +221,7 @@
                     <span class="hidden sm:inline">Paket Prompt</span>
                 </div>
                 <div class="min-w-0">
-                    <p class="truncate text-[13px] font-semibold text-stone-800 dark:text-gray-100">{{ $activePrompt?->title ?: 'Hasil Prompy Studio' }}</p>
+                    <p class="truncate text-[13px] font-semibold text-stone-800 dark:text-gray-100">{{ $activePrompt?->displayTitle() ?: 'Hasil Prompy Studio' }}</p>
                     <p class="text-[11px] text-stone-500 dark:text-gray-400">{{ $activePrompt ? $activePrompt->platform_label.' · '.$activePrompt->prompt_type_label : 'Output prompt tampil di sini' }}</p>
                 </div>
             </div>
@@ -266,7 +268,7 @@
                             <div class="flex items-start justify-between gap-3">
                                 <div class="min-w-0">
                                     <p class="text-[10.5px] font-bold uppercase tracking-wider text-stone-400 dark:text-gray-500">Prompt utama (EN)</p>
-                                    <h3 class="mt-1 truncate text-[15px] font-bold text-stone-900 dark:text-gray-100">{{ $activePrompt?->title ?: 'Paket Prompt' }}</h3>
+                                    <h3 class="mt-1 truncate text-[15px] font-bold text-stone-900 dark:text-gray-100">{{ $activePrompt?->displayTitle() ?: 'Paket Prompt' }}</h3>
                                 </div>
                                 @if($activePrompt?->contains_internal_context)
                                     <span class="shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">Konteks internal</span>
@@ -358,30 +360,6 @@
                     </div>
                 @endif
 
-                @if($prompts->isNotEmpty())
-                    <div class="memo-config-panel">
-                        <div class="border-b border-stone-100 bg-white px-4 py-3 dark:border-gray-800 dark:bg-gray-900">
-                            <h3 class="text-[13px] font-bold text-stone-800 dark:text-gray-100">Riwayat Prompt</h3>
-                        </div>
-                        <div class="divide-y divide-stone-100 dark:divide-gray-800">
-                            @foreach($prompts as $prompt)
-                                <div class="flex items-center gap-3 px-4 py-3" wire:key="prompt-history-{{ $prompt->id }}">
-                                    <button type="button" wire:click="selectPrompt({{ $prompt->id }})" class="min-w-0 flex-1 text-left">
-                                        <p class="truncate text-[13px] font-semibold text-stone-800 dark:text-gray-100">{{ $prompt->title ?: 'Paket Prompt' }}</p>
-                                        <p class="mt-0.5 text-[11px] text-stone-500 dark:text-gray-500">{{ $prompt->platform_label }} · {{ $prompt->prompt_type_label }}</p>
-                                    </button>
-                                    @if($prompt->contains_internal_context)
-                                        <span class="hidden shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 sm:inline-flex">Internal</span>
-                                    @endif
-                                    <button type="button" wire:click="deletePrompt({{ $prompt->id }})" wire:confirm="Hapus prompt ini?"
-                                        class="shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">
-                                        Hapus
-                                    </button>
-                                </div>
-                            @endforeach
-                        </div>
-                    </div>
-                @endif
             </div>
         </div>
     </div>

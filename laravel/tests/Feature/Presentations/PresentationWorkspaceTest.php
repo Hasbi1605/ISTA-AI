@@ -94,7 +94,10 @@ class PresentationWorkspaceTest extends TestCase
             ->assertSee('Ide / permintaan')
             ->assertSee('Buat Paket Prompt')
             ->assertSee('Paket Prompt')
+            ->assertSee('Prompt Baru')
+            ->assertSee('Belum ada prompt')
             ->assertSee('Belum ada paket prompt')
+            ->assertDontSee('Presentasi Baru')
             ->assertDontSee('Segera hadir');
     }
 

@@ -386,8 +386,8 @@ class PromptStudioService
 
     protected function deriveTitle(string $idea): string
     {
-        $firstLine = trim((string) (preg_split('/[\r\n]+/', $idea)[0] ?? ''));
+        $title = GeneratedPrompt::compactDisplayTitle($idea);
 
-        return Str::limit($firstLine !== '' ? $firstLine : $idea, 120, '');
+        return $title !== '' ? $title : Str::limit(trim($idea), 64, '');
     }
 }
