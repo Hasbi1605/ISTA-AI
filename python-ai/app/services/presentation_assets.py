@@ -17,6 +17,10 @@ from pptx.util import Emu, Pt
 BRAND_NAME = "Istana Kepresidenan Yogyakarta"
 BRAND_MONOGRAM = "IKY"
 
+# Mode aset MVP (#225): seluruh aset visual digambar lokal (shape vektor),
+# tidak ada pengambilan dari internet. Enrichment aset web ditunda ke #227.
+ASSET_MODE = "local_assets_only"
+
 # Nama shape logo dipakai sebagai marker agar bisa diverifikasi di test/QA.
 LOGO_SHAPE_NAME = "ista-logo"
 
