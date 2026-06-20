@@ -134,22 +134,8 @@
                 </div>
             </div>
         @elseif($subMode === 'prompy')
-            {{-- ===== PROMPY STUDIO (placeholder, dikerjakan di child #263) ===== --}}
-            <div class="mx-auto max-w-xl rounded-2xl border border-dashed border-stone-300 bg-white/60 p-8 text-center dark:border-gray-700 dark:bg-gray-800/40">
-                <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-ista-gold/15 text-ista-gold">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.4 6.6L23 12l-6.6 2.4L14 21l-2.4-6.6L5 12l6.6-2.4L14 3z" />
-                    </svg>
-                </div>
-                <h3 class="text-base font-bold text-stone-800 dark:text-gray-100">Prompy Studio</h3>
-                <p class="mt-2 text-[13px] leading-relaxed text-stone-500 dark:text-gray-400">
-                    Generator prompt profesional untuk platform AI eksternal sedang disiapkan.
-                    Fitur ini akan hadir pada tahap berikutnya.
-                </p>
-                <span class="mt-4 inline-flex items-center gap-1.5 rounded-full bg-stone-100 px-3 py-1 text-[12px] font-semibold text-stone-500 dark:bg-gray-800 dark:text-gray-400">
-                    <span class="h-1.5 w-1.5 rounded-full bg-ista-gold"></span> Segera hadir
-                </span>
-            </div>
+            {{-- ===== PROMPY STUDIO (#263) — komponen terpisah, state independen ===== --}}
+            <livewire:presentations.prompy-studio />
         @else
             {{-- ===== BUAT PPT ISTA ===== --}}
             <div class="grid grid-cols-1 gap-6 lg:grid-cols-5">

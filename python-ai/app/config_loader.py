@@ -207,7 +207,21 @@ PERTANYAAN USER:
             "Buat jawaban hipotetis singkat 2-3 kalimat untuk pertanyaan berikut. "
             "Padat, faktual, gunakan kosakata yang relevan dengan topik."
         ),
-    }
+    },
+    "prompt_studio": {
+        "body": (
+            "Anda adalah ahli prompt engineering. Susun satu paket prompt siap salin-tempel "
+            "untuk platform \"{platform_label}\" jenis \"{prompt_type_label}\".\n\n"
+            "Ide pengguna (Bahasa Indonesia): {idea}\n"
+            "Catatan konteks tambahan: {context_notes}\n"
+            "Karakter platform: {platform_guidance}\n"
+            "Panduan struktur: {type_guidance}\n\n"
+            "Balas HANYA satu objek JSON valid dengan field: main_prompt (Bahasa Inggris), "
+            "variants (array Bahasa Inggris), negative_prompt (Bahasa Inggris), "
+            "recommended_settings (objek), notes_id (Bahasa Indonesia). "
+            "Jangan mengarang data sensitif dan jangan menyertakan URL atau kunci API."
+        ),
+    },
 }
 
 
@@ -444,3 +458,31 @@ def get_hyde_query_prompt() -> str:
         ['hyde', 'query'],
         "HyDE query prompt empty, using default fallback",
     )
+
+
+def get_prompt_studio_prompt() -> str:
+    """Get Prompy Studio prompt-package generation template (#263)."""
+    return _get_prompt_with_fallback(
+        ['prompts', 'prompt_studio', 'body'],
+        ['prompt_studio', 'body'],
+        "Prompt studio prompt empty, using default fallback",
+    )
+
+
+def get_prompt_studio_config() -> Dict[str, Any]:
+    """Get Prompy Studio platform/type profiles (#263)."""
+    config = load_config()
+    studio = config.get('prompt_studio', {})
+    return studio if isinstance(studio, dict) else {}
+
+
+def get_prompt_studio_platforms() -> List[Dict[str, Any]]:
+    """Get configured external AI platform profiles for Prompy Studio."""
+    platforms = get_prompt_studio_config().get('platforms', [])
+    return platforms if isinstance(platforms, list) else []
+
+
+def get_prompt_studio_types() -> List[Dict[str, Any]]:
+    """Get configured prompt types for Prompy Studio."""
+    types = get_prompt_studio_config().get('types', [])
+    return types if isinstance(types, list) else []

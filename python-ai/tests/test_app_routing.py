@@ -31,4 +31,12 @@ def test_document_app_only_exposes_document_routes():
     assert "/api/documents/export" in paths
     assert "/api/memos/generate-body" in paths
     assert "/api/presentations/generate" in paths
+    assert "/api/prompts/generate" in paths
+    assert "/api/prompts/profiles" in paths
     assert "/api/chat" not in paths
+
+
+def test_chat_app_does_not_expose_prompt_routes():
+    paths = _paths(chat_app)
+
+    assert "/api/prompts/generate" not in paths

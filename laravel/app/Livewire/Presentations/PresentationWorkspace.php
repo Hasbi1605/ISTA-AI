@@ -20,7 +20,7 @@ use Throwable;
  *
  * Sub-mode "Buat PPT ISTA": form konfigurasi hybrid + prompt, pilih dokumen
  * ready, generate async (pipeline #222), status/history, dan download PPTX/PDF
- * (#224). Sub-mode "Prompy Studio" masih placeholder (dikerjakan di #263).
+ * (#224). Sub-mode "Prompy Studio" memuat generator paket prompt (#263).
  */
 class PresentationWorkspace extends Component
 {

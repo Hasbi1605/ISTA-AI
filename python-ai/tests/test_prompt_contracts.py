@@ -234,6 +234,26 @@ def test_runtime_prompt_template_falls_back_when_placeholder_is_invalid():
     assert "Prompt rusak" not in prompt
 
 
+def test_prompt_studio_profiles_and_template_are_loaded_from_yaml():
+    from app import config_loader
+
+    platforms = {p["key"] for p in config_loader.get_prompt_studio_platforms()}
+    types = {t["key"] for t in config_loader.get_prompt_studio_types()}
+
+    # Platform awal yang wajib didukung (#263).
+    assert {"gpt_image_2", "gemini_nano_banana", "canva_ai", "google_flow", "generic"} <= platforms
+    # Jenis prompt yang wajib didukung.
+    assert {"image", "presentation", "poster_infographic", "video_storyboard"} <= types
+
+    template = config_loader.get_prompt_studio_prompt()
+    assert "{platform_label}" in template
+    assert "{prompt_type_label}" in template
+    assert "{idea}" in template
+    assert "{source_context}" in template
+    assert "{reference_image_context}" in template
+    assert "main_prompt" in template
+
+
 def test_memo_prompt_uses_config_loader_template():
     from app.services.memo_generation import build_memo_prompt
 

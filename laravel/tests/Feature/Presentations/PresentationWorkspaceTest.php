@@ -51,7 +51,7 @@ class PresentationWorkspaceTest extends TestCase
             ->assertSee('Modern Minimal');
     }
 
-    public function test_prompy_submode_shows_placeholder(): void
+    public function test_prompy_submode_embeds_prompt_studio(): void
     {
         $user = User::factory()->create();
 
@@ -59,7 +59,10 @@ class PresentationWorkspaceTest extends TestCase
             ->test(PresentationWorkspace::class)
             ->call('setSubMode', 'prompy')
             ->assertSee('Prompy Studio')
-            ->assertSee('Segera hadir');
+            ->assertSee('Ide / permintaan')
+            ->assertSee('Buat Paket Prompt')
+            ->assertSee('Riwayat Prompt')
+            ->assertDontSee('Segera hadir');
     }
 
     public function test_generate_creates_pending_presentation_and_dispatches_job(): void
