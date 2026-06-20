@@ -211,8 +211,10 @@ class PresentationWorkspaceTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(PresentationWorkspace::class)
-            ->assertSee('Proses ini terlalu lama')
-            ->assertSee('Kirim ulang job render')
+            ->assertSee('Render belum selesai')
+            ->assertSee('Kirim ulang')
+            ->assertDontSee('Terlalu lama menunggu')
+            ->assertDontSee('Menunggu')
             ->call('retry', $presentation->id)
             ->assertSee('Presentasi dikirim ulang karena proses sebelumnya terlalu lama.');
 
@@ -234,8 +236,9 @@ class PresentationWorkspaceTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(PresentationWorkspace::class)
-            ->assertSee('Sedang merender presentasi')
-            ->assertDontSee('Proses ini terlalu lama')
+            ->assertSee('Merender presentasi')
+            ->assertDontSee('Render belum selesai')
+            ->assertDontSee('Menunggu')
             ->call('retry', $presentation->id)
             ->assertSee('Presentasi masih diproses.');
 

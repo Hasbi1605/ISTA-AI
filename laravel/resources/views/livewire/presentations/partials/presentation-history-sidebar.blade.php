@@ -46,14 +46,6 @@
         ->values()
         ->all();
     $presentationTitles = $presentations->pluck('title')->map(fn ($title) => (string) $title)->values()->all();
-    $presentationBadge = function (string $status) {
-        return match($status) {
-            \App\Models\Presentation::STATUS_READY, \App\Models\Presentation::STATUS_EDITED => ['Siap', 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'],
-            \App\Models\Presentation::STATUS_PROCESSING => ['Diproses', 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300'],
-            \App\Models\Presentation::STATUS_ERROR => ['Gagal', 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'],
-            default => ['Menunggu', 'bg-stone-100 text-stone-600 dark:bg-gray-700 dark:text-gray-300'],
-        };
-    };
 @endphp
 
 <aside
@@ -173,24 +165,25 @@
 
                     @forelse ($groupPresentations as $presentation)
                         @php
-                            $badge = $presentationBadge($presentation->status);
-                            $isStale = in_array($presentation->status, [\App\Models\Presentation::STATUS_PENDING, \App\Models\Presentation::STATUS_PROCESSING], true)
-                                && ($presentation->updated_at?->lessThan(now()->subMinutes($staleInProgressMinutes)) ?? false);
+                            $isInProgress = in_array($presentation->status, [\App\Models\Presentation::STATUS_PENDING, \App\Models\Presentation::STATUS_PROCESSING], true);
+                            $iconClass = $presentation->status === \App\Models\Presentation::STATUS_ERROR
+                                ? 'text-rose-500 dark:text-rose-300'
+                                : 'text-stone-400 dark:text-gray-500';
                         @endphp
                         <li class="group relative" wire:key="presentation-sidebar-{{ $groupKey }}-{{ $presentation->id }}" x-show="isVisible(@js($presentation->title))">
-                            <div class="chat-history-item items-start gap-2.5 py-2.5 pr-9 {{ (int) $activePresentationHistoryId === (int) $presentation->id ? 'is-active' : '' }}">
-                                <button type="button"
-                                        wire:click="selectPresentation({{ $presentation->id }})"
-                                        @click="showPresentationPreviewPanel()"
-                                        data-presentation-history-id="{{ $presentation->id }}"
-                                        aria-current="{{ (int) $activePresentationHistoryId === (int) $presentation->id ? 'page' : 'false' }}"
-                                        class="flex min-w-0 flex-1 items-start gap-2.5 text-left">
-                                    <span class="mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center text-stone-400 dark:text-gray-500">
+                            <button type="button"
+                                    wire:click="selectPresentation({{ $presentation->id }})"
+                                    @click="showPresentationPreviewPanel()"
+                                    data-presentation-history-id="{{ $presentation->id }}"
+                                    aria-current="{{ (int) $activePresentationHistoryId === (int) $presentation->id ? 'page' : 'false' }}"
+                                    aria-busy="{{ $isInProgress ? 'true' : 'false' }}"
+                                    class="chat-history-item items-start gap-2.5 py-2.5 pr-9 {{ (int) $activePresentationHistoryId === (int) $presentation->id ? 'is-active' : '' }}">
+                                    <span class="mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center {{ $iconClass }}">
                                         @if($presentation->isReady())
                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 5h16M5 5v10a1 1 0 001 1h12a1 1 0 001-1V5M9 21l3-3 3 3" />
                                             </svg>
-                                        @elseif(in_array($presentation->status, [\App\Models\Presentation::STATUS_PENDING, \App\Models\Presentation::STATUS_PROCESSING], true))
+                                        @elseif($isInProgress)
                                             <span class="h-3.5 w-3.5 rounded-full border border-current border-t-transparent text-ista-primary animate-spin dark:text-amber-200" aria-hidden="true"></span>
                                         @else
                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -203,12 +196,8 @@
                                         <span class="mt-1 block truncate text-[10.5px] text-stone-400 dark:text-gray-500">
                                             {{ $templates[$presentation->visual_template] ?? $presentation->visual_template }} · {{ $presentation->updated_at?->diffForHumans(short: true) }}
                                         </span>
-                                        @if($isStale)
-                                            <span class="mt-1 block text-[10.5px] font-semibold text-amber-700 dark:text-amber-200">Terlalu lama menunggu</span>
-                                        @endif
                                     </span>
-                                    <span class="mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold {{ $badge[1] }}">{{ $badge[0] }}</span>
-                                </button>
+                            </button>
                                 <button type="button"
                                         wire:click="deletePresentation({{ $presentation->id }})"
                                         wire:confirm="Hapus presentasi &quot;{{ $presentation->title }}&quot;?"
@@ -218,7 +207,6 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                     </svg>
                                 </button>
-                            </div>
                         </li>
                     @empty
                         @if ($groupKey === 'today')

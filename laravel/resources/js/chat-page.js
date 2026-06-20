@@ -3227,7 +3227,7 @@ const registerChatPageData = (Alpine) => {
         },
 
         presentationLoadingLabels() {
-            return ['Menyiapkan permintaan', 'Menunggu antrean render', 'Menyusun file dan panel hasil'];
+            return ['Menyiapkan permintaan', 'Antrean render diproses', 'Menyusun file dan panel hasil'];
         },
 
         startPresentationLoadingPhase() {

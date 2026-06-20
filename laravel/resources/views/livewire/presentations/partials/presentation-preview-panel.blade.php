@@ -5,7 +5,7 @@
             \App\Models\Presentation::STATUS_READY, \App\Models\Presentation::STATUS_EDITED => ['Siap', 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'],
             \App\Models\Presentation::STATUS_PROCESSING => ['Diproses', 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300'],
             \App\Models\Presentation::STATUS_ERROR => ['Gagal', 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'],
-            \App\Models\Presentation::STATUS_PENDING => ['Menunggu', 'bg-stone-100 text-stone-600 dark:bg-gray-700 dark:text-gray-300'],
+            \App\Models\Presentation::STATUS_PENDING => ['Dalam antrean', 'bg-stone-100 text-stone-600 dark:bg-gray-700 dark:text-gray-300'],
             default => ['Belum aktif', 'bg-stone-100 text-stone-600 dark:bg-gray-700 dark:text-gray-300'],
         };
     };
@@ -35,7 +35,9 @@
                     <p class="truncate text-[13px] font-semibold text-stone-800 dark:text-gray-100">{{ $activePreviewPresentation->title }}</p>
                     <p class="text-[11px] text-stone-500 dark:text-gray-400">{{ $templates[$activePreviewPresentation->visual_template] ?? $activePreviewPresentation->visual_template }}</p>
                 </div>
-                <span class="hidden shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold sm:inline-flex {{ $badge[1] }}">{{ $badge[0] }}</span>
+                @if(! $isPreviewInProgress)
+                    <span class="hidden shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold sm:inline-flex {{ $badge[1] }}">{{ $badge[0] }}</span>
+                @endif
             @else
                 <div class="min-w-0">
                     <p class="truncate text-[13px] font-semibold text-stone-800 dark:text-gray-100">Panel Presentasi</p>
@@ -87,9 +89,9 @@
                     <span x-show="downloadStatus || downloadError" x-cloak x-text="downloadStatus || downloadError" class="hidden max-w-[190px] truncate text-[11px] font-medium text-stone-500 dark:text-gray-400 md:inline" :class="{ 'text-amber-700 dark:text-amber-200': downloadError }" role="status" aria-live="polite"></span>
                 @elseif($isPreviewStale)
                     <button type="button" wire:click="retry({{ $activePreviewPresentation->id }})" wire:loading.attr="disabled" wire:target="retry"
-                        class="inline-flex items-center gap-1 rounded-lg bg-amber-600 px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-amber-700 disabled:opacity-60">
+                        class="inline-flex items-center gap-1 rounded-lg bg-ista-primary px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-ista-dark disabled:opacity-60">
                         <span wire:loading wire:target="retry" class="h-3.5 w-3.5 rounded-full border-2 border-white/70 border-t-transparent animate-spin" aria-hidden="true"></span>
-                        <span>Kirim ulang job</span>
+                        <span>Kirim ulang</span>
                     </button>
                 @endif
             </div>
@@ -198,19 +200,19 @@
                         </div>
                     </div>
                     <h3 class="text-[15px] font-semibold text-stone-700 dark:text-gray-300">
-                        {{ $activePreviewPresentation->status === \App\Models\Presentation::STATUS_PENDING ? 'Menunggu antrean render...' : 'Sedang merender presentasi...' }}
+                        {{ $activePreviewPresentation->status === \App\Models\Presentation::STATUS_PENDING ? 'Dalam antrean render...' : 'Merender presentasi...' }}
                     </h3>
                     <p class="mt-2 text-[13px] leading-relaxed text-stone-500 dark:text-gray-400">
                         <span class="ista-loading-shimmer ista-label-enter" x-text="presentationLoadingPhase"></span>
                     </p>
                     @if($isPreviewStale)
-                        <div class="mt-5 rounded-xl border border-amber-300/70 bg-amber-50 px-4 py-3 text-left text-[12px] leading-relaxed text-amber-800 dark:border-amber-700/50 dark:bg-amber-900/20 dark:text-amber-100">
-                            <p class="font-bold">Proses ini terlalu lama.</p>
-                            <p class="mt-1">Presentasi belum berubah selama lebih dari {{ $staleInProgressMinutes }} menit. Kemungkinan worker antrean belum berjalan atau job sebelumnya berhenti.</p>
+                        <div class="mt-5 rounded-lg border border-ista-primary/25 bg-ista-primary/5 px-3 py-2.5 text-left text-[12px] leading-relaxed text-stone-700 dark:border-ista-primary/35 dark:bg-ista-primary/10 dark:text-gray-200">
+                            <p class="font-semibold">Render belum selesai.</p>
+                            <p class="mt-0.5 text-stone-500 dark:text-gray-400">Belum ada pembaruan lebih dari {{ $staleInProgressMinutes }} menit.</p>
                             <button type="button" wire:click="retry({{ $activePreviewPresentation->id }})" wire:loading.attr="disabled" wire:target="retry"
-                                class="mt-3 inline-flex items-center gap-2 rounded-lg bg-amber-700 px-3 py-2 text-[12px] font-semibold text-white hover:bg-amber-800 disabled:opacity-60">
+                                class="mt-2 inline-flex items-center gap-2 rounded-lg bg-ista-primary px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-ista-dark disabled:opacity-60">
                                 <span wire:loading wire:target="retry" class="h-3.5 w-3.5 rounded-full border-2 border-white/70 border-t-transparent animate-spin" aria-hidden="true"></span>
-                                <span>Kirim ulang job render</span>
+                                <span>Kirim ulang</span>
                             </button>
                         </div>
                     @endif
