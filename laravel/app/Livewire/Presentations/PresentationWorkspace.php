@@ -26,6 +26,8 @@ class PresentationWorkspace extends Component
 {
     private const HISTORY_LOAD_LIMIT = 50;
 
+    private const STALE_IN_PROGRESS_MINUTES = 10;
+
     public string $subMode = 'create'; // create | prompy
 
     // Form konfigurasi PPT
@@ -65,11 +67,39 @@ class PresentationWorkspace extends Component
     {
         $this->footer = 'Istana Kepresidenan Yogyakarta';
         $this->header = 'Istana Kepresidenan Yogyakarta';
+
+        $this->activePresentationId = Presentation::where('user_id', Auth::id())
+            ->orderByDesc('updated_at')
+            ->orderByDesc('id')
+            ->value('id');
     }
 
     public function setSubMode(string $mode): void
     {
         $this->subMode = in_array($mode, ['create', 'prompy'], true) ? $mode : 'create';
+
+        if ($this->subMode !== 'create') {
+            $this->editingPresentationId = null;
+            $this->forgetEditorConfigCache();
+        }
+    }
+
+    public function startNewPresentation(): void
+    {
+        $this->title = '';
+        $this->visualTemplate = 'resmi_klasik';
+        $this->audience = '';
+        $this->slideCount = 8;
+        $this->header = 'Istana Kepresidenan Yogyakarta';
+        $this->footer = 'Istana Kepresidenan Yogyakarta';
+        $this->presenter = '';
+        $this->unit = '';
+        $this->additionalInstruction = '';
+        $this->selectedDocuments = [];
+        $this->activePresentationId = null;
+        $this->editingPresentationId = null;
+        $this->statusMessage = null;
+        $this->forgetEditorConfigCache();
     }
 
     public function selectTemplate(string $key): void
@@ -152,7 +182,9 @@ class PresentationWorkspace extends Component
             return;
         }
 
-        if ($presentation->status === Presentation::STATUS_PROCESSING) {
+        $isStaleInProgress = $this->isStaleInProgress($presentation);
+
+        if ($presentation->status === Presentation::STATUS_PROCESSING && ! $isStaleInProgress) {
             $this->statusMessage = 'Presentasi masih diproses.';
 
             return;
@@ -167,7 +199,26 @@ class PresentationWorkspace extends Component
 
         $service->dispatchExisting($presentation);
         $this->activePresentationId = $presentation->id;
-        $this->statusMessage = 'Presentasi dijadwalkan ulang untuk dibuat.';
+        $this->editingPresentationId = null;
+        $this->forgetEditorConfigCache();
+        $this->statusMessage = $isStaleInProgress
+            ? 'Presentasi dikirim ulang karena proses sebelumnya terlalu lama.'
+            : 'Presentasi dijadwalkan ulang untuk dibuat.';
+    }
+
+    public function selectPresentation(int $presentationId): void
+    {
+        $presentation = Presentation::where('id', $presentationId)
+            ->where('user_id', Auth::id())
+            ->first();
+
+        if (! $presentation) {
+            return;
+        }
+
+        $this->activePresentationId = $presentation->id;
+        $this->editingPresentationId = $presentation->isReady() ? $presentation->id : null;
+        $this->forgetEditorConfigCache();
     }
 
     public function deletePresentation(int $presentationId): void
@@ -231,14 +282,22 @@ class PresentationWorkspace extends Component
      */
     public function editorConfig(): ?array
     {
-        if (! $this->editingPresentationId) {
+        if ($this->subMode !== 'create') {
+            $this->forgetEditorConfigCache();
+
+            return null;
+        }
+
+        $targetPresentationId = $this->editingPresentationId ?: $this->activePresentationId;
+
+        if (! $targetPresentationId) {
             $this->forgetEditorConfigCache();
 
             return null;
         }
 
         $presentation = Presentation::with('currentVersion')
-            ->where('id', $this->editingPresentationId)
+            ->where('id', $targetPresentationId)
             ->where('user_id', Auth::id())
             ->first();
 
@@ -351,11 +410,21 @@ class PresentationWorkspace extends Component
             fn (Presentation $p) => in_array($p->status, [Presentation::STATUS_PENDING, Presentation::STATUS_PROCESSING], true)
         );
 
+        $activePresentation = $this->activePresentationId
+            ? $presentations->firstWhere('id', (int) $this->activePresentationId)
+            : null;
+
+        $previewPresentation = $activePresentation
+            ?: $presentations->first(fn (Presentation $p) => in_array($p->status, [Presentation::STATUS_PENDING, Presentation::STATUS_PROCESSING], true))
+            ?: $presentations->first();
+
         return view('livewire.presentations.presentation-workspace', [
             'presentations' => $presentations,
             'availableDocuments' => $availableDocuments,
             'templates' => PresentationGenerationService::VISUAL_TEMPLATES,
             'hasInProgress' => $hasInProgress,
+            'previewPresentation' => $previewPresentation,
+            'staleInProgressMinutes' => self::STALE_IN_PROGRESS_MINUTES,
             'slideCountMin' => PresentationGenerationService::SLIDE_COUNT_MIN,
             'slideCountMax' => PresentationGenerationService::SLIDE_COUNT_MAX,
             'editorConfig' => $this->editorConfig(),
@@ -372,5 +441,14 @@ class PresentationWorkspace extends Component
         }
 
         RateLimiter::hit($key, $decaySeconds);
+    }
+
+    private function isStaleInProgress(Presentation $presentation): bool
+    {
+        if (! in_array($presentation->status, [Presentation::STATUS_PENDING, Presentation::STATUS_PROCESSING], true)) {
+            return false;
+        }
+
+        return $presentation->updated_at?->lessThan(now()->subMinutes(self::STALE_IN_PROGRESS_MINUTES)) ?? false;
     }
 }

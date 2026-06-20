@@ -247,6 +247,69 @@ class PromptStudioTest extends TestCase
             ->assertDontSee('Prompt Orang Lain');
     }
 
+    public function test_result_panel_shows_active_prompt_package(): void
+    {
+        $user = User::factory()->create();
+
+        GeneratedPrompt::create([
+            'user_id' => $user->id,
+            'platform' => 'gpt_image_2',
+            'platform_label' => 'GPT Image 2',
+            'prompt_type' => 'poster_infographic',
+            'prompt_type_label' => 'Poster / Infografis',
+            'title' => 'Poster Kenegaraan',
+            'idea' => 'poster',
+            'package' => $this->fakePackageResponse([
+                'main_prompt' => 'A polished state ceremony poster with official red and gold accents.',
+            ]),
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(PrompyStudio::class)
+            ->assertSee('Paket Prompt')
+            ->assertSee('Prompt utama (EN)')
+            ->assertSee('A polished state ceremony poster')
+            ->assertSee('Salin semua')
+            ->assertSee('Riwayat Prompt');
+    }
+
+    public function test_select_prompt_changes_active_result_panel(): void
+    {
+        $user = User::factory()->create();
+
+        $first = GeneratedPrompt::create([
+            'user_id' => $user->id,
+            'platform' => 'generic',
+            'platform_label' => 'Generic',
+            'prompt_type' => 'image',
+            'prompt_type_label' => 'Gambar',
+            'title' => 'Prompt Pertama',
+            'idea' => 'pertama',
+            'package' => $this->fakePackageResponse(['main_prompt' => 'First prompt output']),
+            'created_at' => now()->subMinute(),
+            'updated_at' => now()->subMinute(),
+        ]);
+
+        GeneratedPrompt::create([
+            'user_id' => $user->id,
+            'platform' => 'generic',
+            'platform_label' => 'Generic',
+            'prompt_type' => 'image',
+            'prompt_type_label' => 'Gambar',
+            'title' => 'Prompt Kedua',
+            'idea' => 'kedua',
+            'package' => $this->fakePackageResponse(['main_prompt' => 'Second prompt output']),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(PrompyStudio::class)
+            ->assertSee('Second prompt output')
+            ->call('selectPrompt', $first->id)
+            ->assertSee('First prompt output');
+    }
+
     public function test_user_cannot_delete_another_users_prompt(): void
     {
         Storage::fake('local');

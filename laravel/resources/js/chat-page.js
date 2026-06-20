@@ -3191,6 +3191,85 @@ const registerChatPageData = (Alpine) => {
         },
     }));
 
+    Alpine.data('presentationWorkspace', () => ({
+        showPresentationSidebar: !window.matchMedia('(max-width: 1023px)').matches,
+        isMobile: window.matchMedia('(max-width: 1023px)').matches,
+        presentationMobilePanel: 'config',
+        presentationLoadingPhase: 'Menyiapkan permintaan',
+        presentationLoadingPhaseKey: 0,
+        presentationLoadingPhaseTimeout: null,
+        presentationPhase2Timeout: null,
+        presentationMediaQuery: null,
+        presentationMediaHandler: null,
+
+        init() {
+            this.presentationMediaQuery = window.matchMedia('(max-width: 1023px)');
+            this.presentationMediaHandler = (event) => {
+                this.isMobile = event.matches;
+                this.showPresentationSidebar = !event.matches;
+
+                if (!event.matches) {
+                    this.presentationMobilePanel = 'config';
+                }
+            };
+
+            this.presentationMediaQuery.addEventListener('change', this.presentationMediaHandler);
+        },
+
+        showPresentationConfigPanel() {
+            this.presentationMobilePanel = 'config';
+            this.showPresentationSidebar = false;
+        },
+
+        showPresentationPreviewPanel() {
+            this.presentationMobilePanel = 'preview';
+            this.showPresentationSidebar = false;
+        },
+
+        presentationLoadingLabels() {
+            return ['Menyiapkan permintaan', 'Menunggu antrean render', 'Menyusun file dan panel hasil'];
+        },
+
+        startPresentationLoadingPhase() {
+            this.resetPresentationLoadingPhase();
+            this.presentationLoadingPhaseKey++;
+            this.presentationLoadingPhase = this.presentationLoadingLabels()[0];
+
+            this.presentationLoadingPhaseTimeout = window.setTimeout(() => {
+                this.presentationLoadingPhase = this.presentationLoadingLabels()[1];
+                this.presentationLoadingPhaseKey++;
+
+                this.presentationPhase2Timeout = window.setTimeout(() => {
+                    this.presentationLoadingPhase = this.presentationLoadingLabels()[2];
+                    this.presentationLoadingPhaseKey++;
+                }, 8000);
+            }, 5000);
+        },
+
+        resetPresentationLoadingPhase() {
+            if (this.presentationLoadingPhaseTimeout) {
+                window.clearTimeout(this.presentationLoadingPhaseTimeout);
+                this.presentationLoadingPhaseTimeout = null;
+            }
+
+            if (this.presentationPhase2Timeout) {
+                window.clearTimeout(this.presentationPhase2Timeout);
+                this.presentationPhase2Timeout = null;
+            }
+
+            this.presentationLoadingPhase = this.presentationLoadingLabels()[0];
+            this.presentationLoadingPhaseKey = 0;
+        },
+
+        destroy() {
+            this.resetPresentationLoadingPhase();
+
+            if (this.presentationMediaQuery && this.presentationMediaHandler) {
+                this.presentationMediaQuery.removeEventListener('change', this.presentationMediaHandler);
+            }
+        },
+    }));
+
     Alpine.data('memoWorkspace', () => ({
         showMemoSidebar: !window.matchMedia('(max-width: 1023px)').matches,
         isMobile: window.matchMedia('(max-width: 1023px)').matches,

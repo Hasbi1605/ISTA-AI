@@ -77,6 +77,17 @@ class PrompyStudio extends Component
         }
     }
 
+    public function selectPrompt(int $promptId): void
+    {
+        $prompt = GeneratedPrompt::where('id', $promptId)
+            ->where('user_id', Auth::id())
+            ->first();
+
+        if ($prompt) {
+            $this->activePromptId = $prompt->id;
+        }
+    }
+
     public function generate(PromptStudioService $service): void
     {
         $this->statusMessage = null;
@@ -156,6 +167,9 @@ class PrompyStudio extends Component
 
         return view('livewire.presentations.prompy-studio', [
             'prompts' => $prompts,
+            'activePrompt' => $this->activePromptId
+                ? $prompts->firstWhere('id', (int) $this->activePromptId)
+                : $prompts->first(),
             'availableDocuments' => $availableDocuments,
             'platforms' => PromptStudioService::PLATFORMS,
             'promptTypes' => PromptStudioService::PROMPT_TYPES,
