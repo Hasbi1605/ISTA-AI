@@ -7,6 +7,7 @@ use App\Http\Controllers\Documents\DocumentExportController;
 use App\Http\Controllers\Documents\DocumentPreviewController;
 use App\Http\Controllers\Memos\MemoFileController;
 use App\Http\Controllers\OnlyOfficeCallbackController;
+use App\Http\Controllers\Presentations\PresentationFileController;
 use App\Livewire\Admin\AdminAccounts;
 use App\Livewire\Admin\AdminDashboard;
 use App\Livewire\Admin\AdminDocuments;
@@ -64,6 +65,18 @@ Route::middleware(['auth', 'active', 'verified'])
         Route::get('/{memo}/download', [MemoFileController::class, 'download'])->name('download');
         Route::get('/{memo}/export-pdf', [MemoFileController::class, 'exportPdf'])->name('export.pdf');
         Route::post('/{memo}/force-save', [MemoFileController::class, 'forceSave'])->name('force-save');
+    });
+Route::get('chat/presentations/{presentation}/signed-file', [PresentationFileController::class, 'signed'])
+    ->whereNumber('presentation')
+    ->name('presentations.file.signed');
+Route::middleware(['auth', 'active', 'verified'])
+    ->prefix('chat/presentations')
+    ->name('presentations.')
+    ->group(function () {
+        Route::get('/{presentation}/download', [PresentationFileController::class, 'downloadPptx'])
+            ->whereNumber('presentation')->name('download');
+        Route::get('/{presentation}/export-pdf', [PresentationFileController::class, 'downloadPdf'])
+            ->whereNumber('presentation')->name('export.pdf');
     });
 
 Route::middleware(['auth', 'active', 'verified'])

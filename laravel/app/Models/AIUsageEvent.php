@@ -44,6 +44,8 @@ class AIUsageEvent extends Model
 
     public const FEATURE_KNOWLEDGE_ADMIN = 'knowledge_admin';
 
+    public const FEATURE_PRESENTATION_GENERATION = 'presentation_generation';
+
     public const ACTION_STARTED = 'started';
 
     public const ACTION_COMPLETED = 'completed';
