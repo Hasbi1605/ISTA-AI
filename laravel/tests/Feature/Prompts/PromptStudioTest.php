@@ -267,8 +267,8 @@ class PromptStudioTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(PrompyStudio::class)
-            ->assertSee('Paket Prompt')
-            ->assertSee('Prompt utama (EN)')
+            ->assertSee('Buat Paket Prompt')
+            ->assertSee('Prompt utama')
             ->assertSee('A polished state ceremony poster')
             ->assertSee('Salin semua')
             ->assertSee('Prompt Baru')
@@ -276,7 +276,7 @@ class PromptStudioTest extends TestCase
             ->assertSee('GPT Image 2')
             ->assertSee('Poster 1 Muharram 1448 H')
             ->assertDontSee('dengan nuansa warna biru')
-            ->assertSeeInOrder(['Riwayat Prompt', 'Prompt utama (EN)']);
+            ->assertSeeInOrder(['Riwayat Prompt', 'Prompt utama']);
     }
 
     public function test_select_prompt_changes_active_result_panel(): void

@@ -58,7 +58,7 @@ class GeneratedPrompt extends Model
     {
         $title = self::compactDisplayTitle((string) ($this->title ?: $this->idea));
 
-        return $title !== '' ? $title : 'Paket Prompt';
+        return $title !== '' ? $title : 'Prompt';
     }
 
     public static function compactDisplayTitle(string $value, int $limit = 64): string

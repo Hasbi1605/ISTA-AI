@@ -212,7 +212,7 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 7h8M8 11h8M8 15h5M5 4h14v16H5z" />
                     </svg>
-                    <span class="hidden sm:inline">Paket Prompt</span>
+                    <span class="hidden sm:inline">Prompt</span>
                 </div>
                 <div class="min-w-0">
                     <p class="truncate text-[13px] font-semibold text-stone-800 dark:text-gray-100">{{ $activePrompt?->displayTitle() ?: 'Hasil Prompy Studio' }}</p>
@@ -261,12 +261,9 @@
                         <div class="border-b border-stone-100 bg-white px-4 py-4 dark:border-gray-800 dark:bg-gray-900">
                             <div class="flex items-start justify-between gap-3">
                                 <div class="min-w-0">
-                                    <p class="text-[10.5px] font-bold uppercase tracking-wider text-stone-400 dark:text-gray-500">Prompt utama (EN)</p>
-                                    <h3 class="mt-1 truncate text-[15px] font-bold text-stone-900 dark:text-gray-100">{{ $activePrompt?->displayTitle() ?: 'Paket Prompt' }}</h3>
+                                    <p class="text-[10.5px] font-bold uppercase tracking-wider text-stone-400 dark:text-gray-500">Prompt utama</p>
+                                    <h3 class="mt-1 truncate text-[15px] font-bold text-stone-900 dark:text-gray-100">{{ $activePrompt?->displayTitle() ?: 'Prompt' }}</h3>
                                 </div>
-                                @if($activePrompt?->contains_internal_context)
-                                    <span class="shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">Konteks internal</span>
-                                @endif
                             </div>
                         </div>
 
@@ -335,7 +332,7 @@
 
                         @if(($activePackage['notes_id'] ?? '') !== '')
                             <div class="memo-config-section bg-stone-50/50 dark:bg-gray-950/20">
-                                <span class="memo-config-label">Catatan (ID)</span>
+                                <span class="memo-config-label">Catatan</span>
                                 <p class="mt-1 whitespace-pre-wrap text-[12.5px] leading-relaxed text-stone-600 dark:text-gray-400">{{ $activePackage['notes_id'] }}</p>
                             </div>
                         @endif

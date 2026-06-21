@@ -23,7 +23,7 @@ class PresentationWorkspaceTest extends TestCase
             ->assertSee('Prompy Studio')
             ->assertSee('Ide / permintaan')
             ->assertSee('Buat Paket Prompt')
-            ->assertSee('Paket Prompt')
+            ->assertSee('Prompt')
             ->assertSee('Prompt Baru')
             ->assertSee('x-data="presentationWorkspace"', false)
             ->assertDontSee('Buat PPT ISTA')
