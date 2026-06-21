@@ -267,7 +267,7 @@
                             </div>
                         </div>
 
-                        <div class="memo-config-section bg-stone-50/65 dark:bg-gray-950/20">
+                        <div class="memo-config-section">
                             <div class="flex items-center justify-between gap-3">
                                 <span class="memo-config-label mb-0">Prompt utama</span>
                                 <button type="button" @click="copy(@js($activePackage['main_prompt'] ?? ''), 'main-active-prompt')"
@@ -298,7 +298,7 @@
                         @endif
 
                         @if(($activePackage['negative_prompt'] ?? '') !== '')
-                            <div class="memo-config-section bg-stone-50/50 dark:bg-gray-950/20">
+                            <div class="memo-config-section">
                                 <div class="flex items-center justify-between gap-3">
                                     <span class="memo-config-label mb-0">Hindari (negative)</span>
                                     <button type="button" @click="copy(@js($activePackage['negative_prompt']), 'active-negative')"
@@ -331,7 +331,7 @@
                         @endif
 
                         @if(($activePackage['notes_id'] ?? '') !== '')
-                            <div class="memo-config-section bg-stone-50/50 dark:bg-gray-950/20">
+                            <div class="memo-config-section">
                                 <span class="memo-config-label">Catatan</span>
                                 <p class="mt-1 whitespace-pre-wrap text-[12.5px] leading-relaxed text-stone-600 dark:text-gray-400">{{ $activePackage['notes_id'] }}</p>
                             </div>
