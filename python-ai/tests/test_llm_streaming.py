@@ -211,8 +211,13 @@ def test_llm_manager_prepends_runtime_prompt_for_rag_sources(monkeypatch):
     )
 
     assert output == ["ok"]
-    assert captured["messages"][0]["content"].startswith("Guardrail runtime.")
-    assert "Prompt RAG." in captured["messages"][0]["content"]
+    assert captured["messages"][0]["role"] == "system"
+    first_system = captured["messages"][0]["content"]
+    # Security guardrail is injected at the very front (highest priority),
+    # followed by the runtime prompt and the RAG system prompt.
+    assert first_system.startswith("PRIORITAS KEAMANAN")
+    assert "Guardrail runtime." in first_system
+    assert "Prompt RAG." in first_system
     assert captured["sources"] == [{"filename": "dokumen.pdf"}]
 
 
