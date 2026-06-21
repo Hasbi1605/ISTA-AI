@@ -171,9 +171,9 @@
                                     @click="showPresentationPreviewPanel()"
                                     aria-current="{{ (int) $activePromptHistoryId === (int) $prompt->id ? 'page' : 'false' }}"
                                     class="chat-history-item items-start gap-2.5 py-2.5 pr-9 {{ (int) $activePromptHistoryId === (int) $prompt->id ? 'is-active' : '' }}">
-                                <span class="mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center text-emerald-600 dark:text-emerald-300">
+                                <span class="mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center text-stone-400 dark:text-gray-500">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12.75 11.25 15 15 9.75M5 4h14v16H5z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 7h8M8 11h8M8 15h5M5 4h14v16H5z" />
                                     </svg>
                                 </span>
                                 <span class="min-w-0 flex-1">
@@ -181,7 +181,6 @@
                                     <span class="mt-1 block truncate text-[10.5px] text-stone-400 dark:text-gray-500">
                                         {{ $prompt->platform_label }} · {{ $prompt->prompt_type_label }}
                                     </span>
-                                    <span class="mt-1 inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">Berhasil</span>
                                 </span>
                             </button>
                             <button type="button"

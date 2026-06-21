@@ -79,8 +79,23 @@
 
         <div class="flex-1 overflow-y-auto bg-transparent px-4 py-4 space-y-4" id="prompy-config-box">
             @if($statusMessage)
-                <div class="rounded-lg border border-ista-primary/20 bg-ista-primary/5 px-3 py-2 text-[12px] font-semibold text-ista-primary dark:border-ista-gold/20 dark:bg-gray-800/60 dark:text-amber-200">
-                    {{ $statusMessage }}
+                <div
+                    x-data="{ show: true }"
+                    x-show="show"
+                    x-init="setTimeout(() => { show = false; $wire.set('statusMessage', null); }, 5000)"
+                    class="relative rounded-lg border border-ista-primary/20 bg-ista-primary/5 pl-3 pr-8 py-2 text-[12px] font-semibold text-ista-primary dark:border-ista-gold/20 dark:bg-gray-800/60 dark:text-amber-200"
+                >
+                    <span>{{ $statusMessage }}</span>
+                    <button
+                        type="button"
+                        @click="show = false; $wire.set('statusMessage', null)"
+                        class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-ista-primary/70 hover:text-ista-primary dark:text-amber-200/70 dark:hover:text-amber-200 transition-colors"
+                        aria-label="Tutup pesan"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
                 </div>
             @endif
             @error('rate_limit')

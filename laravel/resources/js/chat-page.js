@@ -3226,6 +3226,14 @@ const registerChatPageData = (Alpine) => {
             this.showPresentationSidebar = false;
         },
 
+        collapsePresentationSidebarForDocument() {
+            this.showPresentationSidebar = false;
+
+            if (this.isMobile) {
+                this.presentationMobilePanel = 'preview';
+            }
+        },
+
         presentationLoadingLabels() {
             return ['Menyiapkan permintaan', 'Antrean render diproses', 'Menyusun file dan panel hasil'];
         },

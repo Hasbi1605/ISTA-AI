@@ -77,6 +77,7 @@ class PresentationWorkspace extends Component
     public function setSubMode(string $mode): void
     {
         $this->subMode = in_array($mode, ['create', 'prompy'], true) ? $mode : 'create';
+        $this->statusMessage = null;
 
         if ($this->subMode !== 'create') {
             $this->editingPresentationId = null;
@@ -233,6 +234,10 @@ class PresentationWorkspace extends Component
         $this->activePresentationId = $presentation->id;
         $this->editingPresentationId = $presentation->isReady() ? $presentation->id : null;
         $this->forgetEditorConfigCache();
+
+        if ($presentation->isReady()) {
+            $this->dispatch('presentation-document-ready', presentationId: $presentation->id);
+        }
     }
 
     public function deletePresentation(int $presentationId): void
@@ -280,6 +285,8 @@ class PresentationWorkspace extends Component
         $this->editingPresentationId = $presentation->id;
         $this->activePresentationId = $presentation->id;
         $this->forgetEditorConfigCache();
+
+        $this->dispatch('presentation-document-ready', presentationId: $presentation->id);
     }
 
     public function closeEditor(): void
@@ -479,5 +486,9 @@ class PresentationWorkspace extends Component
                 ?: 'Render presentasi gagal. Silakan kirim ulang.',
             default => $pendingMessage,
         };
+
+        if ($presentation->isReady()) {
+            $this->dispatch('presentation-document-ready', presentationId: $presentation->id);
+        }
     }
 }
