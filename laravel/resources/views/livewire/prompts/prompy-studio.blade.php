@@ -62,7 +62,14 @@
         },
         dropReferenceImage(event) {
             this.referenceImageDragging = false;
-            const file = event.dataTransfer?.files?.[0] || null;
+            const files = event.dataTransfer?.files;
+
+            if (files && files.length > 1) {
+                this.referenceImageDropError = 'Pilih satu gambar saja.';
+                return;
+            }
+
+            const file = files?.[0] || null;
 
             if (!this.validateReferenceImageFile(file)) {
                 return;
@@ -234,10 +241,10 @@
                             wire:model="referenceImage"
                             accept="image/jpeg,image/png"
                             class="sr-only"
-                            @change="handleReferenceImageChange($event)"
-                            @livewire-upload-start="referenceImageUploading = true; referenceImageUploadFailed = false"
-                            @livewire-upload-finish="referenceImageUploading = false"
-                            @livewire-upload-error="referenceImageUploading = false; referenceImageUploadFailed = true; referenceImageName = ''"
+                            x-on:change="handleReferenceImageChange($event)"
+                            x-on:livewire-upload-start="referenceImageUploading = true; referenceImageUploadFailed = false"
+                            x-on:livewire-upload-finish="referenceImageUploading = false"
+                            x-on:livewire-upload-error="referenceImageUploading = false; referenceImageUploadFailed = true; referenceImageName = ''"
                         />
                         <button
                             type="button"
