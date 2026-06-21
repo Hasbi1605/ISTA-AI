@@ -3061,12 +3061,16 @@ const registerChatPageData = (Alpine) => {
 
         showPresentationConfigPanel() {
             this.presentationMobilePanel = 'config';
-            this.showPresentationSidebar = false;
+            if (this.isMobile) {
+                this.showPresentationSidebar = false;
+            }
         },
 
         showPresentationPreviewPanel() {
             this.presentationMobilePanel = 'preview';
-            this.showPresentationSidebar = false;
+            if (this.isMobile) {
+                this.showPresentationSidebar = false;
+            }
         },
 
         destroy() {
