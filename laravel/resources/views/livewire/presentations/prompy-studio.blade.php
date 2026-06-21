@@ -276,7 +276,7 @@
                                     <span x-show="copied === 'main-active-prompt'" x-cloak>Tersalin</span>
                                 </button>
                             </div>
-                            <p class="mt-2 whitespace-pre-wrap rounded-r-lg border-l-2 border-ista-primary bg-stone-100/30 px-3 py-3 font-mono text-[12px] leading-relaxed text-stone-700 dark:bg-gray-900/40 dark:text-gray-300 shadow-sm">{{ $activePackage['main_prompt'] ?? '' }}</p>
+                            <p class="mt-2 whitespace-pre-wrap rounded-r-lg border-l-2 border-stone-300 bg-stone-50/80 px-3 py-3 font-mono text-[12px] leading-relaxed text-stone-700 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300 shadow-sm">{{ $activePackage['main_prompt'] ?? '' }}</p>
                         </div>
 
                         @if(!empty($activePackage['variants']))
@@ -285,7 +285,7 @@
                                 <div class="space-y-2">
                                     @foreach($activePackage['variants'] as $vi => $variant)
                                         <div class="flex items-start gap-2">
-                                            <p class="flex-1 whitespace-pre-wrap rounded-r-lg border-l-2 border-stone-200 bg-stone-50/50 px-3 py-2 font-mono text-[12px] leading-relaxed text-stone-600 dark:border-gray-800/40 dark:bg-gray-950/40 dark:text-gray-400">{{ $variant }}</p>
+                                            <p class="flex-1 whitespace-pre-wrap rounded-r-lg border-l-2 border-stone-300 bg-stone-50/80 px-3 py-2 font-mono text-[12px] leading-relaxed text-stone-600 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-400">{{ $variant }}</p>
                                             <button type="button" @click="copy(@js($variant), 'active-var-{{ $vi }}')"
                                                 class="shrink-0 rounded-lg bg-ista-primary/10 px-2.5 py-1 text-[11px] font-semibold text-ista-primary hover:bg-ista-primary/15">
                                                 <span x-show="copied !== 'active-var-{{ $vi }}'">Salin</span>
@@ -307,7 +307,7 @@
                                         <span x-show="copied === 'active-negative'" x-cloak>Tersalin</span>
                                     </button>
                                 </div>
-                                <p class="mt-2 whitespace-pre-wrap rounded-r-lg border-l-2 border-rose-300 bg-rose-50/10 px-3 py-2.5 font-mono text-[12px] leading-relaxed text-stone-600 dark:border-rose-950/20 dark:text-gray-400">{{ $activePackage['negative_prompt'] }}</p>
+                                <p class="mt-2 whitespace-pre-wrap rounded-r-lg border-l-2 border-stone-300 bg-stone-50/80 px-3 py-2.5 font-mono text-[12px] leading-relaxed text-stone-600 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-400">{{ $activePackage['negative_prompt'] }}</p>
                             </div>
                         @endif
 
@@ -322,11 +322,11 @@
                                         <span x-show="copied === 'active-settings'" x-cloak>Tersalin</span>
                                     </button>
                                 </div>
-                                <dl class="mt-2 grid grid-cols-1 gap-1 rounded-lg bg-stone-50 px-3 py-2 text-[12.5px] dark:bg-gray-950">
+                                <div class="mt-2 rounded-r-lg border-l-2 border-stone-300 bg-stone-50/80 px-3 py-2.5 font-mono text-[12px] leading-relaxed text-stone-700 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300">
                                     @foreach($activePackage['recommended_settings'] as $sk => $sv)
-                                        <div class="flex gap-1.5"><dt class="font-semibold text-stone-500 dark:text-gray-400">{{ $sk }}:</dt><dd class="text-stone-700 dark:text-gray-300">{{ $sv }}</dd></div>
+                                        <div>{{ $sk }}: {{ $sv }}</div>
                                     @endforeach
-                                </dl>
+                                </div>
                             </div>
                         @endif
 
