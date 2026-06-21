@@ -8,6 +8,7 @@ use App\Models\Document;
 use App\Models\Presentation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
@@ -17,6 +18,11 @@ use Tests\TestCase;
 class PresentationWorkspaceTest extends TestCase
 {
     use RefreshDatabase;
+
+    private function fakePptxBytes(): string
+    {
+        return 'PK'.str_repeat("\x00pptx-content", 30);
+    }
 
     protected function tearDown(): void
     {
@@ -121,6 +127,42 @@ class PresentationWorkspaceTest extends TestCase
             'status' => Presentation::STATUS_PENDING,
         ]);
         Queue::assertPushed(GeneratePresentation::class);
+    }
+
+    public function test_generate_inline_finishes_and_opens_ready_presentation(): void
+    {
+        Storage::fake('local');
+        Queue::fake();
+        Http::fake([
+            '*/api/presentations/generate' => Http::response($this->fakePptxBytes(), 200, [
+                'X-Presentation-Template' => 'executive_brief',
+                'X-Presentation-Slide-Count' => '6',
+            ]),
+        ]);
+        config([
+            'presentations.generation.mode' => 'inline',
+            'services.onlyoffice.jwt_secret' => 'workspace-secret',
+            'services.onlyoffice.public_url' => 'https://onlyoffice.test',
+            'services.onlyoffice.laravel_internal_url' => 'http://laravel:8000',
+        ]);
+
+        $user = User::factory()->create(['email_verified_at' => now()]);
+
+        $component = Livewire::actingAs($user)
+            ->test(PresentationWorkspace::class)
+            ->set('title', 'Paparan Triwulan')
+            ->set('visualTemplate', 'executive_brief')
+            ->set('slideCount', 6)
+            ->call('generate')
+            ->assertSee('Presentasi selesai dibuat.');
+
+        $presentation = Presentation::where('user_id', $user->id)->firstOrFail();
+
+        $this->assertSame(Presentation::STATUS_READY, $presentation->status);
+        $component
+            ->assertSet('activePresentationId', $presentation->id)
+            ->assertSet('editingPresentationId', $presentation->id);
+        Queue::assertNotPushed(GeneratePresentation::class);
     }
 
     public function test_generate_requires_title(): void
@@ -269,5 +311,111 @@ class PresentationWorkspaceTest extends TestCase
         $this->assertSame(Presentation::STATUS_PENDING, $presentation->status);
         $this->assertNull($presentation->error_message);
         Queue::assertPushed(GeneratePresentation::class);
+    }
+
+    public function test_retry_inline_finishes_errored_presentation_and_opens_editor(): void
+    {
+        Storage::fake('local');
+        Queue::fake();
+        Http::fake([
+            '*/api/presentations/generate' => Http::response($this->fakePptxBytes(), 200, [
+                'X-Presentation-Template' => 'resmi_klasik',
+                'X-Presentation-Slide-Count' => '8',
+            ]),
+        ]);
+        config([
+            'presentations.generation.mode' => 'inline',
+            'services.onlyoffice.jwt_secret' => 'workspace-secret',
+            'services.onlyoffice.public_url' => 'https://onlyoffice.test',
+            'services.onlyoffice.laravel_internal_url' => 'http://laravel:8000',
+        ]);
+
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        $presentation = Presentation::create([
+            'user_id' => $user->id,
+            'title' => 'Gagal Sebelumnya',
+            'status' => Presentation::STATUS_ERROR,
+            'visual_template' => 'resmi_klasik',
+            'configuration' => ['title' => 'Gagal Sebelumnya', 'visual_template' => 'resmi_klasik', 'slide_count' => 8],
+            'outline' => [['title' => 'Agenda', 'bullets' => ['A', 'B']]],
+            'source_document_ids' => [],
+            'error_message' => 'Gagal.',
+        ]);
+
+        $component = Livewire::actingAs($user)
+            ->test(PresentationWorkspace::class)
+            ->call('retry', $presentation->id)
+            ->assertSee('Presentasi selesai dibuat.');
+
+        $presentation->refresh();
+        $this->assertSame(Presentation::STATUS_READY, $presentation->status);
+        $this->assertNull($presentation->error_message);
+        $component
+            ->assertSet('activePresentationId', $presentation->id)
+            ->assertSet('editingPresentationId', $presentation->id);
+        Queue::assertNotPushed(GeneratePresentation::class);
+    }
+
+    public function test_retry_inline_failure_keeps_error_state_and_shows_safe_message(): void
+    {
+        Storage::fake('local');
+        Queue::fake();
+        Http::fake([
+            '*/api/presentations/generate' => Http::response('RuntimeException: renderer down', 500),
+        ]);
+        config(['presentations.generation.mode' => 'inline']);
+
+        $user = User::factory()->create();
+        $presentation = Presentation::create([
+            'user_id' => $user->id,
+            'title' => 'Gagal Sebelumnya',
+            'status' => Presentation::STATUS_ERROR,
+            'visual_template' => 'resmi_klasik',
+            'configuration' => ['title' => 'Gagal Sebelumnya', 'visual_template' => 'resmi_klasik', 'slide_count' => 8],
+            'outline' => [['title' => 'Agenda', 'bullets' => ['A', 'B']]],
+            'source_document_ids' => [],
+            'error_message' => 'Gagal.',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(PresentationWorkspace::class)
+            ->call('retry', $presentation->id)
+            ->assertSee('Gagal membuat ulang presentasi. Coba lagi sebentar.');
+
+        $presentation->refresh();
+        $this->assertSame(Presentation::STATUS_ERROR, $presentation->status);
+        $this->assertSame('Gagal membuat presentasi. Silakan coba generate ulang.', $presentation->error_message);
+        Queue::assertNotPushed(GeneratePresentation::class);
+    }
+
+    public function test_retry_inline_non_throwing_error_shows_job_error_message(): void
+    {
+        Storage::fake('local');
+        Queue::fake();
+        Http::fake();
+        config(['presentations.generation.mode' => 'inline']);
+
+        $user = User::factory()->create();
+        $presentation = Presentation::create([
+            'user_id' => $user->id,
+            'title' => 'Dokumen Tidak Siap',
+            'status' => Presentation::STATUS_ERROR,
+            'visual_template' => 'resmi_klasik',
+            'configuration' => ['title' => 'Dokumen Tidak Siap', 'visual_template' => 'resmi_klasik', 'slide_count' => 8],
+            'outline' => [['title' => 'Agenda', 'bullets' => ['A', 'B']]],
+            'source_document_ids' => [999999],
+            'error_message' => 'Gagal.',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(PresentationWorkspace::class)
+            ->call('retry', $presentation->id)
+            ->assertSee('Dokumen sumber tidak valid atau belum siap. Pilih ulang dokumen lalu coba lagi.');
+
+        $presentation->refresh();
+        $this->assertSame(Presentation::STATUS_ERROR, $presentation->status);
+        $this->assertSame('Dokumen sumber tidak valid atau belum siap. Pilih ulang dokumen lalu coba lagi.', $presentation->error_message);
+        Queue::assertNotPushed(GeneratePresentation::class);
+        Http::assertNothingSent();
     }
 }

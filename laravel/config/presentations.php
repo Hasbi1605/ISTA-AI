@@ -3,6 +3,24 @@
 return [
     /*
     |--------------------------------------------------------------------------
+    | Presentation Generation Mode
+    |--------------------------------------------------------------------------
+    |
+    | The current PPT renderer is deterministic and normally finishes quickly.
+    | Production defaults to inline generation so users are not blocked by an
+    | unhealthy queue worker. Set PRESENTATION_GENERATION_MODE=queued to route
+    | renders through Horizon again after queue health is proven.
+    |
+    */
+    'generation' => [
+        'mode' => env(
+            'PRESENTATION_GENERATION_MODE',
+            env('APP_ENV') === 'production' ? 'inline' : 'queued'
+        ),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Presentation Queue
     |--------------------------------------------------------------------------
     |

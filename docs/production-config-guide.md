@@ -118,6 +118,18 @@ Alasannya:
 
 Keputusan ini sengaja dipertahankan untuk PR cleanup ini agar scope tidak melebar ke migrasi web server. Jika nanti ingin pindah ke `php-fpm` + web server terpisah, itu layak diperlakukan sebagai perubahan deployment tersendiri.
 
+## Runtime Generate Presentasi
+
+Generate PPT production default memakai `PRESENTATION_GENERATION_MODE=inline`. Renderer PPT saat ini deterministik dan singkat, sehingga request submit/retry menjalankan `GeneratePresentation` langsung dari Laravel dan tidak lagi tersangkut bila Horizon/queue worker sedang tidak sehat.
+
+Gunakan `PRESENTATION_GENERATION_MODE=queued` hanya bila queue Redis/Horizon sudah terbukti sehat dan render ingin dikembalikan ke async worker. Saat mode queued dipakai, pastikan `PRESENTATION_QUEUE_CONNECTION=redis`, service `horizon` aktif, dan scheduler tetap menjalankan resolver stale render.
+
+## Horizon Worker Compatibility
+
+Production memakai Laravel 13 dengan Horizon 5.45. Horizon 5.45 belum mendeklarasikan opsi internal `horizon:work --stop-when-empty-for` yang dipakai worker Laravel 13, sehingga tanpa compatibility command worker dapat crash-loop dengan pesan `The "stop-when-empty-for" option does not exist.`.
+
+App menyediakan `App\Console\Commands\CompatibleHorizonWorkCommand` dan binding di `App\Providers\HorizonServiceProvider` agar `php artisan horizon` tetap dipakai, tetapi child worker `horizon:work` menerima opsi Laravel 13 tersebut. Jika suatu saat Horizon upstream sudah memperbaiki signature ini, compatibility command bisa dievaluasi ulang setelah `php artisan horizon:work --help` di container production tetap menampilkan `--stop-when-empty-for`.
+
 ## Command Compose Production
 
 Gunakan `--env-file .env.droplet` agar variable interpolation seperti `ONLYOFFICE_JWT_SECRET` dan `ONLYOFFICE_DOCUMENTSERVER_TAG` terbaca konsisten:

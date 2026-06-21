@@ -162,8 +162,10 @@ class PresentationWorkspace extends Component
                 'source_document_ids' => $this->selectedDocuments,
             ]);
 
-            $this->activePresentationId = $presentation->id;
-            $this->statusMessage = 'Presentasi sedang dibuat. Status akan diperbarui otomatis.';
+            $this->syncPresentationDispatchResult(
+                $presentation,
+                'Presentasi sedang dibuat. Status akan diperbarui otomatis.'
+            );
         } catch (Throwable $e) {
             report($e);
             $this->statusMessage = UserFacingError::message($e, 'Gagal memulai pembuatan presentasi. Coba lagi sebentar.');
@@ -197,13 +199,25 @@ class PresentationWorkspace extends Component
             'error_message' => null,
         ])->save();
 
-        $service->dispatchExisting($presentation);
-        $this->activePresentationId = $presentation->id;
-        $this->editingPresentationId = null;
-        $this->forgetEditorConfigCache();
-        $this->statusMessage = $isStaleInProgress
-            ? 'Presentasi dikirim ulang karena proses sebelumnya terlalu lama.'
-            : 'Presentasi dijadwalkan ulang untuk dibuat.';
+        try {
+            $service->dispatchExisting($presentation);
+        } catch (Throwable $e) {
+            report($e);
+            $presentation->refresh();
+            $this->activePresentationId = $presentation->id;
+            $this->editingPresentationId = null;
+            $this->forgetEditorConfigCache();
+            $this->statusMessage = UserFacingError::message($e, 'Gagal membuat ulang presentasi. Coba lagi sebentar.');
+
+            return;
+        }
+
+        $this->syncPresentationDispatchResult(
+            $presentation,
+            $isStaleInProgress
+                ? 'Presentasi dikirim ulang karena proses sebelumnya terlalu lama.'
+                : 'Presentasi dijadwalkan ulang untuk dibuat.'
+        );
     }
 
     public function selectPresentation(int $presentationId): void
@@ -450,5 +464,20 @@ class PresentationWorkspace extends Component
         }
 
         return $presentation->updated_at?->lessThan(now()->subMinutes(self::STALE_IN_PROGRESS_MINUTES)) ?? false;
+    }
+
+    private function syncPresentationDispatchResult(Presentation $presentation, string $pendingMessage): void
+    {
+        $presentation->refresh();
+        $this->activePresentationId = $presentation->id;
+        $this->editingPresentationId = $presentation->isReady() ? $presentation->id : null;
+        $this->forgetEditorConfigCache();
+
+        $this->statusMessage = match (true) {
+            $presentation->isReady() => 'Presentasi selesai dibuat.',
+            $presentation->status === Presentation::STATUS_ERROR => $presentation->error_message
+                ?: 'Render presentasi gagal. Silakan kirim ulang.',
+            default => $pendingMessage,
+        };
     }
 }

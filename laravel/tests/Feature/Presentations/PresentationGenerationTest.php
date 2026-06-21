@@ -77,6 +77,7 @@ class PresentationGenerationTest extends TestCase
     {
         Queue::fake();
         config([
+            'presentations.generation.mode' => 'queued',
             'presentations.queue.connection' => 'redis',
             'presentations.queue.name' => 'default',
         ]);
@@ -93,6 +94,62 @@ class PresentationGenerationTest extends TestCase
             return $job->connection === 'redis'
                 && $job->queue === 'default';
         });
+    }
+
+    public function test_create_and_dispatch_runs_inline_when_configured(): void
+    {
+        Storage::fake('local');
+        Queue::fake();
+        Http::fake([
+            '*/api/presentations/generate' => Http::response($this->fakePptxBytes(), 200, [
+                'X-Presentation-Template' => 'modern_minimal',
+                'X-Presentation-Slide-Count' => '6',
+            ]),
+        ]);
+        config(['presentations.generation.mode' => 'inline']);
+
+        $user = User::factory()->create();
+
+        $presentation = app(PresentationGenerationService::class)->createAndDispatch($user, [
+            'title' => 'Rapat Koordinasi',
+            'visual_template' => 'modern_minimal',
+            'slide_count' => 6,
+        ])->refresh();
+
+        $this->assertSame(Presentation::STATUS_READY, $presentation->status);
+        $this->assertNotNull($presentation->pptx_path);
+        $this->assertSame(1, $presentation->versions()->count());
+        Storage::disk('local')->assertExists($presentation->pptx_path);
+        Queue::assertNotPushed(GeneratePresentation::class);
+    }
+
+    public function test_inline_generation_marks_presentation_error_when_renderer_fails(): void
+    {
+        Storage::fake('local');
+        Queue::fake();
+        Http::fake([
+            '*/api/presentations/generate' => Http::response('renderer down', 500),
+        ]);
+        config(['presentations.generation.mode' => 'inline']);
+
+        $user = User::factory()->create();
+
+        try {
+            app(PresentationGenerationService::class)->createAndDispatch($user, [
+                'title' => 'Rapat Koordinasi',
+                'visual_template' => 'modern_minimal',
+                'slide_count' => 6,
+            ]);
+            $this->fail('Expected inline renderer failure was not thrown.');
+        } catch (RuntimeException) {
+            // The service should still persist an actionable error state.
+        }
+
+        $presentation = Presentation::where('user_id', $user->id)->latest('id')->firstOrFail();
+
+        $this->assertSame(Presentation::STATUS_ERROR, $presentation->status);
+        $this->assertSame('Gagal membuat presentasi. Silakan coba generate ulang.', $presentation->error_message);
+        Queue::assertNotPushed(GeneratePresentation::class);
     }
 
     public function test_create_and_dispatch_filters_out_foreign_documents(): void

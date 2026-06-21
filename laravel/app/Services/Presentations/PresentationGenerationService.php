@@ -9,14 +9,16 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Throwable;
 
 /**
  * Pipeline generate presentasi (epic #218, child #222).
  *
  * Membuat record presentasi (status pending), membangun outline deterministik
  * dari konfigurasi user, memanggil renderer Python (#221) untuk menghasilkan
- * PPTX, lalu menyimpannya ke private disk. Job `GeneratePresentation` yang
- * mengorkestrasi transisi status dengan guard anti stale-job.
+ * PPTX, lalu menyimpannya ke private disk. Production default menjalankan
+ * renderer inline agar fitur tidak bergantung pada queue worker; mode queued
+ * tetap tersedia via konfigurasi.
  */
 class PresentationGenerationService
 {
@@ -92,7 +94,7 @@ class PresentationGenerationService
             'source_document_ids' => $sourceDocumentIds,
         ]);
 
-        GeneratePresentation::dispatch($presentation);
+        $this->dispatchOrRun($presentation);
 
         return $presentation;
     }
@@ -102,7 +104,33 @@ class PresentationGenerationService
      */
     public function dispatchExisting(Presentation $presentation): void
     {
+        $this->dispatchOrRun($presentation);
+    }
+
+    protected function dispatchOrRun(Presentation $presentation): void
+    {
+        if ($this->generationMode() === 'inline') {
+            $job = new GeneratePresentation($presentation);
+
+            try {
+                app()->call([$job, 'handle']);
+            } catch (Throwable $e) {
+                $job->failed($e);
+
+                throw $e;
+            }
+
+            return;
+        }
+
         GeneratePresentation::dispatch($presentation);
+    }
+
+    public function generationMode(): string
+    {
+        $mode = strtolower(trim((string) config('presentations.generation.mode', 'queued')));
+
+        return $mode === 'inline' ? 'inline' : 'queued';
     }
 
     /**
