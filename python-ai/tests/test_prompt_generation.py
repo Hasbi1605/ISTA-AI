@@ -52,6 +52,8 @@ def test_build_prompt_embeds_idea_and_platform_guidance():
     assert "Canva AI" in prompt
     assert "Gunakan warna emas" in prompt
     assert "Palet dominan biru" in prompt
+    assert "mempertahankan orientasi/rasio aspek" in prompt
+    assert "membedakan elemen yang harus ditiru" in prompt
     assert "JSON" in prompt
 
 
@@ -88,12 +90,18 @@ def test_generate_prompt_package_uses_reference_image_analysis():
             "mime_type": "image/png",
             "data_base64": "aW1hZ2UtYnl0ZXM=",
         },
-        vision_generator=lambda _prompt, _image: "Dominan biru, layout tengah, banyak ruang kosong.",
+        vision_generator=lambda _prompt, _image: (
+            "Orientasi/rasio: poster vertikal 9:16. "
+            "Tipografi/teks terlihat: AZALEEA Laundry dan slogan besar. "
+            "Ganti/sesuaikan: nama brand menjadi ISTA Laundry."
+        ),
         text_generator=fake_text_generator,
     )
 
     assert package.reference_image_analyzed is True
-    assert "Dominan biru" in captured_prompt
+    assert "poster vertikal 9:16" in captured_prompt
+    assert "AZALEEA Laundry" in captured_prompt
+    assert "ISTA Laundry" in captured_prompt
 
 
 def test_default_vision_generator_sends_reference_image_to_model_cascade(monkeypatch):

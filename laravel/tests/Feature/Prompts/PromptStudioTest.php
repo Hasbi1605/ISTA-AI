@@ -3,6 +3,7 @@
 namespace Tests\Feature\Prompts;
 
 use App\Livewire\Prompts\PrompyStudio;
+use App\Models\AIUsageEvent;
 use App\Models\GeneratedPrompt;
 use App\Models\User;
 use App\Services\Prompts\PromptStudioService;
@@ -89,7 +90,9 @@ class PromptStudioTest extends TestCase
     {
         Storage::fake('local');
         Http::fake([
-            '*/api/prompts/generate' => Http::response($this->fakePackageResponse(), 200),
+            '*/api/prompts/generate' => Http::response($this->fakePackageResponse([
+                'reference_image_analyzed' => true,
+            ]), 200),
         ]);
         $user = User::factory()->create();
 
@@ -104,6 +107,16 @@ class PromptStudioTest extends TestCase
         $this->assertStringContainsString('prompt-references/'.$user->id, $prompt->reference_image_path);
         Storage::disk('local')->assertExists($prompt->reference_image_path);
         $this->assertTrue($prompt->contains_internal_context);
+        $event = AIUsageEvent::where('feature', AIUsageEvent::FEATURE_PROMPT_GENERATION)
+            ->where('subject_id', $prompt->id)
+            ->first();
+        $this->assertNotNull($event);
+        $this->assertSame((int) $prompt->id, $event->metadata['generated_prompt_id'] ?? null);
+        $this->assertSame('gemini_nano_banana', $event->metadata['platform'] ?? null);
+        $this->assertSame('image', $event->metadata['prompt_type'] ?? null);
+        $this->assertTrue($event->metadata['has_reference_image'] ?? false);
+        $this->assertTrue($event->metadata['reference_image_analyzed'] ?? false);
+        $this->assertTrue($event->metadata['contains_internal_context'] ?? false);
         Http::assertSent(function ($request) {
             $data = $request->data();
             $referenceImage = $data['reference_image'] ?? null;
@@ -219,6 +232,9 @@ class PromptStudioTest extends TestCase
             'package' => $this->fakePackageResponse([
                 'main_prompt' => 'A polished state ceremony poster with official red and gold accents.',
             ]),
+            'reference_image_path' => 'prompt-references/'.$user->id.'/ref.jpg',
+            'reference_image_mime' => 'image/jpeg',
+            'reference_image_size_bytes' => 253051,
         ]);
 
         Livewire::actingAs($user)
@@ -230,6 +246,7 @@ class PromptStudioTest extends TestCase
             ->assertSee('Prompt Baru')
             ->assertSee('Cari prompt...')
             ->assertSee('GPT Image 2')
+            ->assertSee('Gambar dianalisis')
             ->assertSee('Poster 1 Muharram 1448 H')
             ->assertDontSee('dengan nuansa warna biru')
             ->assertSeeInOrder(['Riwayat Prompt', 'Prompt utama']);

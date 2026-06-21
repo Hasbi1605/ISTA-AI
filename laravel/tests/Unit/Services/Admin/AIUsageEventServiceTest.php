@@ -161,6 +161,31 @@ class AIUsageEventServiceTest extends TestCase
         $this->assertSame('github_models', $clean['model_provider']);
     }
 
+    public function test_prompt_generation_metadata_is_allowed_without_raw_prompt_content(): void
+    {
+        $service = app(AIUsageEventService::class);
+
+        $clean = $service->sanitizeMetadata([
+            'generated_prompt_id' => 12,
+            'platform' => 'gpt_image_2',
+            'prompt_type' => 'poster_infographic',
+            'has_reference_image' => true,
+            'reference_image_analyzed' => true,
+            'contains_internal_context' => true,
+            'prompt' => 'raw prompt content must be dropped',
+            'context_text' => 'raw context must be dropped',
+        ]);
+
+        $this->assertSame([
+            'generated_prompt_id' => 12,
+            'platform' => 'gpt_image_2',
+            'prompt_type' => 'poster_infographic',
+            'has_reference_image' => true,
+            'reference_image_analyzed' => true,
+            'contains_internal_context' => true,
+        ], $clean);
+    }
+
     public function test_embedding_model_metadata_is_allowed_for_document_processing_events(): void
     {
         $service = app(AIUsageEventService::class);

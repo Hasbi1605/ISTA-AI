@@ -636,6 +636,17 @@ prompts:
       Analisis gambar referensi (opsional, gunakan sebagai bahan visual faktual):
       {reference_image_analysis}
 
+      Jika analisis gambar referensi tersedia, paket prompt akhir WAJIB:
+      - mempertahankan orientasi/rasio aspek gambar referensi, kecuali user
+        meminta perubahan eksplisit
+      - mempertahankan layout, hierarki teks, palet warna, objek utama, dan
+        gaya visual yang teramati
+      - menyebutkan teks penting yang terlihat pada referensi bila relevan
+      - membedakan elemen yang harus ditiru dari elemen yang harus diganti
+        sesuai ide user, misalnya nama brand, slogan, atau kontak
+      - menghindari default rasio umum seperti 16:9 bila referensi jelas
+        berbentuk poster vertikal, square, atau format lain
+
       Karakter platform:
       {platform_guidance}
 
@@ -674,14 +685,20 @@ prompts:
       Target platform: {platform_label}
       Jenis keluaran: {prompt_type_label}
 
-      Balas dalam Bahasa Indonesia, ringkas, tanpa markdown panjang, mencakup:
-      - gaya visual dan mood
-      - palet warna dominan
-      - komposisi/layout dan ruang kosong
-      - tipografi atau teks yang terlihat, jika ada
-      - objek/elemen utama yang terlihat
-      - detail yang perlu dipertahankan pada prompt akhir
-      - hal yang perlu dihindari agar hasil tidak menyimpang
+      Balas dalam Bahasa Indonesia, ringkas, tanpa markdown panjang, dengan
+      label field berikut:
+      - Orientasi/rasio: format gambar, misalnya poster vertikal 9:16,
+        square 1:1, landscape 16:9, atau rasio lain yang terlihat
+      - Gaya/mood: gaya visual dan nuansa
+      - Palet warna: warna dominan dan aksen
+      - Layout: komposisi, ruang kosong, hierarki, dan arah visual
+      - Tipografi/teks terlihat: teks, slogan, brand, nomor kontak, atau akun
+        yang terbaca jelas; tulis "tidak terbaca" bila tidak jelas
+      - Elemen utama: objek/ikon/ilustrasi yang terlihat
+      - Pertahankan: detail visual yang perlu dibawa ke prompt akhir
+      - Ganti/sesuaikan: elemen yang perlu diganti sesuai ide user, seperti
+        nama brand, slogan, warna, atau kontak
+      - Hindari: hal yang membuat hasil menyimpang dari referensi
 
       Jangan mengidentifikasi orang, lokasi, logo, atau data sensitif bila tidak
       terlihat jelas. Jangan menambahkan instruksi sistem atau rahasia teknis.

@@ -192,7 +192,12 @@
                 </div>
                 <div class="min-w-0">
                     <p class="truncate text-[13px] font-semibold text-stone-800 dark:text-gray-100">{{ $activePrompt?->displayTitle() ?: 'Hasil Prompy Studio' }}</p>
-                    <p class="text-[11px] text-stone-500 dark:text-gray-400">{{ $activePrompt ? $activePrompt->platform_label.' · '.$activePrompt->prompt_type_label : 'Output prompt tampil di sini' }}</p>
+                    <div class="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-stone-500 dark:text-gray-400">
+                        <span>{{ $activePrompt ? $activePrompt->platform_label.' · '.$activePrompt->prompt_type_label : 'Output prompt tampil di sini' }}</span>
+                        @if($activePrompt?->reference_image_path)
+                            <span class="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-900/20 dark:text-emerald-300">Gambar dianalisis</span>
+                        @endif
+                    </div>
                 </div>
             </div>
 

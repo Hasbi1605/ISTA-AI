@@ -40,9 +40,12 @@ class AIUsageEventService
         'document_count',
         'document_extension',
         'document_extensions',
+        'generated_prompt_id',
         'memo_id',
         'memo_type',
         'memo_version',
+        'platform',
+        'prompt_type',
         'page_size',
         'history_message_count',
         'web_search_mode',
@@ -63,6 +66,9 @@ class AIUsageEventService
         'knowledge_source_ids',
         'has_documents',
         'has_attachment',
+        'has_reference_image',
+        'reference_image_analyzed',
+        'contains_internal_context',
         'attachment_extension',
         'duration_ms',
         'duration_label',
@@ -105,7 +111,10 @@ class AIUsageEventService
         'searchable_text',
     ];
 
-    private const FORBIDDEN_KEY_EXCEPTIONS = [];
+    private const FORBIDDEN_KEY_EXCEPTIONS = [
+        'generated_prompt_id',
+        'prompt_type',
+    ];
 
     /**
      * Record that an AI feature has started running for a user.
