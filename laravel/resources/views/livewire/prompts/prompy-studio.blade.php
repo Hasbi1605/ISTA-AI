@@ -3,8 +3,8 @@
     $referenceImageName = is_object($referenceImage) && method_exists($referenceImage, 'getClientOriginalName')
         ? $referenceImage->getClientOriginalName()
         : '';
-    $promptBubbleClass = 'whitespace-pre-wrap rounded-2xl border border-stone-200/80 bg-white/90 px-4 py-3 font-mono text-[12px] leading-relaxed text-stone-700 shadow-[0_14px_32px_-28px_rgba(28,25,23,0.5)] dark:border-gray-700/70 dark:bg-gray-800/75 dark:text-gray-300 dark:shadow-none';
     $promptBubbleMutedClass = 'whitespace-pre-wrap rounded-2xl border border-stone-200/75 bg-stone-50/90 px-4 py-3 font-mono text-[12px] leading-relaxed text-stone-600 shadow-[0_14px_32px_-30px_rgba(28,25,23,0.42)] dark:border-gray-700/65 dark:bg-gray-800/60 dark:text-gray-400 dark:shadow-none';
+    $promptSettingsBubbleClass = 'inline-flex w-fit max-w-full flex-col gap-1 rounded-2xl border border-stone-200/75 bg-stone-50/90 px-4 py-3 font-mono text-[12px] leading-relaxed text-stone-600 shadow-[0_14px_32px_-30px_rgba(28,25,23,0.42)] dark:border-gray-700/65 dark:bg-gray-800/60 dark:text-gray-400 dark:shadow-none';
 @endphp
 
 <div
@@ -379,7 +379,7 @@
                                     <span x-show="copied === 'main-active-prompt'" x-cloak>Tersalin</span>
                                 </button>
                             </div>
-                            <p class="mt-2 {{ $promptBubbleClass }}">{{ $activePackage['main_prompt'] ?? '' }}</p>
+                            <p class="mt-2 {{ $promptBubbleMutedClass }}">{{ $activePackage['main_prompt'] ?? '' }}</p>
                         </div>
 
                         @if(!empty($activePackage['variants']))
@@ -425,9 +425,9 @@
                                         <span x-show="copied === 'active-settings'" x-cloak>Tersalin</span>
                                     </button>
                                 </div>
-                                <div class="mt-2 {{ $promptBubbleClass }}">
+                                <div class="mt-2 {{ $promptSettingsBubbleClass }}">
                                     @foreach($activePackage['recommended_settings'] as $sk => $sv)
-                                        <div>{{ $sk }}: {{ $sv }}</div>
+                                        <div class="max-w-full break-words">{{ $sk }}: {{ $sv }}</div>
                                     @endforeach
                                 </div>
                             </div>
