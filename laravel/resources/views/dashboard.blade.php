@@ -66,9 +66,8 @@
             </div>
 
             <main class="relative z-10 mx-auto flex min-h-0 flex-1 w-full max-w-7xl items-center px-5 py-12 sm:px-10 lg:py-16">
-                <section class="w-full text-center">
-                    <div class="mx-auto w-fit ista-pill">Asisten Istana Pintar</div>
-                    <h1 class="ista-hero-title mt-8 text-stone-900 dark:text-gray-100">Tanya <strong><span class="text-ista-primary">ISTA</span> <span class="font-light italic text-ista-gold">AI</span></strong></h1>
+                <section class="w-full text-center -translate-y-6 sm:-translate-y-10">
+                    <h1 class="ista-hero-title mt-0 text-stone-900 dark:text-gray-100">Tanya <strong><span class="text-ista-primary">ISTA</span> <span class="font-light italic text-ista-gold">AI</span></strong></h1>
 
                     @auth
                     <form action="{{ route('chat') }}" method="GET" class="ista-search-shell">

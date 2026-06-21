@@ -49,7 +49,6 @@ class PromptStudioService
     public const REFERENCE_IMAGE_MIME_TYPES = [
         'image/jpeg',
         'image/png',
-        'image/webp',
     ];
 
     public const REFERENCE_IMAGE_MAX_BYTES = 5_242_880; // 5 MB
@@ -302,7 +301,7 @@ class PromptStudioService
 
         $mime = (string) $file->getMimeType();
         if (! in_array($mime, self::REFERENCE_IMAGE_MIME_TYPES, true)) {
-            throw new RuntimeException('Format gambar referensi tidak didukung. Gunakan JPG, PNG, atau WebP.');
+            throw new RuntimeException('Format gambar referensi tidak didukung. Gunakan JPG atau PNG.');
         }
 
         $size = (int) $file->getSize();
@@ -312,7 +311,6 @@ class PromptStudioService
 
         $extension = match ($mime) {
             'image/png' => 'png',
-            'image/webp' => 'webp',
             default => 'jpg',
         };
 

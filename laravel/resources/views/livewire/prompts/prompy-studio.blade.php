@@ -1,17 +1,101 @@
 @php
     $activePackage = $activePrompt?->normalizedPackage();
+    $referenceImageName = is_object($referenceImage) && method_exists($referenceImage, 'getClientOriginalName')
+        ? $referenceImage->getClientOriginalName()
+        : '';
 @endphp
 
 <div
     class="contents"
+    x-on:prompy-reference-image-cleared.window="clearReferenceImageState()"
     x-data="{
         copied: null,
+        selectedPlatform: @entangle('platform'),
+        selectedPromptType: @entangle('promptType'),
+        referenceImageName: @js($referenceImageName),
+        referenceImageDragging: false,
+        referenceImageUploading: false,
+        referenceImageUploadFailed: false,
+        referenceImageDropError: '',
         copy(text, id) {
             if (!text) return;
             navigator.clipboard.writeText(text).then(() => {
                 this.copied = id;
                 setTimeout(() => { if (this.copied === id) this.copied = null; }, 1500);
             });
+        },
+        chooseReferenceImage() {
+            this.$refs.referenceImageInput?.click();
+        },
+        handleReferenceImageChange(event) {
+            const file = event.target.files?.[0] || null;
+            this.referenceImageDropError = '';
+            this.referenceImageUploadFailed = false;
+            this.referenceImageName = file ? file.name : '';
+        },
+        clearReferenceImageState() {
+            this.referenceImageName = '';
+            this.referenceImageDragging = false;
+            this.referenceImageUploading = false;
+            this.referenceImageUploadFailed = false;
+            this.referenceImageDropError = '';
+
+            if (this.$refs.referenceImageInput) {
+                this.$refs.referenceImageInput.value = '';
+            }
+        },
+        validateReferenceImageFile(file) {
+            if (!file) return false;
+
+            if (!['image/jpeg', 'image/png'].includes(file.type)) {
+                this.referenceImageDropError = 'Gunakan gambar JPG atau PNG.';
+                return false;
+            }
+
+            if (file.size > 5 * 1024 * 1024) {
+                this.referenceImageDropError = 'Ukuran gambar maksimal 5 MB.';
+                return false;
+            }
+
+            this.referenceImageDropError = '';
+            return true;
+        },
+        dropReferenceImage(event) {
+            this.referenceImageDragging = false;
+            const file = event.dataTransfer?.files?.[0] || null;
+
+            if (!this.validateReferenceImageFile(file)) {
+                return;
+            }
+
+            const input = this.$refs.referenceImageInput;
+            if (!input) return;
+
+            try {
+                const transfer = new DataTransfer();
+                transfer.items.add(file);
+                input.files = transfer.files;
+            } catch (_) {
+                try {
+                    input.files = event.dataTransfer.files;
+                } catch (_) {
+                    this.referenceImageDropError = 'Gagal membaca gambar.';
+                    return;
+                }
+            }
+
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+        },
+        referenceImageCardClass() {
+            if (this.referenceImageDragging) {
+                return 'border-ista-primary bg-ista-primary/5 text-ista-primary dark:border-amber-400/60 dark:bg-amber-900/10 dark:text-amber-200';
+            }
+
+            if (this.referenceImageName && !this.referenceImageUploading && !this.referenceImageUploadFailed) {
+                return 'border-emerald-300 bg-emerald-50/80 text-emerald-800 dark:border-emerald-800/60 dark:bg-emerald-900/20 dark:text-emerald-200';
+            }
+
+            return 'border-stone-200 bg-white text-stone-700 hover:border-ista-primary/40 hover:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-amber-400/40';
         }
     }"
 >
@@ -106,8 +190,11 @@
                         <label class="memo-config-label">Platform tujuan</label>
                         <div class="grid grid-cols-2 gap-2">
                             @foreach($platforms as $key => $label)
-                                <button type="button" wire:click="selectPlatform('{{ $key }}')"
-                                    class="min-h-10 rounded-md border px-3 py-2 text-left text-[12px] font-semibold transition-all {{ $platform === $key ? 'border-ista-primary bg-ista-primary/5 text-ista-primary dark:bg-gray-800' : 'border-stone-200 text-stone-600 hover:border-ista-primary/40 dark:border-gray-700 dark:text-gray-300' }}">
+                                <button type="button"
+                                    @click="selectedPlatform = @js($key)"
+                                    :aria-pressed="selectedPlatform === @js($key) ? 'true' : 'false'"
+                                    :class="selectedPlatform === @js($key) ? 'border-ista-primary bg-ista-primary/5 text-ista-primary dark:bg-gray-800' : 'border-stone-200 text-stone-600 hover:border-ista-primary/40 dark:border-gray-700 dark:text-gray-300'"
+                                    class="min-h-10 rounded-md border px-3 py-2 text-left text-[12px] font-semibold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ista-primary">
                                     {{ $label }}
                                 </button>
                             @endforeach
@@ -119,8 +206,11 @@
                         <label class="memo-config-label">Jenis keluaran</label>
                         <div class="grid grid-cols-2 gap-2">
                             @foreach($promptTypes as $key => $label)
-                                <button type="button" wire:click="selectPromptType('{{ $key }}')"
-                                    class="min-h-10 rounded-md border px-3 py-2 text-left text-[12px] font-semibold transition-all {{ $promptType === $key ? 'border-ista-primary bg-ista-primary/5 text-ista-primary dark:bg-gray-800' : 'border-stone-200 text-stone-600 hover:border-ista-primary/40 dark:border-gray-700 dark:text-gray-300' }}">
+                                <button type="button"
+                                    @click="selectedPromptType = @js($key)"
+                                    :aria-pressed="selectedPromptType === @js($key) ? 'true' : 'false'"
+                                    :class="selectedPromptType === @js($key) ? 'border-ista-primary bg-ista-primary/5 text-ista-primary dark:bg-gray-800' : 'border-stone-200 text-stone-600 hover:border-ista-primary/40 dark:border-gray-700 dark:text-gray-300'"
+                                    class="min-h-10 rounded-md border px-3 py-2 text-left text-[12px] font-semibold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ista-primary">
                                     {{ $label }}
                                 </button>
                             @endforeach
@@ -138,19 +228,44 @@
 
                     <div class="mt-3">
                         <label class="memo-config-label">Gambar referensi</label>
-                        <input type="file" wire:model="referenceImage" accept="image/jpeg,image/png,image/webp"
-                            class="block w-full text-[12px] text-stone-600 file:mr-3 file:rounded-lg file:border-0 file:bg-ista-primary/10 file:px-3 file:py-1.5 file:text-[12px] file:font-semibold file:text-ista-primary dark:text-gray-300" />
-                        <p class="memo-config-help">Opsional. JPG, PNG, atau WebP, maks 5 MB. File disimpan privat lalu dianalisis oleh model vision terkonfigurasi untuk menangkap gaya visual, warna, layout, dan komposisi.</p>
+                        <input
+                            x-ref="referenceImageInput"
+                            type="file"
+                            wire:model="referenceImage"
+                            accept="image/jpeg,image/png"
+                            class="sr-only"
+                            @change="handleReferenceImageChange($event)"
+                            @livewire-upload-start="referenceImageUploading = true; referenceImageUploadFailed = false"
+                            @livewire-upload-finish="referenceImageUploading = false"
+                            @livewire-upload-error="referenceImageUploading = false; referenceImageUploadFailed = true; referenceImageName = ''"
+                        />
+                        <button
+                            type="button"
+                            @click="chooseReferenceImage()"
+                            @dragenter.prevent="referenceImageDragging = true"
+                            @dragover.prevent="referenceImageDragging = true"
+                            @dragleave.prevent="referenceImageDragging = false"
+                            @drop.prevent="dropReferenceImage($event)"
+                            :class="referenceImageCardClass()"
+                            class="group flex w-full items-center gap-3 rounded-lg border border-dashed px-3 py-2.5 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ista-primary"
+                        >
+                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-current/15 bg-white/70 dark:bg-gray-950/30">
+                                <svg x-show="!referenceImageName || referenceImageUploading || referenceImageUploadFailed" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 16V4m0 0l-4 4m4-4l4 4M4 17v1.5A1.5 1.5 0 005.5 20h13a1.5 1.5 0 001.5-1.5V17" />
+                                </svg>
+                                <svg x-show="referenceImageName && !referenceImageUploading && !referenceImageUploadFailed" x-cloak xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M5 13l4 4L19 7" />
+                                </svg>
+                            </span>
+                            <span class="min-w-0 flex-1">
+                                <span class="block truncate text-[12px] font-semibold" x-text="referenceImageName || 'Pilih atau seret gambar'"></span>
+                                <span class="mt-0.5 block text-[11px] leading-relaxed opacity-75">Opsional. JPG/PNG, maks 5 MB. Dianalisis privat saat prompt dibuat.</span>
+                            </span>
+                        </button>
                         <div wire:loading wire:target="referenceImage" class="mt-1 text-[11px] font-semibold text-ista-primary">Mengunggah gambar...</div>
+                        <p x-show="referenceImageDropError" x-cloak class="memo-config-error" x-text="referenceImageDropError"></p>
                         @error('referenceImage') <p class="memo-config-error">{{ $message }}</p> @enderror
                     </div>
-
-                    @if($referenceImage || trim($contextNotes) !== '')
-                        <div class="mt-3 rounded-lg border border-amber-300/70 bg-amber-50 px-3 py-2 text-[12px] leading-relaxed text-amber-800 dark:border-amber-700/50 dark:bg-amber-900/20 dark:text-amber-200">
-                            <span class="font-semibold">Konteks privat.</span>
-                            Analisis gambar/catatan dipakai untuk membuat prompt. Periksa kembali isi prompt sebelum menyalin ke platform eksternal.
-                        </div>
-                    @endif
                 </div>
             </form>
         </div>

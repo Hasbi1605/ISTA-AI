@@ -78,6 +78,7 @@ class PrompyStudio extends Component
         $this->isComposingNewPrompt = true;
         $this->statusMessage = null;
         $this->resetValidation();
+        $this->dispatch('prompy-reference-image-cleared');
     }
 
     public function generate(PromptStudioService $service): void
@@ -92,7 +93,7 @@ class PrompyStudio extends Component
             'referenceImage' => [
                 'nullable',
                 'image',
-                'mimes:jpg,jpeg,png,webp',
+                'mimes:jpg,jpeg,png',
                 'max:'.(int) (PromptStudioService::REFERENCE_IMAGE_MAX_BYTES / 1024),
             ],
         ], [
@@ -100,7 +101,7 @@ class PrompyStudio extends Component
             'platform.in' => 'Platform tidak dikenal.',
             'promptType.in' => 'Jenis prompt tidak dikenal.',
             'referenceImage.image' => 'Gambar referensi harus berupa file gambar.',
-            'referenceImage.mimes' => 'Gambar referensi harus JPG, PNG, atau WebP.',
+            'referenceImage.mimes' => 'Gambar referensi harus JPG atau PNG.',
             'referenceImage.max' => 'Ukuran gambar referensi maksimal 5 MB.',
         ]);
 
@@ -118,6 +119,7 @@ class PrompyStudio extends Component
             $this->activePromptId = $prompt->id;
             $this->isComposingNewPrompt = false;
             $this->reset('referenceImage');
+            $this->dispatch('prompy-reference-image-cleared');
             $this->statusMessage = 'Paket prompt berhasil dibuat.';
         } catch (Throwable $e) {
             report($e);

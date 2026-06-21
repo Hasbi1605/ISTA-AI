@@ -148,6 +148,25 @@ class PromptStudioTest extends TestCase
         ]);
     }
 
+    public function test_webp_reference_image_is_rejected(): void
+    {
+        Storage::fake('local');
+        Http::fake([
+            '*/api/prompts/generate' => Http::response($this->fakePackageResponse(), 200),
+        ]);
+        $user = User::factory()->create();
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Gunakan JPG atau PNG.');
+
+        app(PromptStudioService::class)->generate($user, [
+            'idea' => 'Ide',
+            'platform' => 'generic',
+            'prompt_type' => 'image',
+            'reference_image' => UploadedFile::fake()->create('ref.webp', 10, 'image/webp'),
+        ]);
+    }
+
     public function test_livewire_generate_creates_prompt(): void
     {
         Http::fake([
@@ -247,6 +266,10 @@ class PromptStudioTest extends TestCase
             ->assertSee('Cari prompt...')
             ->assertSee('GPT Image 2')
             ->assertSee('Gambar dianalisis')
+            ->assertSee('Pilih atau seret gambar')
+            ->assertSee('Opsional. JPG/PNG, maks 5 MB. Dianalisis privat saat prompt dibuat.')
+            ->assertDontSee('WebP')
+            ->assertDontSee('Konteks privat')
             ->assertSee('Poster 1 Muharram 1448 H')
             ->assertDontSee('dengan nuansa warna biru')
             ->assertSeeInOrder(['Riwayat Prompt', 'Prompt utama']);
