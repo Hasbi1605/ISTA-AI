@@ -4,7 +4,6 @@ namespace App\Livewire\Presentations;
 
 use App\Models\Document;
 use App\Models\GeneratedPrompt;
-use App\Models\Presentation;
 use App\Services\Prompts\PromptStudioService;
 use App\Support\UserFacingError;
 use Illuminate\Support\Facades\Auth;
@@ -15,12 +14,10 @@ use Livewire\WithFileUploads;
 use Throwable;
 
 /**
- * Prompy Studio (epic #218, child #263).
+ * Prompy Studio.
  *
- * Sub-mode terpisah dari "Buat PPT ISTA": generator paket prompt profesional
- * (main prompt Bahasa Inggris + catatan Bahasa Indonesia) untuk platform AI
- * eksternal, plus riwayat private milik user. State sepenuhnya terpisah dari
- * pipeline generate PPTX.
+ * Generator paket prompt profesional untuk platform AI eksternal, plus riwayat
+ * private milik user.
  */
 class PrompyStudio extends Component
 {
@@ -71,7 +68,7 @@ class PrompyStudio extends Component
             return;
         }
 
-        if (Presentation::sourceDocumentsOwnedAndReady((int) Auth::id(), [$documentId])) {
+        if ($this->documentIsOwnedAndReady((int) Auth::id(), $documentId)) {
             $selected[] = $documentId;
             $this->selectedDocuments = array_values(array_unique($selected));
         }
@@ -198,5 +195,13 @@ class PrompyStudio extends Component
         }
 
         RateLimiter::hit($key, $decaySeconds);
+    }
+
+    private function documentIsOwnedAndReady(int $userId, int $documentId): bool
+    {
+        return Document::where('id', $documentId)
+            ->where('user_id', $userId)
+            ->where('status', 'ready')
+            ->exists();
     }
 }

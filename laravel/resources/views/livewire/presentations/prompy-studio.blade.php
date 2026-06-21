@@ -28,13 +28,9 @@
                     <img src="{{ asset('images/icons/collapse-left-light.svg') }}" alt="" class="h-5 w-5 dark:hidden transition-transform duration-300 ease-in-out" :class="showPresentationSidebar ? 'rotate-0' : 'rotate-180'" />
                     <img src="{{ asset('images/icons/collapse-left-dark.svg') }}" alt="" class="h-5 w-5 hidden dark:block transition-transform duration-300 ease-in-out" :class="showPresentationSidebar ? 'rotate-0' : 'rotate-180'" />
                 </button>
-                <button type="button"
-                        wire:click="$parent.setSubMode('create')"
-                        class="group flex min-w-0 items-center"
-                        aria-label="Kembali ke pembuat PPT"
-                        title="Kembali ke pembuat PPT">
+                <div class="group flex min-w-0 items-center">
                     <span class="ista-brand-title text-xl text-ista-primary not-italic transition-transform duration-300 group-hover:scale-105">ISTA <span class="font-light italic text-ista-gold">AI</span></span>
-                </button>
+                </div>
             </div>
 
             <div class="justify-self-center">
@@ -56,23 +52,6 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 7h8M8 11h8M8 15h5M5 4h14v16H5z" />
                     </svg>
                     <span>Hasil</span>
-                </button>
-            </div>
-        </div>
-
-        <div class="lg:hidden border-b border-amber-200/70 bg-amber-50/[0.92] px-4 py-3 text-[12.5px] leading-relaxed text-amber-900 shadow-sm backdrop-blur-sm dark:border-amber-400/20 dark:bg-amber-500/10 dark:text-amber-100" role="note">
-            Prompy Studio menghasilkan paket prompt untuk disalin. Gunakan tombol Hasil untuk melihat dan menyalin output.
-        </div>
-
-        <div class="border-b border-stone-200/70 px-4 py-3 dark:border-[#1E293B]/70">
-            <div class="grid grid-cols-2 gap-1 rounded-lg border border-stone-200/70 bg-white/80 p-1 dark:border-gray-700 dark:bg-gray-900/70">
-                <button type="button" wire:click="$parent.setSubMode('create')"
-                    class="rounded-md px-3 py-2 text-[12px] font-bold text-stone-500 transition hover:bg-stone-100 dark:text-gray-400 dark:hover:bg-gray-800">
-                    Buat PPT ISTA
-                </button>
-                <button type="button"
-                    class="rounded-md bg-ista-primary px-3 py-2 text-[12px] font-bold text-white shadow-sm">
-                    Prompy Studio
                 </button>
             </div>
         </div>
@@ -206,7 +185,7 @@
                         form="prompy-form"
                         wire:loading.attr="disabled"
                         wire:target="generate,referenceImage"
-                        @click="startPresentationLoadingPhase(); showPresentationPreviewPanel()"
+                        @click="showPresentationPreviewPanel()"
                         class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-ista-primary px-4 text-[13px] font-semibold text-white shadow-sm transition hover:bg-ista-dark active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50">
                     <span wire:loading.remove wire:target="generate">Buat Paket Prompt</span>
                     <span wire:loading.inline-flex wire:target="generate" class="items-center gap-2">
@@ -271,7 +250,7 @@
                     </div>
                     <h3 class="text-[15px] font-semibold text-stone-700 dark:text-gray-300">Menyusun paket prompt...</h3>
                     <p class="mt-2 text-[13px] leading-relaxed text-stone-500 dark:text-gray-400">
-                        <span class="ista-loading-shimmer ista-label-enter" x-text="presentationLoadingPhase"></span>
+                        <span class="ista-loading-shimmer ista-label-enter">Mengolah ide dan konteks terpilih</span>
                     </p>
                 </div>
             </div>

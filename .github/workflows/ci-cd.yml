@@ -243,7 +243,6 @@ jobs:
           ${compose} up -d --build --remove-orphans
           ${compose} exec -T laravel php artisan migrate --force
           ${compose} restart laravel horizon scheduler
-          ${compose} exec -T laravel php artisan presentations:recover-stale-renders
 
           running_services="$(${compose} ps --services --status running)"
           printf '%s\n' "${running_services}"

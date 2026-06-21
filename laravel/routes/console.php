@@ -16,8 +16,3 @@ Schedule::command('chat:resolve-stale-responses --minutes=10')
     ->everyMinute()
     ->withoutOverlapping()
     ->runInBackground();
-
-Schedule::command('presentations:resolve-stale-renders --minutes=10')
-    ->everyMinute()
-    ->withoutOverlapping()
-    ->runInBackground();

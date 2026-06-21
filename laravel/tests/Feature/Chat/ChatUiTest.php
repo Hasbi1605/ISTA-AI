@@ -1776,7 +1776,7 @@ class ChatUiTest extends TestCase
             ->assertOk()
             ->assertSee('Buka tab chat', false)
             ->assertSee('Buka tab memo', false)
-            ->assertSee('Buka tab presentasi', false)
+            ->assertSee('Buka tab Prompy', false)
             ->assertSee("activeTab === 'presentation'", false)
             ->assertSee('presentationEnabled:', false);
     }

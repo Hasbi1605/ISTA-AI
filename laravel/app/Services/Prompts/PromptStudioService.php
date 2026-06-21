@@ -5,7 +5,6 @@ namespace App\Services\Prompts;
 use App\Models\AIUsageEvent;
 use App\Models\Document;
 use App\Models\GeneratedPrompt;
-use App\Models\Presentation;
 use App\Models\User;
 use App\Services\Admin\AIUsageEventService;
 use Illuminate\Http\UploadedFile;
@@ -16,7 +15,7 @@ use RuntimeException;
 use Throwable;
 
 /**
- * Prompy Studio (epic #218, child #263).
+ * Prompy Studio.
  *
  * Menyusun paket prompt profesional untuk platform AI eksternal lewat python-ai
  * (`/api/prompts/generate`) lalu menyimpan riwayat milik user. ISTA AI TIDAK
@@ -102,7 +101,7 @@ class PromptStudioService
         $contextNotes = Str::limit(trim((string) ($input['context_notes'] ?? '')), self::CONTEXT_NOTES_MAX_LENGTH, '');
 
         // Hanya dokumen milik user + ready yang boleh jadi sumber.
-        $sourceDocumentIds = Presentation::sanitizeSourceDocumentIds(
+        $sourceDocumentIds = $this->sanitizeSourceDocumentIds(
             (int) $user->id,
             $input['source_document_ids'] ?? []
         );
@@ -227,6 +226,32 @@ class PromptStudioService
         $key = str_replace([' ', '-'], '_', $key);
 
         return array_key_exists($key, self::PROMPT_TYPES) ? $key : 'image';
+    }
+
+    /**
+     * @param  mixed  $documentIds
+     * @return list<int>
+     */
+    protected function sanitizeSourceDocumentIds(int $userId, mixed $documentIds): array
+    {
+        $requested = collect(is_iterable($documentIds) ? $documentIds : [])
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn (int $id) => $id > 0)
+            ->unique()
+            ->values();
+
+        if ($requested->isEmpty()) {
+            return [];
+        }
+
+        return Document::query()
+            ->where('user_id', $userId)
+            ->where('status', 'ready')
+            ->whereIn('id', $requested->all())
+            ->orderBy('id')
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
     }
 
     /**

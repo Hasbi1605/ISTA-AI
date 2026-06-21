@@ -1,5 +1,5 @@
-{{-- Tab Toggle: Chat / Memo / Presentasi (Presentasi di belakang feature flag, epic #218) --}}
-<div class="chat-mode-toggle inline-flex items-center rounded-full border border-stone-200/80 bg-white/80 p-1 shadow-sm backdrop-blur-sm dark:border-gray-700 dark:bg-gray-800/80" role="tablist" aria-label="Pilih mode chat, memo, atau presentasi">
+{{-- Tab Toggle: Chat / Memo / Prompy --}}
+<div class="chat-mode-toggle inline-flex items-center rounded-full border border-stone-200/80 bg-white/80 p-1 shadow-sm backdrop-blur-sm dark:border-gray-700 dark:bg-gray-800/80" role="tablist" aria-label="Pilih mode chat, memo, atau Prompy">
     <button
         type="button"
         @click="$dispatch('chat-tab-switch', { tab: 'chat' })"
@@ -47,7 +47,7 @@
         aria-controls="presentation-mode-panel"
         :aria-selected="activeTab === 'presentation' ? 'true' : 'false'"
         :tabindex="activeTab === 'presentation' ? 0 : -1"
-        aria-label="Buka tab presentasi"
+        aria-label="Buka tab Prompy"
         :class="activeTab === 'presentation'
             ? 'bg-ista-primary text-white shadow-sm'
             : 'text-stone-500 hover:text-stone-700 dark:text-gray-400 dark:hover:text-gray-200'"
@@ -56,7 +56,7 @@
         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 5h16M5 5v10a1 1 0 001 1h12a1 1 0 001-1V5M9 21l3-3 3 3M12 9v3" />
         </svg>
-        <span class="chat-mode-tab-label">Presentasi</span>
+        <span class="chat-mode-tab-label">Prompy</span>
     </button>
     @endif
 </div>

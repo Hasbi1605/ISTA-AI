@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Response
 
 from app.api_shared import HealthResponse, build_health_payload, build_ready_payload
-from app.routers import documents, knowledge, memos, presentations, prompts
+from app.routers import documents, knowledge, memos, prompts
 
 # Load .env from the project root (python-ai/.env)
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env"))
@@ -13,7 +13,6 @@ app = FastAPI(title="ISTA AI Document Microservice", version="1.2.0")
 app.include_router(documents.router)
 app.include_router(knowledge.router)
 app.include_router(memos.router)
-app.include_router(presentations.router)
 app.include_router(prompts.router)
 
 

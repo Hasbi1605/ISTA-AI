@@ -15,7 +15,7 @@ File ini berada di root repo pada server production dan tidak boleh dicommit. Is
 - API key provider AI: `GITHUB_TOKEN`, `GITHUB_TOKEN_2`, `GROQ_API_KEY`, `GEMINI_API_KEY`, `LANGSEARCH_API_KEY`
 - URL internal Laravel ke Python
 - `PUBLIC_REGISTRATION_ENABLED` untuk membuka/menutup registrasi mandiri
-- `FEATURE_PRESENTATION` untuk menampilkan/rollback tab Presentasi dan tombol dashboard
+- `FEATURE_PRESENTATION` untuk menampilkan/rollback tab Prompy Studio dan tombol dashboard
 - `SECURITY_CSP_ALLOW_UNSAFE_EVAL` untuk override global CSP `unsafe-eval` bila benar-benar diperlukan
 - `SECURITY_CSP_ALLOW_LIVEWIRE_UNSAFE_EVAL` untuk compatibility halaman Livewire/Alpine tanpa membuka eval pada response plain HTML
 - konfigurasi OnlyOffice seperti `ONLYOFFICE_JWT_SECRET`, `ONLYOFFICE_SIGNED_URL_TTL_MINUTES`, dan `ONLYOFFICE_DOCUMENTSERVER_TAG`
@@ -30,13 +30,13 @@ PUBLIC_REGISTRATION_ENABLED=false
 
 Aktifkan hanya jika deployment memang menerima pendaftaran publik. Untuk deployment private-document internal, akun user dibuat/dikelola oleh admin.
 
-Fitur Presentasi sudah aktif default setelah epic #218 stabil:
+Fitur Prompy Studio sudah aktif default. Nama env `FEATURE_PRESENTATION` dipertahankan untuk kompatibilitas rollout lama:
 
 ```text
 FEATURE_PRESENTATION=true
 ```
 
-Set `FEATURE_PRESENTATION=false` hanya sebagai rollback sementara bila tab Presentasi perlu disembunyikan lagi tanpa revert kode.
+Set `FEATURE_PRESENTATION=false` hanya sebagai rollback sementara bila tab Prompy perlu disembunyikan lagi tanpa revert kode.
 
 Production default tidak mengizinkan `unsafe-eval` secara global:
 
@@ -117,12 +117,6 @@ Alasannya:
 - Storage persisten tetap berada di volume `laravel_storage`, jadi perubahan runtime web server tidak mengubah model data.
 
 Keputusan ini sengaja dipertahankan untuk PR cleanup ini agar scope tidak melebar ke migrasi web server. Jika nanti ingin pindah ke `php-fpm` + web server terpisah, itu layak diperlakukan sebagai perubahan deployment tersendiri.
-
-## Runtime Generate Presentasi
-
-Generate PPT production default memakai `PRESENTATION_GENERATION_MODE=inline`. Renderer PPT saat ini deterministik dan singkat, sehingga request submit/retry menjalankan `GeneratePresentation` langsung dari Laravel dan tidak lagi tersangkut bila Horizon/queue worker sedang tidak sehat.
-
-Gunakan `PRESENTATION_GENERATION_MODE=queued` hanya bila queue Redis/Horizon sudah terbukti sehat dan render ingin dikembalikan ke async worker. Saat mode queued dipakai, pastikan `PRESENTATION_QUEUE_CONNECTION=redis`, service `horizon` aktif, dan scheduler tetap menjalankan resolver stale render.
 
 ## Horizon Worker Compatibility
 

@@ -124,7 +124,6 @@ class AdminUsage extends Component
             AIUsageEvent::FEATURE_MEMO_GENERATION => 'Memo: Generate',
             AIUsageEvent::FEATURE_MEMO_REVISION => 'Memo: Revisi',
             AIUsageEvent::FEATURE_KNOWLEDGE_ADMIN => 'Knowledge (Admin)',
-            AIUsageEvent::FEATURE_PRESENTATION_GENERATION => 'Presentasi: Generate',
             AIUsageEvent::FEATURE_PROMPT_GENERATION => 'Prompy Studio: Generate',
         ];
     }

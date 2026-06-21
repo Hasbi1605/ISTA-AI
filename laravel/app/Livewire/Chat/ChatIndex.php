@@ -689,8 +689,8 @@ class ChatIndex extends Component
     }
 
     /**
-     * Tab yang valid untuk shell ISTA AI. Tab presentasi hanya tersedia bila
-     * feature flag aktif (epic #218 dirilis bertahap).
+     * Tab yang valid untuk shell ISTA AI. Tab Prompy memakai key lama
+     * "presentation" agar URL produksi yang sudah tersebar tetap kompatibel.
      *
      * @return list<string>
      */
@@ -712,7 +712,7 @@ class ChatIndex extends Component
 
     /**
      * Normalisasi nilai tab dari URL/aksi user. Alias "presentasi" diterima
-     * dan dipetakan ke "presentation". Nilai tidak dikenal (atau presentasi
+     * dan dipetakan ke "presentation". Nilai tidak dikenal (atau tab Prompy
      * saat flag mati) jatuh ke "chat" agar panel tidak pernah kosong.
      */
     public function normalizeTab(?string $tab): string

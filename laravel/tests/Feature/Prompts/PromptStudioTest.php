@@ -273,7 +273,7 @@ class PromptStudioTest extends TestCase
             ->assertSee('Salin semua')
             ->assertSee('Prompt Baru')
             ->assertSee('Cari prompt...')
-            ->assertSee('Berhasil')
+            ->assertSee('GPT Image 2')
             ->assertSee('Poster 1 Muharram 1448 H')
             ->assertDontSee('dengan nuansa warna biru')
             ->assertSeeInOrder(['Riwayat Prompt', 'Prompt utama (EN)']);

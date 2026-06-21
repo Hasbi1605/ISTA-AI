@@ -61,7 +61,6 @@ docker compose --env-file .env.droplet -f docker-compose.production.yml config >
 docker compose --env-file .env.droplet -f docker-compose.production.yml up -d --build --remove-orphans
 docker compose --env-file .env.droplet -f docker-compose.production.yml exec -T laravel php artisan migrate --force
 docker compose --env-file .env.droplet -f docker-compose.production.yml restart laravel horizon scheduler
-docker compose --env-file .env.droplet -f docker-compose.production.yml exec -T laravel php artisan presentations:recover-stale-renders
 docker compose --env-file .env.droplet -f docker-compose.production.yml exec -T laravel php artisan horizon:status
 ```
 

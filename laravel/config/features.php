@@ -12,8 +12,8 @@ return [
     |
     */
 
-    // Tab Presentasi (PPTX/PDF generator) pada shell ISTA AI. Aktif default
-    // setelah epic #218 stabil; set FEATURE_PRESENTATION=false untuk rollback.
+    // Tab Prompy Studio pada shell ISTA AI. Nama env tetap dipertahankan untuk
+    // kompatibilitas rollout lama; set FEATURE_PRESENTATION=false untuk rollback.
     'presentation' => (bool) env('FEATURE_PRESENTATION', true),
 
 ];

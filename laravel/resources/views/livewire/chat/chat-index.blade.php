@@ -98,7 +98,7 @@
         <livewire:memos.memo-workspace />
     </div>
 
-    {{-- ===== PRESENTATION TAB CONTENT (feature flag, epic #218) ===== --}}
+    {{-- ===== PROMPY TAB CONTENT (kept on presentation tab key for URL compatibility) ===== --}}
     @if($presentationEnabled)
     <div x-show="activeTab === 'presentation'" x-cloak class="flex w-full h-full overflow-hidden">
         <livewire:presentations.presentation-workspace />
