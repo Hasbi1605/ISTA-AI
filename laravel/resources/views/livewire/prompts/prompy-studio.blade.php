@@ -3,6 +3,8 @@
     $referenceImageName = is_object($referenceImage) && method_exists($referenceImage, 'getClientOriginalName')
         ? $referenceImage->getClientOriginalName()
         : '';
+    $promptBubbleClass = 'whitespace-pre-wrap rounded-2xl border border-stone-200/80 bg-white/90 px-4 py-3 font-mono text-[12px] leading-relaxed text-stone-700 shadow-[0_14px_32px_-28px_rgba(28,25,23,0.5)] dark:border-gray-700/70 dark:bg-gray-800/75 dark:text-gray-300 dark:shadow-none';
+    $promptBubbleMutedClass = 'whitespace-pre-wrap rounded-2xl border border-stone-200/75 bg-stone-50/90 px-4 py-3 font-mono text-[12px] leading-relaxed text-stone-600 shadow-[0_14px_32px_-30px_rgba(28,25,23,0.42)] dark:border-gray-700/65 dark:bg-gray-800/60 dark:text-gray-400 dark:shadow-none';
 @endphp
 
 <div
@@ -200,7 +202,7 @@
                                 <button type="button"
                                     @click="selectedPlatform = @js($key)"
                                     :aria-pressed="selectedPlatform === @js($key) ? 'true' : 'false'"
-                                    :class="selectedPlatform === @js($key) ? 'border-ista-primary bg-ista-primary/5 text-ista-primary dark:bg-gray-800' : 'border-stone-200 text-stone-600 hover:border-ista-primary/40 dark:border-gray-700 dark:text-gray-300'"
+                                    :class="selectedPlatform === @js($key) ? 'border-ista-primary bg-ista-primary/[0.04] text-stone-800 ring-1 ring-ista-primary/20 dark:border-ista-primary dark:bg-gray-800/80 dark:text-gray-100 dark:ring-ista-primary/40' : 'border-stone-200 text-stone-600 hover:border-ista-primary/40 dark:border-gray-700 dark:text-gray-300'"
                                     class="min-h-10 rounded-md border px-3 py-2 text-left text-[12px] font-semibold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ista-primary">
                                     {{ $label }}
                                 </button>
@@ -216,7 +218,7 @@
                                 <button type="button"
                                     @click="selectedPromptType = @js($key)"
                                     :aria-pressed="selectedPromptType === @js($key) ? 'true' : 'false'"
-                                    :class="selectedPromptType === @js($key) ? 'border-ista-primary bg-ista-primary/5 text-ista-primary dark:bg-gray-800' : 'border-stone-200 text-stone-600 hover:border-ista-primary/40 dark:border-gray-700 dark:text-gray-300'"
+                                    :class="selectedPromptType === @js($key) ? 'border-ista-primary bg-ista-primary/[0.04] text-stone-800 ring-1 ring-ista-primary/20 dark:border-ista-primary dark:bg-gray-800/80 dark:text-gray-100 dark:ring-ista-primary/40' : 'border-stone-200 text-stone-600 hover:border-ista-primary/40 dark:border-gray-700 dark:text-gray-300'"
                                     class="min-h-10 rounded-md border px-3 py-2 text-left text-[12px] font-semibold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ista-primary">
                                     {{ $label }}
                                 </button>
@@ -257,9 +259,10 @@
                             class="group flex w-full items-center gap-3 rounded-lg border border-dashed px-3 py-2.5 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ista-primary"
                         >
                             <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-current/15 bg-white/70 dark:bg-gray-950/30">
-                                <svg x-show="!referenceImageName || referenceImageUploading || referenceImageUploadFailed" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg x-show="!referenceImageUploading && (!referenceImageName || referenceImageUploadFailed)" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 16V4m0 0l-4 4m4-4l4 4M4 17v1.5A1.5 1.5 0 005.5 20h13a1.5 1.5 0 001.5-1.5V17" />
                                 </svg>
+                                <span x-show="referenceImageUploading" x-cloak class="h-4 w-4 rounded-full border-2 border-current/50 border-t-transparent animate-spin" aria-hidden="true"></span>
                                 <svg x-show="referenceImageName && !referenceImageUploading && !referenceImageUploadFailed" x-cloak xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M5 13l4 4L19 7" />
                                 </svg>
@@ -269,7 +272,6 @@
                                 <span class="mt-0.5 block text-[11px] leading-relaxed opacity-75">Opsional. JPG/PNG, maks 5 MB. Dianalisis privat saat prompt dibuat.</span>
                             </span>
                         </button>
-                        <div wire:loading wire:target="referenceImage" class="mt-1 text-[11px] font-semibold text-ista-primary">Mengunggah gambar...</div>
                         <p x-show="referenceImageDropError" x-cloak class="memo-config-error" x-text="referenceImageDropError"></p>
                         @error('referenceImage') <p class="memo-config-error">{{ $message }}</p> @enderror
                     </div>
@@ -293,7 +295,7 @@
                 </button>
             </div>
             <div class="text-center mt-3 text-[11px] text-[#94A3B8] dark:text-[#64748B]">
-                ISTA AI tidak memanggil platform gambar/video eksternal.
+                ISTA AI dapat keliru. Mohon verifikasi kembali informasi yang penting.
             </div>
         </div>
     </div>
@@ -316,9 +318,6 @@
                     <p class="truncate text-[13px] font-semibold text-stone-800 dark:text-gray-100">{{ $activePrompt?->displayTitle() ?: 'Hasil Prompy Studio' }}</p>
                     <div class="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-stone-500 dark:text-gray-400">
                         <span>{{ $activePrompt ? $activePrompt->platform_label.' · '.$activePrompt->prompt_type_label : 'Output prompt tampil di sini' }}</span>
-                        @if($activePrompt?->reference_image_path)
-                            <span class="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-900/20 dark:text-emerald-300">Gambar dianalisis</span>
-                        @endif
                     </div>
                 </div>
             </div>
@@ -379,7 +378,7 @@
                                     <span x-show="copied === 'main-active-prompt'" x-cloak>Tersalin</span>
                                 </button>
                             </div>
-                            <p class="mt-2 whitespace-pre-wrap rounded-r-lg border-l-2 border-stone-300 bg-stone-50/80 px-3 py-3 font-mono text-[12px] leading-relaxed text-stone-700 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300 shadow-sm">{{ $activePackage['main_prompt'] ?? '' }}</p>
+                            <p class="mt-2 {{ $promptBubbleClass }}">{{ $activePackage['main_prompt'] ?? '' }}</p>
                         </div>
 
                         @if(!empty($activePackage['variants']))
@@ -388,7 +387,7 @@
                                 <div class="space-y-2">
                                     @foreach($activePackage['variants'] as $vi => $variant)
                                         <div class="flex items-start gap-2">
-                                            <p class="flex-1 whitespace-pre-wrap rounded-r-lg border-l-2 border-stone-300 bg-stone-50/80 px-3 py-2 font-mono text-[12px] leading-relaxed text-stone-600 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-400">{{ $variant }}</p>
+                                            <p class="flex-1 {{ $promptBubbleMutedClass }}">{{ $variant }}</p>
                                             <button type="button" @click="copy(@js($variant), 'active-var-{{ $vi }}')"
                                                 class="shrink-0 rounded-lg bg-ista-primary/10 px-2.5 py-1 text-[11px] font-semibold text-ista-primary hover:bg-ista-primary/15">
                                                 <span x-show="copied !== 'active-var-{{ $vi }}'">Salin</span>
@@ -410,7 +409,7 @@
                                         <span x-show="copied === 'active-negative'" x-cloak>Tersalin</span>
                                     </button>
                                 </div>
-                                <p class="mt-2 whitespace-pre-wrap rounded-r-lg border-l-2 border-stone-300 bg-stone-50/80 px-3 py-2.5 font-mono text-[12px] leading-relaxed text-stone-600 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-400">{{ $activePackage['negative_prompt'] }}</p>
+                                <p class="mt-2 {{ $promptBubbleMutedClass }}">{{ $activePackage['negative_prompt'] }}</p>
                             </div>
                         @endif
 
@@ -425,7 +424,7 @@
                                         <span x-show="copied === 'active-settings'" x-cloak>Tersalin</span>
                                     </button>
                                 </div>
-                                <div class="mt-2 rounded-r-lg border-l-2 border-stone-300 bg-stone-50/80 px-3 py-2.5 font-mono text-[12px] leading-relaxed text-stone-700 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300">
+                                <div class="mt-2 {{ $promptBubbleClass }}">
                                     @foreach($activePackage['recommended_settings'] as $sk => $sv)
                                         <div>{{ $sk }}: {{ $sv }}</div>
                                     @endforeach

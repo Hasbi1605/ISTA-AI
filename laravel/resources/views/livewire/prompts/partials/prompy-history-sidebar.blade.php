@@ -50,6 +50,9 @@
 
 <aside
     x-data="{
+        activePromptId: @js($activePromptHistoryId),
+        loadingPromptId: null,
+        promptLoadToken: 0,
         openSections: @js($openPromptSections),
         sectionKeys: @js($foldedPromptSectionKeys),
         search: '',
@@ -73,7 +76,52 @@
             this.sectionKeys.forEach((section) => { next[section] = shouldOpen; });
             this.openSections = next;
         },
+        setActivePrompt(id) {
+            const promptId = id ? Number(id) : null;
+            const nextPromptId = Number.isFinite(promptId) ? promptId : null;
+
+            if (this.activePromptId === nextPromptId) {
+                return;
+            }
+
+            this.activePromptId = nextPromptId;
+        },
+        isLoadingPrompt(id) {
+            return this.loadingPromptId === Number(id);
+        },
+        loadPrompt(id) {
+            const promptId = Number(id);
+
+            if (!Number.isFinite(promptId) || promptId <= 0) {
+                return Promise.resolve({ stale: false });
+            }
+
+            if (this.activePromptId === promptId) {
+                return Promise.resolve({ stale: false });
+            }
+
+            const promptLoadToken = this.promptLoadToken + 1;
+            this.promptLoadToken = promptLoadToken;
+            this.loadingPromptId = promptId;
+
+            return Promise.resolve(this.$wire.selectPrompt(promptId))
+                .then(() => {
+                    if (this.promptLoadToken !== promptLoadToken) {
+                        return { stale: true };
+                    }
+
+                    this.setActivePrompt(promptId);
+
+                    return { stale: false };
+                })
+                .finally(() => {
+                    if (this.promptLoadToken === promptLoadToken && this.loadingPromptId === promptId) {
+                        this.loadingPromptId = null;
+                    }
+                });
+        },
     }"
+    x-effect="setActivePrompt($wire.activePromptId)"
     :class="[
         showPrompySidebar ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-full pointer-events-none',
         isMobile ? 'fixed left-0 top-0 h-full w-[288px] shadow-2xl border-r border-stone-200/60 dark:border-[#1E293B]' : (showPrompySidebar ? 'relative w-[288px] border-r border-stone-200/60 dark:border-[#1E293B]' : 'relative w-0 border-r border-transparent')
@@ -167,14 +215,17 @@
                         @php $promptDisplayTitle = $prompt->displayTitle(); @endphp
                         <li class="group relative" wire:key="prompy-sidebar-{{ $groupKey }}-{{ $prompt->id }}" x-show="isVisible(@js($promptDisplayTitle))">
                             <button type="button"
-                                    wire:click="selectPrompt({{ $prompt->id }})"
-                                    @click="showPrompyPreviewPanel()"
-                                    aria-current="{{ (int) $activePromptHistoryId === (int) $prompt->id ? 'page' : 'false' }}"
+                                    @click="showPrompyPreviewPanel(); loadPrompt({{ $prompt->id }})"
+                                    data-prompy-history-id="{{ $prompt->id }}"
+                                    :aria-current="activePromptId === {{ (int) $prompt->id }} ? 'page' : 'false'"
+                                    :aria-busy="isLoadingPrompt({{ (int) $prompt->id }}) ? 'true' : 'false'"
+                                    :class="{ 'is-active': activePromptId === {{ (int) $prompt->id }} }"
                                     class="chat-history-item items-start gap-2.5 py-2.5 pr-9 {{ (int) $activePromptHistoryId === (int) $prompt->id ? 'is-active' : '' }}">
                                 <span class="mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center text-stone-400 dark:text-gray-500">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <svg x-show="!isLoadingPrompt({{ (int) $prompt->id }})" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 7h8M8 11h8M8 15h5M5 4h14v16H5z" />
                                     </svg>
+                                    <span x-show="isLoadingPrompt({{ (int) $prompt->id }})" class="h-3.5 w-3.5 rounded-full border border-current border-t-transparent text-ista-primary animate-spin dark:text-amber-200" style="display: none;" aria-hidden="true"></span>
                                 </span>
                                 <span class="min-w-0 flex-1">
                                     <span class="block truncate text-[13.2px] font-medium" title="{{ $promptDisplayTitle }}">{{ $promptDisplayTitle }}</span>
