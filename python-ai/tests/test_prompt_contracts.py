@@ -240,8 +240,11 @@ def test_prompt_studio_profiles_and_template_are_loaded_from_yaml():
     platforms = {p["key"] for p in config_loader.get_prompt_studio_platforms()}
     types = {t["key"] for t in config_loader.get_prompt_studio_types()}
 
-    # Platform awal yang wajib didukung (#263).
-    assert {"gpt_image_2", "gemini_nano_banana", "canva_ai", "google_flow", "generic"} <= platforms
+    # Platform aktif Prompy Studio: Google Flow tidak ditampilkan karena overlap dengan Gemini.
+    assert {"gpt_image_2", "gemini_nano_banana", "canva_ai", "generic"} <= platforms
+    assert "google_flow" not in platforms
+    labels = {p["key"]: p["label"] for p in config_loader.get_prompt_studio_platforms()}
+    assert labels["generic"] == "Universal"
     # Jenis prompt yang wajib didukung.
     assert {"image", "presentation", "poster_infographic", "video_storyboard"} <= types
 

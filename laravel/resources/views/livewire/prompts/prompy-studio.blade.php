@@ -203,8 +203,9 @@
                                     @click="selectedPlatform = @js($key)"
                                     :aria-pressed="selectedPlatform === @js($key) ? 'true' : 'false'"
                                     :class="selectedPlatform === @js($key) ? 'border-ista-primary bg-ista-primary/[0.04] text-stone-800 ring-1 ring-ista-primary/20 dark:border-ista-primary dark:bg-gray-800/80 dark:text-gray-100 dark:ring-ista-primary/40' : 'border-stone-200 text-stone-600 hover:border-ista-primary/40 dark:border-gray-700 dark:text-gray-300'"
-                                    class="min-h-10 rounded-md border px-3 py-2 text-left text-[12px] font-semibold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ista-primary">
-                                    {{ $label }}
+                                    class="flex min-h-10 items-center gap-2.5 rounded-md border px-3 py-2 text-left text-[12px] font-semibold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ista-primary">
+                                    @include('livewire.prompts.partials.prompy-platform-icon', ['platformKey' => $key])
+                                    <span class="min-w-0 truncate">{{ $label }}</span>
                                 </button>
                             @endforeach
                         </div>

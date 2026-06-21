@@ -77,6 +77,7 @@ class PromptStudioTest extends TestCase
         ]);
 
         $this->assertSame([], $prompt->source_document_ids);
+        $this->assertSame('Universal', $prompt->platform_label);
         $this->assertFalse($prompt->contains_internal_context);
         Http::assertSent(function ($request) {
             $data = $request->data();
@@ -212,7 +213,7 @@ class PromptStudioTest extends TestCase
         GeneratedPrompt::create([
             'user_id' => $user->id,
             'platform' => 'generic',
-            'platform_label' => 'Generic',
+            'platform_label' => 'Universal',
             'prompt_type' => 'image',
             'prompt_type_label' => 'Gambar',
             'title' => 'Prompt Saya',
@@ -222,7 +223,7 @@ class PromptStudioTest extends TestCase
         GeneratedPrompt::create([
             'user_id' => $other->id,
             'platform' => 'generic',
-            'platform_label' => 'Generic',
+            'platform_label' => 'Universal',
             'prompt_type' => 'image',
             'prompt_type_label' => 'Gambar',
             'title' => 'Prompt Orang Lain',
@@ -265,6 +266,10 @@ class PromptStudioTest extends TestCase
             ->assertSee('Prompt Baru')
             ->assertSee('Cari prompt...')
             ->assertSee('GPT Image 2')
+            ->assertSee('Gemini / Nano Banana')
+            ->assertSee('Canva AI')
+            ->assertSee('Universal')
+            ->assertDontSee('Google Flow')
             ->assertDontSee('Gambar dianalisis')
             ->assertSee('Pilih atau seret gambar')
             ->assertSee('Opsional. JPG/PNG, maks 5 MB. Dianalisis privat saat prompt dibuat.')
@@ -274,6 +279,8 @@ class PromptStudioTest extends TestCase
             ->assertSee('data-prompy-history-id=', false)
             ->assertSee('h-3.5 w-3.5 rounded-full border border-current border-t-transparent text-ista-primary animate-spin dark:text-amber-200', false)
             ->assertSee('h-4 w-4 rounded-full border-2 border-current/50 border-t-transparent animate-spin', false)
+            ->assertSee('bg-cyan-50 text-[#00C4CC]', false)
+            ->assertSee('bg-sky-50 text-sky-600', false)
             ->assertDontSee('WebP')
             ->assertDontSee('Konteks privat')
             ->assertDontSee('Mengunggah gambar')
@@ -291,7 +298,7 @@ class PromptStudioTest extends TestCase
         $first = GeneratedPrompt::create([
             'user_id' => $user->id,
             'platform' => 'generic',
-            'platform_label' => 'Generic',
+            'platform_label' => 'Universal',
             'prompt_type' => 'image',
             'prompt_type_label' => 'Gambar',
             'title' => 'Prompt Pertama',
@@ -304,7 +311,7 @@ class PromptStudioTest extends TestCase
         GeneratedPrompt::create([
             'user_id' => $user->id,
             'platform' => 'generic',
-            'platform_label' => 'Generic',
+            'platform_label' => 'Universal',
             'prompt_type' => 'image',
             'prompt_type_label' => 'Gambar',
             'title' => 'Prompt Kedua',
@@ -329,7 +336,7 @@ class PromptStudioTest extends TestCase
         GeneratedPrompt::create([
             'user_id' => $user->id,
             'platform' => 'generic',
-            'platform_label' => 'Generic',
+            'platform_label' => 'Universal',
             'prompt_type' => 'image',
             'prompt_type_label' => 'Gambar',
             'title' => 'Prompt Lama',
@@ -358,7 +365,7 @@ class PromptStudioTest extends TestCase
         $foreign = GeneratedPrompt::create([
             'user_id' => $other->id,
             'platform' => 'generic',
-            'platform_label' => 'Generic',
+            'platform_label' => 'Universal',
             'prompt_type' => 'image',
             'prompt_type_label' => 'Gambar',
             'title' => 'Milik Orang Lain',

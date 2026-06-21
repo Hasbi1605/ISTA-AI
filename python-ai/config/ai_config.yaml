@@ -758,15 +758,10 @@ prompt_studio:
       guidance: >-
         Optimalkan untuk Canva Magic Media / desain. Sertakan tujuan desain,
         gaya brand, teks yang ingin tampil, dan format (poster, slide, sosial).
-    - key: "google_flow"
-      label: "Google Flow"
-      guidance: >-
-        Optimalkan untuk Google Flow (video/scene). Strukturkan sebagai
-        deskripsi shot/scene dengan kamera, gerakan, durasi, dan transisi.
     - key: "generic"
-      label: "Generic"
+      label: "Universal"
       guidance: >-
-        Prompt umum yang netral platform. Jelas, terstruktur, dan mudah
+        Prompt universal yang netral platform. Jelas, terstruktur, dan mudah
         diadaptasi ke berbagai alat AI.
   types:
     - key: "image"

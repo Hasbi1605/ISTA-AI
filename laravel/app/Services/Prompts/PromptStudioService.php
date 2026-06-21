@@ -29,8 +29,7 @@ class PromptStudioService
         'gpt_image_2' => 'GPT Image 2',
         'gemini_nano_banana' => 'Gemini / Nano Banana',
         'canva_ai' => 'Canva AI',
-        'google_flow' => 'Google Flow',
-        'generic' => 'Generic',
+        'generic' => 'Universal',
     ];
 
     /** Jenis keluaran prompt yang didukung. */

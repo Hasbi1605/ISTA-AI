@@ -32,6 +32,7 @@ VALID_PACKAGE = {
 
 def test_resolve_platform_falls_back_to_generic():
     assert resolve_platform("does-not-exist")["key"] == "generic"
+    assert resolve_platform("does-not-exist")["label"] == "Universal"
     assert resolve_platform("gpt_image_2")["label"] == "GPT Image 2"
 
 
