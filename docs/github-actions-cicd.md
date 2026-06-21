@@ -6,7 +6,7 @@ Repo ini memiliki workflow `.github/workflows/ci-cd.yml` untuk menjalankan CI da
 
 1. `pull_request` ke `main` menjalankan test Laravel, build frontend, audit dependency, dan test Python.
 2. `push` ke `main` menjalankan semua check yang sama.
-3. Jika semua check lulus pada `push main`, job `Deploy production` SSH ke server, masuk ke repo production, `git pull --ff-only origin main`, rebuild Docker Compose, menjalankan migrasi, restart service runtime, recovery terbatas render presentasi stale, verifikasi Horizon/Scheduler tetap running, lalu smoke check health internal.
+3. Jika semua check lulus pada `push main`, job `Deploy production` SSH ke server, masuk ke repo production, `git pull --ff-only origin main`, rebuild Docker Compose, menjalankan migrasi, restart service runtime, verifikasi Horizon/Scheduler tetap running, lalu smoke check health internal.
 4. `workflow_dispatch` bisa menjalankan CI manual. Deploy manual hanya berjalan jika input `deploy=true` dan branch yang dipilih adalah `main`.
 
 ## Secret GitHub yang Dibutuhkan

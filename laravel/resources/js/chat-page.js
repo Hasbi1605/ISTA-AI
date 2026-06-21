@@ -459,7 +459,7 @@ const registerChatPageData = (Alpine) => {
 
     Alpine.data('chatLayout', (config = {}) => ({
         activeTab: config.activeTab || 'chat',
-        presentationEnabled: config.presentationEnabled === true,
+        prompyEnabled: config.prompyEnabled === true,
         darkMode: isDarkThemeEnabled(),
         isMobile: window.matchMedia('(max-width: 1023px)').matches,
         showLeftSidebar: !window.matchMedia('(max-width: 1023px)').matches,
@@ -498,16 +498,24 @@ const registerChatPageData = (Alpine) => {
 
         setTab(tab) {
             const allowed = ['chat', 'memo'];
-            if (this.presentationEnabled) {
-                allowed.push('presentation');
+            const normalizedTab = this.normalizeTab(tab);
+
+            if (this.prompyEnabled) {
+                allowed.push('prompy');
             }
 
-            if (!allowed.includes(tab)) {
+            if (!allowed.includes(normalizedTab)) {
                 return;
             }
 
-            this.activeTab = tab;
-            this.$wire.set('tab', tab);
+            this.activeTab = normalizedTab;
+            this.$wire.set('tab', normalizedTab);
+        },
+
+        normalizeTab(tab) {
+            const normalized = String(tab || '').trim().toLowerCase();
+
+            return ['presentation', 'presentasi'].includes(normalized) ? 'prompy' : normalized;
         },
 
         onDragEnter(event) {
@@ -3038,40 +3046,46 @@ const registerChatPageData = (Alpine) => {
         },
     }));
 
-    Alpine.data('presentationWorkspace', () => ({
-        showPresentationSidebar: !window.matchMedia('(max-width: 1023px)').matches,
+    Alpine.data('prompyWorkspace', () => ({
+        showPrompySidebar: !window.matchMedia('(max-width: 1023px)').matches,
         isMobile: window.matchMedia('(max-width: 1023px)').matches,
-        presentationMobilePanel: 'config',
-        presentationMediaQuery: null,
-        presentationMediaHandler: null,
+        prompyMobilePanel: 'config',
+        prompyMediaQuery: null,
+        prompyMediaHandler: null,
 
         init() {
-            this.presentationMediaQuery = window.matchMedia('(max-width: 1023px)');
-            this.presentationMediaHandler = (event) => {
+            this.prompyMediaQuery = window.matchMedia('(max-width: 1023px)');
+            this.prompyMediaHandler = (event) => {
                 this.isMobile = event.matches;
-                this.showPresentationSidebar = !event.matches;
+                this.showPrompySidebar = !event.matches;
 
                 if (!event.matches) {
-                    this.presentationMobilePanel = 'config';
+                    this.prompyMobilePanel = 'config';
                 }
             };
 
-            this.presentationMediaQuery.addEventListener('change', this.presentationMediaHandler);
+            this.prompyMediaQuery.addEventListener('change', this.prompyMediaHandler);
         },
 
-        showPresentationConfigPanel() {
-            this.presentationMobilePanel = 'config';
-            this.showPresentationSidebar = false;
+        showPrompyConfigPanel() {
+            this.prompyMobilePanel = 'config';
+
+            if (this.isMobile) {
+                this.showPrompySidebar = false;
+            }
         },
 
-        showPresentationPreviewPanel() {
-            this.presentationMobilePanel = 'preview';
-            this.showPresentationSidebar = false;
+        showPrompyPreviewPanel() {
+            this.prompyMobilePanel = 'preview';
+
+            if (this.isMobile) {
+                this.showPrompySidebar = false;
+            }
         },
 
         destroy() {
-            if (this.presentationMediaQuery && this.presentationMediaHandler) {
-                this.presentationMediaQuery.removeEventListener('change', this.presentationMediaHandler);
+            if (this.prompyMediaQuery && this.prompyMediaHandler) {
+                this.prompyMediaQuery.removeEventListener('change', this.prompyMediaHandler);
             }
         },
     }));

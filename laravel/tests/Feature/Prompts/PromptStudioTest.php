@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Prompts;
 
-use App\Livewire\Presentations\PrompyStudio;
+use App\Livewire\Prompts\PrompyStudio;
 use App\Models\Document;
 use App\Models\GeneratedPrompt;
 use App\Models\User;
@@ -313,7 +313,35 @@ class PromptStudioTest extends TestCase
             ->test(PrompyStudio::class)
             ->assertSee('Second prompt output')
             ->call('selectPrompt', $first->id)
+            ->assertSet('isComposingNewPrompt', false)
             ->assertSee('First prompt output');
+    }
+
+    public function test_start_new_prompt_shows_empty_result_panel_even_with_history(): void
+    {
+        $user = User::factory()->create();
+
+        GeneratedPrompt::create([
+            'user_id' => $user->id,
+            'platform' => 'generic',
+            'platform_label' => 'Generic',
+            'prompt_type' => 'image',
+            'prompt_type_label' => 'Gambar',
+            'title' => 'Prompt Lama',
+            'idea' => 'lama',
+            'package' => $this->fakePackageResponse(['main_prompt' => 'Existing prompt output']),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(PrompyStudio::class)
+            ->assertSee('Existing prompt output')
+            ->call('startNewPrompt')
+            ->assertSet('activePromptId', null)
+            ->assertSet('isComposingNewPrompt', true)
+            ->assertSee('Belum ada paket prompt')
+            ->assertDontSee('Existing prompt output');
     }
 
     public function test_user_cannot_delete_another_users_prompt(): void

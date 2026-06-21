@@ -1,8 +1,8 @@
 <?php
 
-namespace Tests\Feature\Presentations;
+namespace Tests\Feature\Prompts;
 
-use App\Livewire\Presentations\PresentationWorkspace;
+use App\Livewire\Prompts\PrompyWorkspace;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
 use Tests\TestCase;
 
-class PresentationWorkspaceTest extends TestCase
+class PrompyWorkspaceTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -19,13 +19,13 @@ class PresentationWorkspaceTest extends TestCase
         $user = User::factory()->create();
 
         Livewire::actingAs($user)
-            ->test(PresentationWorkspace::class)
+            ->test(PrompyWorkspace::class)
             ->assertSee('Prompy Studio')
             ->assertSee('Ide / permintaan')
             ->assertSee('Buat Paket Prompt')
             ->assertSee('Prompt')
             ->assertSee('Prompt Baru')
-            ->assertSee('x-data="presentationWorkspace"', false)
+            ->assertSee('x-data="prompyWorkspace"', false)
             ->assertDontSee('Buat PPT ISTA')
             ->assertDontSee('Konfigurasi Presentasi')
             ->assertDontSee('Unduh PPTX');
@@ -40,7 +40,7 @@ class PresentationWorkspaceTest extends TestCase
         $this->assertFalse(Route::has('presentations.onlyoffice.callback'));
     }
 
-    public function test_presentation_generation_tables_are_dropped(): void
+    public function test_removed_ppt_generation_tables_are_dropped(): void
     {
         $this->assertFalse(Schema::hasTable('presentations'));
         $this->assertFalse(Schema::hasTable('presentation_versions'));

@@ -12,8 +12,8 @@ return [
     |
     */
 
-    // Tab Prompy Studio pada shell ISTA AI. Nama env tetap dipertahankan untuk
-    // kompatibilitas rollout lama; set FEATURE_PRESENTATION=false untuk rollback.
-    'presentation' => (bool) env('FEATURE_PRESENTATION', true),
+    // Tab Prompy Studio pada shell ISTA AI. FEATURE_PRESENTATION hanya dibaca
+    // sebagai fallback legacy dari rollout lama.
+    'prompy' => (bool) env('FEATURE_PROMPY', env('FEATURE_PRESENTATION', true)),
 
 ];

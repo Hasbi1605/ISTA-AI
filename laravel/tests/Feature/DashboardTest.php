@@ -68,27 +68,27 @@ class DashboardTest extends TestCase
 
     public function test_authenticated_dashboard_links_to_prompy_when_feature_is_enabled(): void
     {
-        config(['features.presentation' => true]);
+        config(['features.prompy' => true]);
         $user = User::factory()->create(['email_verified_at' => now()]);
 
         $response = $this->actingAs($user)->get('/');
 
         $response->assertStatus(200);
         $response->assertSee('Buka Prompy', false);
-        $response->assertSee(route('chat', ['tab' => 'presentation']), false);
+        $response->assertSee(route('chat', ['tab' => 'prompy']), false);
         $response->assertSee('sm:grid-cols-3', false);
     }
 
     public function test_authenticated_dashboard_hides_prompy_when_feature_is_disabled(): void
     {
-        config(['features.presentation' => false]);
+        config(['features.prompy' => false]);
         $user = User::factory()->create(['email_verified_at' => now()]);
 
         $response = $this->actingAs($user)->get('/');
 
         $response->assertStatus(200);
         $response->assertDontSee('Buka Prompy', false);
-        $response->assertDontSee(route('chat', ['tab' => 'presentation']), false);
+        $response->assertDontSee(route('chat', ['tab' => 'prompy']), false);
         $response->assertSee('sm:grid-cols-2', false);
     }
 }

@@ -15,18 +15,18 @@
         }
     }"
 >
-    @include('livewire.presentations.partials.prompy-history-sidebar')
+    @include('livewire.prompts.partials.prompy-history-sidebar')
 
     <div
-        x-show="!isMobile || presentationMobilePanel === 'config'"
+        x-show="!isMobile || prompyMobilePanel === 'config'"
         x-cloak
         class="flex flex-col w-full lg:w-[460px] xl:w-[560px] flex-shrink-0 border-r border-stone-200/70 dark:border-[#1E293B] bg-transparent overflow-hidden"
     >
         <div class="h-[61px] flex-shrink-0 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 px-3 sm:px-6 z-20 border-b border-stone-200/70 dark:border-[#1E293B]/70 backdrop-blur-sm">
             <div class="flex min-w-0 items-center gap-2 justify-self-start">
-                <button type="button" @click="showPresentationSidebar = !showPresentationSidebar" class="p-2 rounded-[10px] hover:bg-[#F1F5F9] dark:hover:bg-gray-800 transition-colors flex-shrink-0" aria-label="Toggle presentation sidebar">
-                    <img src="{{ asset('images/icons/collapse-left-light.svg') }}" alt="" class="h-5 w-5 dark:hidden transition-transform duration-300 ease-in-out" :class="showPresentationSidebar ? 'rotate-0' : 'rotate-180'" />
-                    <img src="{{ asset('images/icons/collapse-left-dark.svg') }}" alt="" class="h-5 w-5 hidden dark:block transition-transform duration-300 ease-in-out" :class="showPresentationSidebar ? 'rotate-0' : 'rotate-180'" />
+                <button type="button" @click="showPrompySidebar = !showPrompySidebar" class="p-2 rounded-[10px] hover:bg-[#F1F5F9] dark:hover:bg-gray-800 transition-colors flex-shrink-0" aria-label="Toggle Prompy sidebar">
+                    <img src="{{ asset('images/icons/collapse-left-light.svg') }}" alt="" class="h-5 w-5 dark:hidden transition-transform duration-300 ease-in-out" :class="showPrompySidebar ? 'rotate-0' : 'rotate-180'" />
+                    <img src="{{ asset('images/icons/collapse-left-dark.svg') }}" alt="" class="h-5 w-5 hidden dark:block transition-transform duration-300 ease-in-out" :class="showPrompySidebar ? 'rotate-0' : 'rotate-180'" />
                 </button>
                 <div class="group flex min-w-0 items-center">
                     <span class="ista-brand-title text-xl text-ista-primary not-italic transition-transform duration-300 group-hover:scale-105">ISTA <span class="font-light italic text-ista-gold">AI</span></span>
@@ -47,7 +47,7 @@
                     </svg>
                 </button>
 
-                <button type="button" @click="showPresentationPreviewPanel()" title="Hasil prompt" aria-label="Buka hasil prompt" class="inline-flex items-center gap-1.5 rounded-[10px] border border-stone-200/70 px-2.5 py-2 text-[11px] font-semibold text-stone-600 transition hover:bg-[#F1F5F9] dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800 lg:hidden">
+                <button type="button" @click="showPrompyPreviewPanel()" title="Hasil prompt" aria-label="Buka hasil prompt" class="inline-flex items-center gap-1.5 rounded-[10px] border border-stone-200/70 px-2.5 py-2 text-[11px] font-semibold text-stone-600 transition hover:bg-[#F1F5F9] dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800 lg:hidden">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 7h8M8 11h8M8 15h5M5 4h14v16H5z" />
                     </svg>
@@ -185,7 +185,7 @@
                         form="prompy-form"
                         wire:loading.attr="disabled"
                         wire:target="generate,referenceImage"
-                        @click="showPresentationPreviewPanel()"
+                        @click="showPrompyPreviewPanel()"
                         class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-ista-primary px-4 text-[13px] font-semibold text-white shadow-sm transition hover:bg-ista-dark active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50">
                     <span wire:loading.remove wire:target="generate">Buat Paket Prompt</span>
                     <span wire:loading.inline-flex wire:target="generate" class="items-center gap-2">
@@ -200,10 +200,10 @@
         </div>
     </div>
 
-    <div x-show="!isMobile || presentationMobilePanel === 'preview'" x-cloak class="flex-1 flex flex-col min-w-0 bg-stone-50 dark:bg-gray-950 overflow-hidden">
+    <div x-show="!isMobile || prompyMobilePanel === 'preview'" x-cloak class="flex-1 flex flex-col min-w-0 bg-stone-50 dark:bg-gray-950 overflow-hidden">
         <div class="relative z-30 min-h-[61px] flex-shrink-0 flex items-center justify-between gap-2 px-3 sm:px-5 border-b border-stone-200/60 bg-white/85 backdrop-blur-sm dark:border-[#1E293B]/70 dark:bg-gray-800/85">
             <div class="flex min-w-0 items-center gap-2">
-                <button type="button" @click="showPresentationConfigPanel()" class="inline-flex items-center justify-center rounded-lg border border-stone-200 bg-white p-2 text-stone-600 shadow-sm transition hover:bg-stone-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 lg:hidden" aria-label="Kembali ke form prompt" title="Kembali">
+                <button type="button" @click="showPrompyConfigPanel()" class="inline-flex items-center justify-center rounded-lg border border-stone-200 bg-white p-2 text-stone-600 shadow-sm transition hover:bg-stone-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 lg:hidden" aria-label="Kembali ke form prompt" title="Kembali">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 19l-7-7 7-7" />
                     </svg>

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Presentations;
+namespace App\Livewire\Prompts;
 
 use App\Models\Document;
 use App\Models\GeneratedPrompt;
@@ -40,6 +40,8 @@ class PrompyStudio extends Component
     public $referenceImage = null;
 
     public ?int $activePromptId = null;
+
+    public bool $isComposingNewPrompt = false;
 
     public ?string $statusMessage = null;
 
@@ -82,6 +84,7 @@ class PrompyStudio extends Component
 
         if ($prompt) {
             $this->activePromptId = $prompt->id;
+            $this->isComposingNewPrompt = false;
         }
     }
 
@@ -94,6 +97,7 @@ class PrompyStudio extends Component
         $this->selectedDocuments = [];
         $this->referenceImage = null;
         $this->activePromptId = null;
+        $this->isComposingNewPrompt = true;
         $this->statusMessage = null;
         $this->resetValidation();
     }
@@ -135,6 +139,7 @@ class PrompyStudio extends Component
             ]);
 
             $this->activePromptId = $prompt->id;
+            $this->isComposingNewPrompt = false;
             $this->reset('referenceImage');
             $this->statusMessage = 'Paket prompt berhasil dibuat.';
         } catch (Throwable $e) {
@@ -175,11 +180,15 @@ class PrompyStudio extends Component
             ->orderByDesc('created_at')
             ->get(['id', 'original_name', 'created_at']);
 
-        return view('livewire.presentations.prompy-studio', [
-            'prompts' => $prompts,
-            'activePrompt' => $this->activePromptId
+        $activePrompt = $this->isComposingNewPrompt
+            ? null
+            : ($this->activePromptId
                 ? $prompts->firstWhere('id', (int) $this->activePromptId)
-                : $prompts->first(),
+                : $prompts->first());
+
+        return view('livewire.prompts.prompy-studio', [
+            'prompts' => $prompts,
+            'activePrompt' => $activePrompt,
             'availableDocuments' => $availableDocuments,
             'platforms' => PromptStudioService::PLATFORMS,
             'promptTypes' => PromptStudioService::PROMPT_TYPES,

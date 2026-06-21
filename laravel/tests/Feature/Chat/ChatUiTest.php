@@ -1751,9 +1751,9 @@ class ChatUiTest extends TestCase
         );
     }
 
-    public function test_presentation_tab_is_hidden_when_feature_flag_is_off(): void
+    public function test_prompy_tab_is_hidden_when_feature_flag_is_off(): void
     {
-        config(['features.presentation' => false]);
+        config(['features.prompy' => false]);
         $user = User::factory()->create();
 
         $this->actingAs($user)
@@ -1761,14 +1761,14 @@ class ChatUiTest extends TestCase
             ->assertOk()
             ->assertSee('Buka tab chat', false)
             ->assertSee('Buka tab memo', false)
-            ->assertDontSee('Buka tab presentasi', false)
-            ->assertDontSee('presentation-mode-tab', false)
-            ->assertDontSee('presentation-mode-panel', false);
+            ->assertDontSee('Buka tab Prompy', false)
+            ->assertDontSee('prompy-mode-tab', false)
+            ->assertDontSee('prompy-mode-panel', false);
     }
 
-    public function test_presentation_tab_is_visible_when_feature_flag_is_on(): void
+    public function test_prompy_tab_is_visible_when_feature_flag_is_on(): void
     {
-        config(['features.presentation' => true]);
+        config(['features.prompy' => true]);
         $user = User::factory()->create();
 
         $this->actingAs($user)
@@ -1777,50 +1777,60 @@ class ChatUiTest extends TestCase
             ->assertSee('Buka tab chat', false)
             ->assertSee('Buka tab memo', false)
             ->assertSee('Buka tab Prompy', false)
-            ->assertSee("activeTab === 'presentation'", false)
-            ->assertSee('presentationEnabled:', false);
+            ->assertSee("activeTab === 'prompy'", false)
+            ->assertSee('prompyEnabled:', false);
     }
 
-    public function test_tab_chat_memo_and_presentation_select_the_correct_panel(): void
+    public function test_tab_chat_memo_and_prompy_select_the_correct_panel(): void
     {
-        config(['features.presentation' => true]);
+        config(['features.prompy' => true]);
         $user = User::factory()->create();
 
         Livewire::actingAs($user)->withQueryParams(['tab' => 'chat'])->test(ChatIndex::class)->assertSet('tab', 'chat');
         Livewire::actingAs($user)->withQueryParams(['tab' => 'memo'])->test(ChatIndex::class)->assertSet('tab', 'memo');
-        Livewire::actingAs($user)->withQueryParams(['tab' => 'presentation'])->test(ChatIndex::class)->assertSet('tab', 'presentation');
+        Livewire::actingAs($user)->withQueryParams(['tab' => 'prompy'])->test(ChatIndex::class)->assertSet('tab', 'prompy');
     }
 
-    public function test_presentation_alias_is_normalized_to_presentation_when_enabled(): void
+    public function test_legacy_prompy_aliases_are_normalized_to_prompy_when_enabled(): void
     {
-        config(['features.presentation' => true]);
+        config(['features.prompy' => true]);
         $user = User::factory()->create();
 
         Livewire::actingAs($user)
             ->withQueryParams(['tab' => 'presentasi'])
             ->test(ChatIndex::class)
-            ->assertSet('tab', 'presentation');
-    }
-
-    public function test_presentation_tab_falls_back_to_chat_when_feature_flag_is_off(): void
-    {
-        config(['features.presentation' => false]);
-        $user = User::factory()->create();
+            ->assertSet('tab', 'prompy');
 
         Livewire::actingAs($user)
             ->withQueryParams(['tab' => 'presentation'])
+            ->test(ChatIndex::class)
+            ->assertSet('tab', 'prompy');
+    }
+
+    public function test_prompy_tab_falls_back_to_chat_when_feature_flag_is_off(): void
+    {
+        config(['features.prompy' => false]);
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['tab' => 'prompy'])
             ->test(ChatIndex::class)
             ->assertSet('tab', 'chat');
 
         Livewire::actingAs($user)
             ->withQueryParams(['tab' => 'presentasi'])
+            ->test(ChatIndex::class)
+            ->assertSet('tab', 'chat');
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['tab' => 'presentation'])
             ->test(ChatIndex::class)
             ->assertSet('tab', 'chat');
     }
 
     public function test_unknown_tab_value_is_normalized_to_chat(): void
     {
-        config(['features.presentation' => true]);
+        config(['features.prompy' => true]);
         $user = User::factory()->create();
 
         Livewire::actingAs($user)
@@ -1829,14 +1839,14 @@ class ChatUiTest extends TestCase
             ->assertSet('tab', 'chat');
     }
 
-    public function test_setting_tab_to_presentation_while_disabled_is_normalized_back_to_chat(): void
+    public function test_setting_tab_to_prompy_while_disabled_is_normalized_back_to_chat(): void
     {
-        config(['features.presentation' => false]);
+        config(['features.prompy' => false]);
         $user = User::factory()->create();
 
         Livewire::actingAs($user)
             ->test(ChatIndex::class)
-            ->set('tab', 'presentation')
+            ->set('tab', 'prompy')
             ->assertSet('tab', 'chat');
     }
 }

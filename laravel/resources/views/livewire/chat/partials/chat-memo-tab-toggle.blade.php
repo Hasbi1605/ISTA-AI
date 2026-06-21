@@ -38,17 +38,17 @@
         </svg>
         <span class="chat-mode-tab-label">Memo</span>
     </button>
-    @if(config('features.presentation'))
+    @if(config('features.prompy'))
     <button
         type="button"
-        @click="$dispatch('chat-tab-switch', { tab: 'presentation' })"
+        @click="$dispatch('chat-tab-switch', { tab: 'prompy' })"
         role="tab"
-        id="presentation-mode-tab"
-        aria-controls="presentation-mode-panel"
-        :aria-selected="activeTab === 'presentation' ? 'true' : 'false'"
-        :tabindex="activeTab === 'presentation' ? 0 : -1"
+        id="prompy-mode-tab"
+        aria-controls="prompy-mode-panel"
+        :aria-selected="activeTab === 'prompy' ? 'true' : 'false'"
+        :tabindex="activeTab === 'prompy' ? 0 : -1"
         aria-label="Buka tab Prompy"
-        :class="activeTab === 'presentation'
+        :class="activeTab === 'prompy'
             ? 'bg-ista-primary text-white shadow-sm'
             : 'text-stone-500 hover:text-stone-700 dark:text-gray-400 dark:hover:text-gray-200'"
         class="chat-mode-tab inline-flex items-center rounded-full px-2.5 py-1.5 text-[13px] font-semibold transition-all duration-200"

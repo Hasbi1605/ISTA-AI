@@ -1,4 +1,4 @@
-<div x-data="chatLayout({ activeTab: $wire.entangle('tab').live, presentationEnabled: @js($presentationEnabled) })"
+<div x-data="chatLayout({ activeTab: $wire.entangle('tab').live, prompyEnabled: @js($prompyEnabled) })"
      x-on:dragenter.window="onDragEnter($event)"
      x-on:dragover.window="onDragOver($event)"
      x-on:dragleave.window="onDragLeave($event)"
@@ -98,10 +98,10 @@
         <livewire:memos.memo-workspace />
     </div>
 
-    {{-- ===== PROMPY TAB CONTENT (kept on presentation tab key for URL compatibility) ===== --}}
-    @if($presentationEnabled)
-    <div x-show="activeTab === 'presentation'" x-cloak class="flex w-full h-full overflow-hidden">
-        <livewire:presentations.presentation-workspace />
+    {{-- ===== PROMPY TAB CONTENT ===== --}}
+    @if($prompyEnabled)
+    <div x-show="activeTab === 'prompy'" x-cloak class="flex w-full h-full overflow-hidden">
+        <livewire:prompts.prompy-workspace />
     </div>
     @endif
 

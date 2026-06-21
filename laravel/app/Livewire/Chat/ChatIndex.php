@@ -684,13 +684,12 @@ class ChatIndex extends Component
         $this->tab = $this->normalizeTab($this->tab);
 
         return view('livewire.chat.chat-index', [
-            'presentationEnabled' => $this->presentationEnabled(),
+            'prompyEnabled' => $this->prompyEnabled(),
         ]);
     }
 
     /**
-     * Tab yang valid untuk shell ISTA AI. Tab Prompy memakai key lama
-     * "presentation" agar URL produksi yang sudah tersebar tetap kompatibel.
+     * Tab yang valid untuk shell ISTA AI.
      *
      * @return list<string>
      */
@@ -698,29 +697,28 @@ class ChatIndex extends Component
     {
         $tabs = ['chat', 'memo'];
 
-        if ($this->presentationEnabled()) {
-            $tabs[] = 'presentation';
+        if ($this->prompyEnabled()) {
+            $tabs[] = 'prompy';
         }
 
         return $tabs;
     }
 
-    public function presentationEnabled(): bool
+    public function prompyEnabled(): bool
     {
-        return (bool) config('features.presentation', false);
+        return (bool) config('features.prompy', false);
     }
 
     /**
-     * Normalisasi nilai tab dari URL/aksi user. Alias "presentasi" diterima
-     * dan dipetakan ke "presentation". Nilai tidak dikenal (atau tab Prompy
-     * saat flag mati) jatuh ke "chat" agar panel tidak pernah kosong.
+     * Normalisasi nilai tab dari URL/aksi user. Alias lama "presentation" dan
+     * "presentasi" diterima agar link lama tetap membuka Prompy.
      */
     public function normalizeTab(?string $tab): string
     {
         $tab = strtolower(trim((string) $tab));
 
-        if ($tab === 'presentasi') {
-            $tab = 'presentation';
+        if (in_array($tab, ['presentation', 'presentasi'], true)) {
+            $tab = 'prompy';
         }
 
         return in_array($tab, $this->allowedTabs(), true) ? $tab : 'chat';
