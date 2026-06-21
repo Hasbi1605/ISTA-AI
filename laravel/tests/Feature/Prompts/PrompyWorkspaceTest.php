@@ -22,7 +22,7 @@ class PrompyWorkspaceTest extends TestCase
             ->test(PrompyWorkspace::class)
             ->assertSee('Prompy Studio')
             ->assertSee('Ide / permintaan')
-            ->assertSee('Buat Paket Prompt')
+            ->assertSee('Buat Prompt')
             ->assertSee('Prompt')
             ->assertSee('Prompt Baru')
             ->assertSee('x-data="prompyWorkspace"', false)

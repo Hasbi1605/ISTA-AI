@@ -267,7 +267,7 @@ class PromptStudioTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(PrompyStudio::class)
-            ->assertSee('Buat Paket Prompt')
+            ->assertSee('Buat Prompt')
             ->assertSee('Prompt utama')
             ->assertSee('A polished state ceremony poster')
             ->assertSee('Salin semua')

@@ -187,7 +187,7 @@
                         wire:target="generate,referenceImage"
                         @click="showPrompyPreviewPanel()"
                         class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-ista-primary px-4 text-[13px] font-semibold text-white shadow-sm transition hover:bg-ista-dark active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50">
-                    <span wire:loading.remove wire:target="generate">Buat Paket Prompt</span>
+                    <span wire:loading.remove wire:target="generate">Buat Prompt</span>
                     <span wire:loading.inline-flex wire:target="generate" class="items-center gap-2">
                         <span class="h-3.5 w-3.5 rounded-full border-2 border-white/70 border-t-transparent animate-spin" aria-hidden="true"></span>
                         <span>Menyusun prompt...</span>
