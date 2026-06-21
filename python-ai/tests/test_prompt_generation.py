@@ -7,7 +7,9 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from app.services import prompt_generation
 from app.services.prompt_generation import (
+    analyze_reference_image,
     build_prompt_studio_prompt,
     generate_prompt_package,
     resolve_platform,
@@ -44,14 +46,12 @@ def test_build_prompt_embeds_idea_and_platform_guidance():
         prompt_type_profile=resolve_type("poster_infographic"),
         platform_profile=resolve_platform("canva_ai"),
         context_notes="Gunakan warna emas",
-        source_context="Dokumen: agenda.pdf\n- Hal. 1: Rapat internal membahas renovasi pendopo.",
-        has_reference_image=True,
+        reference_image_analysis="Palet dominan biru, layout simetris, tipografi serif elegan.",
     )
     assert "Buat poster acara kenegaraan" in prompt
     assert "Canva AI" in prompt
     assert "Gunakan warna emas" in prompt
-    assert "Rapat internal membahas renovasi pendopo" in prompt
-    assert "mengunggah gambar referensi yang sama" in prompt
+    assert "Palet dominan biru" in prompt
     assert "JSON" in prompt
 
 
@@ -70,6 +70,79 @@ def test_generate_prompt_package_parses_json():
     assert package.negative_prompt == "blurry, low quality, watermark"
     assert package.recommended_settings["aspect_ratio"] == "16:9"
     assert "Tempel prompt utama" in package.notes_id
+
+
+def test_generate_prompt_package_uses_reference_image_analysis():
+    captured_prompt = ""
+
+    def fake_text_generator(prompt: str) -> str:
+        nonlocal captured_prompt
+        captured_prompt = prompt
+        return json.dumps(VALID_PACKAGE)
+
+    package = generate_prompt_package(
+        idea="Buat poster dari gambar referensi",
+        platform="gpt_image_2",
+        prompt_type="poster_infographic",
+        reference_image={
+            "mime_type": "image/png",
+            "data_base64": "aW1hZ2UtYnl0ZXM=",
+        },
+        vision_generator=lambda _prompt, _image: "Dominan biru, layout tengah, banyak ruang kosong.",
+        text_generator=fake_text_generator,
+    )
+
+    assert package.reference_image_analyzed is True
+    assert "Dominan biru" in captured_prompt
+
+
+def test_default_vision_generator_sends_reference_image_to_model_cascade(monkeypatch):
+    captured = {}
+
+    def fake_stream_with_cascade(messages, model_list):
+        captured["messages"] = messages
+        captured["model_list"] = model_list
+        yield "[MODEL: Vision Test]\n"
+        yield "Dominan biru, layout tengah, ruang kosong luas."
+
+    monkeypatch.setattr(
+        "app.services.llm_streaming.stream_with_cascade",
+        fake_stream_with_cascade,
+    )
+
+    output = prompt_generation._default_vision_generator(
+        "Analisis gambar ini.",
+        {"mime_type": "image/png", "data_base64": "aW1hZ2UtYnl0ZXM="},
+        runtime_config={
+            "prompt_studio_vision_models": [
+                {
+                    "label": "Vision Test",
+                    "provider": "litellm",
+                    "model_name": "openai/gpt-4.1",
+                    "api_key_env": "GITHUB_TOKEN",
+                    "base_url": "https://models.github.ai/inference",
+                }
+            ]
+        },
+    )
+
+    assert "Dominan biru" in output
+    assert captured["model_list"][0]["model_name"] == "openai/gpt-4.1"
+    content = captured["messages"][0]["content"]
+    assert content[0] == {"type": "text", "text": "Analisis gambar ini."}
+    assert content[1]["type"] == "image_url"
+    assert content[1]["image_url"]["url"].startswith("data:image/png;base64,")
+
+
+def test_reference_image_analysis_rejects_invalid_payload():
+    with pytest.raises(ValueError):
+        analyze_reference_image(
+            reference_image={"mime_type": "application/pdf", "data_base64": "abc"},
+            idea="Ide",
+            platform_profile=resolve_platform("generic"),
+            prompt_type_profile=resolve_type("image"),
+            vision_generator=lambda _prompt, _image: "Tidak dipakai",
+        )
 
 
 def test_generate_handles_model_label_and_code_fence():

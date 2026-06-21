@@ -249,9 +249,18 @@ def test_prompt_studio_profiles_and_template_are_loaded_from_yaml():
     assert "{platform_label}" in template
     assert "{prompt_type_label}" in template
     assert "{idea}" in template
-    assert "{source_context}" in template
-    assert "{reference_image_context}" in template
+    assert "{source_context}" not in template
+    assert "{reference_image_analysis}" in template
     assert "main_prompt" in template
+
+    reference_template = config_loader.get_prompt_studio_reference_image_prompt()
+    assert "{platform_label}" in reference_template
+    assert "{prompt_type_label}" in reference_template
+    assert "{idea}" in reference_template
+
+    vision_models = config_loader.get_prompt_studio_vision_models()
+    assert vision_models
+    assert all(model.get("provider") == "litellm" for model in vision_models)
 
 
 def test_memo_prompt_uses_config_loader_template():

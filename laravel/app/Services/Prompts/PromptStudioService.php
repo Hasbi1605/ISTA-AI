@@ -3,7 +3,6 @@
 namespace App\Services\Prompts;
 
 use App\Models\AIUsageEvent;
-use App\Models\Document;
 use App\Models\GeneratedPrompt;
 use App\Models\User;
 use App\Services\Admin\AIUsageEventService;
@@ -55,14 +54,6 @@ class PromptStudioService
 
     public const REFERENCE_IMAGE_MAX_BYTES = 5_242_880; // 5 MB
 
-    public const SOURCE_DOCUMENT_CONTEXT_MAX_LENGTH = 8000;
-
-    private const SOURCE_DOCUMENT_CONTEXT_DOCUMENT_LIMIT = 5;
-
-    private const SOURCE_DOCUMENT_CONTEXT_CHUNK_LIMIT = 3;
-
-    private const SOURCE_DOCUMENT_CONTEXT_CHUNK_MAX_LENGTH = 1200;
-
     protected string $baseUrl;
 
     protected ?string $token;
@@ -100,18 +91,11 @@ class PromptStudioService
         $promptType = $this->normalizePromptType((string) ($input['prompt_type'] ?? 'image'));
         $contextNotes = Str::limit(trim((string) ($input['context_notes'] ?? '')), self::CONTEXT_NOTES_MAX_LENGTH, '');
 
-        // Hanya dokumen milik user + ready yang boleh jadi sumber.
-        $sourceDocumentIds = $this->sanitizeSourceDocumentIds(
-            (int) $user->id,
-            $input['source_document_ids'] ?? []
-        );
-        $sourceContext = $this->buildSourceDocumentContext($user, $sourceDocumentIds);
-
         $referenceImage = $input['reference_image'] ?? null;
         $storedImage = $this->storeReferenceImage($user, $referenceImage);
+        $referenceImagePayload = $this->buildReferenceImagePayload($storedImage);
 
-        $containsInternalContext = $sourceDocumentIds !== []
-            || $storedImage !== null
+        $containsInternalContext = $storedImage !== null
             || $contextNotes !== '';
 
         try {
@@ -120,8 +104,7 @@ class PromptStudioService
                 $platform,
                 $promptType,
                 $contextNotes,
-                $sourceContext,
-                $storedImage !== null,
+                $referenceImagePayload,
             );
         } catch (Throwable $e) {
             $this->deleteStoredImage($storedImage['path'] ?? null);
@@ -159,7 +142,7 @@ class PromptStudioService
                     'recommended_settings' => $package['recommended_settings'],
                     'notes_id' => $package['notes_id'],
                 ],
-                'source_document_ids' => $sourceDocumentIds,
+                'source_document_ids' => [],
                 'contains_internal_context' => $containsInternalContext,
                 'reference_image_path' => $storedImage['path'] ?? null,
                 'reference_image_mime' => $storedImage['mime'] ?? null,
@@ -193,8 +176,8 @@ class PromptStudioService
                 'generated_prompt_id' => (int) $prompt->id,
                 'platform' => $platform,
                 'prompt_type' => $promptType,
-                'document_count' => count($sourceDocumentIds),
                 'has_reference_image' => $storedImage !== null,
+                'reference_image_analyzed' => (bool) ($package['reference_image_analyzed'] ?? false),
                 'contains_internal_context' => $containsInternalContext,
                 ...$usageEvents->modelMetadata($package['model_label'] ?: null),
             ],
@@ -229,41 +212,15 @@ class PromptStudioService
     }
 
     /**
-     * @param  mixed  $documentIds
-     * @return list<int>
-     */
-    protected function sanitizeSourceDocumentIds(int $userId, mixed $documentIds): array
-    {
-        $requested = collect(is_iterable($documentIds) ? $documentIds : [])
-            ->map(fn ($id) => (int) $id)
-            ->filter(fn (int $id) => $id > 0)
-            ->unique()
-            ->values();
-
-        if ($requested->isEmpty()) {
-            return [];
-        }
-
-        return Document::query()
-            ->where('user_id', $userId)
-            ->where('status', 'ready')
-            ->whereIn('id', $requested->all())
-            ->orderBy('id')
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
-    }
-
-    /**
-     * @return array{main_prompt: string, variants: list<string>, negative_prompt: string, recommended_settings: array<string, string>, notes_id: string, platform_label: string, prompt_type_label: string, model_label: string}
+     * @param  array{mime_type: string, data_base64: string}|null  $referenceImagePayload
+     * @return array{main_prompt: string, variants: list<string>, negative_prompt: string, recommended_settings: array<string, string>, notes_id: string, platform_label: string, prompt_type_label: string, model_label: string, reference_image_analyzed: bool}
      */
     protected function requestPackage(
         string $idea,
         string $platform,
         string $promptType,
         string $contextNotes,
-        string $sourceContext = '',
-        bool $hasReferenceImage = false,
+        ?array $referenceImagePayload = null,
     ): array
     {
         $payload = [
@@ -271,8 +228,7 @@ class PromptStudioService
             'platform' => $platform,
             'prompt_type' => $promptType,
             'context_notes' => $contextNotes !== '' ? $contextNotes : null,
-            'source_context' => $sourceContext !== '' ? $sourceContext : null,
-            'has_reference_image' => $hasReferenceImage,
+            'reference_image' => $referenceImagePayload,
         ];
 
         $response = Http::withToken($this->token ?: '')
@@ -303,67 +259,34 @@ class PromptStudioService
             'platform_label' => (string) ($data['platform_label'] ?? ''),
             'prompt_type_label' => (string) ($data['prompt_type_label'] ?? ''),
             'model_label' => (string) ($data['model_label'] ?? ''),
+            'reference_image_analyzed' => (bool) ($data['reference_image_analyzed'] ?? false),
         ];
     }
 
     /**
-     * Build a bounded text context from indexed chunks of owned, ready documents.
-     *
-     * @param  list<int>  $sourceDocumentIds
+     * @param  array{path: string, mime: string, size: int}|null  $storedImage
+     * @return array{mime_type: string, data_base64: string}|null
      */
-    protected function buildSourceDocumentContext(User $user, array $sourceDocumentIds): string
+    protected function buildReferenceImagePayload(?array $storedImage): ?array
     {
-        if ($sourceDocumentIds === []) {
-            return '';
+        if ($storedImage === null) {
+            return null;
         }
 
-        $orderedIds = array_values(array_unique(array_map('intval', $sourceDocumentIds)));
-        $orderedIds = array_slice($orderedIds, 0, self::SOURCE_DOCUMENT_CONTEXT_DOCUMENT_LIMIT);
-
-        $documents = Document::where('user_id', $user->id)
-            ->where('status', 'ready')
-            ->whereIn('id', $orderedIds)
-            ->get(['id', 'original_name'])
-            ->keyBy('id');
-
-        $sections = [];
-        foreach ($orderedIds as $documentId) {
-            $document = $documents->get($documentId);
-            if (! $document) {
-                continue;
-            }
-
-            $chunks = $document->chunks()
-                ->whereNotNull('text_content')
-                ->orderBy('page_number')
-                ->orderBy('id')
-                ->limit(self::SOURCE_DOCUMENT_CONTEXT_CHUNK_LIMIT)
-                ->get(['page_number', 'text_content']);
-
-            $lines = ['Dokumen: '.trim((string) $document->original_name)];
-            foreach ($chunks as $chunk) {
-                $text = $this->compactContextText((string) $chunk->text_content);
-                if ($text === '') {
-                    continue;
-                }
-
-                $page = $chunk->page_number !== null ? 'Hal. '.(int) $chunk->page_number : 'Cuplikan';
-                $lines[] = '- '.$page.': '.Str::limit($text, self::SOURCE_DOCUMENT_CONTEXT_CHUNK_MAX_LENGTH, '');
-            }
-
-            if (count($lines) === 1) {
-                $lines[] = '- Tidak ada cuplikan teks indeks yang tersedia.';
-            }
-
-            $sections[] = implode("\n", $lines);
+        $path = $storedImage['path'] ?? null;
+        if (! is_string($path) || $path === '' || ! Storage::disk('local')->exists($path)) {
+            throw new RuntimeException('Gambar referensi tidak ditemukan.');
         }
 
-        return Str::limit(implode("\n\n", $sections), self::SOURCE_DOCUMENT_CONTEXT_MAX_LENGTH, '');
-    }
+        $contents = Storage::disk('local')->get($path);
+        if (! is_string($contents) || $contents === '') {
+            throw new RuntimeException('Gambar referensi kosong.');
+        }
 
-    protected function compactContextText(string $text): string
-    {
-        return trim((string) preg_replace('/\s+/u', ' ', $text));
+        return [
+            'mime_type' => (string) $storedImage['mime'],
+            'data_base64' => base64_encode($contents),
+        ];
     }
 
     /**

@@ -38,12 +38,13 @@ ISTA AI berjalan sebagai stack hybrid:
 
 ### Prompy Studio (#263)
 
-- Ide (Bahasa Indonesia), catatan konteks, platform, jenis prompt, flag reference image, dan cuplikan teks terbatas dari `document_chunks` bila user memilih dokumen sumber dikirim dari Laravel ke Python `/api/prompts/generate`.
-- Python memanggil LLM (provider sesuai `ai_config.yaml`) untuk menyusun teks paket prompt, lalu mengembalikan JSON (prompt utama Bahasa Inggris, variasi, negative prompt, recommended settings, catatan Bahasa Indonesia).
+- Ide (Bahasa Indonesia), catatan konteks, platform, jenis prompt, dan reference image opsional dikirim dari Laravel ke Python `/api/prompts/generate`.
+- Python memanggil model vision terkonfigurasi (`prompt_studio.vision_models`) untuk menganalisis reference image menjadi brief visual (gaya, warna, layout, komposisi), lalu memanggil LLM untuk menyusun teks paket prompt dan mengembalikan JSON (prompt utama Bahasa Inggris, variasi, negative prompt, recommended settings, catatan Bahasa Indonesia).
 - ISTA AI **tidak** memanggil platform AI eksternal (OpenAI Image, Gemini, Canva, Google Flow, dll) dan **tidak** menghasilkan gambar/video. Output hanya teks prompt untuk disalin pengguna secara manual.
 - Riwayat paket prompt disimpan di tabel `generated_prompts` milik user (private, owner-scoped).
-- Reference image (opsional, MVP) divalidasi tipe (JPG/PNG/WebP) dan ukuran (maks 5 MB), lalu disimpan di disk private (`prompt-references/{user_id}/...`). File gambar tidak dikirim ke Python atau platform eksternal; Python hanya menerima flag agar prompt mengingatkan user mengunggah gambar referensi yang sama secara manual di platform target.
-- Bila dokumen sumber (hanya milik user + ready), reference image, atau catatan konteks dipakai, prompt ditandai `contains_internal_context=true` dan UI menampilkan peringatan konteks internal.
+- Reference image divalidasi tipe (JPG/PNG/WebP) dan ukuran (maks 5 MB), disimpan di disk private (`prompt-references/{user_id}/...`), lalu dikirim sebagai base64 dari Laravel ke Python agar dapat dianalisis model vision. File gambar tetap tidak dikirim ke platform target eksternal seperti GPT Image/Gemini/Canva/Flow oleh ISTA AI.
+- Dokumen sumber tidak lagi dipakai di Prompy Studio. Kolom `source_document_ids` pada riwayat prompt dipertahankan sebagai kompatibilitas schema lama dan selalu kosong untuk prompt baru.
+- Bila reference image atau catatan konteks dipakai, prompt ditandai `contains_internal_context=true` dan UI menampilkan peringatan konteks privat.
 - MVP tidak melakukan redaksi data sensitif otomatis; pengguna diingatkan memeriksa prompt sebelum menyalin ke platform eksternal.
 - Isi ide, catatan, paket prompt, dan reference image tidak di-log.
 
@@ -61,6 +62,7 @@ Data yang dapat terkirim:
 - prompt RAG yang berisi chunk dokumen relevan
 - input embedding berupa teks chunk dokumen
 - prompt summarization atau memo generation bila model aktif memakai GitHub Models
+- ide/catatan Prompy Studio, brief prompt package, dan reference image bila user mengunggah gambar referensi
 
 Endpoint aktif:
 

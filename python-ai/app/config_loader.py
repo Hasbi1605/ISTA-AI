@@ -234,12 +234,23 @@ PERTANYAAN USER:
             "untuk platform \"{platform_label}\" jenis \"{prompt_type_label}\".\n\n"
             "Ide pengguna (Bahasa Indonesia): {idea}\n"
             "Catatan konteks tambahan: {context_notes}\n"
+            "Analisis gambar referensi: {reference_image_analysis}\n"
             "Karakter platform: {platform_guidance}\n"
             "Panduan struktur: {type_guidance}\n\n"
             "Balas HANYA satu objek JSON valid dengan field: main_prompt (Bahasa Inggris), "
             "variants (array Bahasa Inggris), negative_prompt (Bahasa Inggris), "
             "recommended_settings (objek), notes_id (Bahasa Indonesia). "
             "Jangan mengarang data sensitif dan jangan menyertakan URL atau kunci API."
+        ),
+    },
+    "prompt_studio_reference_image": {
+        "body": (
+            "Analisis gambar referensi untuk membantu menyusun prompt visual. "
+            "Konteks ide: {idea}. Target: {platform_label}, jenis {prompt_type_label}. "
+            "Balas ringkas dalam Bahasa Indonesia berisi: gaya visual, palet warna, "
+            "komposisi/layout, tipografi/teks bila terlihat, objek utama, suasana, "
+            "detail yang perlu dipertahankan, dan hal yang perlu dihindari. "
+            "Jangan mengarang identitas orang/lokasi bila tidak jelas."
         ),
     },
 }
@@ -502,6 +513,15 @@ def get_prompt_studio_prompt() -> str:
     )
 
 
+def get_prompt_studio_reference_image_prompt() -> str:
+    """Get Prompy Studio reference-image analysis prompt."""
+    return _get_prompt_with_fallback(
+        ['prompts', 'prompt_studio_reference_image', 'body'],
+        ['prompt_studio_reference_image', 'body'],
+        "Prompt studio reference-image prompt empty, using default fallback",
+    )
+
+
 def get_prompt_studio_config() -> Dict[str, Any]:
     """Get Prompy Studio platform/type profiles (#263)."""
     config = load_config()
@@ -519,3 +539,9 @@ def get_prompt_studio_types() -> List[Dict[str, Any]]:
     """Get configured prompt types for Prompy Studio."""
     types = get_prompt_studio_config().get('types', [])
     return types if isinstance(types, list) else []
+
+
+def get_prompt_studio_vision_models() -> List[Dict[str, Any]]:
+    """Get configured vision-capable models for Prompy Studio reference images."""
+    models = get_prompt_studio_config().get('vision_models', [])
+    return models if isinstance(models, list) else []

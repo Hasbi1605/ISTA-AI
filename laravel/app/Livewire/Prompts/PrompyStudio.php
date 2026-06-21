@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Prompts;
 
-use App\Models\Document;
 use App\Models\GeneratedPrompt;
 use App\Services\Prompts\PromptStudioService;
 use App\Support\UserFacingError;
@@ -33,10 +32,7 @@ class PrompyStudio extends Component
 
     public string $contextNotes = '';
 
-    /** @var array<int, int|string> */
-    public array $selectedDocuments = [];
-
-    /** Reference image privat (MVP). */
+    /** Reference image privat yang dianalisis model vision. */
     public $referenceImage = null;
 
     public ?int $activePromptId = null;
@@ -59,23 +55,6 @@ class PrompyStudio extends Component
         }
     }
 
-    public function toggleDocument(int $documentId): void
-    {
-        $documentId = (int) $documentId;
-        $selected = array_map('intval', $this->selectedDocuments);
-
-        if (in_array($documentId, $selected, true)) {
-            $this->selectedDocuments = array_values(array_diff($selected, [$documentId]));
-
-            return;
-        }
-
-        if ($this->documentIsOwnedAndReady((int) Auth::id(), $documentId)) {
-            $selected[] = $documentId;
-            $this->selectedDocuments = array_values(array_unique($selected));
-        }
-    }
-
     public function selectPrompt(int $promptId): void
     {
         $prompt = GeneratedPrompt::where('id', $promptId)
@@ -94,7 +73,6 @@ class PrompyStudio extends Component
         $this->platform = 'generic';
         $this->promptType = 'image';
         $this->contextNotes = '';
-        $this->selectedDocuments = [];
         $this->referenceImage = null;
         $this->activePromptId = null;
         $this->isComposingNewPrompt = true;
@@ -134,7 +112,6 @@ class PrompyStudio extends Component
                 'platform' => $this->platform,
                 'prompt_type' => $this->promptType,
                 'context_notes' => $this->contextNotes,
-                'source_document_ids' => $this->selectedDocuments,
                 'reference_image' => $this->referenceImage,
             ]);
 
@@ -175,11 +152,6 @@ class PrompyStudio extends Component
             ->limit(self::HISTORY_LOAD_LIMIT)
             ->get();
 
-        $availableDocuments = Document::where('user_id', $userId)
-            ->where('status', 'ready')
-            ->orderByDesc('created_at')
-            ->get(['id', 'original_name', 'created_at']);
-
         $activePrompt = $this->isComposingNewPrompt
             ? null
             : ($this->activePromptId
@@ -189,7 +161,6 @@ class PrompyStudio extends Component
         return view('livewire.prompts.prompy-studio', [
             'prompts' => $prompts,
             'activePrompt' => $activePrompt,
-            'availableDocuments' => $availableDocuments,
             'platforms' => PromptStudioService::PLATFORMS,
             'promptTypes' => PromptStudioService::PROMPT_TYPES,
         ]);
@@ -206,11 +177,4 @@ class PrompyStudio extends Component
         RateLimiter::hit($key, $decaySeconds);
     }
 
-    private function documentIsOwnedAndReady(int $userId, int $documentId): bool
-    {
-        return Document::where('id', $documentId)
-            ->where('user_id', $userId)
-            ->where('status', 'ready')
-            ->exists();
-    }
 }

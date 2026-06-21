@@ -3,7 +3,6 @@
 namespace Tests\Feature\Prompts;
 
 use App\Livewire\Prompts\PrompyStudio;
-use App\Models\Document;
 use App\Models\GeneratedPrompt;
 use App\Models\User;
 use App\Services\Prompts\PromptStudioService;
@@ -38,22 +37,8 @@ class PromptStudioTest extends TestCase
             'recommended_settings' => ['aspect_ratio' => '16:9'],
             'notes_id' => 'Tempel prompt utama ke platform pilihan Anda.',
             'model_label' => 'GPT-4.1',
+            'reference_image_analyzed' => false,
         ], $overrides);
-    }
-
-    private function makeDocument(User $user, string $status = 'ready'): Document
-    {
-        $slug = $status.'-'.uniqid();
-
-        return Document::create([
-            'user_id' => $user->id,
-            'filename' => $slug.'.pdf',
-            'original_name' => $slug.'.pdf',
-            'file_path' => 'documents/'.$user->id.'/'.$slug.'.pdf',
-            'mime_type' => 'application/pdf',
-            'file_size_bytes' => 100,
-            'status' => $status,
-        ]);
     }
 
     public function test_service_generates_and_persists_owned_prompt(): void
@@ -76,66 +61,27 @@ class PromptStudioTest extends TestCase
         $this->assertFalse($prompt->contains_internal_context);
     }
 
-    public function test_internal_context_flag_set_when_document_used(): void
+    public function test_source_documents_are_ignored_for_prompy_generation(): void
     {
         Http::fake([
             '*/api/prompts/generate' => Http::response($this->fakePackageResponse(), 200),
         ]);
         $user = User::factory()->create();
-        $doc = $this->makeDocument($user, 'ready');
-        $doc->chunks()->create([
-            'page_number' => 1,
-            'text_content' => 'Agenda rapat internal membahas revitalisasi pendopo dan jadwal audiensi.',
-        ]);
 
         $prompt = app(PromptStudioService::class)->generate($user, [
-            'idea' => 'Ringkas laporan jadi prompt presentasi',
-            'platform' => 'generic',
-            'prompt_type' => 'presentation',
-            'source_document_ids' => [$doc->id],
-        ]);
-
-        $this->assertTrue($prompt->contains_internal_context);
-        $this->assertSame([(int) $doc->id], $prompt->source_document_ids);
-        Http::assertSent(function ($request) {
-            $context = (string) ($request->data()['source_context'] ?? '');
-
-            return str_contains($context, 'Dokumen:')
-                && str_contains($context, 'Agenda rapat internal membahas revitalisasi pendopo');
-        });
-    }
-
-    public function test_foreign_or_not_ready_documents_are_rejected(): void
-    {
-        Http::fake([
-            '*/api/prompts/generate' => Http::response($this->fakePackageResponse(), 200),
-        ]);
-        $user = User::factory()->create();
-        $other = User::factory()->create();
-        $foreign = $this->makeDocument($other, 'ready');
-        $processing = $this->makeDocument($user, 'processing');
-        $foreign->chunks()->create([
-            'page_number' => 1,
-            'text_content' => 'Rahasia milik user lain tidak boleh terkirim.',
-        ]);
-        $processing->chunks()->create([
-            'page_number' => 1,
-            'text_content' => 'Dokumen belum ready tidak boleh terkirim.',
-        ]);
-
-        $prompt = app(PromptStudioService::class)->generate($user, [
-            'idea' => 'Ide',
+            'idea' => 'Buat prompt visual tanpa dokumen sumber',
             'platform' => 'generic',
             'prompt_type' => 'image',
-            'source_document_ids' => [$foreign->id, $processing->id],
+            'source_document_ids' => [123, 456],
         ]);
 
         $this->assertSame([], $prompt->source_document_ids);
         $this->assertFalse($prompt->contains_internal_context);
         Http::assertSent(function ($request) {
-            $context = (string) ($request->data()['source_context'] ?? '');
+            $data = $request->data();
 
-            return $context === '';
+            return ! array_key_exists('source_context', $data)
+                && ! array_key_exists('has_reference_image', $data);
         });
     }
 
@@ -158,7 +104,17 @@ class PromptStudioTest extends TestCase
         $this->assertStringContainsString('prompt-references/'.$user->id, $prompt->reference_image_path);
         Storage::disk('local')->assertExists($prompt->reference_image_path);
         $this->assertTrue($prompt->contains_internal_context);
-        Http::assertSent(fn ($request) => $request->data()['has_reference_image'] === true);
+        Http::assertSent(function ($request) {
+            $data = $request->data();
+            $referenceImage = $data['reference_image'] ?? null;
+
+            return is_array($referenceImage)
+                && $referenceImage['mime_type'] === 'image/png'
+                && is_string($referenceImage['data_base64'])
+                && $referenceImage['data_base64'] !== ''
+                && ! array_key_exists('has_reference_image', $data)
+                && ! array_key_exists('source_context', $data);
+        });
     }
 
     public function test_invalid_reference_image_type_is_rejected(): void

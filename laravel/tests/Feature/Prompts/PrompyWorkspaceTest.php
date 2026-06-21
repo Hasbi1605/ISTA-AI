@@ -26,6 +26,7 @@ class PrompyWorkspaceTest extends TestCase
             ->assertSee('Prompt')
             ->assertSee('Prompt Baru')
             ->assertSee('x-data="prompyWorkspace"', false)
+            ->assertDontSee('Dokumen sumber')
             ->assertDontSee('Buat PPT ISTA')
             ->assertDontSee('Konfigurasi Presentasi')
             ->assertDontSee('Unduh PPTX');

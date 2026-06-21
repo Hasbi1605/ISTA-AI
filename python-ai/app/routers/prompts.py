@@ -8,7 +8,8 @@ from app.config_loader import get_prompt_studio_platforms, get_prompt_studio_typ
 from app.services.prompt_generation import (
     CONTEXT_NOTES_MAX_LENGTH,
     IDEA_MAX_LENGTH,
-    SOURCE_CONTEXT_MAX_LENGTH,
+    REFERENCE_IMAGE_ALLOWED_MIME_TYPES,
+    REFERENCE_IMAGE_BASE64_MAX_LENGTH,
     generate_prompt_package,
 )
 
@@ -28,9 +29,21 @@ class GeneratePromptRequest(BaseModel):
     platform: str = Field("generic", min_length=1, max_length=60)
     prompt_type: str = Field("image", min_length=1, max_length=60)
     context_notes: str | None = Field(None, max_length=CONTEXT_NOTES_MAX_LENGTH)
-    source_context: str | None = Field(None, max_length=SOURCE_CONTEXT_MAX_LENGTH)
-    has_reference_image: bool = False
+    reference_image: dict[str, Any] | None = None
     runtime_config: dict[str, Any] | None = None
+
+    def normalized_reference_image(self) -> dict[str, str] | None:
+        if self.reference_image is None:
+            return None
+
+        mime_type = str(self.reference_image.get("mime_type") or "").strip().lower()
+        data_base64 = str(self.reference_image.get("data_base64") or "").strip()
+        if mime_type not in REFERENCE_IMAGE_ALLOWED_MIME_TYPES:
+            raise ValueError("Format gambar referensi tidak didukung.")
+        if data_base64 == "" or len(data_base64) > REFERENCE_IMAGE_BASE64_MAX_LENGTH:
+            raise ValueError("Data gambar referensi tidak valid.")
+
+        return {"mime_type": mime_type, "data_base64": data_base64}
 
 
 @router.get("/profiles", dependencies=[Depends(verify_token)])
@@ -49,8 +62,7 @@ def generate_prompt(request: GeneratePromptRequest):
             platform=request.platform,
             prompt_type=request.prompt_type,
             context_notes=request.context_notes or "",
-            source_context=request.source_context or "",
-            has_reference_image=request.has_reference_image,
+            reference_image=request.normalized_reference_image(),
             runtime_config=request.runtime_config,
         )
     except ValueError as exc:

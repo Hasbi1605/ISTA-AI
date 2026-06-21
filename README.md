@@ -54,7 +54,7 @@ Core data stores and runtime services:
 
 ## Security and Privacy
 
-Before running ISTA AI with real data, read [docs/data-flow-privacy.md](docs/data-flow-privacy.md). The system can send selected prompts, chat history, document chunks, and search queries to configured external providers. Production usage needs a clear data classification policy.
+Before running ISTA AI with real data, read [docs/data-flow-privacy.md](docs/data-flow-privacy.md). The system can send selected prompts, chat history, document chunks, reference images, and search queries to configured external providers. Production usage needs a clear data classification policy.
 
 Important rules:
 

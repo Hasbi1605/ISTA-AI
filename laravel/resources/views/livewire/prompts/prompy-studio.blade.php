@@ -140,39 +140,15 @@
                         <label class="memo-config-label">Gambar referensi</label>
                         <input type="file" wire:model="referenceImage" accept="image/jpeg,image/png,image/webp"
                             class="block w-full text-[12px] text-stone-600 file:mr-3 file:rounded-lg file:border-0 file:bg-ista-primary/10 file:px-3 file:py-1.5 file:text-[12px] file:font-semibold file:text-ista-primary dark:text-gray-300" />
-                        <p class="memo-config-help">Opsional. JPG, PNG, atau WebP, maks 5 MB, disimpan privat.</p>
+                        <p class="memo-config-help">Opsional. JPG, PNG, atau WebP, maks 5 MB. File disimpan privat lalu dianalisis oleh model vision terkonfigurasi untuk menangkap gaya visual, warna, layout, dan komposisi.</p>
                         <div wire:loading wire:target="referenceImage" class="mt-1 text-[11px] font-semibold text-ista-primary">Mengunggah gambar...</div>
                         @error('referenceImage') <p class="memo-config-error">{{ $message }}</p> @enderror
                     </div>
-                </div>
 
-                <div class="memo-config-section">
-                    <div class="mb-3 flex items-center justify-between gap-3">
-                        <div>
-                            <p class="text-[11.5px] font-bold text-stone-700 dark:text-gray-200">Dokumen sumber</p>
-                            <p class="mt-0.5 text-[11.5px] text-stone-500 dark:text-gray-500">Opsional, menandai prompt sebagai konteks internal.</p>
-                        </div>
-                        <span class="text-[10.5px] font-semibold text-stone-400 dark:text-gray-500">{{ count($selectedDocuments) }} dipilih</span>
-                    </div>
-                    @if($availableDocuments->isEmpty())
-                        <p class="rounded-lg border border-dashed border-stone-200/70 px-3 py-3 text-[12px] text-stone-400 dark:border-gray-800 dark:text-gray-500">Belum ada dokumen ready.</p>
-                    @else
-                        <div class="max-h-44 space-y-1 overflow-y-auto pr-1">
-                            @foreach($availableDocuments as $doc)
-                                <label class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-stone-50 dark:hover:bg-gray-800">
-                                    <input type="checkbox" wire:click="toggleDocument({{ $doc->id }})"
-                                        @checked(in_array((int) $doc->id, array_map('intval', $selectedDocuments), true))
-                                        class="h-4 w-4 rounded border-stone-300 text-ista-primary focus:ring-ista-primary/30" />
-                                    <span class="truncate text-[12px] text-stone-700 dark:text-gray-300">{{ $doc->original_name }}</span>
-                                </label>
-                            @endforeach
-                        </div>
-                    @endif
-
-                    @if(!empty($selectedDocuments) || $referenceImage || trim($contextNotes) !== '')
+                    @if($referenceImage || trim($contextNotes) !== '')
                         <div class="mt-3 rounded-lg border border-amber-300/70 bg-amber-50 px-3 py-2 text-[12px] leading-relaxed text-amber-800 dark:border-amber-700/50 dark:bg-amber-900/20 dark:text-amber-200">
-                            <span class="font-semibold">Konteks internal.</span>
-                            Periksa kembali sebelum menyalin ke platform eksternal.
+                            <span class="font-semibold">Konteks privat.</span>
+                            Analisis gambar/catatan dipakai untuk membuat prompt. Periksa kembali isi prompt sebelum menyalin ke platform eksternal.
                         </div>
                     @endif
                 </div>

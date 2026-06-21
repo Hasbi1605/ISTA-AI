@@ -10,6 +10,8 @@ yang boleh diolah/disimpan oleh pemanggil.
 """
 from __future__ import annotations
 
+import base64
+import binascii
 import json
 import re
 from dataclasses import dataclass, field
@@ -18,13 +20,17 @@ from typing import Any, Callable, Mapping
 from app.config_loader import (
     get_prompt_studio_platforms,
     get_prompt_studio_prompt,
+    get_prompt_studio_reference_image_prompt,
     get_prompt_studio_types,
+    get_prompt_studio_vision_models,
 )
 from app.runtime_config import render_prompt_template, runtime_prompt
 
 IDEA_MAX_LENGTH = 4000
 CONTEXT_NOTES_MAX_LENGTH = 4000
-SOURCE_CONTEXT_MAX_LENGTH = 8000
+REFERENCE_IMAGE_ANALYSIS_MAX_LENGTH = 2500
+REFERENCE_IMAGE_BASE64_MAX_LENGTH = 7_100_000
+REFERENCE_IMAGE_ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
 MAIN_PROMPT_MAX_LENGTH = 6000
 NOTES_MAX_LENGTH = 4000
 MAX_VARIANTS = 4
@@ -43,6 +49,7 @@ class PromptPackage:
     recommended_settings: dict[str, str] = field(default_factory=dict)
     notes_id: str = ""
     model_label: str = ""
+    reference_image_analyzed: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -56,6 +63,7 @@ class PromptPackage:
             "recommended_settings": self.recommended_settings,
             "notes_id": self.notes_id,
             "model_label": self.model_label,
+            "reference_image_analyzed": self.reference_image_analyzed,
         }
 
 
@@ -94,21 +102,13 @@ def build_prompt_studio_prompt(
     prompt_type_profile: Mapping[str, Any],
     platform_profile: Mapping[str, Any],
     context_notes: str = "",
-    source_context: str = "",
-    has_reference_image: bool = False,
+    reference_image_analysis: str = "",
     runtime_config: Mapping[str, Any] | None = None,
 ) -> str:
-    reference_image_context = (
-        "Pengguna mengunggah gambar referensi privat di ISTA AI. Anda tidak menerima file gambar ini; "
-        "susun prompt agar pengguna mengunggah gambar referensi yang sama secara manual di platform target."
-        if has_reference_image
-        else "-"
-    )
     template_values = {
         "idea": idea.strip(),
         "context_notes": (context_notes or "").strip() or "-",
-        "source_context": (source_context or "").strip() or "-",
-        "reference_image_context": reference_image_context,
+        "reference_image_analysis": (reference_image_analysis or "").strip() or "-",
         "platform_label": str(platform_profile.get("label", "Generic")),
         "platform_guidance": str(platform_profile.get("guidance", "")).strip() or "-",
         "prompt_type_label": str(prompt_type_profile.get("label", "")),
@@ -122,15 +122,35 @@ def build_prompt_studio_prompt(
     )
 
 
+def build_reference_image_analysis_prompt(
+    *,
+    idea: str,
+    prompt_type_profile: Mapping[str, Any],
+    platform_profile: Mapping[str, Any],
+    runtime_config: Mapping[str, Any] | None = None,
+) -> str:
+    template_values = {
+        "idea": idea.strip(),
+        "platform_label": str(platform_profile.get("label", "Generic")),
+        "prompt_type_label": str(prompt_type_profile.get("label", "")),
+    }
+    runtime_template = runtime_prompt(runtime_config, "prompt_studio_reference_image", "body")
+    return render_prompt_template(
+        runtime_template,
+        get_prompt_studio_reference_image_prompt(),
+        **template_values,
+    )
+
+
 def generate_prompt_package(
     *,
     idea: str,
     platform: str,
     prompt_type: str,
     context_notes: str = "",
-    source_context: str = "",
-    has_reference_image: bool = False,
+    reference_image: Mapping[str, Any] | None = None,
     text_generator: Callable[[str], str] | None = None,
+    vision_generator: Callable[[str, Mapping[str, str]], str] | None = None,
     runtime_config: Mapping[str, Any] | None = None,
 ) -> PromptPackage:
     clean_idea = (idea or "").strip()
@@ -140,18 +160,24 @@ def generate_prompt_package(
         clean_idea = clean_idea[:IDEA_MAX_LENGTH]
 
     clean_notes = (context_notes or "").strip()[:CONTEXT_NOTES_MAX_LENGTH]
-    clean_source_context = (source_context or "").strip()[:SOURCE_CONTEXT_MAX_LENGTH]
 
     platform_profile = resolve_platform(platform)
     type_profile = resolve_type(prompt_type)
+    reference_image_analysis = analyze_reference_image(
+        reference_image=reference_image,
+        idea=clean_idea,
+        platform_profile=platform_profile,
+        prompt_type_profile=type_profile,
+        vision_generator=vision_generator,
+        runtime_config=runtime_config,
+    )
 
     prompt = build_prompt_studio_prompt(
         idea=clean_idea,
         prompt_type_profile=type_profile,
         platform_profile=platform_profile,
         context_notes=clean_notes,
-        source_context=clean_source_context,
-        has_reference_image=has_reference_image,
+        reference_image_analysis=reference_image_analysis,
         runtime_config=runtime_config,
     )
 
@@ -173,7 +199,47 @@ def generate_prompt_package(
         recommended_settings=_clean_settings(payload.get("recommended_settings")),
         notes_id=_clean_text(payload.get("notes_id"), NOTES_MAX_LENGTH),
         model_label=model_label,
+        reference_image_analyzed=reference_image_analysis != "",
     )
+
+
+def analyze_reference_image(
+    *,
+    reference_image: Mapping[str, Any] | None,
+    idea: str,
+    platform_profile: Mapping[str, Any],
+    prompt_type_profile: Mapping[str, Any],
+    vision_generator: Callable[[str, Mapping[str, str]], str] | None = None,
+    runtime_config: Mapping[str, Any] | None = None,
+) -> str:
+    if not reference_image:
+        return ""
+
+    normalized = _normalize_reference_image(reference_image)
+    prompt = build_reference_image_analysis_prompt(
+        idea=idea,
+        platform_profile=platform_profile,
+        prompt_type_profile=prompt_type_profile,
+        runtime_config=runtime_config,
+    )
+
+    generator = vision_generator or (
+        lambda body, image: _default_vision_generator(
+            body,
+            image,
+            runtime_config=runtime_config,
+        )
+    )
+    raw = generator(prompt, normalized)
+    text = _strip_model_label(raw).strip()
+    if text.startswith("[ISTA_AI_ERROR]"):
+        raise ValueError("Gagal menganalisis gambar referensi.")
+
+    clean = _clean_text(text, REFERENCE_IMAGE_ANALYSIS_MAX_LENGTH)
+    if clean == "":
+        raise ValueError("Gagal menganalisis gambar referensi.")
+
+    return clean
 
 
 def _default_text_generator(prompt: str, runtime_config: Mapping[str, Any] | None = None) -> str:
@@ -188,6 +254,77 @@ def _default_text_generator(prompt: str, runtime_config: Mapping[str, Any] | Non
         chunks.append(chunk)
 
     return "".join(chunks)
+
+
+def _default_vision_generator(
+    prompt: str,
+    reference_image: Mapping[str, str],
+    runtime_config: Mapping[str, Any] | None = None,
+) -> str:
+    from app.services.llm_streaming import stream_with_cascade
+
+    models = _prompt_studio_vision_models(runtime_config)
+    data_url = f"data:{reference_image['mime_type']};base64,{reference_image['data_base64']}"
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": {"url": data_url}},
+            ],
+        }
+    ]
+
+    chunks: list[str] = []
+    for chunk in stream_with_cascade(
+        messages,  # type: ignore[arg-type]
+        model_list=models,
+    ):
+        chunks.append(chunk)
+
+    return "".join(chunks)
+
+
+def _prompt_studio_vision_models(runtime_config: Mapping[str, Any] | None = None) -> list[dict[str, Any]]:
+    if isinstance(runtime_config, Mapping):
+        models = runtime_config.get("prompt_studio_vision_models")
+        if isinstance(models, list):
+            safe_models = []
+            for model in models[:8]:
+                if not isinstance(model, Mapping):
+                    continue
+                provider = str(model.get("provider") or "").strip()
+                model_name = str(model.get("model_name") or "").strip()
+                api_key_env = str(model.get("api_key_env") or "").strip()
+                if provider and model_name and api_key_env:
+                    safe = dict(model)
+                    safe["provider"] = provider
+                    safe["model_name"] = model_name
+                    safe["api_key_env"] = api_key_env
+                    safe_models.append(safe)
+            if safe_models:
+                return safe_models
+
+    return get_prompt_studio_vision_models()
+
+
+def _normalize_reference_image(reference_image: Mapping[str, Any]) -> dict[str, str]:
+    mime_type = str(reference_image.get("mime_type") or "").strip().lower()
+    if mime_type not in REFERENCE_IMAGE_ALLOWED_MIME_TYPES:
+        raise ValueError("Format gambar referensi tidak didukung.")
+
+    data_base64 = str(reference_image.get("data_base64") or "").strip()
+    if data_base64 == "":
+        raise ValueError("Data gambar referensi kosong.")
+    if len(data_base64) > REFERENCE_IMAGE_BASE64_MAX_LENGTH:
+        raise ValueError("Ukuran gambar referensi terlalu besar.")
+
+    try:
+        base64.b64decode(data_base64, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise ValueError("Data gambar referensi tidak valid.") from exc
+
+    return {"mime_type": mime_type, "data_base64": data_base64}
 
 
 def _extract_model_label(text: str) -> str:
