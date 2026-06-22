@@ -225,6 +225,15 @@ class PrompyStudio extends Component
         }
     }
 
+    public function sendPromptRevision(?string $message = null): void
+    {
+        if ($message !== null) {
+            $this->revisionInstruction = $message;
+        }
+
+        $this->revisePrompt(app(PromptStudioService::class));
+    }
+
     public function generateConfiguredRevision(PromptStudioService $service): void
     {
         $this->statusMessage = null;

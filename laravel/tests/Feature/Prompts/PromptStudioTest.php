@@ -333,6 +333,9 @@ class PromptStudioTest extends TestCase
             ->assertSee('Prompt aktif')
             ->assertSee('Konfigurasi prompt:')
             ->assertSee('Tulis revisi untuk prompt ini...')
+            ->assertSee('prompyRevisionText', false)
+            ->assertSee('submitPrompyRevision($wire, $refs.prompyInput)', false)
+            ->assertSee('sendPromptRevision(message)', false)
             ->assertSee('Edit konfigurasi')
             ->assertDontSee('Catatan konteks tambahan')
             ->assertSee('ISTA AI dapat keliru. Mohon verifikasi kembali informasi yang penting.')
@@ -519,6 +522,47 @@ class PromptStudioTest extends TestCase
         $this->assertSame('Gunakan Gambar 1 sebagai subjek dan tiru gaya Gambar 2.', $calls[1]['revision_instruction'] ?? null);
         $this->assertSame('A first draft visual prompt.', $calls[1]['current_package']['main_prompt'] ?? null);
         $this->assertCount(2, $calls[1]['reference_images'] ?? []);
+    }
+
+    public function test_livewire_prompt_revision_message_creates_version_and_clears_composer(): void
+    {
+        $calls = [];
+        Http::fake([
+            '*/api/prompts/generate' => function ($request) use (&$calls) {
+                $data = $request->data();
+                $calls[] = $data;
+
+                if (! empty($data['revision_instruction'])) {
+                    return Http::response($this->fakePackageResponse([
+                        'main_prompt' => 'A revised prompt with the requested WhatsApp number.',
+                    ]), 200);
+                }
+
+                return Http::response($this->fakePackageResponse([
+                    'main_prompt' => 'A first draft prompt.',
+                ]), 200);
+            },
+        ]);
+        $user = User::factory()->create();
+
+        $component = Livewire::actingAs($user)
+            ->test(PrompyStudio::class)
+            ->set('idea', 'Buat prompt desain laundry')
+            ->call('selectPlatform', 'gpt_image_2')
+            ->call('selectPromptType', 'image')
+            ->call('generate')
+            ->call('sendPromptRevision', 'Ganti nomor WhatsApp menjadi 083826039171')
+            ->assertSet('revisionInstruction', '')
+            ->assertSet('showPromptConfiguration', false)
+            ->assertSee('Ganti nomor WhatsApp menjadi 083826039171')
+            ->assertSee('Revisi prompt "Prompt desain laundry" berhasil disimpan sebagai Versi 2')
+            ->assertSee('A revised prompt with the requested WhatsApp number.');
+
+        $prompt = GeneratedPrompt::with('versions')->findOrFail($component->get('activePromptId'));
+        $this->assertSame(2, $prompt->versions()->count());
+        $this->assertSame('Ganti nomor WhatsApp menjadi 083826039171', $prompt->currentVersion?->revision_instruction);
+        $this->assertSame('Ganti nomor WhatsApp menjadi 083826039171', $calls[1]['revision_instruction'] ?? null);
+        $this->assertSame('A first draft prompt.', $calls[1]['current_package']['main_prompt'] ?? null);
     }
 
     public function test_livewire_active_prompt_configuration_regenerates_same_history_item(): void

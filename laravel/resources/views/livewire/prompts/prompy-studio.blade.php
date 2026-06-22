@@ -18,12 +18,50 @@
         referenceImageUploading: false,
         referenceImageUploadFailed: false,
         referenceImageDropError: '',
+        prompyRevisionText: '',
+        prompyRevisionLoading: false,
         copy(text, id) {
             if (!text) return;
             navigator.clipboard.writeText(text).then(() => {
                 this.copied = id;
                 setTimeout(() => { if (this.copied === id) this.copied = null; }, 1500);
             });
+        },
+        scrollPrompyChatToBottom() {
+            this.$nextTick(() => {
+                const box = this.$refs.prompyChatBox;
+                if (box) box.scrollTop = box.scrollHeight;
+            });
+        },
+        async submitPrompyRevision($wire, textarea) {
+            const message = (textarea?.value || '').trim();
+
+            if (!message || this.prompyRevisionLoading || $wire.isGenerating) {
+                return;
+            }
+
+            this.prompyRevisionText = message;
+            this.prompyRevisionLoading = true;
+            this.showPrompyPreviewPanel?.();
+            this.scrollPrompyChatToBottom();
+
+            try {
+                textarea.value = '';
+                textarea.style.height = 'auto';
+                textarea.dispatchEvent(new Event('input', { bubbles: true }));
+                this.scrollPrompyChatToBottom();
+
+                await $wire.sendPromptRevision(message);
+            } catch (error) {
+                textarea.value = message;
+                textarea.style.height = 'auto';
+                textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+                textarea.dispatchEvent(new Event('input', { bubbles: true }));
+            } finally {
+                this.prompyRevisionText = '';
+                this.prompyRevisionLoading = false;
+                this.scrollPrompyChatToBottom();
+            }
         },
         chooseReferenceImage() {
             this.$refs.referenceImageInput?.click();
@@ -380,7 +418,27 @@
                     </div>
                 @endforeach
 
-                <div class="flex justify-start" wire:loading.flex wire:target="generate,generateConfiguredPrompt,generateConfiguredRevision,revisePrompt" wire:key="prompy-loading-bubble">
+                <template x-if="prompyRevisionText">
+                    <div class="flex justify-end">
+                        <div class="w-full flex items-start gap-2.5 flex-row-reverse">
+                            <div class="shrink-0 h-8 w-8 rounded-full flex items-center justify-center bg-[#E2E8F0] dark:bg-white text-[#62748E] dark:text-black">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2m12-10a4 4 0 11-8 0 4 4 0 018 0z" />
+                                </svg>
+                            </div>
+                            <div class="flex max-w-[82%] flex-col gap-1 items-end text-right">
+                                <div class="flex items-center gap-2 mb-1 justify-end">
+                                    <span class="text-[13px] font-bold text-stone-800 dark:text-[#F8FAFC]">Anda</span>
+                                </div>
+                                <div class="bg-ista-primary text-white rounded-lg rounded-br-sm px-4 py-3">
+                                    <p class="text-[14px] leading-relaxed whitespace-pre-wrap" x-text="prompyRevisionText"></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                <div class="flex justify-start" wire:loading.flex wire:target="generate,generateConfiguredPrompt,generateConfiguredRevision,revisePrompt,sendPromptRevision" wire:key="prompy-loading-bubble">
                     <div class="w-full flex items-start gap-2.5">
                         <div class="shrink-0 h-8 w-8 rounded-full bg-white border border-stone-200 shadow-sm p-1 flex items-center justify-center">
                             <img src="{{ asset('images/ista/logo.png') }}" alt="ISTA AI" class="h-full w-full object-contain" />
@@ -425,12 +483,12 @@
                     </button>
                 </div>
             @elseif($activePrompt)
-                <form wire:submit.prevent="revisePrompt" class="chat-form relative rounded-xl shadow-sm bg-white dark:bg-gray-800 border border-stone-200/60 dark:border-gray-700 transition-colors">
+                <form @submit.prevent="submitPrompyRevision($wire, $refs.prompyInput)" class="chat-form relative rounded-xl shadow-sm bg-white dark:bg-gray-800 border border-stone-200/60 dark:border-gray-700 transition-colors">
                     <div class="px-3 pb-3 pt-3 w-full">
                         <textarea
                             wire:model="revisionInstruction"
                             x-ref="prompyInput"
-                            @keydown.enter="if(!$event.shiftKey) { $event.preventDefault(); $el.closest('form')?.requestSubmit(); }"
+                            @keydown.enter="if(!$event.shiftKey) { $event.preventDefault(); submitPrompyRevision($wire, $refs.prompyInput); }"
                             placeholder="Tulis revisi untuk prompt ini..."
                             aria-label="Tulis revisi untuk prompt ini"
                             rows="1"
@@ -444,8 +502,8 @@
                         <div class="mt-2 flex items-center justify-end">
                             <button type="submit"
                                     wire:loading.attr="disabled"
-                                    wire:target="revisePrompt"
-                                    @click="showPrompyPreviewPanel()"
+                                    wire:target="revisePrompt,sendPromptRevision"
+                                    :disabled="prompyRevisionLoading || $wire.isGenerating"
                                     class="bg-ista-primary hover:bg-ista-dark dark:bg-ista-primary dark:hover:bg-ista-dark disabled:opacity-50 disabled:cursor-not-allowed rounded-full transition-all duration-300 h-[32px] w-[32px] flex items-center justify-center group"
                                     aria-label="Kirim revisi prompt">
                                 <img src="{{ asset('images/icons/send-light.svg') }}" alt="" class="h-[17px] w-[17px] dark:hidden brightness-0 invert" />
@@ -503,7 +561,7 @@
         </div>
 
         <div class="flex-1 overflow-y-auto px-4 py-4">
-            <div wire:loading.flex wire:target="generate,generateConfiguredPrompt,generateConfiguredRevision,revisePrompt" class="min-h-[420px] items-center justify-center px-6 text-center">
+            <div wire:loading.flex wire:target="generate,generateConfiguredPrompt,generateConfiguredRevision,revisePrompt,sendPromptRevision" class="min-h-[420px] items-center justify-center px-6 text-center">
                 <div class="max-w-sm">
                     <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-[0_18px_40px_-28px_rgba(15,23,42,0.75)] dark:bg-gray-900">
                         <div class="relative flex h-12 w-12 items-center justify-center rounded-full">
@@ -518,7 +576,7 @@
                 </div>
             </div>
 
-            <div wire:loading.remove wire:target="generate,generateConfiguredPrompt,generateConfiguredRevision,revisePrompt" class="space-y-4">
+            <div wire:loading.remove wire:target="generate,generateConfiguredPrompt,generateConfiguredRevision,revisePrompt,sendPromptRevision" class="space-y-4">
                 @if($activePackage)
                     <div class="memo-config-panel">
                         <div class="border-b border-stone-100 bg-white px-4 py-4 dark:border-gray-800 dark:bg-gray-900">
