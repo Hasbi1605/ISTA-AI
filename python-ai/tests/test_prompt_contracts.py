@@ -267,6 +267,12 @@ def test_prompt_studio_profiles_and_template_are_loaded_from_yaml():
     assert "Tipografi/teks terlihat" in reference_template
     assert "Ganti/sesuaikan" in reference_template
 
+    chat_template = config_loader.get_prompt_studio_chat_prompt()
+    assert "{user_message}" in chat_template
+    assert "{chat_history}" in chat_template
+    assert "{current_package}" in chat_template
+    assert "answer|clarify|revise" in chat_template
+
     vision_models = config_loader.get_prompt_studio_vision_models()
     assert vision_models
     assert all(model.get("provider") == "litellm" for model in vision_models)

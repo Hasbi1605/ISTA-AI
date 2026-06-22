@@ -18,8 +18,9 @@ use Throwable;
 /**
  * Prompy Studio.
  *
- * Menyusun paket prompt profesional untuk platform AI eksternal lewat python-ai
- * (`/api/prompts/generate`) lalu menyimpan riwayat milik user. ISTA AI TIDAK
+     * Menyusun paket prompt profesional untuk platform AI eksternal lewat python-ai
+     * (`/api/prompts/generate`) dan merutekan chat Prompy (`/api/prompts/chat`).
+     * ISTA AI TIDAK
  * memanggil platform eksternal dan tidak menghasilkan gambar/video langsung.
  *
  * Privasi: ide, catatan, paket prompt, dan reference image tidak di-log.
@@ -47,6 +48,10 @@ class PromptStudioService
     public const CONTEXT_NOTES_MAX_LENGTH = 4000;
 
     public const REVISION_INSTRUCTION_MAX_LENGTH = 3000;
+
+    public const PROMPT_CHAT_MESSAGE_MAX_LENGTH = 3000;
+
+    public const PROMPT_CHAT_HISTORY_LIMIT = 12;
 
     /** Reference image privat (MVP): tipe & ukuran yang diizinkan. */
     public const REFERENCE_IMAGE_MIME_TYPES = [
@@ -367,6 +372,124 @@ class PromptStudioService
         return $updatedPrompt;
     }
 
+    /**
+     * Route one Prompy chat turn through the Python AI service.
+     *
+     * @param  array<int, array{role?: string, content?: string, timestamp?: string}>  $chatMessages
+     * @return array{intent: string, assistant_message: string, revision_instruction: string, model_label: string}
+     */
+    public function chat(User $user, GeneratedPrompt $prompt, string $message, array $chatMessages = []): array
+    {
+        if (! $prompt->isOwnedBy($user)) {
+            throw new RuntimeException('Prompt tidak ditemukan.');
+        }
+
+        $usageEvents = app(AIUsageEventService::class);
+        $startedAt = microtime(true);
+        $requestId = $usageEvents->newRequestId();
+        $cleanMessage = Str::limit(trim($message), self::PROMPT_CHAT_MESSAGE_MAX_LENGTH, '');
+        if ($cleanMessage === '') {
+            throw new RuntimeException('Pesan wajib diisi.');
+        }
+
+        $prompt->loadMissing(['currentVersion', 'versions']);
+        $activeVersion = $prompt->currentVersion ?: $prompt->versions->sortByDesc('version_number')->first();
+        $currentPackage = $activeVersion?->normalizedPackage() ?? $prompt->normalizedPackage();
+        $activeVersionLabel = 'Versi '.(int) ($activeVersion?->version_number ?? 1);
+        $chatHistoryPayload = $this->promptChatHistoryPayload($chatMessages);
+
+        try {
+            $response = Http::withToken($this->token ?: '')
+                ->connectTimeout($this->connectTimeout)
+                ->timeout($this->timeout)
+                ->acceptJson()
+                ->asJson()
+                ->post($this->baseUrl.'/api/prompts/chat', [
+                    'message' => $cleanMessage,
+                    'idea' => (string) $prompt->idea,
+                    'platform_label' => (string) $prompt->platform_label,
+                    'prompt_type_label' => (string) $prompt->prompt_type_label,
+                    'active_version_label' => $activeVersionLabel,
+                    'current_package' => $currentPackage,
+                    'chat_messages' => $chatHistoryPayload,
+                ]);
+
+            if (! $response->successful()) {
+                throw new RuntimeException($response->body() ?: 'Gagal memproses chat Prompy.');
+            }
+
+            $data = $response->json();
+            if (! is_array($data)) {
+                throw new RuntimeException('Respons chat Prompy tidak valid.');
+            }
+
+            $intent = strtolower(trim((string) ($data['intent'] ?? 'answer')));
+            if (! in_array($intent, ['answer', 'clarify', 'revise'], true)) {
+                $intent = 'answer';
+            }
+
+            $assistantMessage = Str::limit(trim((string) ($data['assistant_message'] ?? '')), 2200, '');
+            $revisionInstruction = Str::limit(
+                trim((string) ($data['revision_instruction'] ?? '')),
+                self::REVISION_INSTRUCTION_MAX_LENGTH,
+                ''
+            );
+        } catch (Throwable $e) {
+            $usageEvents->failed(
+                feature: AIUsageEvent::FEATURE_PROMPT_GENERATION,
+                userId: (int) $user->id,
+                metadata: [
+                    'generated_prompt_id' => (int) $prompt->id,
+                    'platform' => (string) $prompt->platform,
+                    'prompt_type' => (string) $prompt->prompt_type,
+                    'channel' => 'prompt_chat',
+                    'history_message_count' => count($chatHistoryPayload),
+                    'reason' => 'prompt_chat_failed',
+                ],
+                requestId: $requestId,
+                latencyMs: $usageEvents->latencyMsSince($startedAt),
+                errorCode: 'prompt_chat_failed',
+                subject: $prompt,
+            );
+
+            throw $e;
+        }
+
+        if ($intent === 'revise' && $revisionInstruction === '') {
+            $revisionInstruction = $cleanMessage;
+        }
+
+        if ($assistantMessage === '') {
+            $assistantMessage = $intent === 'clarify'
+                ? 'Maksudnya ingin saya cek bagian apa dari prompt ini?'
+                : 'Saya bantu bahas prompt ini tanpa mengubah panel hasil dulu.';
+        }
+
+        $usageEvents->completed(
+            feature: AIUsageEvent::FEATURE_PROMPT_GENERATION,
+            userId: (int) $user->id,
+            metadata: [
+                'generated_prompt_id' => (int) $prompt->id,
+                'platform' => (string) $prompt->platform,
+                'prompt_type' => (string) $prompt->prompt_type,
+                'channel' => 'prompt_chat',
+                'outcome' => $intent,
+                'history_message_count' => count($chatHistoryPayload),
+                ...$usageEvents->modelMetadata((string) ($data['model_label'] ?? '')),
+            ],
+            requestId: $requestId,
+            latencyMs: $usageEvents->latencyMsSince($startedAt),
+            subject: $prompt,
+        );
+
+        return [
+            'intent' => $intent,
+            'assistant_message' => $assistantMessage,
+            'revision_instruction' => $intent === 'revise' ? $revisionInstruction : '',
+            'model_label' => Str::limit(trim((string) ($data['model_label'] ?? '')), 191, ''),
+        ];
+    }
+
     public function deletePrompt(GeneratedPrompt $prompt): void
     {
         $this->deleteStoredImagePaths($this->referenceImagePaths($prompt));
@@ -444,6 +567,28 @@ class PromptStudioService
             'model_label' => (string) ($data['model_label'] ?? ''),
             'reference_image_analyzed' => (bool) ($data['reference_image_analyzed'] ?? false),
         ];
+    }
+
+    /**
+     * @param  array<int, array{role?: string, content?: string, timestamp?: string}>  $messages
+     * @return array<int, array{role: string, content: string, timestamp: string}>
+     */
+    protected function promptChatHistoryPayload(array $messages): array
+    {
+        return collect($messages)
+            ->filter(fn ($message) => is_array($message))
+            ->map(function (array $message): array {
+                return [
+                    'role' => ($message['role'] ?? null) === 'user' ? 'user' : 'assistant',
+                    'content' => Str::limit(trim((string) ($message['content'] ?? '')), 900, ''),
+                    'timestamp' => trim((string) ($message['timestamp'] ?? '')),
+                ];
+            })
+            ->filter(fn (array $message) => $message['content'] !== '')
+            ->values()
+            ->take(-self::PROMPT_CHAT_HISTORY_LIMIT)
+            ->values()
+            ->all();
     }
 
     /**

@@ -19,6 +19,7 @@ from typing import Any, Callable, Mapping
 
 from app.config_loader import (
     get_prompt_studio_platforms,
+    get_prompt_studio_chat_prompt,
     get_prompt_studio_prompt,
     get_prompt_studio_reference_image_prompt,
     get_prompt_studio_types,
@@ -36,6 +37,10 @@ MAIN_PROMPT_MAX_LENGTH = 6000
 NOTES_MAX_LENGTH = 4000
 MAX_VARIANTS = 4
 MAX_SETTINGS = 12
+PROMPT_CHAT_MESSAGE_MAX_LENGTH = 3000
+PROMPT_CHAT_ASSISTANT_MAX_LENGTH = 2200
+PROMPT_CHAT_HISTORY_MAX_MESSAGES = 12
+PROMPT_CHAT_INTENTS = {"answer", "clarify", "revise"}
 
 
 @dataclass(slots=True)
@@ -65,6 +70,22 @@ class PromptPackage:
             "notes_id": self.notes_id,
             "model_label": self.model_label,
             "reference_image_analyzed": self.reference_image_analyzed,
+        }
+
+
+@dataclass(slots=True)
+class PromptChatDecision:
+    intent: str
+    assistant_message: str
+    revision_instruction: str = ""
+    model_label: str = ""
+
+    def to_dict(self) -> dict[str, str]:
+        return {
+            "intent": self.intent,
+            "assistant_message": self.assistant_message,
+            "revision_instruction": self.revision_instruction,
+            "model_label": self.model_label,
         }
 
 
@@ -149,6 +170,34 @@ def build_reference_image_analysis_prompt(
     )
 
 
+def build_prompt_studio_chat_prompt(
+    *,
+    user_message: str,
+    idea: str,
+    platform_label: str,
+    prompt_type_label: str,
+    active_version_label: str = "Versi aktif",
+    current_package: Mapping[str, Any] | None = None,
+    chat_messages: list[Mapping[str, Any]] | None = None,
+    runtime_config: Mapping[str, Any] | None = None,
+) -> str:
+    template_values = {
+        "user_message": user_message.strip(),
+        "idea": (idea or "").strip() or "-",
+        "platform_label": (platform_label or "").strip() or "-",
+        "prompt_type_label": (prompt_type_label or "").strip() or "-",
+        "active_version_label": (active_version_label or "").strip() or "Versi aktif",
+        "current_package": _format_current_package(current_package),
+        "chat_history": _format_prompt_chat_history(chat_messages or []),
+    }
+    runtime_template = runtime_prompt(runtime_config, "prompt_studio_chat", "body")
+    return render_prompt_template(
+        runtime_template,
+        get_prompt_studio_chat_prompt(),
+        **template_values,
+    )
+
+
 def generate_prompt_package(
     *,
     idea: str,
@@ -213,6 +262,77 @@ def generate_prompt_package(
         notes_id=_clean_text(payload.get("notes_id"), NOTES_MAX_LENGTH),
         model_label=model_label,
         reference_image_analyzed=reference_image_analysis != "",
+    )
+
+
+def generate_prompt_chat_decision(
+    *,
+    user_message: str,
+    idea: str,
+    platform_label: str,
+    prompt_type_label: str,
+    active_version_label: str = "Versi aktif",
+    current_package: Mapping[str, Any] | None = None,
+    chat_messages: list[Mapping[str, Any]] | None = None,
+    text_generator: Callable[[str], str] | None = None,
+    runtime_config: Mapping[str, Any] | None = None,
+) -> PromptChatDecision:
+    clean_message = (user_message or "").strip()
+    if not clean_message:
+        raise ValueError("Pesan wajib diisi.")
+    if len(clean_message) > PROMPT_CHAT_MESSAGE_MAX_LENGTH:
+        clean_message = clean_message[:PROMPT_CHAT_MESSAGE_MAX_LENGTH]
+
+    prompt = build_prompt_studio_chat_prompt(
+        user_message=clean_message,
+        idea=idea,
+        platform_label=platform_label,
+        prompt_type_label=prompt_type_label,
+        active_version_label=active_version_label,
+        current_package=current_package,
+        chat_messages=chat_messages,
+        runtime_config=runtime_config,
+    )
+
+    generator = text_generator or (
+        lambda body: _default_text_generator(body, runtime_config=runtime_config)
+    )
+    raw = generator(prompt)
+    model_label = _extract_model_label(raw)
+    payload = _parse_prompt_chat_json(raw)
+
+    intent = str(payload.get("intent") or "answer").strip().lower()
+    if intent not in PROMPT_CHAT_INTENTS:
+        intent = "answer"
+
+    assistant_message = _clean_text(
+        payload.get("assistant_message"),
+        PROMPT_CHAT_ASSISTANT_MAX_LENGTH,
+    )
+    revision_instruction = _clean_text(
+        payload.get("revision_instruction"),
+        PROMPT_CHAT_MESSAGE_MAX_LENGTH,
+    )
+
+    if intent == "revise" and revision_instruction == "":
+        revision_instruction = clean_message
+
+    if assistant_message == "":
+        if intent == "clarify":
+            assistant_message = "Maksudnya ingin saya cek bagian apa dari prompt ini?"
+        elif intent == "revise":
+            assistant_message = "Saya akan buat versi baru berdasarkan arahan itu."
+        else:
+            assistant_message = "Bisa. Saya bantu bahas prompt ini tanpa mengubah panel hasil dulu."
+
+    if intent != "revise":
+        revision_instruction = ""
+
+    return PromptChatDecision(
+        intent=intent,
+        assistant_message=assistant_message,
+        revision_instruction=revision_instruction,
+        model_label=model_label,
     )
 
 
@@ -396,6 +516,21 @@ def _format_current_package(current_package: Mapping[str, Any] | None) -> str:
         return "-"
 
 
+def _format_prompt_chat_history(messages: list[Mapping[str, Any]]) -> str:
+    lines: list[str] = []
+    for message in messages[-PROMPT_CHAT_HISTORY_MAX_MESSAGES:]:
+        role = str(message.get("role") or "").strip().lower()
+        if role not in {"user", "assistant"}:
+            continue
+        content = _clean_text(message.get("content"), 900)
+        if not content:
+            continue
+        label = "User" if role == "user" else "Assistant"
+        lines.append(f"{label}: {content}")
+
+    return "\n".join(lines) if lines else "-"
+
+
 def _extract_model_label(text: str) -> str:
     match = re.match(r"^\s*\[MODEL:(?P<label>[^\]\r\n]{1,200})\]\s*", text or "", flags=re.IGNORECASE)
     if not match:
@@ -431,6 +566,30 @@ def _parse_package_json(raw: str) -> dict[str, Any]:
 
     if not _clean_text(parsed.get("main_prompt"), MAIN_PROMPT_MAX_LENGTH):
         raise ValueError("Hasil paket prompt tidak memuat prompt utama.")
+
+    return parsed
+
+
+def _parse_prompt_chat_json(raw: str) -> dict[str, Any]:
+    text = _strip_model_label(raw).strip()
+    if not text:
+        raise ValueError("AI tidak menghasilkan respons chat Prompy.")
+
+    fenced = re.match(r"^```(?:json)?\s*(?P<body>.+?)\s*```$", text, flags=re.IGNORECASE | re.DOTALL)
+    if fenced:
+        text = fenced.group("body").strip()
+
+    candidate = _extract_first_json_object(text)
+    if candidate is None:
+        raise ValueError("Respons chat Prompy tidak valid.")
+
+    try:
+        parsed = json.loads(candidate)
+    except json.JSONDecodeError as exc:
+        raise ValueError("Respons chat Prompy tidak valid.") from exc
+
+    if not isinstance(parsed, dict):
+        raise ValueError("Respons chat Prompy tidak valid.")
 
     return parsed
 

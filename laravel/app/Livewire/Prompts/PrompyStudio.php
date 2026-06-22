@@ -262,18 +262,29 @@ class PrompyStudio extends Component
             return;
         }
 
-        if ($this->looksLikePromptChangeNote($userMessage)) {
-            $this->revisionInstruction = $userMessage;
-            $this->revisePrompt(app(PromptStudioService::class));
+        $this->enforceRateLimit('promptChat', 30, 60, 'Terlalu banyak pesan prompt. Coba lagi sebentar.');
+
+        $service = app(PromptStudioService::class);
+
+        try {
+            $decision = $service->chat(Auth::user(), $prompt, $userMessage, $this->promptChatMessages);
+        } catch (Throwable $e) {
+            report($e);
+            $this->statusMessage = UserFacingError::message($e, 'Gagal memproses chat Prompy. Coba lagi sebentar.');
 
             return;
         }
 
-        $this->enforceRateLimit('promptChat', 30, 60, 'Terlalu banyak pesan prompt. Coba lagi sebentar.');
+        if (($decision['intent'] ?? 'answer') === 'revise') {
+            $this->revisionInstruction = trim((string) ($decision['revision_instruction'] ?? '')) ?: $userMessage;
+            $this->revisePrompt($service);
+
+            return;
+        }
 
         $updated = $this->persistPromptChatExchange($prompt, [
             $this->makePromptChatMessage('user', $userMessage),
-            $this->makePromptChatMessage('assistant', $this->promptChatReplyFor($userMessage, $prompt)),
+            $this->makePromptChatMessage('assistant', (string) ($decision['assistant_message'] ?? 'Saya bantu bahas prompt ini.')),
         ]);
 
         if ($updated) {
@@ -525,28 +536,6 @@ class PrompyStudio extends Component
         });
     }
 
-    private function promptChatReplyFor(string $message, GeneratedPrompt $prompt): string
-    {
-        $message = trim($message);
-        $versionLabel = 'Versi '.(int) ($prompt->currentVersion?->version_number ?? 1);
-        $platformLabel = $prompt->platform_label ?: (PromptStudioService::PLATFORMS[$prompt->platform] ?? 'platform target');
-        $promptTypeLabel = $prompt->prompt_type_label ?: (PromptStudioService::PROMPT_TYPES[$prompt->prompt_type] ?? 'output');
-
-        if ($this->isShortUnclearPromptChatMessage($message)) {
-            return 'Saya belum menangkap maksudnya. Coba tulis pertanyaan atau arahan yang lebih lengkap, misalnya apa yang ingin dicek dari prompt ini.';
-        }
-
-        if ($this->isPromptChatAcknowledgement($message)) {
-            return 'Baik, saya pertahankan '.$versionLabel.' sebagai prompt aktif. Paket di panel hasil kanan sudah siap disalin saat diperlukan.';
-        }
-
-        if ($this->isPromptChatQuestion($message)) {
-            return 'Untuk konteks prompt ini, paket aktif adalah '.$versionLabel.' untuk '.$platformLabel.' dengan keluaran '.$promptTypeLabel.'. Anda bisa menanyakan bagian prompt, meminta penjelasan, atau memakai tombol salin di panel hasil kanan.';
-        }
-
-        return 'Saya catat untuk konteks prompt ini. Paket di panel hasil belum saya ubah otomatis, jadi Anda masih bisa berdiskusi atau memastikan arahnya dulu sebelum membuat ulang prompt.';
-    }
-
     private function promptRevisionAssistantReply(GeneratedPromptVersion $version): string
     {
         $versionLabel = 'Versi '.(int) $version->version_number;
@@ -594,33 +583,6 @@ class PrompyStudio extends Component
         }
 
         return $merged;
-    }
-
-    private function isShortUnclearPromptChatMessage(string $message): bool
-    {
-        return mb_strlen(trim($message)) <= 2;
-    }
-
-    private function isPromptChatAcknowledgement(string $message): bool
-    {
-        $normalized = mb_strtolower(trim((string) preg_replace('/\s+/u', ' ', $message)), 'UTF-8');
-        $normalized = trim($normalized, " \t\n\r\0\x0B.!?,");
-
-        return (bool) preg_match('/^(?:ok|oke|okay|sip|siap|mantap|bagus|sudah bagus|oke sudah bagus|terima kasih|makasih|thanks|thank you)$/iu', $normalized);
-    }
-
-    private function isPromptChatQuestion(string $message): bool
-    {
-        $normalized = mb_strtolower(trim($message), 'UTF-8');
-
-        return str_contains($normalized, '?')
-            || (bool) preg_match('/^(?:apa|apakah|bagaimana|gimana|kenapa|mengapa|bisa|boleh|cara|untuk apa|menurutmu|menurut anda|saran|rekomendasi|review|evaluasi)\b/iu', $normalized)
-            || (bool) preg_match('/\b(?:perlu ditingkatkan|yang perlu ditingkatkan|apa yg perlu ditingkatkan|apa yang perlu ditingkatkan)\b/iu', $normalized);
-    }
-
-    private function looksLikePromptChangeNote(string $message): bool
-    {
-        return (bool) preg_match('/\b(?:revisi|ubah|ganti|tambahkan|tambah|hapus|hilangkan|kurangi|perbaiki|jadikan|buat\s+(?:lebih|agar|jadi)|bikin\s+(?:lebih|agar|jadi)|pakai|gunakan|tiru|ikuti|pertahankan|masukkan|sertakan|sesuaikan|pendekkan|panjangkan|singkatkan|replace|change|add|remove|make|kurang|terlalu)\b/iu', $message);
     }
 
     private function promptConfigurationSummary(?GeneratedPrompt $prompt = null, ?GeneratedPromptVersion $version = null): string

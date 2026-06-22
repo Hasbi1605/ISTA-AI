@@ -8,9 +8,11 @@ from app.config_loader import get_prompt_studio_platforms, get_prompt_studio_typ
 from app.services.prompt_generation import (
     CONTEXT_NOTES_MAX_LENGTH,
     IDEA_MAX_LENGTH,
+    PROMPT_CHAT_MESSAGE_MAX_LENGTH,
     REFERENCE_IMAGE_ALLOWED_MIME_TYPES,
     REFERENCE_IMAGE_BASE64_MAX_LENGTH,
     REFERENCE_IMAGE_MAX_COUNT,
+    generate_prompt_chat_decision,
     generate_prompt_package,
 )
 
@@ -61,6 +63,17 @@ class GeneratePromptRequest(BaseModel):
         return normalized
 
 
+class PromptChatRequest(BaseModel):
+    message: str = Field(..., min_length=1, max_length=PROMPT_CHAT_MESSAGE_MAX_LENGTH)
+    idea: str = Field("", max_length=IDEA_MAX_LENGTH)
+    platform_label: str = Field("Universal", max_length=120)
+    prompt_type_label: str = Field("Gambar", max_length=120)
+    active_version_label: str = Field("Versi aktif", max_length=80)
+    current_package: dict[str, Any] | None = None
+    chat_messages: list[dict[str, Any]] = Field(default_factory=list, max_length=24)
+    runtime_config: dict[str, Any] | None = None
+
+
 @router.get("/profiles", dependencies=[Depends(verify_token)])
 def list_prompt_profiles():
     return {
@@ -86,3 +99,22 @@ def generate_prompt(request: GeneratePromptRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return package.to_dict()
+
+
+@router.post("/chat", dependencies=[Depends(verify_token)])
+def prompt_chat(request: PromptChatRequest):
+    try:
+        decision = generate_prompt_chat_decision(
+            user_message=request.message,
+            idea=request.idea,
+            platform_label=request.platform_label,
+            prompt_type_label=request.prompt_type_label,
+            active_version_label=request.active_version_label,
+            current_package=request.current_package,
+            chat_messages=request.chat_messages,
+            runtime_config=request.runtime_config,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return decision.to_dict()

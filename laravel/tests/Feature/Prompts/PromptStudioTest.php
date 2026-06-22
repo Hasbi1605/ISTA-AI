@@ -42,6 +42,16 @@ class PromptStudioTest extends TestCase
         ], $overrides);
     }
 
+    private function fakePromptChatResponse(array $overrides = []): array
+    {
+        return array_merge([
+            'intent' => 'answer',
+            'assistant_message' => 'Saya bantu bahas prompt ini tanpa mengubah panel hasil dulu.',
+            'revision_instruction' => '',
+            'model_label' => 'GPT-4.1',
+        ], $overrides);
+    }
+
     public function test_service_generates_and_persists_owned_prompt(): void
     {
         Http::fake([
@@ -478,6 +488,21 @@ class PromptStudioTest extends TestCase
         Storage::fake('local');
         $calls = [];
         Http::fake([
+            '*/api/prompts/chat' => function ($request) {
+                $data = $request->data();
+                if (str_contains((string) ($data['message'] ?? ''), 'Ganti nomor')) {
+                    return Http::response($this->fakePromptChatResponse([
+                        'intent' => 'revise',
+                        'assistant_message' => 'Saya ubah nomor WhatsApp pada versi baru.',
+                        'revision_instruction' => 'Ganti nomor WhatsApp menjadi 083826039171',
+                    ]), 200);
+                }
+
+                return Http::response($this->fakePromptChatResponse([
+                    'intent' => 'answer',
+                    'assistant_message' => 'Baik, saya pertahankan Versi 2 sebagai prompt aktif.',
+                ]), 200);
+            },
             '*/api/prompts/generate' => function ($request) use (&$calls) {
                 $data = $request->data();
                 $calls[] = $data;
@@ -528,6 +553,22 @@ class PromptStudioTest extends TestCase
     {
         $calls = [];
         Http::fake([
+            '*/api/prompts/chat' => function ($request) {
+                $message = (string) ($request->data()['message'] ?? '');
+
+                if (str_contains($message, 'Ganti nomor')) {
+                    return Http::response($this->fakePromptChatResponse([
+                        'intent' => 'revise',
+                        'assistant_message' => 'Saya ubah nomor WhatsApp pada versi baru.',
+                        'revision_instruction' => 'Ganti nomor WhatsApp menjadi 083826039171',
+                    ]), 200);
+                }
+
+                return Http::response($this->fakePromptChatResponse([
+                    'intent' => 'answer',
+                    'assistant_message' => 'Baik, saya pertahankan Versi 2 sebagai prompt aktif.',
+                ]), 200);
+            },
             '*/api/prompts/generate' => function ($request) use (&$calls) {
                 $data = $request->data();
                 $calls[] = $data;
@@ -578,6 +619,14 @@ class PromptStudioTest extends TestCase
     public function test_livewire_prompt_chat_preserves_repeated_assistant_replies(): void
     {
         Http::fake([
+            '*/api/prompts/chat' => function ($request) {
+                $message = (string) ($request->data()['message'] ?? '');
+
+                return Http::response($this->fakePromptChatResponse([
+                    'intent' => 'answer',
+                    'assistant_message' => 'Saya menangkap pesan "'.$message.'". Mau saya cek bagian prompt yang mana?',
+                ]), 200);
+            },
             '*/api/prompts/generate' => Http::response($this->fakePackageResponse([
                 'main_prompt' => 'A first draft prompt.',
             ]), 200),
@@ -603,10 +652,9 @@ class PromptStudioTest extends TestCase
         $this->assertSame('hei jawblah', $prompt->chat_messages[4]['content'] ?? null);
         $this->assertSame('assistant', $prompt->chat_messages[5]['role'] ?? null);
 
-        $assistantFallback = 'Saya catat untuk konteks prompt ini. Paket di panel hasil belum saya ubah otomatis, jadi Anda masih bisa berdiskusi atau memastikan arahnya dulu sebelum membuat ulang prompt.';
         $assistantReplies = collect($component->get('promptChatMessages'))
             ->where('role', 'assistant')
-            ->where('content', $assistantFallback)
+            ->filter(fn (array $message) => str_contains((string) $message['content'], 'Mau saya cek bagian prompt yang mana?'))
             ->count();
 
         $this->assertSame(3, $assistantReplies);
@@ -616,6 +664,11 @@ class PromptStudioTest extends TestCase
     {
         $calls = [];
         Http::fake([
+            '*/api/prompts/chat' => Http::response($this->fakePromptChatResponse([
+                'intent' => 'answer',
+                'assistant_message' => 'Menurut saya prompt ini sudah kuat; yang bisa ditingkatkan adalah instruksi tipografi dan ruang kosong.',
+                'revision_instruction' => '',
+            ]), 200),
             '*/api/prompts/generate' => function ($request) use (&$calls) {
                 $calls[] = $request->data();
 
@@ -633,7 +686,7 @@ class PromptStudioTest extends TestCase
             ->call('selectPromptType', 'image')
             ->call('generate')
             ->call('sendPromptChat', 'menurutmu untuk apa yg perlu ditingkatkan dari prompt tersebut')
-            ->assertSee('Untuk konteks prompt ini');
+            ->assertSee('yang bisa ditingkatkan adalah instruksi tipografi');
 
         $prompt = GeneratedPrompt::with('versions')->findOrFail($component->get('activePromptId'));
         $this->assertSame(1, $prompt->versions()->count());
@@ -641,6 +694,61 @@ class PromptStudioTest extends TestCase
         $this->assertCount(2, $prompt->chat_messages);
         $this->assertSame('user', $prompt->chat_messages[0]['role'] ?? null);
         $this->assertSame('assistant', $prompt->chat_messages[1]['role'] ?? null);
+    }
+
+    public function test_livewire_prompt_chat_test_message_stays_conversational_without_new_version(): void
+    {
+        $calls = [];
+        Http::fake([
+            '*/api/prompts/chat' => function ($request) {
+                $message = (string) ($request->data()['message'] ?? '');
+                $reply = str_contains($message, 'kurang')
+                    ? 'Prompt ini sudah cukup jelas; yang bisa diperkuat adalah arahan hierarchy teks dan white space.'
+                    : 'Tes diterima. Mau saya cek atau revisi bagian tertentu dari prompt ini?';
+
+                return Http::response($this->fakePromptChatResponse([
+                    'intent' => 'answer',
+                    'assistant_message' => $reply,
+                ]), 200);
+            },
+            '*/api/prompts/generate' => function ($request) use (&$calls) {
+                $calls[] = $request->data();
+
+                return Http::response($this->fakePackageResponse([
+                    'main_prompt' => 'A first draft prompt.',
+                ]), 200);
+            },
+        ]);
+        $user = User::factory()->create();
+
+        $component = Livewire::actingAs($user)
+            ->test(PrompyStudio::class)
+            ->set('idea', 'Buat Poster 1 Muharram 1448 H')
+            ->call('selectPlatform', 'gpt_image_2')
+            ->call('selectPromptType', 'poster_infographic')
+            ->call('generate')
+            ->call('sendPromptChat', 'apa yg kurang?')
+            ->assertSee('hierarchy teks dan white space')
+            ->call('sendPromptChat', 'Tesin')
+            ->assertSee('Tes diterima');
+
+        $prompt = GeneratedPrompt::with('versions')->findOrFail($component->get('activePromptId'));
+        $this->assertSame(1, $prompt->versions()->count());
+        $this->assertCount(1, $calls);
+        $this->assertCount(4, $prompt->chat_messages);
+
+        $chatEvents = AIUsageEvent::where('feature', AIUsageEvent::FEATURE_PROMPT_GENERATION)
+            ->where('subject_id', $prompt->id)
+            ->get()
+            ->filter(fn (AIUsageEvent $event) => ($event->metadata['channel'] ?? null) === 'prompt_chat')
+            ->values();
+
+        $this->assertCount(2, $chatEvents);
+        $this->assertSame('answer', $chatEvents[0]->metadata['outcome'] ?? null);
+        $this->assertSame('answer', $chatEvents[1]->metadata['outcome'] ?? null);
+        $this->assertSame(3, $chatEvents[0]->metadata['history_message_count'] ?? null);
+        $this->assertSame(5, $chatEvents[1]->metadata['history_message_count'] ?? null);
+        $this->assertArrayNotHasKey('message_content', $chatEvents[0]->metadata ?? []);
     }
 
     public function test_livewire_active_prompt_configuration_regenerates_same_history_item(): void

@@ -11,7 +11,9 @@ from app.services import prompt_generation
 from app.services.prompt_generation import (
     analyze_reference_image,
     analyze_reference_images,
+    build_prompt_studio_chat_prompt,
     build_prompt_studio_prompt,
+    generate_prompt_chat_decision,
     generate_prompt_package,
     resolve_platform,
     resolve_type,
@@ -257,6 +259,65 @@ def test_generate_extracts_json_with_surrounding_text():
         text_generator=lambda _p: raw,
     )
     assert package.main_prompt.startswith("A professional poster")
+
+
+def test_build_prompt_chat_prompt_includes_context_and_guardrail():
+    prompt = build_prompt_studio_chat_prompt(
+        user_message="Menurutmu apa yang kurang?",
+        idea="Poster 1 Muharram",
+        platform_label="GPT Image 2",
+        prompt_type_label="Poster / Infografis",
+        active_version_label="Versi 1",
+        current_package={"main_prompt": "A blue minimalist poster", "variants": []},
+        chat_messages=[{"role": "assistant", "content": "Prompt awal sudah dibuat."}],
+    )
+
+    assert "Menurutmu apa yang kurang?" in prompt
+    assert "Poster 1 Muharram" in prompt
+    assert "apa yang kurang?" in prompt
+    assert "harus answer, bukan revise" in prompt
+    assert "A blue minimalist poster" in prompt
+
+
+def test_prompt_chat_decision_answer_does_not_carry_revision_instruction():
+    decision = generate_prompt_chat_decision(
+        user_message="Menurutmu prompt ini kurang apa?",
+        idea="Poster 1 Muharram",
+        platform_label="GPT Image 2",
+        prompt_type_label="Poster / Infografis",
+        current_package={"main_prompt": "A blue minimalist poster"},
+        text_generator=lambda _prompt: json.dumps({
+            "intent": "answer",
+            "assistant_message": "Prompt sudah cukup kuat; yang bisa ditambah adalah konteks tipografi.",
+            "revision_instruction": "ubah prompt",
+        }),
+    )
+
+    assert decision.intent == "answer"
+    assert "cukup kuat" in decision.assistant_message
+    assert decision.revision_instruction == ""
+
+
+def test_prompt_chat_decision_revise_uses_model_instruction():
+    decision = generate_prompt_chat_decision(
+        user_message="Terapkan saran nomor 2",
+        idea="Poster 1 Muharram",
+        platform_label="GPT Image 2",
+        prompt_type_label="Poster / Infografis",
+        current_package={"main_prompt": "A blue minimalist poster"},
+        chat_messages=[
+            {"role": "assistant", "content": "Saran 2: kurangi ikon bintang dan perbesar white space."},
+        ],
+        text_generator=lambda _prompt: "[MODEL: GPT-4.1]\n" + json.dumps({
+            "intent": "revise",
+            "assistant_message": "Saya terapkan saran nomor 2 sebagai versi baru.",
+            "revision_instruction": "Kurangi ikon bintang dan perbesar white space.",
+        }),
+    )
+
+    assert decision.intent == "revise"
+    assert decision.revision_instruction == "Kurangi ikon bintang dan perbesar white space."
+    assert decision.model_label == "GPT-4.1"
 
 
 def test_generate_requires_idea():
