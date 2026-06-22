@@ -191,6 +191,25 @@ class PromptStudioTest extends TestCase
         ]);
     }
 
+    public function test_new_prompt_starts_without_default_platform_or_prompt_type(): void
+    {
+        Http::fake();
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->test(PrompyStudio::class)
+            ->assertSet('platform', null)
+            ->assertSet('promptType', null)
+            ->set('idea', 'Buat prompt visual')
+            ->call('generate')
+            ->assertHasErrors([
+                'platform' => 'required',
+                'promptType' => 'required',
+            ]);
+
+        Http::assertNothingSent();
+    }
+
     public function test_livewire_requires_idea(): void
     {
         Http::fake();
@@ -198,6 +217,8 @@ class PromptStudioTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(PrompyStudio::class)
+            ->call('selectPlatform', 'gpt_image_2')
+            ->call('selectPromptType', 'poster_infographic')
             ->set('idea', '')
             ->call('generate')
             ->assertHasErrors(['idea' => 'required']);
@@ -356,6 +377,8 @@ class PromptStudioTest extends TestCase
             ->call('startNewPrompt')
             ->assertSet('activePromptId', null)
             ->assertSet('isComposingNewPrompt', true)
+            ->assertSet('platform', null)
+            ->assertSet('promptType', null)
             ->assertSee('Belum ada paket prompt')
             ->assertDontSee('Existing prompt output');
     }
@@ -394,6 +417,8 @@ class PromptStudioTest extends TestCase
         Livewire::actingAs($user)
             ->test(PrompyStudio::class)
             ->set('idea', 'Ide gagal')
+            ->call('selectPlatform', 'gpt_image_2')
+            ->call('selectPromptType', 'poster_infographic')
             ->call('generate');
 
         $this->assertDatabaseCount('generated_prompts', 0);

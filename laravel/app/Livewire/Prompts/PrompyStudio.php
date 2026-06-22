@@ -26,9 +26,9 @@ class PrompyStudio extends Component
 
     public string $idea = '';
 
-    public string $platform = 'generic';
+    public ?string $platform = null;
 
-    public string $promptType = 'image';
+    public ?string $promptType = null;
 
     public string $contextNotes = '';
 
@@ -70,8 +70,8 @@ class PrompyStudio extends Component
     public function startNewPrompt(): void
     {
         $this->idea = '';
-        $this->platform = 'generic';
-        $this->promptType = 'image';
+        $this->platform = null;
+        $this->promptType = null;
         $this->contextNotes = '';
         $this->referenceImage = null;
         $this->activePromptId = null;
@@ -98,7 +98,9 @@ class PrompyStudio extends Component
             ],
         ], [
             'idea.required' => 'Ide prompt wajib diisi.',
+            'platform.required' => 'Pilih platform tujuan.',
             'platform.in' => 'Platform tidak dikenal.',
+            'promptType.required' => 'Pilih jenis keluaran.',
             'promptType.in' => 'Jenis prompt tidak dikenal.',
             'referenceImage.image' => 'Gambar referensi harus berupa file gambar.',
             'referenceImage.mimes' => 'Gambar referensi harus JPG atau PNG.',
