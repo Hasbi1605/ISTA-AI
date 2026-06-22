@@ -30,6 +30,7 @@ class GeneratedPrompt extends Model
         'package',
         'current_version_id',
         'source_document_ids',
+        'chat_messages',
         'contains_internal_context',
         'reference_image_path',
         'reference_image_mime',
@@ -42,6 +43,7 @@ class GeneratedPrompt extends Model
         return [
             'package' => 'array',
             'source_document_ids' => 'array',
+            'chat_messages' => 'array',
             'contains_internal_context' => 'boolean',
         ];
     }

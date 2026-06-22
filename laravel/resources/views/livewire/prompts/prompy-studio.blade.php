@@ -42,7 +42,6 @@
 
             this.prompyRevisionText = message;
             this.prompyRevisionLoading = true;
-            this.showPrompyPreviewPanel?.();
             this.scrollPrompyChatToBottom();
 
             try {
@@ -51,7 +50,7 @@
                 textarea.dispatchEvent(new Event('input', { bubbles: true }));
                 this.scrollPrompyChatToBottom();
 
-                await $wire.sendPromptRevision(message);
+                await $wire.sendPromptChat(message);
             } catch (error) {
                 textarea.value = message;
                 textarea.style.height = 'auto';
@@ -438,7 +437,7 @@
                     </div>
                 </template>
 
-                <div class="flex justify-start" wire:loading.flex wire:target="generate,generateConfiguredPrompt,generateConfiguredRevision,revisePrompt,sendPromptRevision" wire:key="prompy-loading-bubble">
+                <div class="flex justify-start" wire:loading.flex wire:target="generate,generateConfiguredPrompt,generateConfiguredRevision,revisePrompt,sendPromptChat" wire:key="prompy-loading-bubble">
                     <div class="w-full flex items-start gap-2.5">
                         <div class="shrink-0 h-8 w-8 rounded-full bg-white border border-stone-200 shadow-sm p-1 flex items-center justify-center">
                             <img src="{{ asset('images/ista/logo.png') }}" alt="ISTA AI" class="h-full w-full object-contain" />
@@ -489,8 +488,8 @@
                             wire:model="revisionInstruction"
                             x-ref="prompyInput"
                             @keydown.enter="if(!$event.shiftKey) { $event.preventDefault(); submitPrompyRevision($wire, $refs.prompyInput); }"
-                            placeholder="Tulis revisi untuk prompt ini..."
-                            aria-label="Tulis revisi untuk prompt ini"
+                            placeholder="Tulis pesan untuk membahas prompt ini..."
+                            aria-label="Tulis pesan untuk membahas prompt ini"
                             rows="1"
                             maxlength="{{ \App\Services\Prompts\PromptStudioService::REVISION_INSTRUCTION_MAX_LENGTH }}"
                             class="chat-input w-full max-h-[120px] min-h-[44px] bg-transparent border-none focus:ring-0 focus:outline-none focus:border-transparent focus-visible:ring-0 focus-visible:outline-none resize-none text-[14px] text-stone-800 dark:text-[#F8FAFC] placeholder-[#94A3B8] dark:placeholder-[#64748B] px-2 py-[10px] hover:bg-transparent focus:bg-transparent"
@@ -502,10 +501,10 @@
                         <div class="mt-2 flex items-center justify-end">
                             <button type="submit"
                                     wire:loading.attr="disabled"
-                                    wire:target="revisePrompt,sendPromptRevision"
+                                    wire:target="sendPromptChat"
                                     :disabled="prompyRevisionLoading || $wire.isGenerating"
                                     class="bg-ista-primary hover:bg-ista-dark dark:bg-ista-primary dark:hover:bg-ista-dark disabled:opacity-50 disabled:cursor-not-allowed rounded-full transition-all duration-300 h-[32px] w-[32px] flex items-center justify-center group"
-                                    aria-label="Kirim revisi prompt">
+                                    aria-label="Kirim pesan prompt">
                                 <img src="{{ asset('images/icons/send-light.svg') }}" alt="" class="h-[17px] w-[17px] dark:hidden brightness-0 invert" />
                                 <img src="{{ asset('images/icons/send-dark.svg') }}" alt="" class="h-[17px] w-[17px] hidden dark:block brightness-0 invert" />
                             </button>
@@ -561,7 +560,7 @@
         </div>
 
         <div class="flex-1 overflow-y-auto px-4 py-4">
-            <div wire:loading.flex wire:target="generate,generateConfiguredPrompt,generateConfiguredRevision,revisePrompt,sendPromptRevision" class="min-h-[420px] items-center justify-center px-6 text-center">
+            <div wire:loading.flex wire:target="generate,generateConfiguredPrompt,generateConfiguredRevision,revisePrompt" class="min-h-[420px] items-center justify-center px-6 text-center">
                 <div class="max-w-sm">
                     <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-[0_18px_40px_-28px_rgba(15,23,42,0.75)] dark:bg-gray-900">
                         <div class="relative flex h-12 w-12 items-center justify-center rounded-full">
@@ -576,7 +575,7 @@
                 </div>
             </div>
 
-            <div wire:loading.remove wire:target="generate,generateConfiguredPrompt,generateConfiguredRevision,revisePrompt,sendPromptRevision" class="space-y-4">
+            <div wire:loading.remove wire:target="generate,generateConfiguredPrompt,generateConfiguredRevision,revisePrompt" class="space-y-4">
                 @if($activePackage)
                     <div class="memo-config-panel">
                         <div class="border-b border-stone-100 bg-white px-4 py-4 dark:border-gray-800 dark:bg-gray-900">
