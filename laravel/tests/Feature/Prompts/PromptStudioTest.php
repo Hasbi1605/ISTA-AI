@@ -575,6 +575,74 @@ class PromptStudioTest extends TestCase
         $this->assertSame('assistant', $prompt->chat_messages[1]['role'] ?? null);
     }
 
+    public function test_livewire_prompt_chat_preserves_repeated_assistant_replies(): void
+    {
+        Http::fake([
+            '*/api/prompts/generate' => Http::response($this->fakePackageResponse([
+                'main_prompt' => 'A first draft prompt.',
+            ]), 200),
+        ]);
+        $user = User::factory()->create();
+
+        $component = Livewire::actingAs($user)
+            ->test(PrompyStudio::class)
+            ->set('idea', 'Buat prompt logo komunitas')
+            ->call('selectPlatform', 'gpt_image_2')
+            ->call('selectPromptType', 'image')
+            ->call('generate')
+            ->call('sendPromptChat', 'uiii pop')
+            ->call('sendPromptChat', 'halo')
+            ->call('sendPromptChat', 'hei jawblah');
+
+        $prompt = GeneratedPrompt::findOrFail($component->get('activePromptId'));
+        $this->assertCount(6, $prompt->chat_messages);
+        $this->assertSame('uiii pop', $prompt->chat_messages[0]['content'] ?? null);
+        $this->assertSame('assistant', $prompt->chat_messages[1]['role'] ?? null);
+        $this->assertSame('halo', $prompt->chat_messages[2]['content'] ?? null);
+        $this->assertSame('assistant', $prompt->chat_messages[3]['role'] ?? null);
+        $this->assertSame('hei jawblah', $prompt->chat_messages[4]['content'] ?? null);
+        $this->assertSame('assistant', $prompt->chat_messages[5]['role'] ?? null);
+
+        $assistantFallback = 'Saya catat untuk konteks prompt ini. Paket di panel hasil belum saya ubah otomatis, jadi Anda masih bisa berdiskusi atau memastikan arahnya dulu sebelum membuat ulang prompt.';
+        $assistantReplies = collect($component->get('promptChatMessages'))
+            ->where('role', 'assistant')
+            ->where('content', $assistantFallback)
+            ->count();
+
+        $this->assertSame(3, $assistantReplies);
+    }
+
+    public function test_livewire_prompt_chat_menurutmu_question_does_not_create_version(): void
+    {
+        $calls = [];
+        Http::fake([
+            '*/api/prompts/generate' => function ($request) use (&$calls) {
+                $calls[] = $request->data();
+
+                return Http::response($this->fakePackageResponse([
+                    'main_prompt' => 'A first draft prompt.',
+                ]), 200);
+            },
+        ]);
+        $user = User::factory()->create();
+
+        $component = Livewire::actingAs($user)
+            ->test(PrompyStudio::class)
+            ->set('idea', 'Buat prompt logo komunitas')
+            ->call('selectPlatform', 'gpt_image_2')
+            ->call('selectPromptType', 'image')
+            ->call('generate')
+            ->call('sendPromptChat', 'menurutmu untuk apa yg perlu ditingkatkan dari prompt tersebut')
+            ->assertSee('Untuk konteks prompt ini');
+
+        $prompt = GeneratedPrompt::with('versions')->findOrFail($component->get('activePromptId'));
+        $this->assertSame(1, $prompt->versions()->count());
+        $this->assertCount(1, $calls);
+        $this->assertCount(2, $prompt->chat_messages);
+        $this->assertSame('user', $prompt->chat_messages[0]['role'] ?? null);
+        $this->assertSame('assistant', $prompt->chat_messages[1]['role'] ?? null);
+    }
+
     public function test_livewire_active_prompt_configuration_regenerates_same_history_item(): void
     {
         $calls = [];

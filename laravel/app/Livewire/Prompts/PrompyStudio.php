@@ -495,7 +495,7 @@ class PrompyStudio extends Component
             ];
         }
 
-        return $this->mergePromptChatMessages(
+        return $this->appendPromptChatMessages(
             $messages,
             $this->normalizeStoredPromptChatMessages($prompt->chat_messages ?? []),
         );
@@ -514,7 +514,7 @@ class PrompyStudio extends Component
                 return null;
             }
 
-            $mergedMessages = $this->mergePromptChatMessages(
+            $mergedMessages = $this->appendPromptChatMessages(
                 $this->normalizeStoredPromptChatMessages($lockedPrompt->chat_messages ?? []),
                 $messages,
             );
@@ -582,32 +582,14 @@ class PrompyStudio extends Component
             ->all();
     }
 
-    private function mergePromptChatMessages(array $primaryMessages, array $secondaryMessages): array
+    private function appendPromptChatMessages(array ...$messageGroups): array
     {
         $merged = [];
-        $seen = [];
 
-        foreach ([...$primaryMessages, ...$secondaryMessages] as $message) {
-            if (! is_array($message)) {
-                continue;
-            }
-
-            $role = ($message['role'] ?? null) === 'user' ? 'user' : 'assistant';
-            $content = trim((string) ($message['content'] ?? ''));
-            if ($content === '') {
-                continue;
-            }
-
-            $key = $role.'|'.mb_strtolower((string) preg_replace('/\s+/u', ' ', $content));
-            if (isset($seen[$key])) {
-                continue;
-            }
-
-            $seen[$key] = true;
-            $merged[] = [
-                'role' => $role,
-                'content' => $content,
-                'timestamp' => (string) ($message['timestamp'] ?? now()->format('H:i')),
+        foreach ($messageGroups as $messages) {
+            $merged = [
+                ...$merged,
+                ...$this->normalizeStoredPromptChatMessages($messages),
             ];
         }
 
@@ -632,7 +614,8 @@ class PrompyStudio extends Component
         $normalized = mb_strtolower(trim($message), 'UTF-8');
 
         return str_contains($normalized, '?')
-            || (bool) preg_match('/^(?:apa|apakah|bagaimana|gimana|kenapa|mengapa|bisa|boleh|cara|untuk apa)\b/iu', $normalized);
+            || (bool) preg_match('/^(?:apa|apakah|bagaimana|gimana|kenapa|mengapa|bisa|boleh|cara|untuk apa|menurutmu|menurut anda|saran|rekomendasi|review|evaluasi)\b/iu', $normalized)
+            || (bool) preg_match('/\b(?:perlu ditingkatkan|yang perlu ditingkatkan|apa yg perlu ditingkatkan|apa yang perlu ditingkatkan)\b/iu', $normalized);
     }
 
     private function looksLikePromptChangeNote(string $message): bool
