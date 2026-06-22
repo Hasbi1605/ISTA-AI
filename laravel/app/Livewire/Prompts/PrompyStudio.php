@@ -253,8 +253,6 @@ class PrompyStudio extends Component
             return;
         }
 
-        $this->enforceRateLimit('promptChat', 30, 60, 'Terlalu banyak pesan prompt. Coba lagi sebentar.');
-
         $prompt = GeneratedPrompt::with(['currentVersion', 'versions'])
             ->where('id', $this->activePromptId)
             ->where('user_id', Auth::id())
@@ -263,6 +261,15 @@ class PrompyStudio extends Component
         if (! $prompt) {
             return;
         }
+
+        if ($this->looksLikePromptChangeNote($userMessage)) {
+            $this->revisionInstruction = $userMessage;
+            $this->revisePrompt(app(PromptStudioService::class));
+
+            return;
+        }
+
+        $this->enforceRateLimit('promptChat', 30, 60, 'Terlalu banyak pesan prompt. Coba lagi sebentar.');
 
         $updated = $this->persistPromptChatExchange($prompt, [
             $this->makePromptChatMessage('user', $userMessage),
@@ -483,7 +490,7 @@ class PrompyStudio extends Component
             ];
             $messages[] = [
                 'role' => 'assistant',
-                'content' => 'Revisi prompt "'.$prompt->displayTitle().'" berhasil disimpan sebagai Versi '.$version->version_number.'. Cek panel hasil untuk menyalin paket prompt terbaru.',
+                'content' => $this->promptRevisionAssistantReply($version),
                 'timestamp' => $this->formatPromptTimestamp($version->created_at),
             ];
         }
@@ -537,11 +544,19 @@ class PrompyStudio extends Component
             return 'Untuk konteks prompt ini, paket aktif adalah '.$versionLabel.' untuk '.$platformLabel.' dengan keluaran '.$promptTypeLabel.'. Anda bisa menanyakan bagian prompt, meminta penjelasan, atau memakai tombol salin di panel hasil kanan.';
         }
 
-        if ($this->looksLikePromptChangeNote($message)) {
-            return 'Saya paham arahnya. Catatan itu relevan untuk prompt aktif, tetapi pesan chat ini tidak otomatis membuat package atau versi baru. Panel hasil kanan tetap memakai '.$versionLabel.' sampai Anda membuat ulang dari konfigurasi.';
+        return 'Saya catat untuk konteks prompt ini. Paket di panel hasil belum saya ubah otomatis, jadi Anda masih bisa berdiskusi atau memastikan arahnya dulu sebelum membuat ulang prompt.';
+    }
+
+    private function promptRevisionAssistantReply(GeneratedPromptVersion $version): string
+    {
+        $versionLabel = 'Versi '.(int) $version->version_number;
+        $instruction = mb_strtolower(trim((string) $version->revision_instruction), 'UTF-8');
+
+        if (str_contains($instruction, 'konfigurasi terbaru') || str_contains($instruction, 'generate ulang prompt aktif')) {
+            return 'Saya sudah membuat ulang prompt dari konfigurasi terbaru sebagai '.$versionLabel.'. Panel hasil kanan sudah memakai versi ini dan siap disalin.';
         }
 
-        return 'Saya catat untuk konteks prompt ini. Paket di panel hasil belum saya ubah otomatis, jadi Anda masih bisa berdiskusi atau memastikan arahnya dulu sebelum membuat ulang prompt.';
+        return 'Sudah saya terapkan ke '.$versionLabel.'. Panel hasil kanan sudah diperbarui dan siap disalin.';
     }
 
     private function makePromptChatMessage(string $role, string $content): array

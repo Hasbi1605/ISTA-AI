@@ -524,13 +524,19 @@ class PromptStudioTest extends TestCase
         $this->assertCount(2, $calls[1]['reference_images'] ?? []);
     }
 
-    public function test_livewire_prompt_chat_message_does_not_create_version_or_package(): void
+    public function test_livewire_prompt_chat_message_revises_only_when_instruction_changes_prompt(): void
     {
         $calls = [];
         Http::fake([
             '*/api/prompts/generate' => function ($request) use (&$calls) {
                 $data = $request->data();
                 $calls[] = $data;
+
+                if (! empty($data['revision_instruction'])) {
+                    return Http::response($this->fakePackageResponse([
+                        'main_prompt' => 'A revised prompt with WhatsApp 083826039171.',
+                    ]), 200);
+                }
 
                 return Http::response($this->fakePackageResponse([
                     'main_prompt' => 'A first draft prompt.',
@@ -549,23 +555,24 @@ class PromptStudioTest extends TestCase
             ->assertSet('revisionInstruction', '')
             ->assertSet('showPromptConfiguration', false)
             ->assertSee('Ganti nomor WhatsApp menjadi 083826039171')
-            ->assertSee('Saya paham arahnya')
-            ->assertSee('pesan chat ini tidak otomatis membuat package atau versi baru')
-            ->assertSee('A first draft prompt.')
+            ->assertSee('Sudah saya terapkan ke Versi 2')
+            ->assertSee('A revised prompt with WhatsApp 083826039171.')
             ->call('sendPromptChat', 'Oke sudah bagus')
             ->assertSee('Oke sudah bagus')
-            ->assertSee('saya pertahankan Versi 1 sebagai prompt aktif');
+            ->assertSee('saya pertahankan Versi 2 sebagai prompt aktif');
 
-        $prompt = GeneratedPrompt::with('versions')->findOrFail($component->get('activePromptId'));
-        $this->assertSame(1, $prompt->versions()->count());
-        $this->assertNull($prompt->currentVersion?->revision_instruction);
-        $this->assertCount(1, $calls);
-        $this->assertCount(4, $prompt->chat_messages);
+        $prompt = GeneratedPrompt::with(['currentVersion', 'versions'])->findOrFail($component->get('activePromptId'));
+        $this->assertSame(2, $prompt->versions()->count());
+        $this->assertSame(2, $prompt->currentVersion?->version_number);
+        $this->assertSame('Ganti nomor WhatsApp menjadi 083826039171', $prompt->currentVersion?->revision_instruction);
+        $this->assertSame('A revised prompt with WhatsApp 083826039171.', $prompt->normalizedPackage()['main_prompt']);
+        $this->assertCount(2, $calls);
+        $this->assertSame('Ganti nomor WhatsApp menjadi 083826039171', $calls[1]['revision_instruction'] ?? null);
+        $this->assertSame('A first draft prompt.', $calls[1]['current_package']['main_prompt'] ?? null);
+        $this->assertCount(2, $prompt->chat_messages);
         $this->assertSame('user', $prompt->chat_messages[0]['role'] ?? null);
-        $this->assertSame('Ganti nomor WhatsApp menjadi 083826039171', $prompt->chat_messages[0]['content'] ?? null);
+        $this->assertSame('Oke sudah bagus', $prompt->chat_messages[0]['content'] ?? null);
         $this->assertSame('assistant', $prompt->chat_messages[1]['role'] ?? null);
-        $this->assertSame('user', $prompt->chat_messages[2]['role'] ?? null);
-        $this->assertSame('Oke sudah bagus', $prompt->chat_messages[2]['content'] ?? null);
     }
 
     public function test_livewire_active_prompt_configuration_regenerates_same_history_item(): void
