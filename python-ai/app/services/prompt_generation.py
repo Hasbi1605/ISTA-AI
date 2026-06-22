@@ -30,7 +30,8 @@ IDEA_MAX_LENGTH = 4000
 CONTEXT_NOTES_MAX_LENGTH = 4000
 REFERENCE_IMAGE_ANALYSIS_MAX_LENGTH = 2500
 REFERENCE_IMAGE_BASE64_MAX_LENGTH = 7_100_000
-REFERENCE_IMAGE_ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
+REFERENCE_IMAGE_MAX_COUNT = 5
+REFERENCE_IMAGE_ALLOWED_MIME_TYPES = {"image/jpeg", "image/png"}
 MAIN_PROMPT_MAX_LENGTH = 6000
 NOTES_MAX_LENGTH = 4000
 MAX_VARIANTS = 4
@@ -103,12 +104,16 @@ def build_prompt_studio_prompt(
     platform_profile: Mapping[str, Any],
     context_notes: str = "",
     reference_image_analysis: str = "",
+    current_package: Mapping[str, Any] | None = None,
+    revision_instruction: str = "",
     runtime_config: Mapping[str, Any] | None = None,
 ) -> str:
     template_values = {
         "idea": idea.strip(),
         "context_notes": (context_notes or "").strip() or "-",
         "reference_image_analysis": (reference_image_analysis or "").strip() or "-",
+        "current_package": _format_current_package(current_package),
+        "revision_instruction": (revision_instruction or "").strip() or "-",
         "platform_label": str(platform_profile.get("label", "Generic")),
         "platform_guidance": str(platform_profile.get("guidance", "")).strip() or "-",
         "prompt_type_label": str(prompt_type_profile.get("label", "")),
@@ -127,10 +132,12 @@ def build_reference_image_analysis_prompt(
     idea: str,
     prompt_type_profile: Mapping[str, Any],
     platform_profile: Mapping[str, Any],
+    reference_label: str = "Gambar referensi",
     runtime_config: Mapping[str, Any] | None = None,
 ) -> str:
     template_values = {
         "idea": idea.strip(),
+        "reference_label": reference_label.strip() or "Gambar referensi",
         "platform_label": str(platform_profile.get("label", "Generic")),
         "prompt_type_label": str(prompt_type_profile.get("label", "")),
     }
@@ -149,6 +156,9 @@ def generate_prompt_package(
     prompt_type: str,
     context_notes: str = "",
     reference_image: Mapping[str, Any] | None = None,
+    reference_images: list[Mapping[str, Any]] | None = None,
+    current_package: Mapping[str, Any] | None = None,
+    revision_instruction: str = "",
     text_generator: Callable[[str], str] | None = None,
     vision_generator: Callable[[str, Mapping[str, str]], str] | None = None,
     runtime_config: Mapping[str, Any] | None = None,
@@ -163,7 +173,8 @@ def generate_prompt_package(
 
     platform_profile = resolve_platform(platform)
     type_profile = resolve_type(prompt_type)
-    reference_image_analysis = analyze_reference_image(
+    reference_image_analysis = analyze_reference_images(
+        reference_images=reference_images,
         reference_image=reference_image,
         idea=clean_idea,
         platform_profile=platform_profile,
@@ -178,6 +189,8 @@ def generate_prompt_package(
         platform_profile=platform_profile,
         context_notes=clean_notes,
         reference_image_analysis=reference_image_analysis,
+        current_package=current_package,
+        revision_instruction=revision_instruction,
         runtime_config=runtime_config,
     )
 
@@ -209,6 +222,7 @@ def analyze_reference_image(
     idea: str,
     platform_profile: Mapping[str, Any],
     prompt_type_profile: Mapping[str, Any],
+    reference_label: str = "Gambar referensi",
     vision_generator: Callable[[str, Mapping[str, str]], str] | None = None,
     runtime_config: Mapping[str, Any] | None = None,
 ) -> str:
@@ -220,6 +234,7 @@ def analyze_reference_image(
         idea=idea,
         platform_profile=platform_profile,
         prompt_type_profile=prompt_type_profile,
+        reference_label=reference_label,
         runtime_config=runtime_config,
     )
 
@@ -240,6 +255,42 @@ def analyze_reference_image(
         raise ValueError("Gagal menganalisis gambar referensi.")
 
     return clean
+
+
+def analyze_reference_images(
+    *,
+    reference_images: list[Mapping[str, Any]] | None = None,
+    reference_image: Mapping[str, Any] | None = None,
+    idea: str,
+    platform_profile: Mapping[str, Any],
+    prompt_type_profile: Mapping[str, Any],
+    vision_generator: Callable[[str, Mapping[str, str]], str] | None = None,
+    runtime_config: Mapping[str, Any] | None = None,
+) -> str:
+    images = list(reference_images or [])
+    if not images and reference_image:
+        images = [reference_image]
+
+    if not images:
+        return ""
+    if len(images) > REFERENCE_IMAGE_MAX_COUNT:
+        raise ValueError("Gambar referensi maksimal 5 file.")
+
+    analyses: list[str] = []
+    for index, image in enumerate(images):
+        label = str(image.get("label") or f"Gambar {index + 1}").strip() or f"Gambar {index + 1}"
+        analysis = analyze_reference_image(
+            reference_image=image,
+            idea=idea,
+            platform_profile=platform_profile,
+            prompt_type_profile=prompt_type_profile,
+            reference_label=label,
+            vision_generator=vision_generator,
+            runtime_config=runtime_config,
+        )
+        analyses.append(f"{label}:\n{analysis}")
+
+    return "\n\n".join(analyses)
 
 
 def _default_text_generator(prompt: str, runtime_config: Mapping[str, Any] | None = None) -> str:
@@ -325,6 +376,24 @@ def _normalize_reference_image(reference_image: Mapping[str, Any]) -> dict[str, 
         raise ValueError("Data gambar referensi tidak valid.") from exc
 
     return {"mime_type": mime_type, "data_base64": data_base64}
+
+
+def _format_current_package(current_package: Mapping[str, Any] | None) -> str:
+    if not isinstance(current_package, Mapping) or not current_package:
+        return "-"
+
+    normalized = {
+        "main_prompt": _clean_text(current_package.get("main_prompt"), MAIN_PROMPT_MAX_LENGTH),
+        "variants": _clean_variants(current_package.get("variants")),
+        "negative_prompt": _clean_text(current_package.get("negative_prompt"), MAIN_PROMPT_MAX_LENGTH),
+        "recommended_settings": _clean_settings(current_package.get("recommended_settings")),
+        "notes_id": _clean_text(current_package.get("notes_id"), NOTES_MAX_LENGTH),
+    }
+
+    try:
+        return json.dumps(normalized, ensure_ascii=False, indent=2)
+    except (TypeError, ValueError):
+        return "-"
 
 
 def _extract_model_label(text: str) -> str:

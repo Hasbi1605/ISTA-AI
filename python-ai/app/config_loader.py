@@ -235,6 +235,8 @@ PERTANYAAN USER:
             "Ide pengguna (Bahasa Indonesia): {idea}\n"
             "Catatan konteks tambahan: {context_notes}\n"
             "Analisis gambar referensi: {reference_image_analysis}\n"
+            "Paket prompt aktif: {current_package}\n"
+            "Instruksi revisi: {revision_instruction}\n"
             "Karakter platform: {platform_guidance}\n"
             "Panduan struktur: {type_guidance}\n\n"
             "Balas HANYA satu objek JSON valid dengan field: main_prompt (Bahasa Inggris), "
@@ -246,7 +248,7 @@ PERTANYAAN USER:
     "prompt_studio_reference_image": {
         "body": (
             "Analisis gambar referensi untuk membantu menyusun prompt visual. "
-            "Konteks ide: {idea}. Target: {platform_label}, jenis {prompt_type_label}. "
+            "Label gambar: {reference_label}. Konteks ide: {idea}. Target: {platform_label}, jenis {prompt_type_label}. "
             "Balas ringkas dalam Bahasa Indonesia berisi: gaya visual, palet warna, "
             "komposisi/layout, tipografi/teks bila terlihat, objek utama, suasana, "
             "detail yang perlu dipertahankan, dan hal yang perlu dihindari. "

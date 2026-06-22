@@ -6,8 +6,10 @@ const CHAT_PENDING_STORAGE_KEY = 'ista.chat.pendingResponses.v1';
 const CHAT_COMPLETED_STORAGE_KEY = 'ista.chat.completedResponses.v1';
 const CHAT_HISTORY_SECTIONS_STORAGE_KEY = 'ista.chat.historySections.v1';
 const MEMO_HISTORY_SECTIONS_STORAGE_KEY = 'ista.memo.historySections.v1';
+const PROMPY_HISTORY_SECTIONS_STORAGE_KEY = 'ista.prompy.historySections.v1';
 const CHAT_HISTORY_SECTION_KEYS = ['seven', 'thirty', 'older'];
 const MEMO_HISTORY_SECTION_KEYS = ['seven', 'thirty', 'older'];
+const PROMPY_HISTORY_SECTION_KEYS = ['seven', 'thirty', 'older'];
 const CHAT_PENDING_MARKER_TTL_MS = 10 * 60 * 1000;
 const CHAT_PENDING_RECENT_TTL_MS = 3 * 60 * 1000;
 const CHAT_PENDING_STALE_WARNING_MS = 45 * 1000;
@@ -312,6 +314,11 @@ const normalizeMemoHistorySectionState = (sections = {}) => MEMO_HISTORY_SECTION
     [section]: Boolean(sections?.[section]),
 }), {});
 
+const normalizePromptHistorySectionState = (sections = {}) => PROMPY_HISTORY_SECTION_KEYS.reduce((state, section) => ({
+    ...state,
+    [section]: Boolean(sections?.[section]),
+}), {});
+
 const loadHistorySectionState = () => {
     try {
         const raw = window.localStorage?.getItem(CHAT_HISTORY_SECTIONS_STORAGE_KEY);
@@ -331,6 +338,18 @@ const loadMemoHistorySectionState = () => {
         const parsed = JSON.parse(raw);
 
         return parsed && typeof parsed === 'object' ? normalizeMemoHistorySectionState(parsed) : {};
+    } catch (_) {
+        return {};
+    }
+};
+
+const loadPromptHistorySectionState = () => {
+    try {
+        const raw = window.localStorage?.getItem(PROMPY_HISTORY_SECTIONS_STORAGE_KEY);
+        if (!raw) return {};
+        const parsed = JSON.parse(raw);
+
+        return parsed && typeof parsed === 'object' ? normalizePromptHistorySectionState(parsed) : {};
     } catch (_) {
         return {};
     }
@@ -358,6 +377,17 @@ const saveMemoHistorySectionState = (sections) => {
     }
 };
 
+const savePromptHistorySectionState = (sections) => {
+    try {
+        window.localStorage?.setItem(
+            PROMPY_HISTORY_SECTIONS_STORAGE_KEY,
+            JSON.stringify(normalizePromptHistorySectionState(sections)),
+        );
+    } catch (_) {
+        // ignore storage write errors
+    }
+};
+
 const initialHistorySectionState = (config = {}) => {
     const storedSections = loadHistorySectionState();
     const serverSections = normalizeHistorySectionState(config.openHistorySections || {});
@@ -373,6 +403,16 @@ const initialMemoHistorySectionState = (config = {}) => {
     const serverSections = normalizeMemoHistorySectionState(config.openHistorySections || {});
 
     return MEMO_HISTORY_SECTION_KEYS.reduce((state, section) => ({
+        ...state,
+        [section]: Boolean(storedSections[section] || serverSections[section]),
+    }), {});
+};
+
+const initialPromptHistorySectionState = (config = {}) => {
+    const storedSections = loadPromptHistorySectionState();
+    const serverSections = normalizePromptHistorySectionState(config.openHistorySections || {});
+
+    return PROMPY_HISTORY_SECTION_KEYS.reduce((state, section) => ({
         ...state,
         [section]: Boolean(storedSections[section] || serverSections[section]),
     }), {});
@@ -1965,6 +2005,185 @@ const registerChatPageData = (Alpine) => {
                 this._userMessageRejectedWindowHandler = null;
             }
             this.clearMessageAckTimeout();
+        },
+    }));
+
+    Alpine.data('prompyHistory', (config = {}) => ({
+        activePromptId: config.activePromptId ? Number(config.activePromptId) : null,
+        openPromptSections: initialPromptHistorySectionState(config),
+        promptSectionKeys: (config.promptSectionKeys || PROMPY_HISTORY_SECTION_KEYS).map((section) => String(section)),
+        promptSearch: '',
+        promptTitles: (config.promptTitles || []).map((title) => String(title || '')),
+        loadingPromptId: null,
+        promptLoadToken: 0,
+
+        init() {
+            this.$nextTick(() => this.syncActivePromptItem());
+        },
+
+        setActivePrompt(id) {
+            const promptId = id ? Number(id) : null;
+            const nextPromptId = Number.isFinite(promptId) ? promptId : null;
+
+            if (this.activePromptId === nextPromptId) {
+                this.syncActivePromptItem();
+                return;
+            }
+
+            this.activePromptId = nextPromptId;
+            this.$nextTick(() => this.syncActivePromptItem());
+        },
+
+        normalizedPromptSearch() {
+            return String(this.promptSearch || '').trim().toLowerCase();
+        },
+
+        isSearchingPromptHistory() {
+            return this.normalizedPromptSearch().length > 0;
+        },
+
+        isPromptVisible(title) {
+            const search = this.normalizedPromptSearch();
+            if (!search) {
+                return true;
+            }
+
+            return String(title || '').toLowerCase().includes(search);
+        },
+
+        hasPromptSearchResults() {
+            const search = this.normalizedPromptSearch();
+            if (!search) {
+                return true;
+            }
+
+            return this.promptTitles.some((title) => String(title || '').toLowerCase().includes(search));
+        },
+
+        isLoadingPrompt(id) {
+            return this.loadingPromptId === Number(id);
+        },
+
+        availablePromptSectionKeys() {
+            return (this.promptSectionKeys || [])
+                .map((section) => String(section))
+                .filter((section) => PROMPY_HISTORY_SECTION_KEYS.includes(section));
+        },
+
+        allPromptSectionsOpen() {
+            const sections = this.availablePromptSectionKeys();
+
+            return sections.length > 0 && sections.every((section) => Boolean(this.openPromptSections?.[section]));
+        },
+
+        persistOpenPromptSections() {
+            savePromptHistorySectionState(this.openPromptSections);
+        },
+
+        isPromptSectionOpen(section) {
+            return this.isSearchingPromptHistory() || Boolean(this.openPromptSections?.[section]);
+        },
+
+        togglePromptSection(section) {
+            if (!section) {
+                return;
+            }
+
+            this.openPromptSections = {
+                ...this.openPromptSections,
+                [section]: !this.openPromptSections?.[section],
+            };
+            this.persistOpenPromptSections();
+        },
+
+        toggleAllPromptHistory() {
+            const shouldOpen = !this.allPromptSectionsOpen();
+            const nextSections = { ...this.openPromptSections };
+
+            this.availablePromptSectionKeys().forEach((section) => {
+                nextSections[section] = shouldOpen;
+            });
+
+            this.openPromptSections = nextSections;
+            this.persistOpenPromptSections();
+        },
+
+        syncActivePromptItem(id = this.activePromptId) {
+            const promptId = id ? Number(id) : null;
+            this.activePromptId = Number.isFinite(promptId) ? promptId : null;
+
+            if (!this.$root) {
+                return;
+            }
+
+            this.$root.querySelectorAll('[data-prompy-history-id]').forEach((button) => {
+                const isActive = Number(button.dataset.prompyHistoryId) === this.activePromptId;
+                button.classList.toggle('is-active', isActive);
+                button.setAttribute('aria-current', isActive ? 'page' : 'false');
+
+                if (isActive) {
+                    const section = button.closest('[data-prompy-history-section]')?.dataset?.prompyHistorySection;
+                    if (section && PROMPY_HISTORY_SECTION_KEYS.includes(section) && !this.openPromptSections?.[section]) {
+                        this.openPromptSections = {
+                            ...this.openPromptSections,
+                            [section]: true,
+                        };
+                        this.persistOpenPromptSections();
+                    }
+                }
+            });
+        },
+
+        loadPrompt(id) {
+            const promptId = Number(id);
+            const previousPromptId = this.activePromptId;
+
+            if (!Number.isFinite(promptId) || promptId <= 0) {
+                return Promise.resolve({ stale: false });
+            }
+
+            if (previousPromptId === promptId) {
+                this.syncActivePromptItem();
+                return Promise.resolve({ stale: false });
+            }
+
+            const promptLoadToken = this.promptLoadToken + 1;
+            this.promptLoadToken = promptLoadToken;
+            this.loadingPromptId = promptId;
+
+            return Promise.resolve(this.$wire.selectPrompt(promptId))
+                .then(() => {
+                    if (this.promptLoadToken !== promptLoadToken) {
+                        return { stale: true };
+                    }
+
+                    const loadedPromptId = Number(this.$wire.activePromptId || 0);
+                    if (loadedPromptId !== promptId) {
+                        this.setActivePrompt(previousPromptId);
+
+                        return { stale: false, blocked: true };
+                    }
+
+                    this.setActivePrompt(promptId);
+
+                    return { stale: false };
+                })
+                .catch((error) => {
+                    if (this.promptLoadToken === promptLoadToken) {
+                        this.setActivePrompt(previousPromptId);
+                    }
+
+                    throw error;
+                })
+                .finally(() => {
+                    if (this.promptLoadToken !== promptLoadToken) {
+                        return;
+                    }
+
+                    if (this.loadingPromptId === promptId) {
+                        this.loadingPromptId = null;
+                    }
+                });
         },
     }));
 

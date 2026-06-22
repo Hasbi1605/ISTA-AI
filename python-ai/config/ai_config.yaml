@@ -636,6 +636,12 @@ prompts:
       Analisis gambar referensi (opsional, gunakan sebagai bahan visual faktual):
       {reference_image_analysis}
 
+      Paket prompt aktif untuk direvisi (kosong bila membuat versi pertama):
+      {current_package}
+
+      Instruksi revisi pengguna (kosong bila membuat versi pertama):
+      {revision_instruction}
+
       Jika analisis gambar referensi tersedia, paket prompt akhir WAJIB:
       - mempertahankan orientasi/rasio aspek gambar referensi, kecuali user
         meminta perubahan eksplisit
@@ -646,6 +652,13 @@ prompts:
         sesuai ide user, misalnya nama brand, slogan, atau kontak
       - menghindari default rasio umum seperti 16:9 bila referensi jelas
         berbentuk poster vertikal, square, atau format lain
+
+      Jika paket prompt aktif dan instruksi revisi tersedia:
+      - revisi paket prompt aktif sesuai instruksi pengguna, bukan membuat ide baru
+        dari nol
+      - pertahankan platform, jenis keluaran, subjek, batasan, dan referensi gambar
+        yang masih relevan kecuali pengguna meminta perubahan eksplisit
+      - hasilkan kembali JSON lengkap yang siap menggantikan versi sebelumnya
 
       Karakter platform:
       {platform_guidance}
@@ -681,6 +694,8 @@ prompts:
 
       Ide/permintaan pengguna:
       {idea}
+
+      Label gambar: {reference_label}
 
       Target platform: {platform_label}
       Jenis keluaran: {prompt_type_label}

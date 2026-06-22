@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from app.services import prompt_generation
 from app.services.prompt_generation import (
     analyze_reference_image,
+    analyze_reference_images,
     build_prompt_studio_prompt,
     generate_prompt_package,
     resolve_platform,
@@ -105,6 +106,73 @@ def test_generate_prompt_package_uses_reference_image_analysis():
     assert "ISTA Laundry" in captured_prompt
 
 
+def test_generate_prompt_package_uses_multiple_reference_images_with_numbered_labels():
+    captured_prompt = ""
+    vision_calls = []
+
+    def fake_vision_generator(prompt: str, image: dict[str, str]) -> str:
+        vision_calls.append((prompt, image))
+        if "Label gambar: Gambar 2" in prompt:
+            return "Gaya visual adalah pas foto formal berlatar merah."
+        return "Subjek utama adalah pegawai dengan jas formal."
+
+    def fake_text_generator(prompt: str) -> str:
+        nonlocal captured_prompt
+        captured_prompt = prompt
+        return json.dumps(VALID_PACKAGE)
+
+    package = generate_prompt_package(
+        idea="Gunakan Gambar 1 sebagai subjek dan tiru gaya Gambar 2",
+        platform="gpt_image_2",
+        prompt_type="image",
+        reference_images=[
+            {
+                "label": "Gambar 1",
+                "mime_type": "image/png",
+                "data_base64": "aW1hZ2UtMQ==",
+            },
+            {
+                "label": "Gambar 2",
+                "mime_type": "image/jpeg",
+                "data_base64": "aW1hZ2UtMg==",
+            },
+        ],
+        vision_generator=fake_vision_generator,
+        text_generator=fake_text_generator,
+    )
+
+    assert package.reference_image_analyzed is True
+    assert len(vision_calls) == 2
+    assert "Label gambar: Gambar 1" in vision_calls[0][0]
+    assert "Label gambar: Gambar 2" in vision_calls[1][0]
+    assert "Gambar 1:" in captured_prompt
+    assert "Subjek utama" in captured_prompt
+    assert "Gambar 2:" in captured_prompt
+    assert "pas foto formal" in captured_prompt
+
+
+def test_generate_prompt_package_includes_revision_context():
+    captured_prompt = ""
+
+    def fake_text_generator(prompt: str) -> str:
+        nonlocal captured_prompt
+        captured_prompt = prompt
+        return json.dumps(VALID_PACKAGE | {"main_prompt": "A revised prompt."})
+
+    package = generate_prompt_package(
+        idea="Buat prompt pas foto",
+        platform="generic",
+        prompt_type="image",
+        current_package={"main_prompt": "Original prompt", "variants": []},
+        revision_instruction="Pendekkan dan buat lebih formal.",
+        text_generator=fake_text_generator,
+    )
+
+    assert package.main_prompt == "A revised prompt."
+    assert "Original prompt" in captured_prompt
+    assert "Pendekkan dan buat lebih formal." in captured_prompt
+
+
 def test_default_vision_generator_sends_reference_image_to_model_cascade(monkeypatch):
     captured = {}
 
@@ -147,6 +215,20 @@ def test_reference_image_analysis_rejects_invalid_payload():
     with pytest.raises(ValueError):
         analyze_reference_image(
             reference_image={"mime_type": "application/pdf", "data_base64": "abc"},
+            idea="Ide",
+            platform_profile=resolve_platform("generic"),
+            prompt_type_profile=resolve_type("image"),
+            vision_generator=lambda _prompt, _image: "Tidak dipakai",
+        )
+
+
+def test_reference_image_analysis_rejects_more_than_five_images():
+    with pytest.raises(ValueError):
+        analyze_reference_images(
+            reference_images=[
+                {"mime_type": "image/png", "data_base64": "aW1hZ2U="}
+                for _ in range(6)
+            ],
             idea="Ide",
             platform_profile=resolve_platform("generic"),
             prompt_type_profile=resolve_type("image"),

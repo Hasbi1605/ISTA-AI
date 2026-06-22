@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
@@ -27,6 +28,7 @@ class GeneratedPrompt extends Model
         'title',
         'idea',
         'package',
+        'current_version_id',
         'source_document_ids',
         'contains_internal_context',
         'reference_image_path',
@@ -47,6 +49,16 @@ class GeneratedPrompt extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function versions(): HasMany
+    {
+        return $this->hasMany(GeneratedPromptVersion::class);
+    }
+
+    public function currentVersion(): BelongsTo
+    {
+        return $this->belongsTo(GeneratedPromptVersion::class, 'current_version_id');
     }
 
     public function isOwnedBy(?User $user): bool
@@ -104,7 +116,17 @@ class GeneratedPrompt extends Model
      */
     public function normalizedPackage(): array
     {
-        $package = is_array($this->package) ? $this->package : [];
+        $version = $this->relationLoaded('currentVersion') ? $this->currentVersion : null;
+
+        return self::normalizePackage($version?->package ?? $this->package);
+    }
+
+    /**
+     * @return array{main_prompt: string, variants: list<string>, negative_prompt: string, recommended_settings: array<string, string>, notes_id: string}
+     */
+    public static function normalizePackage(mixed $package): array
+    {
+        $package = is_array($package) ? $package : [];
 
         return [
             'main_prompt' => (string) ($package['main_prompt'] ?? ''),

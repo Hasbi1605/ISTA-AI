@@ -3,27 +3,27 @@
     $promptHistoryTodayStart = $promptHistoryNow->copy()->startOfDay();
     $promptHistorySevenDayStart = $promptHistoryTodayStart->copy()->subDays(7);
     $promptHistoryThirtyDayStart = $promptHistoryTodayStart->copy()->subDays(30);
-    $promptCreatedAt = fn ($prompt) => $prompt->created_at?->copy()->timezone('Asia/Jakarta');
+    $promptUpdatedAt = fn ($prompt) => $prompt->updated_at?->copy()->timezone('Asia/Jakarta');
 
-    $todayPrompts = $prompts->filter(function ($prompt) use ($promptCreatedAt, $promptHistoryTodayStart) {
-        $createdAt = $promptCreatedAt($prompt);
+    $todayPrompts = $prompts->filter(function ($prompt) use ($promptUpdatedAt, $promptHistoryTodayStart) {
+        $updatedAt = $promptUpdatedAt($prompt);
 
-        return $createdAt && $createdAt->greaterThanOrEqualTo($promptHistoryTodayStart);
+        return $updatedAt && $updatedAt->greaterThanOrEqualTo($promptHistoryTodayStart);
     });
-    $sevenDayPrompts = $prompts->filter(function ($prompt) use ($promptCreatedAt, $promptHistoryTodayStart, $promptHistorySevenDayStart) {
-        $createdAt = $promptCreatedAt($prompt);
+    $sevenDayPrompts = $prompts->filter(function ($prompt) use ($promptUpdatedAt, $promptHistoryTodayStart, $promptHistorySevenDayStart) {
+        $updatedAt = $promptUpdatedAt($prompt);
 
-        return $createdAt && $createdAt->lessThan($promptHistoryTodayStart) && $createdAt->greaterThanOrEqualTo($promptHistorySevenDayStart);
+        return $updatedAt && $updatedAt->lessThan($promptHistoryTodayStart) && $updatedAt->greaterThanOrEqualTo($promptHistorySevenDayStart);
     });
-    $thirtyDayPrompts = $prompts->filter(function ($prompt) use ($promptCreatedAt, $promptHistorySevenDayStart, $promptHistoryThirtyDayStart) {
-        $createdAt = $promptCreatedAt($prompt);
+    $thirtyDayPrompts = $prompts->filter(function ($prompt) use ($promptUpdatedAt, $promptHistorySevenDayStart, $promptHistoryThirtyDayStart) {
+        $updatedAt = $promptUpdatedAt($prompt);
 
-        return $createdAt && $createdAt->lessThan($promptHistorySevenDayStart) && $createdAt->greaterThanOrEqualTo($promptHistoryThirtyDayStart);
+        return $updatedAt && $updatedAt->lessThan($promptHistorySevenDayStart) && $updatedAt->greaterThanOrEqualTo($promptHistoryThirtyDayStart);
     });
-    $olderPrompts = $prompts->filter(function ($prompt) use ($promptCreatedAt, $promptHistoryThirtyDayStart) {
-        $createdAt = $promptCreatedAt($prompt);
+    $olderPrompts = $prompts->filter(function ($prompt) use ($promptUpdatedAt, $promptHistoryThirtyDayStart) {
+        $updatedAt = $promptUpdatedAt($prompt);
 
-        return $createdAt && $createdAt->lessThan($promptHistoryThirtyDayStart);
+        return $updatedAt && $updatedAt->lessThan($promptHistoryThirtyDayStart);
     });
     $promptGroups = [
         ['key' => 'today', 'label' => 'Hari Ini', 'prompts' => $todayPrompts, 'collapsible' => false],
@@ -31,7 +31,7 @@
         ['key' => 'thirty', 'label' => '30 Hari Terakhir', 'prompts' => $thirtyDayPrompts, 'collapsible' => true],
         ['key' => 'older', 'label' => 'Lebih Lama', 'prompts' => $olderPrompts, 'collapsible' => true],
     ];
-    $activePromptHistoryId = $activePromptId ? (int) $activePromptId : null;
+    $activePromptHistoryId = $activePrompt?->id ? (int) $activePrompt->id : null;
     $openPromptSections = collect($promptGroups)
         ->filter(fn (array $group) => $group['collapsible'])
         ->mapWithKeys(fn (array $group) => [
@@ -49,78 +49,7 @@
 @endphp
 
 <aside
-    x-data="{
-        activePromptId: @js($activePromptHistoryId),
-        loadingPromptId: null,
-        promptLoadToken: 0,
-        openSections: @js($openPromptSections),
-        sectionKeys: @js($foldedPromptSectionKeys),
-        search: '',
-        titles: @js($promptTitles),
-        normalizedSearch() { return String(this.search || '').trim().toLowerCase(); },
-        isSearching() { return this.normalizedSearch().length > 0; },
-        isVisible(title) {
-            const search = this.normalizedSearch();
-            return ! search || String(title || '').toLowerCase().includes(search);
-        },
-        hasResults() {
-            const search = this.normalizedSearch();
-            return ! search || this.titles.some((title) => String(title || '').toLowerCase().includes(search));
-        },
-        isOpen(section) { return this.isSearching() || Boolean(this.openSections?.[section]); },
-        toggle(section) { this.openSections = { ...this.openSections, [section]: !this.openSections?.[section] }; },
-        allOpen() { return this.sectionKeys.length > 0 && this.sectionKeys.every((section) => Boolean(this.openSections?.[section])); },
-        toggleAll() {
-            const shouldOpen = ! this.allOpen();
-            const next = { ...this.openSections };
-            this.sectionKeys.forEach((section) => { next[section] = shouldOpen; });
-            this.openSections = next;
-        },
-        setActivePrompt(id) {
-            const promptId = id ? Number(id) : null;
-            const nextPromptId = Number.isFinite(promptId) ? promptId : null;
-
-            if (this.activePromptId === nextPromptId) {
-                return;
-            }
-
-            this.activePromptId = nextPromptId;
-        },
-        isLoadingPrompt(id) {
-            return this.loadingPromptId === Number(id);
-        },
-        loadPrompt(id) {
-            const promptId = Number(id);
-
-            if (!Number.isFinite(promptId) || promptId <= 0) {
-                return Promise.resolve({ stale: false });
-            }
-
-            if (this.activePromptId === promptId) {
-                return Promise.resolve({ stale: false });
-            }
-
-            const promptLoadToken = this.promptLoadToken + 1;
-            this.promptLoadToken = promptLoadToken;
-            this.loadingPromptId = promptId;
-
-            return Promise.resolve(this.$wire.selectPrompt(promptId))
-                .then(() => {
-                    if (this.promptLoadToken !== promptLoadToken) {
-                        return { stale: true };
-                    }
-
-                    this.setActivePrompt(promptId);
-
-                    return { stale: false };
-                })
-                .finally(() => {
-                    if (this.promptLoadToken === promptLoadToken && this.loadingPromptId === promptId) {
-                        this.loadingPromptId = null;
-                    }
-                });
-        },
-    }"
+    x-data="prompyHistory({ activePromptId: @js($activePromptHistoryId), openHistorySections: @js($openPromptSections), promptSectionKeys: @js($foldedPromptSectionKeys), promptTitles: @js($promptTitles) })"
     x-effect="setActivePrompt($wire.activePromptId)"
     :class="[
         showPrompySidebar ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-full pointer-events-none',
@@ -146,7 +75,7 @@
     <div class="p-4 pt-2 pb-5">
         <button type="button"
                 wire:click="startNewPrompt"
-                @click="showPrompyConfigPanel()"
+                @click="showPrompyConfigPanel(); setActivePrompt(null)"
                 class="w-full flex items-center justify-start px-4 py-2.5 rounded-lg border border-stone-200/60 dark:border-[#334155] dark:bg-transparent bg-white hover:bg-gray-50 dark:hover:bg-white/5 font-medium text-[13px] text-gray-700 dark:text-gray-200 transition-all duration-200 shadow-sm">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-[#64748B] dark:text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 5v14m-7-7h14" />
@@ -165,7 +94,7 @@
                 <input
                     id="prompy-history-search"
                     type="search"
-                    x-model.debounce.150ms="search"
+                    x-model.debounce.150ms="promptSearch"
                     placeholder="Cari prompt..."
                     class="h-9 w-full rounded-lg border border-stone-200/70 bg-white pl-9 pr-8 text-[12.5px] text-gray-700 outline-none placeholder:text-[#94A3B8] focus:border-ista-primary focus:outline-none focus:ring-2 focus:ring-ista-primary/15 dark:border-[#334155] dark:bg-transparent dark:text-gray-100 dark:placeholder:text-[#64748B]"
                 >
@@ -174,7 +103,7 @@
             <div class="mt-2 flex items-center justify-between px-1">
                 <span class="text-[10.5px] font-semibold uppercase tracking-wider text-[#94A3B8] dark:text-[#64748B]">Riwayat Prompt</span>
                 @if (! empty($foldedPromptSectionKeys))
-                    <button type="button" @click="toggleAll()" class="rounded-md px-2 py-1 text-[11px] font-semibold text-ista-primary transition-colors hover:bg-ista-primary/10 dark:text-amber-200 dark:hover:bg-amber-300/10" x-text="allOpen() ? 'Ringkas' : 'Lihat semua'">Lihat semua</button>
+                    <button type="button" @click="toggleAllPromptHistory()" class="rounded-md px-2 py-1 text-[11px] font-semibold text-ista-primary transition-colors hover:bg-ista-primary/10 dark:text-amber-200 dark:hover:bg-amber-300/10" x-text="allPromptSectionsOpen() ? 'Ringkas' : 'Lihat semua'">Lihat semua</button>
                 @endif
             </div>
         </div>
@@ -199,13 +128,13 @@
 
                 <div class="mb-6" data-prompy-history-section="{{ $groupKey }}">
                     @if ($isCollapsible)
-                        <button type="button" @click="toggle('{{ $groupKey }}')" :aria-expanded="isOpen('{{ $groupKey }}') ? 'true' : 'false'" aria-controls="prompy-history-section-{{ $groupKey }}" class="flex w-full items-center justify-between text-left">
+                        <button type="button" @click="togglePromptSection('{{ $groupKey }}')" :aria-expanded="isPromptSectionOpen('{{ $groupKey }}') ? 'true' : 'false'" aria-controls="prompy-history-section-{{ $groupKey }}" class="flex w-full items-center justify-between text-left">
                             <span class="truncate text-[11.3px] font-bold uppercase tracking-wider text-[#64748B] dark:text-[#94A3B8]">{{ $groupLabel }}</span>
-                            <svg xmlns="http://www.w3.org/2000/svg" :class="isOpen('{{ $groupKey }}') ? 'rotate-180' : ''" class="h-3 w-3 text-[#64748B] dark:text-[#94A3B8] transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg xmlns="http://www.w3.org/2000/svg" :class="isPromptSectionOpen('{{ $groupKey }}') ? 'rotate-180' : ''" class="h-3 w-3 text-[#64748B] dark:text-[#94A3B8] transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                             </svg>
                         </button>
-                        <ul id="prompy-history-section-{{ $groupKey }}" x-show="isOpen('{{ $groupKey }}')" class="mt-2 space-y-1" style="{{ ($openPromptSections[$groupKey] ?? false) ? '' : 'display: none;' }}">
+                        <ul id="prompy-history-section-{{ $groupKey }}" x-show="isPromptSectionOpen('{{ $groupKey }}')" class="mt-2 space-y-1" style="{{ ($openPromptSections[$groupKey] ?? false) ? '' : 'display: none;' }}">
                     @else
                         <h3 class="text-[11.6px] font-bold text-[#64748B] dark:text-[#94A3B8] uppercase tracking-wider mb-2">{{ $groupLabel }}</h3>
                         <ul id="prompy-history-section-{{ $groupKey }}" class="space-y-1">
@@ -213,7 +142,7 @@
 
                     @forelse ($groupPrompts as $prompt)
                         @php $promptDisplayTitle = $prompt->displayTitle(); @endphp
-                        <li class="group relative" wire:key="prompy-sidebar-{{ $groupKey }}-{{ $prompt->id }}" x-show="isVisible(@js($promptDisplayTitle))">
+                        <li class="group relative" wire:key="prompy-sidebar-{{ $groupKey }}-{{ $prompt->id }}" x-show="isPromptVisible(@js($promptDisplayTitle))">
                             <button type="button"
                                     @click="showPrompyPreviewPanel(); loadPrompt({{ $prompt->id }})"
                                     data-prompy-history-id="{{ $prompt->id }}"
@@ -255,7 +184,7 @@
                 </div>
             @endforeach
 
-            <div x-show="isSearching() && !hasResults()" x-transition.opacity class="mb-6 rounded-lg border border-dashed border-stone-200/70 px-3 py-3 text-[12px] leading-relaxed text-stone-400 dark:border-gray-800 dark:text-gray-500" style="display: none;">
+            <div x-show="isSearchingPromptHistory() && !hasPromptSearchResults()" x-transition.opacity class="mb-6 rounded-lg border border-dashed border-stone-200/70 px-3 py-3 text-[12px] leading-relaxed text-stone-400 dark:border-gray-800 dark:text-gray-500" style="display: none;">
                 Tidak ada prompt yang cocok.
             </div>
         @endif

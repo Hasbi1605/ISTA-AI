@@ -10,6 +10,7 @@ from app.services.prompt_generation import (
     IDEA_MAX_LENGTH,
     REFERENCE_IMAGE_ALLOWED_MIME_TYPES,
     REFERENCE_IMAGE_BASE64_MAX_LENGTH,
+    REFERENCE_IMAGE_MAX_COUNT,
     generate_prompt_package,
 )
 
@@ -30,20 +31,34 @@ class GeneratePromptRequest(BaseModel):
     prompt_type: str = Field("image", min_length=1, max_length=60)
     context_notes: str | None = Field(None, max_length=CONTEXT_NOTES_MAX_LENGTH)
     reference_image: dict[str, Any] | None = None
+    reference_images: list[dict[str, Any]] | None = None
+    current_package: dict[str, Any] | None = None
+    revision_instruction: str | None = Field(None, max_length=3000)
     runtime_config: dict[str, Any] | None = None
 
-    def normalized_reference_image(self) -> dict[str, str] | None:
-        if self.reference_image is None:
-            return None
+    def normalized_reference_images(self) -> list[dict[str, str]]:
+        images = self.reference_images or ([] if self.reference_image is None else [self.reference_image])
+        if not images:
+            return []
+        if len(images) > REFERENCE_IMAGE_MAX_COUNT:
+            raise ValueError("Gambar referensi maksimal 5 file.")
 
-        mime_type = str(self.reference_image.get("mime_type") or "").strip().lower()
-        data_base64 = str(self.reference_image.get("data_base64") or "").strip()
-        if mime_type not in REFERENCE_IMAGE_ALLOWED_MIME_TYPES:
-            raise ValueError("Format gambar referensi tidak didukung.")
-        if data_base64 == "" or len(data_base64) > REFERENCE_IMAGE_BASE64_MAX_LENGTH:
-            raise ValueError("Data gambar referensi tidak valid.")
+        normalized = []
+        for index, image in enumerate(images):
+            mime_type = str(image.get("mime_type") or "").strip().lower()
+            data_base64 = str(image.get("data_base64") or "").strip()
+            if mime_type not in REFERENCE_IMAGE_ALLOWED_MIME_TYPES:
+                raise ValueError("Format gambar referensi tidak didukung.")
+            if data_base64 == "" or len(data_base64) > REFERENCE_IMAGE_BASE64_MAX_LENGTH:
+                raise ValueError("Data gambar referensi tidak valid.")
 
-        return {"mime_type": mime_type, "data_base64": data_base64}
+            normalized.append({
+                "label": str(image.get("label") or f"Gambar {index + 1}").strip() or f"Gambar {index + 1}",
+                "mime_type": mime_type,
+                "data_base64": data_base64,
+            })
+
+        return normalized
 
 
 @router.get("/profiles", dependencies=[Depends(verify_token)])
@@ -62,7 +77,9 @@ def generate_prompt(request: GeneratePromptRequest):
             platform=request.platform,
             prompt_type=request.prompt_type,
             context_notes=request.context_notes or "",
-            reference_image=request.normalized_reference_image(),
+            reference_images=request.normalized_reference_images(),
+            current_package=request.current_package,
+            revision_instruction=request.revision_instruction or "",
             runtime_config=request.runtime_config,
         )
     except ValueError as exc:

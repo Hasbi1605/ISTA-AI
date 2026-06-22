@@ -1,8 +1,7 @@
 @php
-    $activePackage = $activePrompt?->normalizedPackage();
-    $referenceImageName = is_object($referenceImage) && method_exists($referenceImage, 'getClientOriginalName')
-        ? $referenceImage->getClientOriginalName()
-        : '';
+    $activePackage = $activePackage ?? $activePrompt?->normalizedPackage();
+    $activeVersions = $activePrompt?->versions ?? collect();
+    $activeVersionNumber = $activeVersion?->version_number;
     $promptBubbleMutedClass = 'whitespace-pre-wrap rounded-2xl border border-stone-200/75 bg-stone-50/90 px-4 py-3 font-mono text-[12px] leading-relaxed text-stone-600 shadow-[0_14px_32px_-30px_rgba(28,25,23,0.42)] dark:border-gray-700/65 dark:bg-gray-800/60 dark:text-gray-400 dark:shadow-none';
     $promptSettingsBubbleClass = 'inline-flex w-fit max-w-full flex-col gap-1 rounded-2xl border border-stone-200/75 bg-stone-50/90 px-4 py-3 font-mono text-[12px] leading-relaxed text-stone-600 shadow-[0_14px_32px_-30px_rgba(28,25,23,0.42)] dark:border-gray-700/65 dark:bg-gray-800/60 dark:text-gray-400 dark:shadow-none';
 @endphp
@@ -14,7 +13,7 @@
         copied: null,
         selectedPlatform: @entangle('platform'),
         selectedPromptType: @entangle('promptType'),
-        referenceImageName: @js($referenceImageName),
+        referenceImages: [],
         referenceImageDragging: false,
         referenceImageUploading: false,
         referenceImageUploadFailed: false,
@@ -30,17 +29,50 @@
             this.$refs.referenceImageInput?.click();
         },
         handleReferenceImageChange(event) {
-            const file = event.target.files?.[0] || null;
+            this.setReferenceImageFiles(event.target.files || []);
+        },
+        releaseReferenceImageUrls() {
+            this.referenceImages.forEach((image) => {
+                if (image.url) URL.revokeObjectURL(image.url);
+            });
+        },
+        setReferenceImageFiles(fileList) {
+            const files = Array.from(fileList || []);
             this.referenceImageDropError = '';
             this.referenceImageUploadFailed = false;
-            this.referenceImageName = file ? file.name : '';
+
+            if (files.length > 5) {
+                this.referenceImageDropError = 'Gambar referensi maksimal 5 file.';
+                this.clearReferenceImageInput();
+                return false;
+            }
+
+            for (const file of files) {
+                if (!this.validateReferenceImageFile(file)) {
+                    this.clearReferenceImageInput();
+                    return false;
+                }
+            }
+
+            this.releaseReferenceImageUrls();
+            this.referenceImages = files.map((file, index) => ({
+                name: file.name,
+                label: `Gambar ${index + 1}`,
+                url: URL.createObjectURL(file),
+            }));
+
+            return true;
         },
         clearReferenceImageState() {
-            this.referenceImageName = '';
             this.referenceImageDragging = false;
             this.referenceImageUploading = false;
             this.referenceImageUploadFailed = false;
             this.referenceImageDropError = '';
+            this.clearReferenceImageInput();
+        },
+        clearReferenceImageInput() {
+            this.releaseReferenceImageUrls();
+            this.referenceImages = [];
 
             if (this.$refs.referenceImageInput) {
                 this.$refs.referenceImageInput.value = '';
@@ -66,14 +98,12 @@
             this.referenceImageDragging = false;
             const files = event.dataTransfer?.files;
 
-            if (files && files.length > 1) {
-                this.referenceImageDropError = 'Pilih satu gambar saja.';
+            if (files && files.length > 5) {
+                this.referenceImageDropError = 'Gambar referensi maksimal 5 file.';
                 return;
             }
 
-            const file = files?.[0] || null;
-
-            if (!this.validateReferenceImageFile(file)) {
+            if (!this.setReferenceImageFiles(files || [])) {
                 return;
             }
 
@@ -82,7 +112,7 @@
 
             try {
                 const transfer = new DataTransfer();
-                transfer.items.add(file);
+                Array.from(files || []).forEach((file) => transfer.items.add(file));
                 input.files = transfer.files;
             } catch (_) {
                 try {
@@ -100,7 +130,7 @@
                 return 'border-ista-primary bg-ista-primary/5 text-ista-primary dark:border-amber-400/60 dark:bg-amber-900/10 dark:text-amber-200';
             }
 
-            if (this.referenceImageName && !this.referenceImageUploading && !this.referenceImageUploadFailed) {
+            if (this.referenceImages.length > 0 && !this.referenceImageUploading && !this.referenceImageUploadFailed) {
                 return 'border-emerald-300 bg-emerald-50/80 text-emerald-800 dark:border-emerald-800/60 dark:bg-emerald-900/20 dark:text-emerald-200';
             }
 
@@ -180,6 +210,7 @@
                 </div>
             @endif
 
+            @if(! $activePrompt)
             <form id="prompy-form" wire:submit.prevent="generate" class="chat-form memo-config-panel">
                 <div class="border-b border-stone-100 bg-white px-4 py-4 dark:border-gray-800 dark:bg-gray-900">
                     <h2 class="mt-1 text-[15px] font-bold text-stone-900 dark:text-gray-100">Prompy Studio</h2>
@@ -241,13 +272,14 @@
                         <input
                             x-ref="referenceImageInput"
                             type="file"
-                            wire:model="referenceImage"
+                            wire:model="referenceImages"
                             accept="image/jpeg,image/png"
+                            multiple
                             class="sr-only"
                             x-on:change="handleReferenceImageChange($event)"
                             x-on:livewire-upload-start="referenceImageUploading = true; referenceImageUploadFailed = false"
                             x-on:livewire-upload-finish="referenceImageUploading = false"
-                            x-on:livewire-upload-error="referenceImageUploading = false; referenceImageUploadFailed = true; referenceImageName = ''"
+                            x-on:livewire-upload-error="referenceImageUploading = false; referenceImageUploadFailed = true; clearReferenceImageInput()"
                         />
                         <button
                             type="button"
@@ -260,40 +292,144 @@
                             class="group flex w-full items-center gap-3 rounded-lg border border-dashed px-3 py-2.5 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ista-primary"
                         >
                             <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-current/15 bg-white/70 dark:bg-gray-950/30">
-                                <svg x-show="!referenceImageUploading && (!referenceImageName || referenceImageUploadFailed)" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg x-show="!referenceImageUploading && (referenceImages.length === 0 || referenceImageUploadFailed)" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 16V4m0 0l-4 4m4-4l4 4M4 17v1.5A1.5 1.5 0 005.5 20h13a1.5 1.5 0 001.5-1.5V17" />
                                 </svg>
                                 <span x-show="referenceImageUploading" x-cloak class="h-4 w-4 rounded-full border-2 border-current/50 border-t-transparent animate-spin" aria-hidden="true"></span>
-                                <svg x-show="referenceImageName && !referenceImageUploading && !referenceImageUploadFailed" x-cloak xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg x-show="referenceImages.length > 0 && !referenceImageUploading && !referenceImageUploadFailed" x-cloak xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M5 13l4 4L19 7" />
                                 </svg>
                             </span>
                             <span class="min-w-0 flex-1">
-                                <span class="block truncate text-[12px] font-semibold" x-text="referenceImageName || 'Pilih atau seret gambar'"></span>
-                                <span class="mt-0.5 block text-[11px] leading-relaxed opacity-75">Opsional. JPG/PNG, maks 5 MB. Dianalisis privat saat prompt dibuat.</span>
+                                <span class="block truncate text-[12px] font-semibold" x-text="referenceImages.length ? `${referenceImages.length} gambar dipilih` : 'Pilih atau seret gambar'"></span>
+                                <span class="mt-0.5 block text-[11px] leading-relaxed opacity-75">Opsional. JPG/PNG, maksimal 5 gambar, masing-masing 5 MB.</span>
                             </span>
                         </button>
+                        <div x-show="referenceImages.length > 0" x-cloak class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                            <template x-for="image in referenceImages" :key="image.label">
+                                <div class="overflow-hidden rounded-lg border border-stone-200 bg-white text-left shadow-sm dark:border-gray-700 dark:bg-gray-900">
+                                    <div class="aspect-[4/3] bg-stone-100 dark:bg-gray-800">
+                                        <img :src="image.url" :alt="image.label" class="h-full w-full object-cover">
+                                    </div>
+                                    <div class="min-w-0 px-2 py-1.5">
+                                        <p class="truncate text-[11px] font-bold text-stone-700 dark:text-gray-200" x-text="image.label"></p>
+                                        <p class="truncate text-[10.5px] text-stone-400 dark:text-gray-500" x-text="image.name"></p>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
                         <p x-show="referenceImageDropError" x-cloak class="memo-config-error" x-text="referenceImageDropError"></p>
-                        @error('referenceImage') <p class="memo-config-error">{{ $message }}</p> @enderror
+                        @error('referenceImages') <p class="memo-config-error">{{ $message }}</p> @enderror
+                        @error('referenceImages.*') <p class="memo-config-error">{{ $message }}</p> @enderror
                     </div>
                 </div>
             </form>
+            @else
+                <div class="memo-config-panel">
+                    <div class="border-b border-stone-100 bg-white px-4 py-4 dark:border-gray-800 dark:bg-gray-900">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <h2 class="mt-1 text-[15px] font-bold text-stone-900 dark:text-gray-100">Revisi Prompt</h2>
+                                <p class="mt-1 max-w-[26rem] text-[12px] leading-relaxed text-stone-500 dark:text-gray-400">Kirim instruksi revisi. Output baru akan menjadi versi berikutnya di panel hasil.</p>
+                            </div>
+                            @if($activeVersionNumber)
+                                <span class="shrink-0 rounded-full bg-ista-primary/10 px-2.5 py-1 text-[11px] font-bold text-ista-primary dark:bg-amber-300/10 dark:text-amber-200">v{{ $activeVersionNumber }}</span>
+                            @endif
+                        </div>
+                    </div>
+
+                    <div class="memo-config-section space-y-3 bg-stone-50/65 dark:bg-gray-950/20">
+                        <div class="rounded-xl border border-stone-200 bg-white px-3 py-3 dark:border-gray-800 dark:bg-gray-900">
+                            <p class="text-[10.5px] font-bold uppercase tracking-wider text-stone-400 dark:text-gray-500">Prompt aktif</p>
+                            <p class="mt-1 truncate text-[13px] font-semibold text-stone-800 dark:text-gray-100">{{ $activePrompt->displayTitle() }}</p>
+                            <p class="mt-1 text-[11px] text-stone-500 dark:text-gray-400">{{ $activePrompt->platform_label }} · {{ $activePrompt->prompt_type_label }}</p>
+                        </div>
+
+                        @if($activeVersions->isNotEmpty())
+                            <div>
+                                <p class="memo-config-label">Versi prompt</p>
+                                <div class="flex flex-wrap gap-2">
+                                    @foreach($activeVersions as $version)
+                                        <button
+                                            type="button"
+                                            wire:click="selectPromptVersion({{ $version->id }})"
+                                            class="rounded-full border px-3 py-1.5 text-[11px] font-bold transition {{ (int) $activeVersionId === (int) $version->id ? 'border-ista-primary bg-ista-primary text-white shadow-sm' : 'border-stone-200 bg-white text-stone-600 hover:border-ista-primary/50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300' }}"
+                                        >
+                                            v{{ $version->version_number }}
+                                        </button>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
+
+                        <div class="space-y-3">
+                            <div class="flex justify-start">
+                                <div class="max-w-[88%] rounded-2xl rounded-tl-md border border-stone-200 bg-white px-3 py-2.5 text-[12.5px] leading-relaxed text-stone-600 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300">
+                                    <p class="font-semibold text-stone-800 dark:text-gray-100">Prompy Studio</p>
+                                    <p class="mt-1">Versi {{ $activeVersionNumber ?: 1 }} siap. Minta revisi seperti chat, misalnya "buat lebih formal", "pendekkan prompt", atau "gunakan Gambar 1 sebagai subjek dan gaya Gambar 2".</p>
+                                </div>
+                            </div>
+
+                            @foreach($activeVersions as $version)
+                                @if($version->revision_instruction)
+                                    <div class="flex justify-end">
+                                        <div class="max-w-[88%] rounded-2xl rounded-tr-md bg-ista-primary px-3 py-2.5 text-[12.5px] leading-relaxed text-white shadow-sm">
+                                            {{ $version->revision_instruction }}
+                                        </div>
+                                    </div>
+                                    <div class="flex justify-start">
+                                        <div class="max-w-[88%] rounded-2xl rounded-tl-md border border-stone-200 bg-white px-3 py-2.5 text-[12.5px] leading-relaxed text-stone-600 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300">
+                                            Versi {{ $version->version_number }} sudah dibuat dan bisa disalin dari panel hasil.
+                                        </div>
+                                    </div>
+                                @endif
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+            @endif
         </div>
 
         <div class="chat-composer-safe flex-shrink-0 px-4 pt-2 bg-transparent w-full">
             <div class="rounded-lg border border-stone-200 bg-white p-2 shadow-[0_-10px_30px_-24px_rgba(28,25,23,0.45)] dark:border-gray-800 dark:bg-gray-900">
-                <button type="submit"
-                        form="prompy-form"
-                        wire:loading.attr="disabled"
-                        wire:target="generate,referenceImage"
-                        @click="showPrompyPreviewPanel()"
-                        class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-ista-primary px-4 text-[13px] font-semibold text-white shadow-sm transition hover:bg-ista-dark active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50">
-                    <span wire:loading.remove wire:target="generate">Buat Prompt</span>
-                    <span wire:loading.inline-flex wire:target="generate" class="items-center gap-2">
-                        <span class="h-3.5 w-3.5 rounded-full border-2 border-white/70 border-t-transparent animate-spin" aria-hidden="true"></span>
-                        <span>Menyusun prompt...</span>
-                    </span>
-                </button>
+                @if($activePrompt)
+                    <form id="prompy-revision-form" wire:submit.prevent="revisePrompt" class="space-y-2">
+                        <label for="prompy-revision-input" class="sr-only">Instruksi revisi prompt</label>
+                        <textarea
+                            id="prompy-revision-input"
+                            wire:model="revisionInstruction"
+                            rows="2"
+                            maxlength="{{ \App\Services\Prompts\PromptStudioService::REVISION_INSTRUCTION_MAX_LENGTH }}"
+                            placeholder="Contoh: gunakan Gambar 1 sebagai subjek utama, tiru gaya visual Gambar 2, lalu buat hasilnya menjadi pas foto formal berlatar merah."
+                            class="memo-config-textarea min-h-[74px] resize-none"
+                        ></textarea>
+                        @error('revisionInstruction') <p class="memo-config-error">{{ $message }}</p> @enderror
+                        <button type="submit"
+                                wire:loading.attr="disabled"
+                                wire:target="revisePrompt"
+                                @click="showPrompyPreviewPanel()"
+                                class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-ista-primary px-4 text-[13px] font-semibold text-white shadow-sm transition hover:bg-ista-dark active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50">
+                            <span wire:loading.remove wire:target="revisePrompt">Revisi Prompt</span>
+                            <span wire:loading.inline-flex wire:target="revisePrompt" class="items-center gap-2">
+                                <span class="h-3.5 w-3.5 rounded-full border-2 border-white/70 border-t-transparent animate-spin" aria-hidden="true"></span>
+                                <span>Merevisi prompt...</span>
+                            </span>
+                        </button>
+                    </form>
+                @else
+                    <button type="submit"
+                            form="prompy-form"
+                            wire:loading.attr="disabled"
+                            wire:target="generate,referenceImages"
+                            @click="showPrompyPreviewPanel()"
+                            class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-ista-primary px-4 text-[13px] font-semibold text-white shadow-sm transition hover:bg-ista-dark active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50">
+                        <span wire:loading.remove wire:target="generate">Buat Prompt</span>
+                        <span wire:loading.inline-flex wire:target="generate" class="items-center gap-2">
+                            <span class="h-3.5 w-3.5 rounded-full border-2 border-white/70 border-t-transparent animate-spin" aria-hidden="true"></span>
+                            <span>Menyusun prompt...</span>
+                        </span>
+                    </button>
+                @endif
             </div>
             <div class="text-center mt-3 text-[11px] text-[#94A3B8] dark:text-[#64748B]">
                 ISTA AI dapat keliru. Mohon verifikasi kembali informasi yang penting.
@@ -318,7 +454,7 @@
                 <div class="min-w-0">
                     <p class="truncate text-[13px] font-semibold text-stone-800 dark:text-gray-100">{{ $activePrompt?->displayTitle() ?: 'Hasil Prompy Studio' }}</p>
                     <div class="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-stone-500 dark:text-gray-400">
-                        <span>{{ $activePrompt ? $activePrompt->platform_label.' · '.$activePrompt->prompt_type_label : 'Output prompt tampil di sini' }}</span>
+                        <span>{{ $activePrompt ? (($activeVersionNumber ? 'v'.$activeVersionNumber.' · ' : '').$activePrompt->platform_label.' · '.$activePrompt->prompt_type_label) : 'Output prompt tampil di sini' }}</span>
                     </div>
                 </div>
             </div>
@@ -343,7 +479,7 @@
         </div>
 
         <div class="flex-1 overflow-y-auto px-4 py-4">
-            <div wire:loading.flex wire:target="generate" class="min-h-[420px] items-center justify-center px-6 text-center">
+            <div wire:loading.flex wire:target="generate,revisePrompt" class="min-h-[420px] items-center justify-center px-6 text-center">
                 <div class="max-w-sm">
                     <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-[0_18px_40px_-28px_rgba(15,23,42,0.75)] dark:bg-gray-900">
                         <div class="relative flex h-12 w-12 items-center justify-center rounded-full">
@@ -358,7 +494,7 @@
                 </div>
             </div>
 
-            <div wire:loading.remove wire:target="generate" class="space-y-4">
+            <div wire:loading.remove wire:target="generate,revisePrompt" class="space-y-4">
                 @if($activePackage)
                     <div class="memo-config-panel">
                         <div class="border-b border-stone-100 bg-white px-4 py-4 dark:border-gray-800 dark:bg-gray-900">

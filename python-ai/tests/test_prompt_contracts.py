@@ -254,9 +254,12 @@ def test_prompt_studio_profiles_and_template_are_loaded_from_yaml():
     assert "{idea}" in template
     assert "{source_context}" not in template
     assert "{reference_image_analysis}" in template
+    assert "{current_package}" in template
+    assert "{revision_instruction}" in template
     assert "main_prompt" in template
 
     reference_template = config_loader.get_prompt_studio_reference_image_prompt()
+    assert "{reference_label}" in reference_template
     assert "{platform_label}" in reference_template
     assert "{prompt_type_label}" in reference_template
     assert "{idea}" in reference_template

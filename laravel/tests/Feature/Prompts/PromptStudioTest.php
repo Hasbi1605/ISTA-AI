@@ -60,6 +60,9 @@ class PromptStudioTest extends TestCase
         $this->assertSame('poster_infographic', $prompt->prompt_type);
         $this->assertStringContainsString('presidential palace', $prompt->normalizedPackage()['main_prompt']);
         $this->assertFalse($prompt->contains_internal_context);
+        $this->assertNotNull($prompt->current_version_id);
+        $this->assertSame(1, $prompt->versions()->count());
+        $this->assertSame(1, $prompt->currentVersion?->version_number);
     }
 
     public function test_source_documents_are_ignored_for_prompy_generation(): void
@@ -87,7 +90,7 @@ class PromptStudioTest extends TestCase
         });
     }
 
-    public function test_reference_image_is_validated_and_stored_private(): void
+    public function test_reference_images_are_validated_and_stored_private(): void
     {
         Storage::fake('local');
         Http::fake([
@@ -101,12 +104,21 @@ class PromptStudioTest extends TestCase
             'idea' => 'Buat gambar dari referensi',
             'platform' => 'gemini_nano_banana',
             'prompt_type' => 'image',
-            'reference_image' => UploadedFile::fake()->image('ref.png', 200, 200),
+            'reference_images' => [
+                UploadedFile::fake()->image('ref-1.png', 200, 200),
+                UploadedFile::fake()->image('ref-2.jpg', 300, 300),
+            ],
         ]);
 
         $this->assertNotNull($prompt->reference_image_path);
         $this->assertStringContainsString('prompt-references/'.$user->id, $prompt->reference_image_path);
         Storage::disk('local')->assertExists($prompt->reference_image_path);
+        $version = $prompt->currentVersion;
+        $this->assertNotNull($version);
+        $this->assertCount(2, $version->reference_images);
+        foreach ($version->reference_images as $image) {
+            Storage::disk('local')->assertExists($image['path']);
+        }
         $this->assertTrue($prompt->contains_internal_context);
         $event = AIUsageEvent::where('feature', AIUsageEvent::FEATURE_PROMPT_GENERATION)
             ->where('subject_id', $prompt->id)
@@ -116,19 +128,46 @@ class PromptStudioTest extends TestCase
         $this->assertSame('gemini_nano_banana', $event->metadata['platform'] ?? null);
         $this->assertSame('image', $event->metadata['prompt_type'] ?? null);
         $this->assertTrue($event->metadata['has_reference_image'] ?? false);
+        $this->assertSame(2, $event->metadata['reference_image_count'] ?? null);
         $this->assertTrue($event->metadata['reference_image_analyzed'] ?? false);
         $this->assertTrue($event->metadata['contains_internal_context'] ?? false);
         Http::assertSent(function ($request) {
             $data = $request->data();
-            $referenceImage = $data['reference_image'] ?? null;
+            $referenceImages = $data['reference_images'] ?? null;
 
-            return is_array($referenceImage)
-                && $referenceImage['mime_type'] === 'image/png'
-                && is_string($referenceImage['data_base64'])
-                && $referenceImage['data_base64'] !== ''
+            return is_array($referenceImages)
+                && count($referenceImages) === 2
+                && $referenceImages[0]['label'] === 'Gambar 1'
+                && $referenceImages[0]['mime_type'] === 'image/png'
+                && is_string($referenceImages[0]['data_base64'])
+                && $referenceImages[0]['data_base64'] !== ''
+                && $referenceImages[1]['label'] === 'Gambar 2'
+                && $referenceImages[1]['mime_type'] === 'image/jpeg'
+                && ! array_key_exists('reference_image', $data)
                 && ! array_key_exists('has_reference_image', $data)
                 && ! array_key_exists('source_context', $data);
         });
+    }
+
+    public function test_reference_images_are_limited_to_five_files(): void
+    {
+        Storage::fake('local');
+        Http::fake([
+            '*/api/prompts/generate' => Http::response($this->fakePackageResponse(), 200),
+        ]);
+        $user = User::factory()->create();
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('maksimal 5 file');
+
+        app(PromptStudioService::class)->generate($user, [
+            'idea' => 'Ide',
+            'platform' => 'generic',
+            'prompt_type' => 'image',
+            'reference_images' => collect(range(1, 6))
+                ->map(fn ($i) => UploadedFile::fake()->image("ref-{$i}.png", 100, 100))
+                ->all(),
+        ]);
     }
 
     public function test_invalid_reference_image_type_is_rejected(): void
@@ -181,7 +220,8 @@ class PromptStudioTest extends TestCase
             ->call('selectPlatform', 'gpt_image_2')
             ->call('selectPromptType', 'poster_infographic')
             ->call('generate')
-            ->assertSee('berhasil dibuat');
+            ->assertSee('berhasil dibuat')
+            ->assertSee('Revisi Prompt');
 
         $this->assertDatabaseHas('generated_prompts', [
             'user_id' => $user->id,
@@ -280,20 +320,16 @@ class PromptStudioTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(PrompyStudio::class)
-            ->assertSee('Buat Prompt')
             ->assertSee('Prompt utama')
             ->assertSee('A polished state ceremony poster')
             ->assertSee('Salin semua')
             ->assertSee('Prompt Baru')
             ->assertSee('Cari prompt...')
-            ->assertSee('GPT Image 2')
-            ->assertSee('Gemini / Nano Banana')
-            ->assertSee('Canva AI')
-            ->assertSee('Universal')
             ->assertDontSee('Google Flow')
             ->assertDontSee('Gambar dianalisis')
-            ->assertSee('Pilih atau seret gambar')
-            ->assertSee('Opsional. JPG/PNG, maks 5 MB. Dianalisis privat saat prompt dibuat.')
+            ->assertSee('Revisi Prompt')
+            ->assertSee('Versi 1 siap')
+            ->assertSee('gunakan Gambar 1 sebagai subjek')
             ->assertSee('ISTA AI dapat keliru. Mohon verifikasi kembali informasi yang penting.')
             ->assertSee('dark:text-gray-100', false)
             ->assertSee('rounded-2xl border border-stone-200/75 bg-stone-50/90', false)
@@ -302,10 +338,6 @@ class PromptStudioTest extends TestCase
             ->assertDontSee('rounded-2xl border border-stone-200/80 bg-white/90', false)
             ->assertSee('data-prompy-history-id=', false)
             ->assertSee('h-3.5 w-3.5 rounded-full border border-current border-t-transparent text-ista-primary animate-spin dark:text-amber-200', false)
-            ->assertSee('h-4 w-4 rounded-full border-2 border-current/50 border-t-transparent animate-spin', false)
-            ->assertSee('prompy-gemini-gradient', false)
-            ->assertSee('prompy-canva-clip', false)
-            ->assertSee('bg-sky-50 text-sky-600', false)
             ->assertDontSee('WebP')
             ->assertDontSee('Konteks privat')
             ->assertDontSee('Mengunggah gambar')
@@ -354,6 +386,44 @@ class PromptStudioTest extends TestCase
             ->assertSee('First prompt output');
     }
 
+    public function test_initial_active_prompt_follows_recently_updated_history(): void
+    {
+        $user = User::factory()->create();
+
+        $recentlyCreated = GeneratedPrompt::create([
+            'user_id' => $user->id,
+            'platform' => 'generic',
+            'platform_label' => 'Universal',
+            'prompt_type' => 'image',
+            'prompt_type_label' => 'Gambar',
+            'title' => 'Prompt Baru Dibuat',
+            'idea' => 'baru dibuat',
+            'package' => $this->fakePackageResponse(['main_prompt' => 'Recently created output']),
+            'created_at' => now(),
+            'updated_at' => now()->subDays(2),
+        ]);
+        $recentlyUpdated = GeneratedPrompt::create([
+            'user_id' => $user->id,
+            'platform' => 'generic',
+            'platform_label' => 'Universal',
+            'prompt_type' => 'image',
+            'prompt_type_label' => 'Gambar',
+            'title' => 'Prompt Baru Diubah',
+            'idea' => 'baru diubah',
+            'package' => $this->fakePackageResponse(['main_prompt' => 'Recently updated output']),
+            'created_at' => now()->subDays(7),
+            'updated_at' => now(),
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(PrompyStudio::class)
+            ->assertSet('activePromptId', $recentlyUpdated->id)
+            ->assertSee('Recently updated output')
+            ->assertDontSee('Recently created output')
+            ->assertSee('data-prompy-history-id="'.$recentlyUpdated->id.'"', false)
+            ->assertSee('data-prompy-history-id="'.$recentlyCreated->id.'"', false);
+    }
+
     public function test_start_new_prompt_shows_empty_result_panel_even_with_history(): void
     {
         $user = User::factory()->create();
@@ -379,8 +449,70 @@ class PromptStudioTest extends TestCase
             ->assertSet('isComposingNewPrompt', true)
             ->assertSet('platform', null)
             ->assertSet('promptType', null)
+            ->assertSee('Pilih atau seret gambar')
+            ->assertSee('Opsional. JPG/PNG, maksimal 5 gambar, masing-masing 5 MB.')
+            ->assertSee('h-4 w-4 rounded-full border-2 border-current/50 border-t-transparent animate-spin', false)
+            ->assertSee('GPT Image 2')
+            ->assertSee('Gemini / Nano Banana')
+            ->assertSee('Canva AI')
+            ->assertSee('Universal')
+            ->assertSee('prompy-gemini-gradient', false)
+            ->assertSee('prompy-canva-clip', false)
+            ->assertSee('bg-sky-50 text-sky-600', false)
+            ->assertDontSee('Google Flow')
             ->assertSee('Belum ada paket prompt')
             ->assertDontSee('Existing prompt output');
+    }
+
+    public function test_revision_creates_new_prompt_version(): void
+    {
+        Storage::fake('local');
+        $calls = [];
+        Http::fake([
+            '*/api/prompts/generate' => function ($request) use (&$calls) {
+                $data = $request->data();
+                $calls[] = $data;
+
+                if (! empty($data['revision_instruction'])) {
+                    return Http::response($this->fakePackageResponse([
+                        'main_prompt' => 'A revised formal passport photo prompt.',
+                        'reference_image_analyzed' => true,
+                    ]), 200);
+                }
+
+                return Http::response($this->fakePackageResponse([
+                    'main_prompt' => 'A first draft visual prompt.',
+                    'reference_image_analyzed' => true,
+                ]), 200);
+            },
+        ]);
+        $user = User::factory()->create();
+
+        $prompt = app(PromptStudioService::class)->generate($user, [
+            'idea' => 'Buat prompt pas foto dari referensi',
+            'platform' => 'gpt_image_2',
+            'prompt_type' => 'image',
+            'reference_images' => [
+                UploadedFile::fake()->image('subject.png', 200, 200),
+                UploadedFile::fake()->image('style.png', 200, 200),
+            ],
+        ]);
+
+        $updated = app(PromptStudioService::class)->revise(
+            $user,
+            $prompt,
+            'Gunakan Gambar 1 sebagai subjek dan tiru gaya Gambar 2.',
+            $prompt->currentVersion,
+        );
+
+        $this->assertSame(2, $updated->versions()->count());
+        $this->assertSame(2, $updated->currentVersion?->version_number);
+        $this->assertStringContainsString('revised formal passport', $updated->normalizedPackage()['main_prompt']);
+        $this->assertSame('Gunakan Gambar 1 sebagai subjek dan tiru gaya Gambar 2.', $updated->currentVersion?->revision_instruction);
+        $this->assertSame('A first draft visual prompt.', $updated->versions()->where('version_number', 1)->first()?->normalizedPackage()['main_prompt']);
+        $this->assertSame('Gunakan Gambar 1 sebagai subjek dan tiru gaya Gambar 2.', $calls[1]['revision_instruction'] ?? null);
+        $this->assertSame('A first draft visual prompt.', $calls[1]['current_package']['main_prompt'] ?? null);
+        $this->assertCount(2, $calls[1]['reference_images'] ?? []);
     }
 
     public function test_user_cannot_delete_another_users_prompt(): void
