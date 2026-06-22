@@ -218,6 +218,7 @@ class PromptStudioService
         GeneratedPrompt $prompt,
         string $instruction,
         ?GeneratedPromptVersion $baseVersion = null,
+        array $overrides = [],
     ): GeneratedPrompt {
         if (! $prompt->isOwnedBy($user)) {
             throw new RuntimeException('Prompt tidak ditemukan.');
@@ -235,27 +236,56 @@ class PromptStudioService
         $prompt->loadMissing(['currentVersion', 'versions']);
         $baseVersion = $this->resolveBaseVersion($prompt, $baseVersion);
         $basePackage = $baseVersion?->normalizedPackage() ?? $prompt->normalizedPackage();
-        $storedImages = $this->storedImagesForVersion($prompt, $baseVersion);
+        $idea = array_key_exists('idea', $overrides)
+            ? Str::limit(trim((string) $overrides['idea']), self::IDEA_MAX_LENGTH, '')
+            : (string) $prompt->idea;
+        if ($idea === '') {
+            throw new RuntimeException('Ide prompt wajib diisi.');
+        }
+
+        $platform = array_key_exists('platform', $overrides)
+            ? $this->normalizePlatform((string) $overrides['platform'])
+            : (string) $prompt->platform;
+        $promptType = array_key_exists('prompt_type', $overrides)
+            ? $this->normalizePromptType((string) $overrides['prompt_type'])
+            : (string) $prompt->prompt_type;
+        $contextNotes = array_key_exists('context_notes', $overrides)
+            ? Str::limit(trim((string) $overrides['context_notes']), self::CONTEXT_NOTES_MAX_LENGTH, '')
+            : '';
+
+        $hasReferenceImageOverride = array_key_exists('reference_images', $overrides)
+            || array_key_exists('reference_image', $overrides);
+        $newStoredImages = $hasReferenceImageOverride
+            ? $this->storeReferenceImages($user, $overrides['reference_images'] ?? ($overrides['reference_image'] ?? null))
+            : [];
+        $storedImages = $hasReferenceImageOverride
+            ? $newStoredImages
+            : $this->storedImagesForVersion($prompt, $baseVersion);
         $referenceImagePayloads = $this->buildReferenceImagePayloads($storedImages);
+        $containsInternalContext = $storedImages !== []
+            || $contextNotes !== ''
+            || (bool) $prompt->contains_internal_context;
 
         try {
             $package = $this->requestPackage(
-                (string) $prompt->idea,
-                (string) $prompt->platform,
-                (string) $prompt->prompt_type,
-                '',
+                $idea,
+                $platform,
+                $promptType,
+                $contextNotes,
                 $referenceImagePayloads,
                 $basePackage,
                 $revisionInstruction,
             );
         } catch (Throwable $e) {
+            $this->deleteStoredImages($newStoredImages);
+
             $usageEvents->failed(
                 feature: AIUsageEvent::FEATURE_PROMPT_GENERATION,
                 userId: (int) $user->id,
                 metadata: [
                     'generated_prompt_id' => (int) $prompt->id,
-                    'platform' => (string) $prompt->platform,
-                    'prompt_type' => (string) $prompt->prompt_type,
+                    'platform' => $platform,
+                    'prompt_type' => $promptType,
                     'revision' => true,
                     'reason' => 'revision_request_failed',
                 ],
@@ -268,30 +298,51 @@ class PromptStudioService
             throw $e;
         }
 
-        $updatedPrompt = DB::transaction(function () use ($prompt, $package, $revisionInstruction, $storedImages): GeneratedPrompt {
-            $packageData = $this->packageData($package);
-            $nextVersionNumber = ((int) $prompt->versions()->max('version_number')) + 1;
-            $firstImage = $storedImages[0] ?? null;
+        try {
+            $updatedPrompt = DB::transaction(function () use (
+                $prompt,
+                $package,
+                $revisionInstruction,
+                $storedImages,
+                $platform,
+                $promptType,
+                $idea,
+                $containsInternalContext,
+            ): GeneratedPrompt {
+                $packageData = $this->packageData($package);
+                $nextVersionNumber = ((int) $prompt->versions()->max('version_number')) + 1;
+                $firstImage = $storedImages[0] ?? null;
 
-            $version = $prompt->versions()->create([
-                'version_number' => $nextVersionNumber,
-                'package' => $packageData,
-                'revision_instruction' => $revisionInstruction,
-                'reference_images' => $this->referenceImageMetadata($storedImages),
-                'model_label' => $package['model_label'] ?: null,
-            ]);
+                $version = $prompt->versions()->create([
+                    'version_number' => $nextVersionNumber,
+                    'package' => $packageData,
+                    'revision_instruction' => $revisionInstruction,
+                    'reference_images' => $this->referenceImageMetadata($storedImages),
+                    'model_label' => $package['model_label'] ?: null,
+                ]);
 
-            $prompt->forceFill([
-                'package' => $packageData,
-                'current_version_id' => $version->id,
-                'reference_image_path' => $firstImage['path'] ?? null,
-                'reference_image_mime' => $firstImage['mime'] ?? null,
-                'reference_image_size_bytes' => $firstImage['size'] ?? null,
-                'model_label' => $package['model_label'] ?: null,
-            ])->save();
+                $prompt->forceFill([
+                    'platform' => $platform,
+                    'platform_label' => self::PLATFORMS[$platform] ?? $package['platform_label'] ?? $platform,
+                    'prompt_type' => $promptType,
+                    'prompt_type_label' => self::PROMPT_TYPES[$promptType] ?? $package['prompt_type_label'] ?? $promptType,
+                    'title' => $this->deriveTitle($idea),
+                    'idea' => $idea,
+                    'package' => $packageData,
+                    'current_version_id' => $version->id,
+                    'contains_internal_context' => $containsInternalContext,
+                    'reference_image_path' => $firstImage['path'] ?? null,
+                    'reference_image_mime' => $firstImage['mime'] ?? null,
+                    'reference_image_size_bytes' => $firstImage['size'] ?? null,
+                    'model_label' => $package['model_label'] ?: null,
+                ])->save();
 
-            return $prompt->fresh(['currentVersion', 'versions']) ?? $prompt;
-        });
+                return $prompt->fresh(['currentVersion', 'versions']) ?? $prompt;
+            });
+        } catch (Throwable $e) {
+            $this->deleteStoredImages($newStoredImages);
+            throw $e;
+        }
 
         $usageEvents->completed(
             feature: AIUsageEvent::FEATURE_PROMPT_GENERATION,

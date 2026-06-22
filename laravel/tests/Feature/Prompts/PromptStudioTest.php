@@ -221,7 +221,10 @@ class PromptStudioTest extends TestCase
             ->call('selectPromptType', 'poster_infographic')
             ->call('generate')
             ->assertSee('berhasil dibuat')
-            ->assertSee('Revisi Prompt');
+            ->assertSee('Prompt aktif')
+            ->assertSee('Konfigurasi prompt:')
+            ->assertSee('Tulis revisi untuk prompt ini...')
+            ->assertDontSee('Catatan konteks tambahan');
 
         $this->assertDatabaseHas('generated_prompts', [
             'user_id' => $user->id,
@@ -327,9 +330,11 @@ class PromptStudioTest extends TestCase
             ->assertSee('Cari prompt...')
             ->assertDontSee('Google Flow')
             ->assertDontSee('Gambar dianalisis')
-            ->assertSee('Revisi Prompt')
-            ->assertSee('Versi 1 siap')
-            ->assertSee('gunakan Gambar 1 sebagai subjek')
+            ->assertSee('Prompt aktif')
+            ->assertSee('Konfigurasi prompt:')
+            ->assertSee('Tulis revisi untuk prompt ini...')
+            ->assertSee('Edit konfigurasi')
+            ->assertDontSee('Catatan konteks tambahan')
             ->assertSee('ISTA AI dapat keliru. Mohon verifikasi kembali informasi yang penting.')
             ->assertSee('dark:text-gray-100', false)
             ->assertSee('rounded-2xl border border-stone-200/75 bg-stone-50/90', false)
@@ -451,6 +456,7 @@ class PromptStudioTest extends TestCase
             ->assertSet('promptType', null)
             ->assertSee('Pilih atau seret gambar')
             ->assertSee('Opsional. JPG/PNG, maksimal 5 gambar, masing-masing 5 MB.')
+            ->assertDontSee('Catatan konteks tambahan')
             ->assertSee('h-4 w-4 rounded-full border-2 border-current/50 border-t-transparent animate-spin', false)
             ->assertSee('GPT Image 2')
             ->assertSee('Gemini / Nano Banana')
@@ -513,6 +519,60 @@ class PromptStudioTest extends TestCase
         $this->assertSame('Gunakan Gambar 1 sebagai subjek dan tiru gaya Gambar 2.', $calls[1]['revision_instruction'] ?? null);
         $this->assertSame('A first draft visual prompt.', $calls[1]['current_package']['main_prompt'] ?? null);
         $this->assertCount(2, $calls[1]['reference_images'] ?? []);
+    }
+
+    public function test_livewire_active_prompt_configuration_regenerates_same_history_item(): void
+    {
+        $calls = [];
+        Http::fake([
+            '*/api/prompts/generate' => function ($request) use (&$calls) {
+                $data = $request->data();
+                $calls[] = $data;
+
+                if (! empty($data['revision_instruction'])) {
+                    return Http::response($this->fakePackageResponse([
+                        'platform' => 'canva_ai',
+                        'platform_label' => 'Canva AI',
+                        'prompt_type' => 'image',
+                        'prompt_type_label' => 'Gambar',
+                        'main_prompt' => 'A regenerated Canva-ready image prompt.',
+                    ]), 200);
+                }
+
+                return Http::response($this->fakePackageResponse([
+                    'main_prompt' => 'A first configured prompt.',
+                ]), 200);
+            },
+        ]);
+        $user = User::factory()->create();
+
+        $component = Livewire::actingAs($user)
+            ->test(PrompyStudio::class)
+            ->set('idea', 'Buat prompt poster awal')
+            ->call('selectPlatform', 'gpt_image_2')
+            ->call('selectPromptType', 'poster_infographic')
+            ->call('generate')
+            ->set('showPromptConfiguration', true)
+            ->set('idea', 'Buat prompt gambar Canva')
+            ->call('selectPlatform', 'canva_ai')
+            ->call('selectPromptType', 'image')
+            ->call('generate')
+            ->assertSet('showPromptConfiguration', false)
+            ->assertSee('Versi prompt')
+            ->assertSee('Versi 2')
+            ->assertSee('Buat prompt gambar Canva')
+            ->assertSee('Tulis revisi untuk prompt ini...');
+
+        $promptId = $component->get('activePromptId');
+        $this->assertDatabaseCount('generated_prompts', 1);
+        $prompt = GeneratedPrompt::with('versions')->findOrFail($promptId);
+        $this->assertSame(2, $prompt->versions()->count());
+        $this->assertSame('canva_ai', $prompt->platform);
+        $this->assertSame('image', $prompt->prompt_type);
+        $this->assertStringContainsString('konfigurasi terbaru', $prompt->currentVersion?->revision_instruction);
+        $this->assertSame('canva_ai', $calls[1]['platform'] ?? null);
+        $this->assertSame('image', $calls[1]['prompt_type'] ?? null);
+        $this->assertSame('A first configured prompt.', $calls[1]['current_package']['main_prompt'] ?? null);
     }
 
     public function test_user_cannot_delete_another_users_prompt(): void
