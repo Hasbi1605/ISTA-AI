@@ -2,6 +2,19 @@
     $activePackage = $activePackage ?? $activePrompt?->normalizedPackage();
     $activeVersions = $activePrompt?->versions ?? collect();
     $activeVersionNumber = $activeVersion?->version_number;
+    $activeReferenceImages = collect(is_array($activeVersion?->reference_images) ? $activeVersion->reference_images : [])
+        ->filter(fn($image) => is_array($image) && !empty($image['path']))
+        ->map(fn($image, $index) => [
+            'label' => (string) ($image['label'] ?? 'Gambar '.($index + 1)),
+            'size' => (int) ($image['size'] ?? 0),
+        ])
+        ->values();
+    if ($activeReferenceImages->isEmpty() && $activePrompt?->reference_image_path) {
+        $activeReferenceImages = collect([[
+            'label' => 'Gambar 1',
+            'size' => (int) $activePrompt->reference_image_size_bytes,
+        ]]);
+    }
     $promptBubbleMutedClass = 'whitespace-pre-wrap rounded-2xl border border-stone-200/75 bg-stone-50/90 px-4 py-3 font-mono text-[12px] leading-relaxed text-stone-600 shadow-[0_14px_32px_-30px_rgba(28,25,23,0.42)] dark:border-gray-700/65 dark:bg-gray-800/60 dark:text-gray-400 dark:shadow-none';
     $promptSettingsBubbleClass = 'inline-flex w-fit max-w-full flex-col gap-1 rounded-2xl border border-stone-200/75 bg-stone-50/90 px-4 py-3 font-mono text-[12px] leading-relaxed text-stone-600 shadow-[0_14px_32px_-30px_rgba(28,25,23,0.42)] dark:border-gray-700/65 dark:bg-gray-800/60 dark:text-gray-400 dark:shadow-none';
 @endphp
@@ -9,6 +22,8 @@
 <div
     class="contents"
     x-on:prompy-reference-image-cleared.window="clearReferenceImageState()"
+    x-on:prompy-reference-document-cleared.window="clearReferenceDocumentState()"
+    x-on:prompy-revision-reference-image-cleared.window="clearRevisionReferenceImageState()"
     x-data="{
         copied: null,
         selectedPlatform: @entangle('platform'),
@@ -18,6 +33,14 @@
         referenceImageUploading: false,
         referenceImageUploadFailed: false,
         referenceImageDropError: '',
+        referenceDocuments: [],
+        referenceDocumentUploading: false,
+        referenceDocumentUploadFailed: false,
+        referenceDocumentDropError: '',
+        revisionReferenceImages: [],
+        revisionReferenceImageUploading: false,
+        revisionReferenceImageUploadFailed: false,
+        revisionReferenceImageDropError: '',
         prompyRevisionText: '',
         prompyRevisionLoading: false,
         copy(text, id) {
@@ -36,7 +59,7 @@
         async submitPrompyRevision($wire, textarea) {
             const message = (textarea?.value || '').trim();
 
-            if (!message || this.prompyRevisionLoading || $wire.isGenerating) {
+            if (!message || this.prompyRevisionLoading || this.revisionReferenceImageUploading || $wire.isGenerating) {
                 return;
             }
 
@@ -65,11 +88,28 @@
         chooseReferenceImage() {
             this.$refs.referenceImageInput?.click();
         },
+        chooseReferenceDocument() {
+            this.$refs.referenceDocumentInput?.click();
+        },
+        chooseRevisionReferenceImage() {
+            this.$refs.revisionReferenceImageInput?.click();
+        },
         handleReferenceImageChange(event) {
             this.setReferenceImageFiles(event.target.files || []);
         },
+        handleReferenceDocumentChange(event) {
+            this.setReferenceDocumentFiles(event.target.files || []);
+        },
+        handleRevisionReferenceImageChange(event) {
+            this.setRevisionReferenceImageFiles(event.target.files || []);
+        },
         releaseReferenceImageUrls() {
             this.referenceImages.forEach((image) => {
+                if (image.url) URL.revokeObjectURL(image.url);
+            });
+        },
+        releaseRevisionReferenceImageUrls() {
+            this.revisionReferenceImages.forEach((image) => {
                 if (image.url) URL.revokeObjectURL(image.url);
             });
         },
@@ -100,6 +140,58 @@
 
             return true;
         },
+        setReferenceDocumentFiles(fileList) {
+            const files = Array.from(fileList || []);
+            this.referenceDocumentDropError = '';
+            this.referenceDocumentUploadFailed = false;
+
+            if (files.length > 3) {
+                this.referenceDocumentDropError = 'Dokumen acuan maksimal 3 file.';
+                this.clearReferenceDocumentInput();
+                return false;
+            }
+
+            for (const file of files) {
+                if (!this.validateReferenceDocumentFile(file)) {
+                    this.clearReferenceDocumentInput();
+                    return false;
+                }
+            }
+
+            this.referenceDocuments = files.map((file, index) => ({
+                name: file.name,
+                label: `Dokumen ${index + 1}`,
+            }));
+
+            return true;
+        },
+        setRevisionReferenceImageFiles(fileList) {
+            const files = Array.from(fileList || []);
+            this.revisionReferenceImageDropError = '';
+            this.revisionReferenceImageUploadFailed = false;
+
+            if (files.length > 5) {
+                this.revisionReferenceImageDropError = 'Gambar revisi maksimal 5 file.';
+                this.clearRevisionReferenceImageInput();
+                return false;
+            }
+
+            for (const file of files) {
+                if (!this.validateRevisionReferenceImageFile(file)) {
+                    this.clearRevisionReferenceImageInput();
+                    return false;
+                }
+            }
+
+            this.releaseRevisionReferenceImageUrls();
+            this.revisionReferenceImages = files.map((file, index) => ({
+                name: file.name,
+                label: `Gambar ${index + 1}`,
+                url: URL.createObjectURL(file),
+            }));
+
+            return true;
+        },
         clearReferenceImageState() {
             this.referenceImageDragging = false;
             this.referenceImageUploading = false;
@@ -113,6 +205,33 @@
 
             if (this.$refs.referenceImageInput) {
                 this.$refs.referenceImageInput.value = '';
+            }
+        },
+        clearReferenceDocumentState() {
+            this.referenceDocumentUploading = false;
+            this.referenceDocumentUploadFailed = false;
+            this.referenceDocumentDropError = '';
+            this.clearReferenceDocumentInput();
+        },
+        clearReferenceDocumentInput() {
+            this.referenceDocuments = [];
+
+            if (this.$refs.referenceDocumentInput) {
+                this.$refs.referenceDocumentInput.value = '';
+            }
+        },
+        clearRevisionReferenceImageState() {
+            this.revisionReferenceImageUploading = false;
+            this.revisionReferenceImageUploadFailed = false;
+            this.revisionReferenceImageDropError = '';
+            this.clearRevisionReferenceImageInput();
+        },
+        clearRevisionReferenceImageInput() {
+            this.releaseRevisionReferenceImageUrls();
+            this.revisionReferenceImages = [];
+
+            if (this.$refs.revisionReferenceImageInput) {
+                this.$refs.revisionReferenceImageInput.value = '';
             }
         },
         validateReferenceImageFile(file) {
@@ -129,6 +248,41 @@
             }
 
             this.referenceImageDropError = '';
+            return true;
+        },
+        validateReferenceDocumentFile(file) {
+            if (!file) return false;
+
+            const allowedExtensions = ['pdf', 'docx', 'xlsx', 'csv'];
+            const extension = (file.name.split('.').pop() || '').toLowerCase();
+
+            if (!allowedExtensions.includes(extension)) {
+                this.referenceDocumentDropError = 'Gunakan PDF, DOCX, XLSX, atau CSV.';
+                return false;
+            }
+
+            if (file.size > 10 * 1024 * 1024) {
+                this.referenceDocumentDropError = 'Ukuran dokumen maksimal 10 MB.';
+                return false;
+            }
+
+            this.referenceDocumentDropError = '';
+            return true;
+        },
+        validateRevisionReferenceImageFile(file) {
+            if (!file) return false;
+
+            if (!['image/jpeg', 'image/png'].includes(file.type)) {
+                this.revisionReferenceImageDropError = 'Gunakan gambar JPG atau PNG.';
+                return false;
+            }
+
+            if (file.size > 5 * 1024 * 1024) {
+                this.revisionReferenceImageDropError = 'Ukuran gambar maksimal 5 MB.';
+                return false;
+            }
+
+            this.revisionReferenceImageDropError = '';
             return true;
         },
         dropReferenceImage(event) {
@@ -382,6 +536,64 @@
                         @error('referenceImages') <p class="memo-config-error">{{ $message }}</p> @enderror
                         @error('referenceImages.*') <p class="memo-config-error">{{ $message }}</p> @enderror
                     </div>
+
+                    <div class="mt-3">
+                        <label class="memo-config-label">Dokumen acuan</label>
+                        <input
+                            x-ref="referenceDocumentInput"
+                            type="file"
+                            wire:model="referenceDocuments"
+                            accept=".pdf,.docx,.xlsx,.csv,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+                            multiple
+                            class="sr-only"
+                            x-on:change="handleReferenceDocumentChange($event)"
+                            x-on:livewire-upload-start="referenceDocumentUploading = true; referenceDocumentUploadFailed = false"
+                            x-on:livewire-upload-finish="referenceDocumentUploading = false"
+                            x-on:livewire-upload-error="referenceDocumentUploading = false; referenceDocumentUploadFailed = true; clearReferenceDocumentInput()"
+                        />
+                        <button
+                            type="button"
+                            @click="chooseReferenceDocument()"
+                            class="group flex w-full items-center gap-3 rounded-lg border border-dashed px-3 py-2.5 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ista-primary"
+                            :class="referenceDocuments.length > 0 && !referenceDocumentUploading && !referenceDocumentUploadFailed ? 'border-sky-300 bg-sky-50/80 text-sky-800 dark:border-sky-800/60 dark:bg-sky-900/20 dark:text-sky-200' : 'border-stone-200 bg-white text-stone-700 hover:border-ista-primary/40 hover:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-amber-400/40'"
+                        >
+                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-current/15 bg-white/70 dark:bg-gray-950/30">
+                                <svg x-show="!referenceDocumentUploading && (referenceDocuments.length === 0 || referenceDocumentUploadFailed)" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 3h7l5 5v13H7a2 2 0 01-2-2V5a2 2 0 012-2z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M14 3v5h5M8 13h8M8 17h5" />
+                                </svg>
+                                <span x-show="referenceDocumentUploading" x-cloak class="h-4 w-4 rounded-full border-2 border-current/50 border-t-transparent animate-spin" aria-hidden="true"></span>
+                                <svg x-show="referenceDocuments.length > 0 && !referenceDocumentUploading && !referenceDocumentUploadFailed" x-cloak xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M5 13l4 4L19 7" />
+                                </svg>
+                            </span>
+                            <span class="min-w-0 flex-1">
+                                <span class="block truncate text-[12px] font-semibold" x-text="referenceDocuments.length ? `${referenceDocuments.length} dokumen dipilih` : 'Pilih dokumen acuan'"></span>
+                                <span class="mt-0.5 block text-[11px] leading-relaxed opacity-75">Opsional. PDF/DOCX/XLSX/CSV, maksimal 3 dokumen, masing-masing 10 MB.</span>
+                            </span>
+                        </button>
+                        <div x-show="referenceDocuments.length > 0" x-cloak class="mt-2 rounded-lg border border-sky-200 bg-sky-50/70 p-2 dark:border-sky-900/60 dark:bg-sky-950/20">
+                            <div class="flex items-center justify-between gap-2">
+                                <p class="text-[11px] font-semibold text-sky-800 dark:text-sky-200">Dokumen ini dipakai sebagai konteks prompt.</p>
+                                <button type="button"
+                                        @click="clearReferenceDocumentState(); $wire.clearReferenceDocuments()"
+                                        class="shrink-0 rounded-md px-2 py-1 text-[10.5px] font-semibold text-sky-700 hover:bg-sky-100 dark:text-sky-200 dark:hover:bg-sky-900/50">
+                                    Hapus
+                                </button>
+                            </div>
+                            <div class="mt-2 flex flex-col gap-1">
+                                <template x-for="document in referenceDocuments" :key="document.label">
+                                    <div class="flex min-w-0 items-center gap-2 rounded-md border border-sky-200 bg-white px-2 py-1.5 text-left dark:border-sky-900/70 dark:bg-gray-900">
+                                        <span class="shrink-0 text-[10px] font-bold text-sky-700 dark:text-sky-200" x-text="document.label"></span>
+                                        <span class="truncate text-[10.5px] text-sky-700/80 dark:text-sky-300/80" x-text="document.name"></span>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                        <p x-show="referenceDocumentDropError" x-cloak class="memo-config-error" x-text="referenceDocumentDropError"></p>
+                        @error('referenceDocuments') <p class="memo-config-error">{{ $message }}</p> @enderror
+                        @error('referenceDocuments.*') <p class="memo-config-error">{{ $message }}</p> @enderror
+                    </div>
                 </div>
             </form>
             @elseif($activePrompt)
@@ -471,7 +683,8 @@
                     <button type="submit"
                             form="prompy-form"
                             wire:loading.attr="disabled"
-                            wire:target="generate,generateConfiguredPrompt,generateConfiguredRevision,referenceImages"
+                            wire:target="generate,generateConfiguredPrompt,generateConfiguredRevision,referenceImages,referenceDocuments"
+                            :disabled="referenceImageUploading || referenceDocumentUploading"
                             @click="showPrompyPreviewPanel()"
                             class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-ista-primary px-4 text-[13px] font-semibold text-white shadow-sm transition hover:bg-ista-dark active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50">
                         <span wire:loading.remove wire:target="generate,generateConfiguredPrompt,generateConfiguredRevision">{{ $activePrompt ? 'Buat ulang dari konfigurasi' : 'Buat Prompt' }}</span>
@@ -482,8 +695,40 @@
                     </button>
                 </div>
             @elseif($activePrompt)
+                @if($activeReferenceImages->isNotEmpty())
+                    <div class="mb-2 rounded-lg border border-stone-200/70 bg-white/85 px-3 py-2 text-left shadow-sm dark:border-gray-700 dark:bg-gray-900/85">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="text-[11px] font-semibold text-stone-600 dark:text-gray-300">
+                                Menggunakan {{ $activeReferenceImages->count() }} gambar referensi dari {{ $activeVersionNumber ? 'Versi '.$activeVersionNumber : 'versi aktif' }}
+                            </span>
+                            <div class="flex min-w-0 flex-wrap items-center gap-1.5">
+                                @foreach($activeReferenceImages as $image)
+                                    <span class="inline-flex max-w-[8.5rem] items-center gap-1 rounded-full border border-stone-200 bg-stone-50 px-2 py-0.5 text-[10.5px] font-semibold text-stone-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 16l4.6-4.6a2 2 0 012.8 0L16 16m-2-2l1.6-1.6a2 2 0 012.8 0L20 14m-1-8H5a1 1 0 00-1 1v10a1 1 0 001 1h14a1 1 0 001-1V7a1 1 0 00-1-1z" />
+                                        </svg>
+                                        <span class="truncate">{{ $image['label'] }}</span>
+                                    </span>
+                                @endforeach
+                            </div>
+                        </div>
+                        <p class="mt-1 text-[10.5px] leading-relaxed text-stone-400 dark:text-gray-500">Kirim tanpa gambar baru untuk memakai acuan ini. Lampirkan gambar di bawah untuk mengganti acuan pada versi berikutnya.</p>
+                    </div>
+                @endif
                 <form @submit.prevent="submitPrompyRevision($wire, $refs.prompyInput)" class="chat-form relative rounded-xl shadow-sm bg-white dark:bg-gray-800 border border-stone-200/60 dark:border-gray-700 transition-colors">
                     <div class="px-3 pb-3 pt-3 w-full">
+                        <input
+                            x-ref="revisionReferenceImageInput"
+                            type="file"
+                            wire:model="revisionReferenceImages"
+                            accept="image/jpeg,image/png"
+                            multiple
+                            class="sr-only"
+                            x-on:change="handleRevisionReferenceImageChange($event)"
+                            x-on:livewire-upload-start="revisionReferenceImageUploading = true; revisionReferenceImageUploadFailed = false"
+                            x-on:livewire-upload-finish="revisionReferenceImageUploading = false"
+                            x-on:livewire-upload-error="revisionReferenceImageUploading = false; revisionReferenceImageUploadFailed = true; clearRevisionReferenceImageInput()"
+                        />
                         <textarea
                             wire:model="revisionInstruction"
                             x-ref="prompyInput"
@@ -497,12 +742,51 @@
                             x-on:input="$el.style.height = 'auto'; $el.style.height = Math.min($el.scrollHeight, 120) + 'px'"
                         ></textarea>
                         @error('revisionInstruction') <p class="memo-config-error">{{ $message }}</p> @enderror
+                        @error('revisionReferenceImages') <p class="memo-config-error">{{ $message }}</p> @enderror
+                        @error('revisionReferenceImages.*') <p class="memo-config-error">{{ $message }}</p> @enderror
 
-                        <div class="mt-2 flex items-center justify-end">
+                        <div x-show="revisionReferenceImages.length > 0" x-cloak class="mt-2 rounded-lg border border-emerald-200 bg-emerald-50/70 p-2 dark:border-emerald-900/60 dark:bg-emerald-950/20">
+                            <div class="flex items-center justify-between gap-2">
+                                <p class="text-[11px] font-semibold text-emerald-800 dark:text-emerald-200" x-text="`${revisionReferenceImages.length} gambar baru untuk versi berikutnya`"></p>
+                                <button type="button"
+                                        @click="clearRevisionReferenceImageState(); $wire.clearRevisionReferenceImages()"
+                                        class="shrink-0 rounded-md px-2 py-1 text-[10.5px] font-semibold text-emerald-700 hover:bg-emerald-100 dark:text-emerald-200 dark:hover:bg-emerald-900/50">
+                                    Hapus
+                                </button>
+                            </div>
+                            <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                                <template x-for="image in revisionReferenceImages" :key="image.label">
+                                    <div class="overflow-hidden rounded-md border border-emerald-200 bg-white text-left dark:border-emerald-900/70 dark:bg-gray-900">
+                                        <div class="aspect-[4/3] bg-emerald-100/70 dark:bg-gray-800">
+                                            <img :src="image.url" :alt="image.label" class="h-full w-full object-cover">
+                                        </div>
+                                        <div class="min-w-0 px-2 py-1">
+                                            <p class="truncate text-[10.5px] font-bold text-emerald-800 dark:text-emerald-200" x-text="image.label"></p>
+                                            <p class="truncate text-[10px] text-emerald-700/70 dark:text-emerald-300/70" x-text="image.name"></p>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                        <p x-show="revisionReferenceImageDropError" x-cloak class="memo-config-error" x-text="revisionReferenceImageDropError"></p>
+
+                        <div class="mt-2 flex items-center justify-between gap-2">
+                            <button type="button"
+                                    @click="chooseRevisionReferenceImage()"
+                                    wire:loading.attr="disabled"
+                                    wire:target="revisionReferenceImages,sendPromptChat"
+                                    :disabled="prompyRevisionLoading || revisionReferenceImageUploading || $wire.isGenerating"
+                                    class="inline-flex h-8 items-center gap-1.5 rounded-full border border-stone-200 px-2.5 text-[11px] font-semibold text-stone-500 transition hover:border-ista-primary/40 hover:text-ista-primary disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-400 dark:hover:border-amber-400/50 dark:hover:text-amber-200">
+                                <svg x-show="!revisionReferenceImageUploading" xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16.5 6.5l-7.8 7.8a3 3 0 104.2 4.2l8.1-8.1a5 5 0 10-7.1-7.1L5.8 11.4" />
+                                </svg>
+                                <span x-show="revisionReferenceImageUploading" x-cloak class="h-3.5 w-3.5 rounded-full border-2 border-current/50 border-t-transparent animate-spin" aria-hidden="true"></span>
+                                <span x-text="revisionReferenceImages.length ? 'Ganti gambar' : 'Lampirkan gambar'"></span>
+                            </button>
                             <button type="submit"
                                     wire:loading.attr="disabled"
-                                    wire:target="sendPromptChat"
-                                    :disabled="prompyRevisionLoading || $wire.isGenerating"
+                                    wire:target="sendPromptChat,revisionReferenceImages"
+                                    :disabled="prompyRevisionLoading || revisionReferenceImageUploading || $wire.isGenerating"
                                     class="bg-ista-primary hover:bg-ista-dark dark:bg-ista-primary dark:hover:bg-ista-dark disabled:opacity-50 disabled:cursor-not-allowed rounded-full transition-all duration-300 h-[32px] w-[32px] flex items-center justify-center group"
                                     aria-label="Kirim pesan prompt">
                                 <img src="{{ asset('images/icons/send-light.svg') }}" alt="" class="h-[17px] w-[17px] dark:hidden brightness-0 invert" />

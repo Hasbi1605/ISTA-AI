@@ -170,7 +170,10 @@ class AIUsageEventServiceTest extends TestCase
             'platform' => 'gpt_image_2',
             'prompt_type' => 'poster_infographic',
             'has_reference_image' => true,
+            'reference_image_count' => 2,
             'reference_image_analyzed' => true,
+            'has_reference_document' => true,
+            'reference_document_count' => 1,
             'contains_internal_context' => true,
             'prompt' => 'raw prompt content must be dropped',
             'context_text' => 'raw context must be dropped',
@@ -181,7 +184,10 @@ class AIUsageEventServiceTest extends TestCase
             'platform' => 'gpt_image_2',
             'prompt_type' => 'poster_infographic',
             'has_reference_image' => true,
+            'reference_image_count' => 2,
             'reference_image_analyzed' => true,
+            'has_reference_document' => true,
+            'reference_document_count' => 1,
             'contains_internal_context' => true,
         ], $clean);
     }

@@ -100,6 +100,53 @@ class PromptStudioTest extends TestCase
         });
     }
 
+    public function test_reference_documents_are_extracted_as_prompt_context(): void
+    {
+        $generateCalls = [];
+        Http::fake([
+            '*/api/documents/extract-content' => Http::response([
+                'content_html' => '<h1>Workshop AI</h1><p>Bahas prompt gambar, konsistensi slide, dan latihan peserta.</p>',
+            ], 200),
+            '*/api/prompts/generate' => function ($request) use (&$generateCalls) {
+                $generateCalls[] = $request->data();
+
+                return Http::response($this->fakePackageResponse(), 200);
+            },
+        ]);
+        $user = User::factory()->create();
+
+        $prompt = app(PromptStudioService::class)->generate($user, [
+            'idea' => 'Buat deck workshop AI untuk pegawai',
+            'platform' => 'google_flow',
+            'prompt_type' => 'presentation',
+            'reference_documents' => [
+                UploadedFile::fake()->createWithContent('brief-workshop.pdf', '%PDF-1.4 brief workshop AI'),
+            ],
+        ]);
+
+        $this->assertSame([], $prompt->source_document_ids);
+        $this->assertSame('google_flow', $prompt->platform);
+        $this->assertSame('Google Flow', $prompt->platform_label);
+        $this->assertTrue($prompt->contains_internal_context);
+        $this->assertCount(1, $generateCalls);
+        $contextNotes = (string) ($generateCalls[0]['context_notes'] ?? '');
+        $this->assertStringContainsString('Dokumen acuan Prompy', $contextNotes);
+        $this->assertStringContainsString('brief-workshop.pdf', $contextNotes);
+        $this->assertStringContainsString('Workshop AI', $contextNotes);
+        $this->assertStringContainsString('konsistensi slide', $contextNotes);
+        $this->assertNull($generateCalls[0]['reference_images'] ?? null);
+
+        $event = AIUsageEvent::where('feature', AIUsageEvent::FEATURE_PROMPT_GENERATION)
+            ->where('subject_id', $prompt->id)
+            ->first();
+        $this->assertNotNull($event);
+        $this->assertTrue($event->metadata['has_reference_document'] ?? false);
+        $this->assertSame(1, $event->metadata['reference_document_count'] ?? null);
+        $this->assertTrue($event->metadata['contains_internal_context'] ?? false);
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/api/documents/extract-content'));
+    }
+
     public function test_reference_images_are_validated_and_stored_private(): void
     {
         Storage::fake('local');
@@ -338,7 +385,6 @@ class PromptStudioTest extends TestCase
             ->assertSee('Salin semua')
             ->assertSee('Prompt Baru')
             ->assertSee('Cari prompt...')
-            ->assertDontSee('Google Flow')
             ->assertDontSee('Gambar dianalisis')
             ->assertSee('Prompt aktif')
             ->assertSee('Konfigurasi prompt:')
@@ -469,16 +515,19 @@ class PromptStudioTest extends TestCase
             ->assertSet('promptType', null)
             ->assertSee('Pilih atau seret gambar')
             ->assertSee('Opsional. JPG/PNG, maksimal 5 gambar, masing-masing 5 MB.')
+            ->assertSee('Dokumen acuan')
+            ->assertSee('Pilih dokumen acuan')
+            ->assertSee('PDF/DOCX/XLSX/CSV, maksimal 3 dokumen')
             ->assertDontSee('Catatan konteks tambahan')
             ->assertSee('h-4 w-4 rounded-full border-2 border-current/50 border-t-transparent animate-spin', false)
             ->assertSee('GPT Image 2')
             ->assertSee('Gemini / Nano Banana')
             ->assertSee('Canva AI')
+            ->assertSee('Google Flow')
             ->assertSee('Universal')
             ->assertSee('prompy-gemini-gradient', false)
             ->assertSee('prompy-canva-clip', false)
             ->assertSee('bg-sky-50 text-sky-600', false)
-            ->assertDontSee('Google Flow')
             ->assertSee('Belum ada paket prompt')
             ->assertDontSee('Existing prompt output');
     }
@@ -614,6 +663,71 @@ class PromptStudioTest extends TestCase
         $this->assertSame('user', $prompt->chat_messages[0]['role'] ?? null);
         $this->assertSame('Oke sudah bagus', $prompt->chat_messages[0]['content'] ?? null);
         $this->assertSame('assistant', $prompt->chat_messages[1]['role'] ?? null);
+    }
+
+    public function test_livewire_prompt_chat_with_new_reference_images_creates_version_without_chat_router(): void
+    {
+        Storage::fake('local');
+        $generateCalls = [];
+        $chatCalls = [];
+        Http::fake([
+            '*/api/prompts/chat' => function ($request) use (&$chatCalls) {
+                $chatCalls[] = $request->data();
+
+                return Http::response($this->fakePromptChatResponse([
+                    'intent' => 'answer',
+                    'assistant_message' => 'Seharusnya tidak lewat router chat jika ada gambar baru.',
+                ]), 200);
+            },
+            '*/api/prompts/generate' => function ($request) use (&$generateCalls) {
+                $data = $request->data();
+                $generateCalls[] = $data;
+
+                if (! empty($data['revision_instruction'])) {
+                    return Http::response($this->fakePackageResponse([
+                        'main_prompt' => 'A revised prompt based on the newly attached reference image.',
+                        'reference_image_analyzed' => true,
+                    ]), 200);
+                }
+
+                return Http::response($this->fakePackageResponse([
+                    'main_prompt' => 'A first draft prompt with an initial reference image.',
+                    'reference_image_analyzed' => true,
+                ]), 200);
+            },
+        ]);
+        $user = User::factory()->create();
+
+        $component = Livewire::actingAs($user)
+            ->test(PrompyStudio::class)
+            ->set('idea', 'Buat prompt poster dari referensi awal')
+            ->call('selectPlatform', 'gpt_image_2')
+            ->call('selectPromptType', 'poster_infographic')
+            ->set('referenceImages', [
+                UploadedFile::fake()->image('awal.png', 200, 200),
+            ])
+            ->call('generate')
+            ->assertSee('Menggunakan 1 gambar referensi dari Versi 1')
+            ->set('revisionReferenceImages', [
+                UploadedFile::fake()->image('baru.png', 240, 320),
+            ])
+            ->call('sendPromptChat', 'Gunakan gambar baru ini sebagai acuan utama versi berikutnya')
+            ->assertSet('revisionReferenceImages', [])
+            ->assertSet('showPromptConfiguration', false)
+            ->assertSee('Menggunakan 1 gambar referensi dari Versi 2')
+            ->assertSee('A revised prompt based on the newly attached reference image.');
+
+        $prompt = GeneratedPrompt::with(['currentVersion', 'versions'])->findOrFail($component->get('activePromptId'));
+        $this->assertSame(2, $prompt->versions()->count());
+        $this->assertSame(2, $prompt->currentVersion?->version_number);
+        $this->assertSame('Gunakan gambar baru ini sebagai acuan utama versi berikutnya', $prompt->currentVersion?->revision_instruction);
+        $this->assertCount(1, $prompt->currentVersion?->reference_images ?? []);
+        $this->assertSame([], $prompt->chat_messages ?? []);
+        $this->assertCount(2, $generateCalls);
+        $this->assertCount(0, $chatCalls);
+        $this->assertSame('Gunakan gambar baru ini sebagai acuan utama versi berikutnya', $generateCalls[1]['revision_instruction'] ?? null);
+        $this->assertCount(1, $generateCalls[1]['reference_images'] ?? []);
+        $this->assertSame('image/png', $generateCalls[1]['reference_images'][0]['mime_type'] ?? null);
     }
 
     public function test_livewire_prompt_chat_preserves_repeated_assistant_replies(): void

@@ -69,6 +69,8 @@ class AIUsageEventService
         'has_reference_image',
         'reference_image_count',
         'reference_image_analyzed',
+        'has_reference_document',
+        'reference_document_count',
         'contains_internal_context',
         'revision',
         'version_number',
