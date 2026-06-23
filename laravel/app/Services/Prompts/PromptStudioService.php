@@ -28,7 +28,7 @@ class PromptStudioService
 {
     /** Platform awal yang didukung (selaras dengan ai_config.yaml #263). */
     public const PLATFORMS = [
-        'gpt_image_2' => 'GPT Image 2',
+        'gpt_image_2' => 'ChatGPT Images / GPT Image',
         'gemini_nano_banana' => 'Gemini / Nano Banana',
         'canva_ai' => 'Canva AI',
         'generic' => 'Universal',

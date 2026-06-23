@@ -672,6 +672,12 @@ prompts:
         sampai slide terakhir
       - Revision / Repair Prompts: prompt pendek untuk memperbaiki slide yang
         melenceng tanpa mengubah seluruh deck
+      "main_prompt" untuk Presentasi BOLEH panjang, berlapis, dan beberapa
+      paragraf bila itu dibutuhkan untuk menjaga alur, konteks, dan konsistensi
+      desain. Jangan memadatkan slide-by-slide table hanya demi pendek. Untuk
+      10+ slide, pertahankan semua slide yang diminta pengguna; untuk puluhan
+      slide, berikan Style Bible yang kuat, urutan batch yang jelas, dan prompt
+      slide sesuai cakupan yang diminta.
       Untuk deck panjang, arahkan pengguna membuat output per slide atau per
       batch kecil, sambil mempertahankan Style Bible yang sama.
 
@@ -699,6 +705,9 @@ prompts:
           "notes_id": "<catatan & panduan pemakaian dalam Bahasa Indonesia, singkat dan praktis>"
         }}
       - "main_prompt" dan "variants" HARUS Bahasa Inggris.
+      - Untuk jenis "Presentasi", "main_prompt" boleh panjang dan terstruktur
+        selama tetap siap salin-tempel; jangan dipotong bila detail slide,
+        style bible, atau consistency rules memang diperlukan.
       - "notes_id" HARUS Bahasa Indonesia.
       - "notes_id" harus singkat, praktis, maksimal 4 langkah/poin, dan diawali
         dengan "Cara pakai:".
@@ -837,22 +846,28 @@ prompt_studio:
       base_url: "https://models.github.ai/inference"
   platforms:
     - key: "gpt_image_2"
-      label: "GPT Image 2"
+      label: "ChatGPT Images / GPT Image"
       guidance: >-
-        Optimalkan untuk model image OpenAI. Tulis deskripsi visual yang kaya
-        (subjek, komposisi, pencahayaan, gaya, palet warna, rasio aspek).
-        Hindari instruksi bergaya chat; fokus pada deskripsi adegan.
+        Optimalkan untuk ChatGPT Images / model image OpenAI. Tulis prompt
+        natural yang menjelaskan subjek, komposisi, pencahayaan, gaya, palet,
+        rasio aspek, detail teks yang ingin terlihat, dan bila perlu latar
+        transparan. Untuk edit berbasis referensi, sebutkan elemen yang harus
+        dipertahankan dari gambar unggahan dan elemen yang harus diganti.
     - key: "gemini_nano_banana"
       label: "Gemini / Nano Banana"
       guidance: >-
-        Optimalkan untuk Google Gemini image (Nano Banana). Deskriptif namun
-        ringkas, sebutkan gaya, suasana, dan detail penting. Cocok untuk editing
-        dan komposisi berbasis referensi.
+        Optimalkan untuk Google Gemini image / Nano Banana. Sebutkan rasio aspek
+        dan image_size bila relevan (1K, 2K, atau 4K), manfaatkan gambar
+        referensi untuk menjaga karakter/subjek, dan tulis teks dalam gambar
+        secara eksplisit. Bila hasil membutuhkan tipografi presisi, minta model
+        membangun elemen teks sejak awal, bukan menambahkannya belakangan.
     - key: "canva_ai"
       label: "Canva AI"
       guidance: >-
-        Optimalkan untuk Canva Magic Media / desain. Sertakan tujuan desain,
-        gaya brand, teks yang ingin tampil, dan format (poster, slide, sosial).
+        Optimalkan untuk Canva Magic Media, Dream Lab, dan alur desain Canva.
+        Sertakan tujuan desain, format akhir, audiens, brand kit/palet warna,
+        teks yang ingin tampil, placeholder teks/gambar, anotasi layout, dan
+        arahan posisi copy agar mudah diterapkan ke template Canva.
     - key: "generic"
       label: "Universal"
       guidance: >-

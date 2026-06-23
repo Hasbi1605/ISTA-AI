@@ -24,6 +24,9 @@ def _fake_generator(payload: dict) -> "callable":
     return lambda _prompt: json.dumps(payload)
 
 
+OPENAI_IMAGE_LABEL = "ChatGPT Images / GPT Image"
+
+
 VALID_PACKAGE = {
     "main_prompt": "A professional poster of the presidential palace at sunrise, golden light.",
     "variants": ["A cinematic wide shot of the palace", "A minimalist flat-design poster"],
@@ -36,7 +39,7 @@ VALID_PACKAGE = {
 def test_resolve_platform_falls_back_to_generic():
     assert resolve_platform("does-not-exist")["key"] == "generic"
     assert resolve_platform("does-not-exist")["label"] == "Universal"
-    assert resolve_platform("gpt_image_2")["label"] == "GPT Image 2"
+    assert resolve_platform("gpt_image_2")["label"] == OPENAI_IMAGE_LABEL
     assert resolve_platform("google_flow")["label"] == "Universal"
 
 
@@ -78,6 +81,8 @@ def test_build_presentation_prompt_includes_deck_kit_and_usage_notes():
     assert "Slide-by-slide Prompt Table" in prompt
     assert "Consistency Rules" in prompt
     assert "Revision / Repair Prompts" in prompt
+    assert "BOLEH panjang" in prompt
+    assert "jangan dipotong" in prompt
     assert "Cara pakai:" in prompt
     assert "dokumen acuan" in prompt
 
@@ -90,13 +95,48 @@ def test_generate_prompt_package_parses_json():
         text_generator=_fake_generator(VALID_PACKAGE),
     )
     assert package.platform == "gpt_image_2"
-    assert package.platform_label == "GPT Image 2"
+    assert package.platform_label == OPENAI_IMAGE_LABEL
     assert package.prompt_type == "poster_infographic"
     assert package.main_prompt.startswith("A professional poster")
     assert len(package.variants) == 2
     assert package.negative_prompt == "blurry, low quality, watermark"
     assert package.recommended_settings["aspect_ratio"] == "16:9"
     assert "Tempel prompt utama" in package.notes_id
+
+
+def test_presentation_main_prompt_can_exceed_default_image_prompt_limit():
+    long_prompt = "\n".join(
+        [
+            f"Slide {index}: "
+            + ("Detailed visual direction, layout guidance, and continuity rule. " * 18)
+            for index in range(1, 15)
+        ]
+    )
+    assert len(long_prompt) > prompt_generation.DEFAULT_MAIN_PROMPT_MAX_LENGTH
+    assert len(long_prompt) < prompt_generation.PRESENTATION_MAIN_PROMPT_MAX_LENGTH
+
+    package = generate_prompt_package(
+        idea="Buat PPT workshop AI 14 slide untuk pegawai Istana",
+        platform="gemini_nano_banana",
+        prompt_type="presentation",
+        text_generator=_fake_generator(VALID_PACKAGE | {"main_prompt": long_prompt}),
+    )
+
+    assert package.prompt_type == "presentation"
+    assert package.main_prompt == long_prompt.strip()
+
+
+def test_non_presentation_main_prompt_keeps_default_length_cap():
+    long_prompt = "x" * (prompt_generation.DEFAULT_MAIN_PROMPT_MAX_LENGTH + 50)
+
+    package = generate_prompt_package(
+        idea="Buat poster acara",
+        platform="gpt_image_2",
+        prompt_type="poster_infographic",
+        text_generator=_fake_generator(VALID_PACKAGE | {"main_prompt": long_prompt}),
+    )
+
+    assert len(package.main_prompt) == prompt_generation.DEFAULT_MAIN_PROMPT_MAX_LENGTH
 
 
 def test_generate_prompt_package_uses_reference_image_analysis():
@@ -286,7 +326,7 @@ def test_build_prompt_chat_prompt_includes_context_and_guardrail():
     prompt = build_prompt_studio_chat_prompt(
         user_message="Menurutmu apa yang kurang?",
         idea="Poster 1 Muharram",
-        platform_label="GPT Image 2",
+        platform_label=OPENAI_IMAGE_LABEL,
         prompt_type_label="Poster / Infografis",
         active_version_label="Versi 1",
         current_package={"main_prompt": "A blue minimalist poster", "variants": []},
@@ -304,7 +344,7 @@ def test_prompt_chat_decision_answer_does_not_carry_revision_instruction():
     decision = generate_prompt_chat_decision(
         user_message="Menurutmu prompt ini kurang apa?",
         idea="Poster 1 Muharram",
-        platform_label="GPT Image 2",
+        platform_label=OPENAI_IMAGE_LABEL,
         prompt_type_label="Poster / Infografis",
         current_package={"main_prompt": "A blue minimalist poster"},
         text_generator=lambda _prompt: json.dumps({
@@ -323,7 +363,7 @@ def test_prompt_chat_decision_revise_uses_model_instruction():
     decision = generate_prompt_chat_decision(
         user_message="Terapkan saran nomor 2",
         idea="Poster 1 Muharram",
-        platform_label="GPT Image 2",
+        platform_label=OPENAI_IMAGE_LABEL,
         prompt_type_label="Poster / Infografis",
         current_package={"main_prompt": "A blue minimalist poster"},
         chat_messages=[

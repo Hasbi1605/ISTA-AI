@@ -29,7 +29,7 @@ class PromptStudioTest extends TestCase
     {
         return array_merge([
             'platform' => 'gpt_image_2',
-            'platform_label' => 'GPT Image 2',
+            'platform_label' => 'ChatGPT Images / GPT Image',
             'prompt_type' => 'poster_infographic',
             'prompt_type_label' => 'Poster / Infografis',
             'main_prompt' => 'A formal poster of the presidential palace, golden hour lighting.',
@@ -67,6 +67,7 @@ class PromptStudioTest extends TestCase
 
         $this->assertSame((int) $user->id, (int) $prompt->user_id);
         $this->assertSame('gpt_image_2', $prompt->platform);
+        $this->assertSame('ChatGPT Images / GPT Image', $prompt->platform_label);
         $this->assertSame('poster_infographic', $prompt->prompt_type);
         $this->assertStringContainsString('presidential palace', $prompt->normalizedPackage()['main_prompt']);
         $this->assertFalse($prompt->contains_internal_context);
@@ -366,7 +367,7 @@ class PromptStudioTest extends TestCase
         GeneratedPrompt::create([
             'user_id' => $user->id,
             'platform' => 'gpt_image_2',
-            'platform_label' => 'GPT Image 2',
+            'platform_label' => 'ChatGPT Images / GPT Image',
             'prompt_type' => 'poster_infographic',
             'prompt_type_label' => 'Poster / Infografis',
             'title' => 'Buat Poster 1 Muharram 1448 H dengan nuansa warna biru, dengan elemen islami yang tidak terlalu ramai',
@@ -411,6 +412,40 @@ class PromptStudioTest extends TestCase
             ->assertSee('Poster 1 Muharram 1448 H')
             ->assertDontSee('dengan nuansa warna biru')
             ->assertSeeInOrder(['Riwayat Prompt', 'Prompt utama']);
+    }
+
+    public function test_result_panel_keeps_long_presentation_prompt_scrollable(): void
+    {
+        $user = User::factory()->create();
+        $longPrompt = str_repeat(
+            "Slide prompt detail with style bible, layout rules, and continuity instructions.\n",
+            180,
+        ).'LONG_PRESENTATION_PROMPT_END_MARKER';
+
+        GeneratedPrompt::create([
+            'user_id' => $user->id,
+            'platform' => 'gemini_nano_banana',
+            'platform_label' => 'Gemini / Nano Banana',
+            'prompt_type' => 'presentation',
+            'prompt_type_label' => 'Presentasi',
+            'title' => 'Workshop AI Untuk Pegawai Istana',
+            'idea' => 'Buat PPT workshop AI',
+            'package' => $this->fakePackageResponse([
+                'platform' => 'gemini_nano_banana',
+                'platform_label' => 'Gemini / Nano Banana',
+                'prompt_type' => 'presentation',
+                'prompt_type_label' => 'Presentasi',
+                'main_prompt' => $longPrompt,
+                'variants' => [],
+            ]),
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(PrompyStudio::class)
+            ->assertSee('LONG_PRESENTATION_PROMPT_END_MARKER')
+            ->assertSee('flex-1 overflow-y-auto px-4 py-4', false)
+            ->assertSee('whitespace-pre-wrap rounded-2xl', false)
+            ->assertDontSee('line-clamp', false);
     }
 
     public function test_select_prompt_changes_active_result_panel(): void
@@ -521,7 +556,7 @@ class PromptStudioTest extends TestCase
             ->assertSee('PDF/DOCX/XLSX/CSV, maksimal 3 dokumen')
             ->assertDontSee('Catatan konteks tambahan')
             ->assertSee('h-4 w-4 rounded-full border-2 border-current/50 border-t-transparent animate-spin', false)
-            ->assertSee('GPT Image 2')
+            ->assertSee('ChatGPT Images / GPT Image')
             ->assertSee('Gemini / Nano Banana')
             ->assertSee('Canva AI')
             ->assertDontSee('Google Flow')

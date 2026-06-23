@@ -245,6 +245,8 @@ def test_prompt_studio_profiles_and_template_are_loaded_from_yaml():
     assert "google_flow" not in platforms
     labels = {p["key"]: p["label"] for p in config_loader.get_prompt_studio_platforms()}
     assert labels["generic"] == "Universal"
+    assert labels["gpt_image_2"] == "ChatGPT Images / GPT Image"
+    assert "Google Flow" not in labels.values()
     # Jenis prompt yang wajib didukung.
     assert {"image", "presentation", "poster_infographic", "video_storyboard"} <= types
 
@@ -262,6 +264,8 @@ def test_prompt_studio_profiles_and_template_are_loaded_from_yaml():
     assert "Deck Brief" in template
     assert "Style Bible" in template
     assert "Slide-by-slide Prompt Table" in template
+    assert "BOLEH panjang" in template
+    assert "jangan dipotong" in template
 
     reference_template = config_loader.get_prompt_studio_reference_image_prompt()
     assert "{reference_label}" in reference_template

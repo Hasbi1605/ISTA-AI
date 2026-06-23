@@ -1,7 +1,7 @@
 """Prompy Studio prompt-package generation (#263).
 
 Menyusun paket prompt profesional siap salin-tempel untuk platform AI eksternal
-(GPT Image 2, Gemini/Nano Banana, Canva AI, Google Flow, Generic) berdasarkan ide
+(ChatGPT Images/GPT Image, Gemini/Nano Banana, Canva AI, Universal) berdasarkan ide
 Bahasa Indonesia dari pengguna. ISTA AI TIDAK memanggil platform tersebut; service
 ini hanya merangkai teks prompt melalui LLM lalu mengembalikan JSON terstruktur.
 
@@ -33,7 +33,9 @@ REFERENCE_IMAGE_ANALYSIS_MAX_LENGTH = 2500
 REFERENCE_IMAGE_BASE64_MAX_LENGTH = 7_100_000
 REFERENCE_IMAGE_MAX_COUNT = 5
 REFERENCE_IMAGE_ALLOWED_MIME_TYPES = {"image/jpeg", "image/png"}
-MAIN_PROMPT_MAX_LENGTH = 6000
+DEFAULT_MAIN_PROMPT_MAX_LENGTH = 6000
+PRESENTATION_MAIN_PROMPT_MAX_LENGTH = 24000
+MAIN_PROMPT_MAX_LENGTH = DEFAULT_MAIN_PROMPT_MAX_LENGTH
 NOTES_MAX_LENGTH = 4000
 MAX_VARIANTS = 4
 MAX_SETTINGS = 12
@@ -129,11 +131,12 @@ def build_prompt_studio_prompt(
     revision_instruction: str = "",
     runtime_config: Mapping[str, Any] | None = None,
 ) -> str:
+    main_prompt_max_length = _main_prompt_max_length(prompt_type_profile)
     template_values = {
         "idea": idea.strip(),
         "context_notes": (context_notes or "").strip() or "-",
         "reference_image_analysis": (reference_image_analysis or "").strip() or "-",
-        "current_package": _format_current_package(current_package),
+        "current_package": _format_current_package(current_package, main_prompt_max_length),
         "revision_instruction": (revision_instruction or "").strip() or "-",
         "platform_label": str(platform_profile.get("label", "Generic")),
         "platform_guidance": str(platform_profile.get("guidance", "")).strip() or "-",
@@ -222,6 +225,7 @@ def generate_prompt_package(
 
     platform_profile = resolve_platform(platform)
     type_profile = resolve_type(prompt_type)
+    main_prompt_max_length = _main_prompt_max_length(type_profile)
     reference_image_analysis = analyze_reference_images(
         reference_images=reference_images,
         reference_image=reference_image,
@@ -255,8 +259,8 @@ def generate_prompt_package(
         platform_label=str(platform_profile.get("label", "Generic")),
         prompt_type=str(type_profile.get("key", prompt_type)),
         prompt_type_label=str(type_profile.get("label", "")),
-        main_prompt=_clean_text(payload.get("main_prompt"), MAIN_PROMPT_MAX_LENGTH),
-        variants=_clean_variants(payload.get("variants")),
+        main_prompt=_clean_text(payload.get("main_prompt"), main_prompt_max_length),
+        variants=_clean_variants(payload.get("variants"), main_prompt_max_length),
         negative_prompt=_clean_text(payload.get("negative_prompt"), MAIN_PROMPT_MAX_LENGTH),
         recommended_settings=_clean_settings(payload.get("recommended_settings")),
         notes_id=_clean_text(payload.get("notes_id"), NOTES_MAX_LENGTH),
@@ -498,13 +502,23 @@ def _normalize_reference_image(reference_image: Mapping[str, Any]) -> dict[str, 
     return {"mime_type": mime_type, "data_base64": data_base64}
 
 
-def _format_current_package(current_package: Mapping[str, Any] | None) -> str:
+def _main_prompt_max_length(prompt_type_profile: Mapping[str, Any] | None = None) -> int:
+    key = str((prompt_type_profile or {}).get("key") or "").strip().lower()
+    if key == "presentation":
+        return PRESENTATION_MAIN_PROMPT_MAX_LENGTH
+    return DEFAULT_MAIN_PROMPT_MAX_LENGTH
+
+
+def _format_current_package(
+    current_package: Mapping[str, Any] | None,
+    main_prompt_max_length: int = DEFAULT_MAIN_PROMPT_MAX_LENGTH,
+) -> str:
     if not isinstance(current_package, Mapping) or not current_package:
         return "-"
 
     normalized = {
-        "main_prompt": _clean_text(current_package.get("main_prompt"), MAIN_PROMPT_MAX_LENGTH),
-        "variants": _clean_variants(current_package.get("variants")),
+        "main_prompt": _clean_text(current_package.get("main_prompt"), main_prompt_max_length),
+        "variants": _clean_variants(current_package.get("variants"), main_prompt_max_length),
         "negative_prompt": _clean_text(current_package.get("negative_prompt"), MAIN_PROMPT_MAX_LENGTH),
         "recommended_settings": _clean_settings(current_package.get("recommended_settings")),
         "notes_id": _clean_text(current_package.get("notes_id"), NOTES_MAX_LENGTH),
@@ -564,7 +578,7 @@ def _parse_package_json(raw: str) -> dict[str, Any]:
     if not isinstance(parsed, dict):
         raise ValueError("Hasil paket prompt tidak valid.")
 
-    if not _clean_text(parsed.get("main_prompt"), MAIN_PROMPT_MAX_LENGTH):
+    if not _clean_text(parsed.get("main_prompt"), 1):
         raise ValueError("Hasil paket prompt tidak memuat prompt utama.")
 
     return parsed
@@ -634,12 +648,12 @@ def _clean_text(value: Any, max_length: int) -> str:
     return clean[:max_length]
 
 
-def _clean_variants(value: Any) -> list[str]:
+def _clean_variants(value: Any, max_length: int = DEFAULT_MAIN_PROMPT_MAX_LENGTH) -> list[str]:
     if not isinstance(value, list):
         return []
     variants: list[str] = []
     for item in value:
-        clean = _clean_text(item, MAIN_PROMPT_MAX_LENGTH)
+        clean = _clean_text(item, max_length)
         if clean:
             variants.append(clean)
         if len(variants) >= MAX_VARIANTS:
