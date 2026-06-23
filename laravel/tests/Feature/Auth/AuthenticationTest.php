@@ -160,23 +160,27 @@ class AuthenticationTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $throttleKey = Str::transliterate(Str::lower($user->email).'|127.0.0.1');
+        $this->freezeTime(function () use ($user): void {
+            $throttleKey = Str::transliterate(Str::lower($user->email).'|127.0.0.1');
 
-        for ($attempt = 0; $attempt < 5; $attempt++) {
-            RateLimiter::hit($throttleKey, 120);
-        }
+            for ($attempt = 0; $attempt < 5; $attempt++) {
+                RateLimiter::hit($throttleKey, 120);
+            }
 
-        $seconds = RateLimiter::availableIn($throttleKey);
+            $seconds = RateLimiter::availableIn($throttleKey);
 
-        Volt::test('pages.auth.login')
-            ->set('form.email', $user->email)
-            ->set('form.password', 'password')
-            ->call('login')
-            ->assertHasErrors([
-                'form.email' => "Terlalu banyak percobaan login. Silakan coba lagi dalam {$seconds} detik.",
-            ]);
-
-        RateLimiter::clear($throttleKey);
+            try {
+                Volt::test('pages.auth.login')
+                    ->set('form.email', $user->email)
+                    ->set('form.password', 'password')
+                    ->call('login')
+                    ->assertHasErrors([
+                        'form.email' => "Terlalu banyak percobaan login. Silakan coba lagi dalam {$seconds} detik.",
+                    ]);
+            } finally {
+                RateLimiter::clear($throttleKey);
+            }
+        });
     }
 
     public function test_chat_page_can_be_rendered_for_authenticated_user(): void
