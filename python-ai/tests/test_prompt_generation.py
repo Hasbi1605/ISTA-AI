@@ -37,7 +37,7 @@ def test_resolve_platform_falls_back_to_generic():
     assert resolve_platform("does-not-exist")["key"] == "generic"
     assert resolve_platform("does-not-exist")["label"] == "Universal"
     assert resolve_platform("gpt_image_2")["label"] == "GPT Image 2"
-    assert resolve_platform("google_flow")["label"] == "Google Flow"
+    assert resolve_platform("google_flow")["label"] == "Universal"
 
 
 def test_resolve_type_falls_back_to_image():
@@ -66,12 +66,12 @@ def test_build_presentation_prompt_includes_deck_kit_and_usage_notes():
     prompt = build_prompt_studio_prompt(
         idea="Buat PPT workshop AI untuk pegawai Istana",
         prompt_type_profile=resolve_type("presentation"),
-        platform_profile=resolve_platform("google_flow"),
+        platform_profile=resolve_platform("gemini_nano_banana"),
         context_notes="Dokumen acuan Prompy: materi membahas prompt gambar, konsistensi slide, dan latihan peserta.",
     )
 
     assert "Buat PPT workshop AI untuk pegawai Istana" in prompt
-    assert "Google Flow" in prompt
+    assert "Gemini / Nano Banana" in prompt
     assert "Dokumen acuan Prompy" in prompt
     assert "Deck Brief" in prompt
     assert "Style Bible" in prompt

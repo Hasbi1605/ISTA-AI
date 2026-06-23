@@ -100,7 +100,7 @@ class PromptStudioTest extends TestCase
         });
     }
 
-    public function test_reference_documents_are_extracted_as_prompt_context(): void
+    public function test_reference_documents_are_extracted_as_prompt_context_and_legacy_google_flow_maps_to_gemini(): void
     {
         $generateCalls = [];
         Http::fake([
@@ -125,10 +125,11 @@ class PromptStudioTest extends TestCase
         ]);
 
         $this->assertSame([], $prompt->source_document_ids);
-        $this->assertSame('google_flow', $prompt->platform);
-        $this->assertSame('Google Flow', $prompt->platform_label);
+        $this->assertSame('gemini_nano_banana', $prompt->platform);
+        $this->assertSame('Gemini / Nano Banana', $prompt->platform_label);
         $this->assertTrue($prompt->contains_internal_context);
         $this->assertCount(1, $generateCalls);
+        $this->assertSame('gemini_nano_banana', $generateCalls[0]['platform'] ?? null);
         $contextNotes = (string) ($generateCalls[0]['context_notes'] ?? '');
         $this->assertStringContainsString('Dokumen acuan Prompy', $contextNotes);
         $this->assertStringContainsString('brief-workshop.pdf', $contextNotes);
@@ -523,7 +524,7 @@ class PromptStudioTest extends TestCase
             ->assertSee('GPT Image 2')
             ->assertSee('Gemini / Nano Banana')
             ->assertSee('Canva AI')
-            ->assertSee('Google Flow')
+            ->assertDontSee('Google Flow')
             ->assertSee('Universal')
             ->assertSee('prompy-gemini-gradient', false)
             ->assertSee('prompy-canva-clip', false)
@@ -728,6 +729,78 @@ class PromptStudioTest extends TestCase
         $this->assertSame('Gunakan gambar baru ini sebagai acuan utama versi berikutnya', $generateCalls[1]['revision_instruction'] ?? null);
         $this->assertCount(1, $generateCalls[1]['reference_images'] ?? []);
         $this->assertSame('image/png', $generateCalls[1]['reference_images'][0]['mime_type'] ?? null);
+    }
+
+    public function test_livewire_prompt_chat_with_new_reference_documents_creates_version_without_chat_router(): void
+    {
+        Storage::fake('local');
+        $generateCalls = [];
+        $chatCalls = [];
+        Http::fake([
+            '*/api/documents/extract-content' => Http::response([
+                'content_html' => '<h1>Brief Baru</h1><p>Tambahkan agenda, target peserta, dan struktur materi workshop.</p>',
+            ], 200),
+            '*/api/prompts/chat' => function ($request) use (&$chatCalls) {
+                $chatCalls[] = $request->data();
+
+                return Http::response($this->fakePromptChatResponse([
+                    'intent' => 'answer',
+                    'assistant_message' => 'Seharusnya tidak lewat router chat jika ada dokumen baru.',
+                ]), 200);
+            },
+            '*/api/prompts/generate' => function ($request) use (&$generateCalls) {
+                $data = $request->data();
+                $generateCalls[] = $data;
+
+                if (! empty($data['revision_instruction'])) {
+                    return Http::response($this->fakePackageResponse([
+                        'main_prompt' => 'A revised prompt based on the newly attached reference document.',
+                    ]), 200);
+                }
+
+                return Http::response($this->fakePackageResponse([
+                    'main_prompt' => 'A first draft prompt.',
+                ]), 200);
+            },
+        ]);
+        $user = User::factory()->create();
+
+        $component = Livewire::actingAs($user)
+            ->test(PrompyStudio::class)
+            ->set('idea', 'Buat prompt deck workshop AI')
+            ->call('selectPlatform', 'gpt_image_2')
+            ->call('selectPromptType', 'presentation')
+            ->call('generate')
+            ->assertSee('Lampirkan file')
+            ->set('revisionReferenceDocuments', [
+                UploadedFile::fake()->createWithContent('brief-baru.pdf', '%PDF-1.4 brief baru'),
+            ])
+            ->call('sendPromptChat', 'Gunakan dokumen baru ini sebagai brief versi berikutnya')
+            ->assertSet('revisionReferenceDocuments', [])
+            ->assertSet('showPromptConfiguration', false)
+            ->assertSee('A revised prompt based on the newly attached reference document.');
+
+        $prompt = GeneratedPrompt::with(['currentVersion', 'versions'])->findOrFail($component->get('activePromptId'));
+        $this->assertSame(2, $prompt->versions()->count());
+        $this->assertSame(2, $prompt->currentVersion?->version_number);
+        $this->assertSame('Gunakan dokumen baru ini sebagai brief versi berikutnya', $prompt->currentVersion?->revision_instruction);
+        $this->assertSame([], $prompt->chat_messages ?? []);
+        $this->assertCount(2, $generateCalls);
+        $this->assertCount(0, $chatCalls);
+        $this->assertSame('Gunakan dokumen baru ini sebagai brief versi berikutnya', $generateCalls[1]['revision_instruction'] ?? null);
+        $this->assertStringContainsString('Dokumen acuan Prompy', (string) ($generateCalls[1]['context_notes'] ?? ''));
+        $this->assertStringContainsString('brief-baru.pdf', (string) ($generateCalls[1]['context_notes'] ?? ''));
+        $this->assertStringContainsString('Brief Baru', (string) ($generateCalls[1]['context_notes'] ?? ''));
+        $this->assertNull($generateCalls[1]['reference_images'] ?? null);
+
+        $revisionEvent = AIUsageEvent::where('feature', AIUsageEvent::FEATURE_PROMPT_GENERATION)
+            ->where('subject_id', $prompt->id)
+            ->latest('id')
+            ->first();
+        $this->assertNotNull($revisionEvent);
+        $this->assertTrue($revisionEvent->metadata['revision'] ?? false);
+        $this->assertTrue($revisionEvent->metadata['has_reference_document'] ?? false);
+        $this->assertSame(1, $revisionEvent->metadata['reference_document_count'] ?? null);
     }
 
     public function test_livewire_prompt_chat_preserves_repeated_assistant_replies(): void

@@ -241,10 +241,10 @@ def test_prompt_studio_profiles_and_template_are_loaded_from_yaml():
     types = {t["key"] for t in config_loader.get_prompt_studio_types()}
 
     # Platform aktif Prompy Studio untuk workshop image/deck eksternal.
-    assert {"gpt_image_2", "gemini_nano_banana", "canva_ai", "google_flow", "generic"} <= platforms
+    assert {"gpt_image_2", "gemini_nano_banana", "canva_ai", "generic"} <= platforms
+    assert "google_flow" not in platforms
     labels = {p["key"]: p["label"] for p in config_loader.get_prompt_studio_platforms()}
     assert labels["generic"] == "Universal"
-    assert labels["google_flow"] == "Google Flow"
     # Jenis prompt yang wajib didukung.
     assert {"image", "presentation", "poster_infographic", "video_storyboard"} <= types
 

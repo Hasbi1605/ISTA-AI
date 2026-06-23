@@ -853,14 +853,6 @@ prompt_studio:
       guidance: >-
         Optimalkan untuk Canva Magic Media / desain. Sertakan tujuan desain,
         gaya brand, teks yang ingin tampil, dan format (poster, slide, sosial).
-    - key: "google_flow"
-      label: "Google Flow"
-      guidance: >-
-        Optimalkan untuk Google Flow sebagai alat visual/video/storyboard.
-        Susun prompt berbasis scene atau shot: subjek, aksi, komposisi kamera,
-        gerakan, durasi/urutan, mood, transisi, dan konsistensi gaya. Untuk
-        presentasi, gunakan Flow sebagai pembuat visual/scene pendukung per
-        slide, bukan sebagai pengganti struktur deck.
     - key: "generic"
       label: "Universal"
       guidance: >-

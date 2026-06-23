@@ -24,6 +24,7 @@
     x-on:prompy-reference-image-cleared.window="clearReferenceImageState()"
     x-on:prompy-reference-document-cleared.window="clearReferenceDocumentState()"
     x-on:prompy-revision-reference-image-cleared.window="clearRevisionReferenceImageState()"
+    x-on:prompy-revision-reference-document-cleared.window="clearRevisionReferenceDocumentState()"
     x-data="{
         copied: null,
         selectedPlatform: @entangle('platform'),
@@ -41,6 +42,10 @@
         revisionReferenceImageUploading: false,
         revisionReferenceImageUploadFailed: false,
         revisionReferenceImageDropError: '',
+        revisionReferenceDocuments: [],
+        revisionReferenceDocumentUploading: false,
+        revisionReferenceDocumentUploadFailed: false,
+        revisionReferenceDocumentDropError: '',
         prompyRevisionText: '',
         prompyRevisionLoading: false,
         copy(text, id) {
@@ -59,7 +64,7 @@
         async submitPrompyRevision($wire, textarea) {
             const message = (textarea?.value || '').trim();
 
-            if (!message || this.prompyRevisionLoading || this.revisionReferenceImageUploading || $wire.isGenerating) {
+            if (!message || this.prompyRevisionLoading || this.revisionReferenceImageUploading || this.revisionReferenceDocumentUploading || $wire.isGenerating) {
                 return;
             }
 
@@ -94,6 +99,9 @@
         chooseRevisionReferenceImage() {
             this.$refs.revisionReferenceImageInput?.click();
         },
+        chooseRevisionReferenceDocument() {
+            this.$refs.revisionReferenceDocumentInput?.click();
+        },
         handleReferenceImageChange(event) {
             this.setReferenceImageFiles(event.target.files || []);
         },
@@ -102,6 +110,9 @@
         },
         handleRevisionReferenceImageChange(event) {
             this.setRevisionReferenceImageFiles(event.target.files || []);
+        },
+        handleRevisionReferenceDocumentChange(event) {
+            this.setRevisionReferenceDocumentFiles(event.target.files || []);
         },
         releaseReferenceImageUrls() {
             this.referenceImages.forEach((image) => {
@@ -192,6 +203,31 @@
 
             return true;
         },
+        setRevisionReferenceDocumentFiles(fileList) {
+            const files = Array.from(fileList || []);
+            this.revisionReferenceDocumentDropError = '';
+            this.revisionReferenceDocumentUploadFailed = false;
+
+            if (files.length > 3) {
+                this.revisionReferenceDocumentDropError = 'Dokumen revisi maksimal 3 file.';
+                this.clearRevisionReferenceDocumentInput();
+                return false;
+            }
+
+            for (const file of files) {
+                if (!this.validateRevisionReferenceDocumentFile(file)) {
+                    this.clearRevisionReferenceDocumentInput();
+                    return false;
+                }
+            }
+
+            this.revisionReferenceDocuments = files.map((file, index) => ({
+                name: file.name,
+                label: `Dokumen ${index + 1}`,
+            }));
+
+            return true;
+        },
         clearReferenceImageState() {
             this.referenceImageDragging = false;
             this.referenceImageUploading = false;
@@ -232,6 +268,19 @@
 
             if (this.$refs.revisionReferenceImageInput) {
                 this.$refs.revisionReferenceImageInput.value = '';
+            }
+        },
+        clearRevisionReferenceDocumentState() {
+            this.revisionReferenceDocumentUploading = false;
+            this.revisionReferenceDocumentUploadFailed = false;
+            this.revisionReferenceDocumentDropError = '';
+            this.clearRevisionReferenceDocumentInput();
+        },
+        clearRevisionReferenceDocumentInput() {
+            this.revisionReferenceDocuments = [];
+
+            if (this.$refs.revisionReferenceDocumentInput) {
+                this.$refs.revisionReferenceDocumentInput.value = '';
             }
         },
         validateReferenceImageFile(file) {
@@ -283,6 +332,25 @@
             }
 
             this.revisionReferenceImageDropError = '';
+            return true;
+        },
+        validateRevisionReferenceDocumentFile(file) {
+            if (!file) return false;
+
+            const allowedExtensions = ['pdf', 'docx', 'xlsx', 'csv'];
+            const extension = (file.name.split('.').pop() || '').toLowerCase();
+
+            if (!allowedExtensions.includes(extension)) {
+                this.revisionReferenceDocumentDropError = 'Gunakan PDF, DOCX, XLSX, atau CSV.';
+                return false;
+            }
+
+            if (file.size > 10 * 1024 * 1024) {
+                this.revisionReferenceDocumentDropError = 'Ukuran dokumen maksimal 10 MB.';
+                return false;
+            }
+
+            this.revisionReferenceDocumentDropError = '';
             return true;
         },
         dropReferenceImage(event) {
@@ -729,6 +797,18 @@
                             x-on:livewire-upload-finish="revisionReferenceImageUploading = false"
                             x-on:livewire-upload-error="revisionReferenceImageUploading = false; revisionReferenceImageUploadFailed = true; clearRevisionReferenceImageInput()"
                         />
+                        <input
+                            x-ref="revisionReferenceDocumentInput"
+                            type="file"
+                            wire:model="revisionReferenceDocuments"
+                            accept=".pdf,.docx,.xlsx,.csv,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+                            multiple
+                            class="sr-only"
+                            x-on:change="handleRevisionReferenceDocumentChange($event)"
+                            x-on:livewire-upload-start="revisionReferenceDocumentUploading = true; revisionReferenceDocumentUploadFailed = false"
+                            x-on:livewire-upload-finish="revisionReferenceDocumentUploading = false"
+                            x-on:livewire-upload-error="revisionReferenceDocumentUploading = false; revisionReferenceDocumentUploadFailed = true; clearRevisionReferenceDocumentInput()"
+                        />
                         <textarea
                             wire:model="revisionInstruction"
                             x-ref="prompyInput"
@@ -744,6 +824,8 @@
                         @error('revisionInstruction') <p class="memo-config-error">{{ $message }}</p> @enderror
                         @error('revisionReferenceImages') <p class="memo-config-error">{{ $message }}</p> @enderror
                         @error('revisionReferenceImages.*') <p class="memo-config-error">{{ $message }}</p> @enderror
+                        @error('revisionReferenceDocuments') <p class="memo-config-error">{{ $message }}</p> @enderror
+                        @error('revisionReferenceDocuments.*') <p class="memo-config-error">{{ $message }}</p> @enderror
 
                         <div x-show="revisionReferenceImages.length > 0" x-cloak class="mt-2 rounded-lg border border-emerald-200 bg-emerald-50/70 p-2 dark:border-emerald-900/60 dark:bg-emerald-950/20">
                             <div class="flex items-center justify-between gap-2">
@@ -770,23 +852,58 @@
                         </div>
                         <p x-show="revisionReferenceImageDropError" x-cloak class="memo-config-error" x-text="revisionReferenceImageDropError"></p>
 
+                        <div x-show="revisionReferenceDocuments.length > 0" x-cloak class="mt-2 rounded-lg border border-sky-200 bg-sky-50/70 p-2 dark:border-sky-900/60 dark:bg-sky-950/20">
+                            <div class="flex items-center justify-between gap-2">
+                                <p class="text-[11px] font-semibold text-sky-800 dark:text-sky-200" x-text="`${revisionReferenceDocuments.length} dokumen baru untuk versi berikutnya`"></p>
+                                <button type="button"
+                                        @click="clearRevisionReferenceDocumentState(); $wire.clearRevisionReferenceDocuments()"
+                                        class="shrink-0 rounded-md px-2 py-1 text-[10.5px] font-semibold text-sky-700 hover:bg-sky-100 dark:text-sky-200 dark:hover:bg-sky-900/50">
+                                    Hapus
+                                </button>
+                            </div>
+                            <div class="mt-2 flex flex-col gap-1">
+                                <template x-for="document in revisionReferenceDocuments" :key="document.label">
+                                    <div class="flex min-w-0 items-center gap-2 rounded-md border border-sky-200 bg-white px-2 py-1.5 text-left dark:border-sky-900/70 dark:bg-gray-900">
+                                        <span class="shrink-0 text-[10px] font-bold text-sky-700 dark:text-sky-200" x-text="document.label"></span>
+                                        <span class="truncate text-[10.5px] text-sky-700/80 dark:text-sky-300/80" x-text="document.name"></span>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                        <p x-show="revisionReferenceDocumentDropError" x-cloak class="memo-config-error" x-text="revisionReferenceDocumentDropError"></p>
+
                         <div class="mt-2 flex items-center justify-between gap-2">
-                            <button type="button"
-                                    @click="chooseRevisionReferenceImage()"
-                                    wire:loading.attr="disabled"
-                                    wire:target="revisionReferenceImages,sendPromptChat"
-                                    :disabled="prompyRevisionLoading || revisionReferenceImageUploading || $wire.isGenerating"
-                                    class="inline-flex h-8 items-center gap-1.5 rounded-full border border-stone-200 px-2.5 text-[11px] font-semibold text-stone-500 transition hover:border-ista-primary/40 hover:text-ista-primary disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-400 dark:hover:border-amber-400/50 dark:hover:text-amber-200">
-                                <svg x-show="!revisionReferenceImageUploading" xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16.5 6.5l-7.8 7.8a3 3 0 104.2 4.2l8.1-8.1a5 5 0 10-7.1-7.1L5.8 11.4" />
-                                </svg>
-                                <span x-show="revisionReferenceImageUploading" x-cloak class="h-3.5 w-3.5 rounded-full border-2 border-current/50 border-t-transparent animate-spin" aria-hidden="true"></span>
-                                <span x-text="revisionReferenceImages.length ? 'Ganti gambar' : 'Lampirkan gambar'"></span>
-                            </button>
+                            <div class="flex min-w-0 flex-wrap items-center gap-2">
+                                <button type="button"
+                                        @click="chooseRevisionReferenceImage()"
+                                        wire:loading.attr="disabled"
+                                        wire:target="revisionReferenceImages,sendPromptChat"
+                                        :disabled="prompyRevisionLoading || revisionReferenceImageUploading || revisionReferenceDocumentUploading || $wire.isGenerating"
+                                        class="inline-flex h-8 items-center gap-1.5 rounded-full border border-stone-200 px-2.5 text-[11px] font-semibold text-stone-500 transition hover:border-ista-primary/40 hover:text-ista-primary disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-400 dark:hover:border-amber-400/50 dark:hover:text-amber-200">
+                                    <svg x-show="!revisionReferenceImageUploading" xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16.5 6.5l-7.8 7.8a3 3 0 104.2 4.2l8.1-8.1a5 5 0 10-7.1-7.1L5.8 11.4" />
+                                    </svg>
+                                    <span x-show="revisionReferenceImageUploading" x-cloak class="h-3.5 w-3.5 rounded-full border-2 border-current/50 border-t-transparent animate-spin" aria-hidden="true"></span>
+                                    <span x-text="revisionReferenceImages.length ? 'Ganti gambar' : 'Lampirkan gambar'"></span>
+                                </button>
+                                <button type="button"
+                                        @click="chooseRevisionReferenceDocument()"
+                                        wire:loading.attr="disabled"
+                                        wire:target="revisionReferenceDocuments,sendPromptChat"
+                                        :disabled="prompyRevisionLoading || revisionReferenceImageUploading || revisionReferenceDocumentUploading || $wire.isGenerating"
+                                        class="inline-flex h-8 items-center gap-1.5 rounded-full border border-stone-200 px-2.5 text-[11px] font-semibold text-stone-500 transition hover:border-ista-primary/40 hover:text-ista-primary disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-400 dark:hover:border-amber-400/50 dark:hover:text-amber-200">
+                                    <svg x-show="!revisionReferenceDocumentUploading" xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 3h7l5 5v13H7a2 2 0 01-2-2V5a2 2 0 012-2z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M14 3v5h5M8 13h8M8 17h5" />
+                                    </svg>
+                                    <span x-show="revisionReferenceDocumentUploading" x-cloak class="h-3.5 w-3.5 rounded-full border-2 border-current/50 border-t-transparent animate-spin" aria-hidden="true"></span>
+                                    <span x-text="revisionReferenceDocuments.length ? 'Ganti file' : 'Lampirkan file'"></span>
+                                </button>
+                            </div>
                             <button type="submit"
                                     wire:loading.attr="disabled"
-                                    wire:target="sendPromptChat,revisionReferenceImages"
-                                    :disabled="prompyRevisionLoading || revisionReferenceImageUploading || $wire.isGenerating"
+                                    wire:target="sendPromptChat,revisionReferenceImages,revisionReferenceDocuments"
+                                    :disabled="prompyRevisionLoading || revisionReferenceImageUploading || revisionReferenceDocumentUploading || $wire.isGenerating"
                                     class="bg-ista-primary hover:bg-ista-dark dark:bg-ista-primary dark:hover:bg-ista-dark disabled:opacity-50 disabled:cursor-not-allowed rounded-full transition-all duration-300 h-[32px] w-[32px] flex items-center justify-center group"
                                     aria-label="Kirim pesan prompt">
                                 <img src="{{ asset('images/icons/send-light.svg') }}" alt="" class="h-[17px] w-[17px] dark:hidden brightness-0 invert" />

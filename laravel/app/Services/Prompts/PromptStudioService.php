@@ -18,10 +18,9 @@ use Throwable;
 /**
  * Prompy Studio.
  *
-     * Menyusun paket prompt profesional untuk platform AI eksternal lewat python-ai
-     * (`/api/prompts/generate`) dan merutekan chat Prompy (`/api/prompts/chat`).
-     * ISTA AI TIDAK
- * memanggil platform eksternal dan tidak menghasilkan gambar/video langsung.
+ * Menyusun paket prompt profesional untuk platform AI eksternal lewat python-ai
+ * (`/api/prompts/generate`) dan merutekan chat Prompy (`/api/prompts/chat`).
+ * ISTA AI tidak memanggil platform eksternal dan tidak menghasilkan gambar/video langsung.
  *
  * Privasi: ide, catatan, paket prompt, dan reference image tidak di-log.
  */
@@ -32,8 +31,11 @@ class PromptStudioService
         'gpt_image_2' => 'GPT Image 2',
         'gemini_nano_banana' => 'Gemini / Nano Banana',
         'canva_ai' => 'Canva AI',
-        'google_flow' => 'Google Flow',
         'generic' => 'Universal',
+    ];
+
+    private const LEGACY_PLATFORM_ALIASES = [
+        'google_flow' => 'gemini_nano_banana',
     ];
 
     /** Jenis keluaran prompt yang didukung. */
@@ -272,7 +274,7 @@ class PromptStudioService
 
         $platform = array_key_exists('platform', $overrides)
             ? $this->normalizePlatform((string) $overrides['platform'])
-            : (string) $prompt->platform;
+            : $this->normalizePlatform((string) $prompt->platform);
         $promptType = array_key_exists('prompt_type', $overrides)
             ? $this->normalizePromptType((string) $overrides['prompt_type'])
             : (string) $prompt->prompt_type;
@@ -528,6 +530,7 @@ class PromptStudioService
     {
         $key = strtolower(trim($platform));
         $key = str_replace([' ', '-'], '_', $key);
+        $key = self::LEGACY_PLATFORM_ALIASES[$key] ?? $key;
 
         return array_key_exists($key, self::PLATFORMS) ? $key : 'generic';
     }

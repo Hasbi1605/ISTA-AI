@@ -43,6 +43,9 @@ class PrompyStudio extends Component
     /** Gambar baru yang dilampirkan dari composer revisi. */
     public array $revisionReferenceImages = [];
 
+    /** Dokumen acuan baru yang dilampirkan dari composer revisi. */
+    public array $revisionReferenceDocuments = [];
+
     public ?int $activePromptId = null;
 
     public ?int $activePromptVersionId = null;
@@ -100,6 +103,7 @@ class PrompyStudio extends Component
             $this->showPromptConfiguration = false;
             $this->clearReferenceDocuments();
             $this->clearRevisionReferenceImages();
+            $this->clearRevisionReferenceDocuments();
         }
     }
 
@@ -126,6 +130,7 @@ class PrompyStudio extends Component
         $this->promptChatMessages = $this->buildPromptChatMessages($prompt);
         $this->clearReferenceDocuments();
         $this->clearRevisionReferenceImages();
+        $this->clearRevisionReferenceDocuments();
     }
 
     public function startNewPrompt(): void
@@ -137,6 +142,7 @@ class PrompyStudio extends Component
         $this->referenceImages = [];
         $this->referenceDocuments = [];
         $this->revisionReferenceImages = [];
+        $this->revisionReferenceDocuments = [];
         $this->activePromptId = null;
         $this->activePromptVersionId = null;
         $this->revisionInstruction = '';
@@ -149,6 +155,7 @@ class PrompyStudio extends Component
         $this->dispatch('prompy-reference-image-cleared');
         $this->dispatch('prompy-reference-document-cleared');
         $this->dispatch('prompy-revision-reference-image-cleared');
+        $this->dispatch('prompy-revision-reference-document-cleared');
     }
 
     public function generate(PromptStudioService $service): void
@@ -188,6 +195,7 @@ class PrompyStudio extends Component
             $this->reset('referenceImages');
             $this->clearReferenceDocuments();
             $this->clearRevisionReferenceImages();
+            $this->clearRevisionReferenceDocuments();
             $this->dispatch('prompy-reference-image-cleared');
             $this->statusMessage = 'Paket prompt berhasil dibuat.';
         } catch (Throwable $e) {
@@ -278,8 +286,8 @@ class PrompyStudio extends Component
 
         $service = app(PromptStudioService::class);
 
-        if ($this->revisionReferenceImages !== []) {
-            $this->revisePromptWithReferenceImages($service, $prompt, $userMessage);
+        if ($this->revisionReferenceImages !== [] || $this->revisionReferenceDocuments !== []) {
+            $this->revisePromptWithReferenceAttachments($service, $prompt, $userMessage);
 
             return;
         }
@@ -334,7 +342,7 @@ class PrompyStudio extends Component
             ? $prompt->versions->firstWhere('id', (int) $this->activePromptVersionId)
             : $prompt->currentVersion;
 
-        $instruction = 'Generate ulang prompt aktif dari konfigurasi terbaru. Gunakan ide, platform, jenis keluaran, dan gambar referensi terbaru dari panel konfigurasi sebagai acuan utama.';
+        $instruction = 'Generate ulang prompt aktif dari konfigurasi terbaru. Gunakan ide, platform, jenis keluaran, gambar referensi, dan dokumen acuan terbaru dari panel konfigurasi sebagai acuan utama.';
         $overrides = [
             'idea' => $this->idea,
             'platform' => $this->platform,
@@ -360,6 +368,7 @@ class PrompyStudio extends Component
             $this->reset('referenceImages');
             $this->clearReferenceDocuments();
             $this->clearRevisionReferenceImages();
+            $this->clearRevisionReferenceDocuments();
             $this->dispatch('prompy-reference-image-cleared');
             $this->statusMessage = 'Prompt berhasil dibuat ulang sebagai versi baru.';
         } catch (Throwable $e) {
@@ -389,11 +398,13 @@ class PrompyStudio extends Component
             $this->revisionInstruction = '';
             $this->referenceDocuments = [];
             $this->revisionReferenceImages = [];
+            $this->revisionReferenceDocuments = [];
             $this->promptChatMessages = [];
             $this->isGenerating = false;
             $this->showPromptConfiguration = true;
             $this->dispatch('prompy-reference-document-cleared');
             $this->dispatch('prompy-revision-reference-image-cleared');
+            $this->dispatch('prompy-revision-reference-document-cleared');
         }
     }
 
@@ -402,6 +413,13 @@ class PrompyStudio extends Component
         $this->reset('revisionReferenceImages');
         $this->resetValidation('revisionReferenceImages');
         $this->dispatch('prompy-revision-reference-image-cleared');
+    }
+
+    public function clearRevisionReferenceDocuments(): void
+    {
+        $this->reset('revisionReferenceDocuments');
+        $this->resetValidation('revisionReferenceDocuments');
+        $this->dispatch('prompy-revision-reference-document-cleared');
     }
 
     public function clearReferenceDocuments(): void
@@ -475,6 +493,9 @@ class PrompyStudio extends Component
     {
         $this->idea = (string) $prompt->idea;
         $this->platform = (string) $prompt->platform;
+        if (! array_key_exists($this->platform, PromptStudioService::PLATFORMS)) {
+            $this->platform = app(PromptStudioService::class)->normalizePlatform($this->platform);
+        }
         $this->promptType = (string) $prompt->prompt_type;
         $this->contextNotes = '';
     }
@@ -528,6 +549,13 @@ class PrompyStudio extends Component
                 'mimes:jpg,jpeg,png',
                 'max:'.(int) (PromptStudioService::REFERENCE_IMAGE_MAX_BYTES / 1024),
             ],
+            'revisionReferenceDocuments' => ['array', 'max:'.PromptStudioService::REFERENCE_DOCUMENT_MAX_COUNT],
+            'revisionReferenceDocuments.*' => [
+                'nullable',
+                'file',
+                'mimes:pdf,docx,xlsx,csv',
+                'max:'.(int) (PromptStudioService::REFERENCE_DOCUMENT_MAX_BYTES / 1024),
+            ],
         ], [
             'revisionInstruction.required' => 'Pesan wajib diisi.',
             'revisionInstruction.max' => 'Pesan maksimal 3000 karakter.',
@@ -535,10 +563,14 @@ class PrompyStudio extends Component
             'revisionReferenceImages.*.image' => 'Gambar revisi harus berupa file gambar.',
             'revisionReferenceImages.*.mimes' => 'Gambar revisi harus JPG atau PNG.',
             'revisionReferenceImages.*.max' => 'Ukuran tiap gambar revisi maksimal 5 MB.',
+            'revisionReferenceDocuments.max' => 'Dokumen acuan revisi maksimal 3 file.',
+            'revisionReferenceDocuments.*.file' => 'Dokumen revisi harus berupa file.',
+            'revisionReferenceDocuments.*.mimes' => 'Dokumen revisi harus PDF, DOCX, XLSX, atau CSV.',
+            'revisionReferenceDocuments.*.max' => 'Ukuran tiap dokumen revisi maksimal 10 MB.',
         ]);
     }
 
-    private function revisePromptWithReferenceImages(PromptStudioService $service, GeneratedPrompt $prompt, string $instruction): void
+    private function revisePromptWithReferenceAttachments(PromptStudioService $service, GeneratedPrompt $prompt, string $instruction): void
     {
         $this->enforceRateLimit('revisePrompt', 10, 60, 'Terlalu banyak revisi prompt. Coba lagi sebentar.');
         $this->isGenerating = true;
@@ -546,21 +578,29 @@ class PrompyStudio extends Component
         $baseVersion = $this->activePromptVersionId
             ? $prompt->versions->firstWhere('id', (int) $this->activePromptVersionId)
             : $prompt->currentVersion;
+        $overrides = [];
+
+        if ($this->revisionReferenceImages !== []) {
+            $overrides['reference_images'] = $this->revisionReferenceImages;
+        }
+
+        if ($this->revisionReferenceDocuments !== []) {
+            $overrides['reference_documents'] = $this->revisionReferenceDocuments;
+        }
 
         try {
-            $updated = $service->revise(Auth::user(), $prompt, $instruction, $baseVersion, [
-                'reference_images' => $this->revisionReferenceImages,
-            ]);
+            $updated = $service->revise(Auth::user(), $prompt, $instruction, $baseVersion, $overrides);
 
             $this->activatePromptModel($updated);
             $this->revisionInstruction = '';
             $this->isComposingNewPrompt = false;
             $this->showPromptConfiguration = false;
             $this->clearRevisionReferenceImages();
-            $this->statusMessage = 'Revisi prompt dengan gambar baru berhasil dibuat.';
+            $this->clearRevisionReferenceDocuments();
+            $this->statusMessage = 'Revisi prompt dengan lampiran baru berhasil dibuat.';
         } catch (Throwable $e) {
             report($e);
-            $this->statusMessage = UserFacingError::message($e, 'Gagal merevisi prompt dengan gambar baru. Coba lagi sebentar.');
+            $this->statusMessage = UserFacingError::message($e, 'Gagal merevisi prompt dengan lampiran baru. Coba lagi sebentar.');
         } finally {
             $this->isGenerating = false;
         }
