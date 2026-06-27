@@ -35,7 +35,7 @@ class GeneratePromptRequest(BaseModel):
     reference_image: dict[str, Any] | None = None
     reference_images: list[dict[str, Any]] | None = None
     current_package: dict[str, Any] | None = None
-    revision_instruction: str | None = Field(None, max_length=3000)
+    revision_instruction: str | None = Field(None, max_length=8000)
     runtime_config: dict[str, Any] | None = None
 
     def normalized_reference_images(self) -> list[dict[str, str]]:

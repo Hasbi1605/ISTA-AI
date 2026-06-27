@@ -46,6 +46,9 @@ class PrompyStudio extends Component
     /** Dokumen acuan baru yang dilampirkan dari composer revisi. */
     public array $revisionReferenceDocuments = [];
 
+    /** Indices of active-version reference images excluded by user (not carried to next revision). */
+    public array $excludedActiveReferenceImages = [];
+
     public ?int $activePromptId = null;
 
     public ?int $activePromptVersionId = null;
@@ -100,6 +103,7 @@ class PrompyStudio extends Component
             $this->activatePromptModel($prompt);
             $this->isComposingNewPrompt = false;
             $this->revisionInstruction = '';
+            $this->excludedActiveReferenceImages = [];
             $this->showPromptConfiguration = false;
             $this->clearReferenceDocuments();
             $this->clearRevisionReferenceImages();
@@ -126,6 +130,7 @@ class PrompyStudio extends Component
         $this->isComposingNewPrompt = false;
         $this->showPromptConfiguration = false;
         $this->revisionInstruction = '';
+        $this->excludedActiveReferenceImages = [];
         $this->applyPromptConfiguration($prompt);
         $this->promptChatMessages = $this->buildPromptChatMessages($prompt);
         $this->clearReferenceDocuments();
@@ -143,6 +148,7 @@ class PrompyStudio extends Component
         $this->referenceDocuments = [];
         $this->revisionReferenceImages = [];
         $this->revisionReferenceDocuments = [];
+        $this->excludedActiveReferenceImages = [];
         $this->activePromptId = null;
         $this->activePromptVersionId = null;
         $this->revisionInstruction = '';
@@ -214,7 +220,7 @@ class PrompyStudio extends Component
             'revisionInstruction' => ['required', 'string', 'max:'.PromptStudioService::REVISION_INSTRUCTION_MAX_LENGTH],
         ], [
             'revisionInstruction.required' => 'Instruksi revisi wajib diisi.',
-            'revisionInstruction.max' => 'Instruksi revisi maksimal 3000 karakter.',
+            'revisionInstruction.max' => 'Instruksi revisi maksimal 8000 karakter.',
         ]);
 
         $this->enforceRateLimit('revisePrompt', 10, 60, 'Terlalu banyak revisi prompt. Coba lagi sebentar.');
@@ -236,10 +242,12 @@ class PrompyStudio extends Component
             : $prompt->currentVersion;
 
         try {
-            $updated = $service->revise(Auth::user(), $prompt, $this->revisionInstruction, $baseVersion);
+            $overrides = $this->buildExcludedImageOverrides($baseVersion);
+            $updated = $service->revise(Auth::user(), $prompt, $this->revisionInstruction, $baseVersion, $overrides);
 
             $this->activatePromptModel($updated);
             $this->revisionInstruction = '';
+            $this->excludedActiveReferenceImages = [];
             $this->isComposingNewPrompt = false;
             $this->showPromptConfiguration = false;
             $this->statusMessage = 'Revisi prompt berhasil dibuat.';
@@ -558,7 +566,7 @@ class PrompyStudio extends Component
             ],
         ], [
             'revisionInstruction.required' => 'Pesan wajib diisi.',
-            'revisionInstruction.max' => 'Pesan maksimal 3000 karakter.',
+            'revisionInstruction.max' => 'Pesan maksimal 8000 karakter.',
             'revisionReferenceImages.max' => 'Gambar referensi maksimal 5 file.',
             'revisionReferenceImages.*.image' => 'Gambar revisi harus berupa file gambar.',
             'revisionReferenceImages.*.mimes' => 'Gambar revisi harus JPG atau PNG.',
@@ -770,6 +778,35 @@ class PrompyStudio extends Component
         }
 
         RateLimiter::hit($key, $decaySeconds);
+    }
+
+    /**
+     * Build reference_images override when user excluded some active images via X button.
+     *
+     * Returns empty array (no override) when nothing was excluded.
+     * Returns ['exclude_reference_image_indices' => [...]] to signal the service.
+     */
+    private function buildExcludedImageOverrides(?GeneratedPromptVersion $baseVersion): array
+    {
+        $excluded = array_values(array_filter(
+            array_map('intval', $this->excludedActiveReferenceImages),
+            fn (int $i) => $i >= 0,
+        ));
+
+        if ($excluded === []) {
+            return [];
+        }
+
+        $images = is_array($baseVersion?->reference_images) ? $baseVersion->reference_images : [];
+        $kept = [];
+
+        foreach ($images as $index => $image) {
+            if (! in_array($index, $excluded, true)) {
+                $kept[] = $image;
+            }
+        }
+
+        return ['kept_reference_images' => $kept];
     }
 
 }

@@ -7,12 +7,14 @@
         ->map(fn($image, $index) => [
             'label' => (string) ($image['label'] ?? 'Gambar '.($index + 1)),
             'size' => (int) ($image['size'] ?? 0),
+            'url' => $activePrompt ? route('prompts.reference-image', ['prompt' => $activePrompt->id, 'imageIndex' => $index, 'version' => $activeVersion?->id]) : '',
         ])
         ->values();
     if ($activeReferenceImages->isEmpty() && $activePrompt?->reference_image_path) {
         $activeReferenceImages = collect([[
             'label' => 'Gambar 1',
             'size' => (int) $activePrompt->reference_image_size_bytes,
+            'url' => route('prompts.reference-image', ['prompt' => $activePrompt->id, 'imageIndex' => 0, 'version' => $activeVersion?->id]),
         ]]);
     }
     $promptBubbleMutedClass = 'whitespace-pre-wrap rounded-2xl border border-stone-200/75 bg-stone-50/90 px-4 py-3 font-mono text-[12px] leading-relaxed text-stone-600 shadow-[0_14px_32px_-30px_rgba(28,25,23,0.42)] dark:border-gray-700/65 dark:bg-gray-800/60 dark:text-gray-400 dark:shadow-none';
@@ -30,6 +32,7 @@
         selectedPlatform: @entangle('platform'),
         selectedPromptType: @entangle('promptType'),
         referenceImages: [],
+        referenceImageFiles: [],
         referenceImageDragging: false,
         referenceImageUploading: false,
         referenceImageUploadFailed: false,
@@ -39,6 +42,7 @@
         referenceDocumentUploadFailed: false,
         referenceDocumentDropError: '',
         revisionReferenceImages: [],
+        revisionReferenceImageFiles: [],
         revisionReferenceImageUploading: false,
         revisionReferenceImageUploadFailed: false,
         revisionReferenceImageDropError: '',
@@ -48,6 +52,9 @@
         revisionReferenceDocumentDropError: '',
         prompyRevisionText: '',
         prompyRevisionLoading: false,
+        activeRefImageModalUrl: null,
+        activeRefImageModalLabel: '',
+        excludedActiveRefImages: @entangle('excludedActiveReferenceImages'),
         copy(text, id) {
             if (!text) return;
             navigator.clipboard.writeText(text).then(() => {
@@ -103,13 +110,17 @@
             this.$refs.revisionReferenceDocumentInput?.click();
         },
         handleReferenceImageChange(event) {
-            this.setReferenceImageFiles(event.target.files || []);
+            const files = event.target.files || [];
+            if (files.length === 0) return;
+            this.setReferenceImageFiles(files);
         },
         handleReferenceDocumentChange(event) {
             this.setReferenceDocumentFiles(event.target.files || []);
         },
         handleRevisionReferenceImageChange(event) {
-            this.setRevisionReferenceImageFiles(event.target.files || []);
+            const files = event.target.files || [];
+            if (files.length === 0) return;
+            this.setRevisionReferenceImageFiles(files);
         },
         handleRevisionReferenceDocumentChange(event) {
             this.setRevisionReferenceDocumentFiles(event.target.files || []);
@@ -125,31 +136,57 @@
             });
         },
         setReferenceImageFiles(fileList) {
-            const files = Array.from(fileList || []);
+            const newFiles = Array.from(fileList || []);
             this.referenceImageDropError = '';
             this.referenceImageUploadFailed = false;
 
-            if (files.length > 5) {
-                this.referenceImageDropError = 'Gambar referensi maksimal 5 file.';
-                this.clearReferenceImageInput();
-                return false;
-            }
-
-            for (const file of files) {
+            for (const file of newFiles) {
                 if (!this.validateReferenceImageFile(file)) {
                     this.clearReferenceImageInput();
                     return false;
                 }
             }
 
-            this.releaseReferenceImageUrls();
-            this.referenceImages = files.map((file, index) => ({
+            const merged = [...this.referenceImageFiles, ...newFiles];
+            if (merged.length > 5) {
+                this.referenceImageDropError = 'Gambar referensi maksimal 5 file.';
+                this.clearReferenceImageInput();
+                return false;
+            }
+
+            this.referenceImageFiles = merged;
+            this.referenceImages = merged.map((file, index) => ({
                 name: file.name,
                 label: `Gambar ${index + 1}`,
                 url: URL.createObjectURL(file),
             }));
 
+            this.syncReferenceImageInput();
             return true;
+        },
+        removeReferenceImageAt(index) {
+            if (index < 0 || index >= this.referenceImageFiles.length) return;
+            if (this.referenceImages[index]?.url) URL.revokeObjectURL(this.referenceImages[index].url);
+            this.referenceImageFiles.splice(index, 1);
+            this.referenceImages = this.referenceImageFiles.map((file, i) => ({
+                name: file.name,
+                label: `Gambar ${i + 1}`,
+                url: URL.createObjectURL(file),
+            }));
+            this.syncReferenceImageInput();
+            if (this.referenceImageFiles.length === 0) {
+                this.$wire.set('referenceImages', []);
+            }
+        },
+        syncReferenceImageInput() {
+            const input = this.$refs.referenceImageInput;
+            if (!input) return;
+            try {
+                const transfer = new DataTransfer();
+                this.referenceImageFiles.forEach((file) => transfer.items.add(file));
+                input.files = transfer.files;
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+            } catch (_) {}
         },
         setReferenceDocumentFiles(fileList) {
             const files = Array.from(fileList || []);
@@ -177,31 +214,57 @@
             return true;
         },
         setRevisionReferenceImageFiles(fileList) {
-            const files = Array.from(fileList || []);
+            const newFiles = Array.from(fileList || []);
             this.revisionReferenceImageDropError = '';
             this.revisionReferenceImageUploadFailed = false;
 
-            if (files.length > 5) {
-                this.revisionReferenceImageDropError = 'Gambar revisi maksimal 5 file.';
-                this.clearRevisionReferenceImageInput();
-                return false;
-            }
-
-            for (const file of files) {
+            for (const file of newFiles) {
                 if (!this.validateRevisionReferenceImageFile(file)) {
                     this.clearRevisionReferenceImageInput();
                     return false;
                 }
             }
 
-            this.releaseRevisionReferenceImageUrls();
-            this.revisionReferenceImages = files.map((file, index) => ({
+            const merged = [...this.revisionReferenceImageFiles, ...newFiles];
+            if (merged.length > 5) {
+                this.revisionReferenceImageDropError = 'Gambar revisi maksimal 5 file.';
+                this.clearRevisionReferenceImageInput();
+                return false;
+            }
+
+            this.revisionReferenceImageFiles = merged;
+            this.revisionReferenceImages = merged.map((file, index) => ({
                 name: file.name,
                 label: `Gambar ${index + 1}`,
                 url: URL.createObjectURL(file),
             }));
 
+            this.syncRevisionReferenceImageInput();
             return true;
+        },
+        removeRevisionReferenceImageAt(index) {
+            if (index < 0 || index >= this.revisionReferenceImageFiles.length) return;
+            if (this.revisionReferenceImages[index]?.url) URL.revokeObjectURL(this.revisionReferenceImages[index].url);
+            this.revisionReferenceImageFiles.splice(index, 1);
+            this.revisionReferenceImages = this.revisionReferenceImageFiles.map((file, i) => ({
+                name: file.name,
+                label: `Gambar ${i + 1}`,
+                url: URL.createObjectURL(file),
+            }));
+            this.syncRevisionReferenceImageInput();
+            if (this.revisionReferenceImageFiles.length === 0) {
+                this.$wire.clearRevisionReferenceImages();
+            }
+        },
+        syncRevisionReferenceImageInput() {
+            const input = this.$refs.revisionReferenceImageInput;
+            if (!input) return;
+            try {
+                const transfer = new DataTransfer();
+                this.revisionReferenceImageFiles.forEach((file) => transfer.items.add(file));
+                input.files = transfer.files;
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+            } catch (_) {}
         },
         setRevisionReferenceDocumentFiles(fileList) {
             const files = Array.from(fileList || []);
@@ -238,6 +301,7 @@
         clearReferenceImageInput() {
             this.releaseReferenceImageUrls();
             this.referenceImages = [];
+            this.referenceImageFiles = [];
 
             if (this.$refs.referenceImageInput) {
                 this.$refs.referenceImageInput.value = '';
@@ -265,6 +329,7 @@
         clearRevisionReferenceImageInput() {
             this.releaseRevisionReferenceImageUrls();
             this.revisionReferenceImages = [];
+            this.revisionReferenceImageFiles = [];
 
             if (this.$refs.revisionReferenceImageInput) {
                 this.$refs.revisionReferenceImageInput.value = '';
@@ -356,8 +421,10 @@
         dropReferenceImage(event) {
             this.referenceImageDragging = false;
             const files = event.dataTransfer?.files;
+            const newFiles = Array.from(files || []);
 
-            if (files && files.length > 5) {
+            const total = this.referenceImageFiles.length + newFiles.length;
+            if (total > 5) {
                 this.referenceImageDropError = 'Gambar referensi maksimal 5 file.';
                 return;
             }
@@ -365,24 +432,6 @@
             if (!this.setReferenceImageFiles(files || [])) {
                 return;
             }
-
-            const input = this.$refs.referenceImageInput;
-            if (!input) return;
-
-            try {
-                const transfer = new DataTransfer();
-                Array.from(files || []).forEach((file) => transfer.items.add(file));
-                input.files = transfer.files;
-            } catch (_) {
-                try {
-                    input.files = event.dataTransfer.files;
-                } catch (_) {
-                    this.referenceImageDropError = 'Gagal membaca gambar.';
-                    return;
-                }
-            }
-
-            input.dispatchEvent(new Event('change', { bubbles: true }));
         },
         referenceImageCardClass() {
             if (this.referenceImageDragging) {
@@ -583,13 +632,16 @@
                                 </svg>
                             </span>
                             <span class="min-w-0 flex-1">
-                                <span class="block truncate text-[12px] font-semibold" x-text="referenceImages.length ? `${referenceImages.length} gambar dipilih` : 'Pilih atau seret gambar'"></span>
+                                <span class="block truncate text-[12px] font-semibold" x-text="referenceImages.length ? `${referenceImages.length} gambar dipilih — klik untuk tambah` : 'Pilih atau seret gambar'"></span>
                                 <span class="mt-0.5 block text-[11px] leading-relaxed opacity-75">Opsional. JPG/PNG, maksimal 5 gambar, masing-masing 5 MB.</span>
                             </span>
                         </button>
                         <div x-show="referenceImages.length > 0" x-cloak class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                            <template x-for="image in referenceImages" :key="image.label">
-                                <div class="overflow-hidden rounded-lg border border-stone-200 bg-white text-left shadow-sm dark:border-gray-700 dark:bg-gray-900">
+                            <template x-for="(image, imgIdx) in referenceImages" :key="image.label">
+                                <div class="relative overflow-hidden rounded-lg border border-stone-200 bg-white text-left shadow-sm dark:border-gray-700 dark:bg-gray-900">
+                                    <button type="button" @click="removeReferenceImageAt(imgIdx)" class="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-red-600" aria-label="Hapus gambar">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                                    </button>
                                     <div class="aspect-[4/3] bg-stone-100 dark:bg-gray-800">
                                         <img :src="image.url" :alt="image.label" class="h-full w-full object-cover">
                                     </div>
@@ -764,23 +816,17 @@
                 </div>
             @elseif($activePrompt)
                 @if($activeReferenceImages->isNotEmpty())
-                    <div class="mb-2 rounded-lg border border-stone-200/70 bg-white/85 px-3 py-2 text-left shadow-sm dark:border-gray-700 dark:bg-gray-900/85">
-                        <div class="flex flex-wrap items-center gap-2">
-                            <span class="text-[11px] font-semibold text-stone-600 dark:text-gray-300">
-                                Menggunakan {{ $activeReferenceImages->count() }} gambar referensi dari {{ $activeVersionNumber ? 'Versi '.$activeVersionNumber : 'versi aktif' }}
-                            </span>
-                            <div class="flex min-w-0 flex-wrap items-center gap-1.5">
-                                @foreach($activeReferenceImages as $image)
-                                    <span class="inline-flex max-w-[8.5rem] items-center gap-1 rounded-full border border-stone-200 bg-stone-50 px-2 py-0.5 text-[10.5px] font-semibold text-stone-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 16l4.6-4.6a2 2 0 012.8 0L16 16m-2-2l1.6-1.6a2 2 0 012.8 0L20 14m-1-8H5a1 1 0 00-1 1v10a1 1 0 001 1h14a1 1 0 001-1V7a1 1 0 00-1-1z" />
-                                        </svg>
-                                        <span class="truncate">{{ $image['label'] }}</span>
-                                    </span>
-                                @endforeach
+                    <div class="mb-2 flex items-center gap-2" x-data="{ refImgs: @js($activeReferenceImages->toArray()) }" x-init="excludedActiveRefImages = []">
+                        <template x-for="(img, idx) in refImgs.filter((_, i) => !excludedActiveRefImages.includes(i))" :key="idx">
+                            <div class="relative group">
+                                <button type="button" @click="activeRefImageModalUrl = img.url; activeRefImageModalLabel = img.label" class="block h-10 w-10 overflow-hidden rounded-md border border-stone-200 shadow-sm transition hover:ring-2 hover:ring-ista-primary/40 dark:border-gray-700">
+                                    <img :src="img.url" :alt="img.label" class="h-full w-full object-cover" />
+                                </button>
+                                <button type="button" @click="excludedActiveRefImages.push(refImgs.indexOf(img))" class="absolute -right-1 -top-1 z-10 hidden h-4 w-4 items-center justify-center rounded-full bg-black/70 text-white group-hover:flex hover:bg-red-600" aria-label="Hapus acuan">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
                             </div>
-                        </div>
-                        <p class="mt-1 text-[10.5px] leading-relaxed text-stone-400 dark:text-gray-500">Kirim tanpa gambar baru untuk memakai acuan ini. Lampirkan gambar di bawah untuk mengganti acuan pada versi berikutnya.</p>
+                        </template>
                     </div>
                 @endif
                 <form @submit.prevent="submitPrompyRevision($wire, $refs.prompyInput)" class="chat-form relative rounded-xl shadow-sm bg-white dark:bg-gray-800 border border-stone-200/60 dark:border-gray-700 transition-colors">
@@ -837,8 +883,11 @@
                                 </button>
                             </div>
                             <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                                <template x-for="image in revisionReferenceImages" :key="image.label">
-                                    <div class="overflow-hidden rounded-md border border-emerald-200 bg-white text-left dark:border-emerald-900/70 dark:bg-gray-900">
+                                <template x-for="(image, imgIdx) in revisionReferenceImages" :key="image.label">
+                                    <div class="relative overflow-hidden rounded-md border border-emerald-200 bg-white text-left dark:border-emerald-900/70 dark:bg-gray-900">
+                                        <button type="button" @click="removeRevisionReferenceImageAt(imgIdx)" class="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-red-600" aria-label="Hapus gambar">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                                        </button>
                                         <div class="aspect-[4/3] bg-emerald-100/70 dark:bg-gray-800">
                                             <img :src="image.url" :alt="image.label" class="h-full w-full object-cover">
                                         </div>
@@ -884,7 +933,7 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16.5 6.5l-7.8 7.8a3 3 0 104.2 4.2l8.1-8.1a5 5 0 10-7.1-7.1L5.8 11.4" />
                                     </svg>
                                     <span x-show="revisionReferenceImageUploading" x-cloak class="h-3.5 w-3.5 rounded-full border-2 border-current/50 border-t-transparent animate-spin" aria-hidden="true"></span>
-                                    <span x-text="revisionReferenceImages.length ? 'Ganti gambar' : 'Lampirkan gambar'"></span>
+                                    <span x-text="revisionReferenceImages.length ? 'Tambah gambar' : 'Lampirkan gambar'"></span>
                                 </button>
                                 <button type="button"
                                         @click="chooseRevisionReferenceDocument()"
@@ -1075,4 +1124,22 @@
             </div>
         </div>
     </div>
+
+    {{-- Modal full-size reference image --}}
+    <template x-teleport="body">
+        <div x-show="activeRefImageModalUrl" x-cloak x-transition.opacity
+             @click="activeRefImageModalUrl = null"
+             @keydown.escape.window="activeRefImageModalUrl = null"
+             class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+            <div class="relative max-h-[90vh] max-w-[90vw]" @click.stop>
+                <button type="button" @click="activeRefImageModalUrl = null"
+                        class="absolute -right-2 -top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-lg text-stone-700 hover:bg-red-50 hover:text-red-600 transition"
+                        aria-label="Tutup">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+                <img :src="activeRefImageModalUrl" :alt="activeRefImageModalLabel" class="max-h-[85vh] max-w-full rounded-lg object-contain shadow-2xl" />
+                <p class="mt-2 text-center text-[12px] font-semibold text-white/80" x-text="activeRefImageModalLabel"></p>
+            </div>
+        </div>
+    </template>
 </div>

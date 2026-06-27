@@ -46,13 +46,13 @@ class PromptStudioService
         'video_storyboard' => 'Video / Storyboard',
     ];
 
-    public const IDEA_MAX_LENGTH = 4000;
+    public const IDEA_MAX_LENGTH = 12000;
 
-    public const CONTEXT_NOTES_MAX_LENGTH = 4000;
+    public const CONTEXT_NOTES_MAX_LENGTH = 12000;
 
-    public const REVISION_INSTRUCTION_MAX_LENGTH = 3000;
+    public const REVISION_INSTRUCTION_MAX_LENGTH = 8000;
 
-    public const PROMPT_CHAT_MESSAGE_MAX_LENGTH = 3000;
+    public const PROMPT_CHAT_MESSAGE_MAX_LENGTH = 8000;
 
     public const PROMPT_CHAT_HISTORY_LIMIT = 12;
 
@@ -287,12 +287,17 @@ class PromptStudioService
 
         $hasReferenceImageOverride = array_key_exists('reference_images', $overrides)
             || array_key_exists('reference_image', $overrides);
+        $hasKeptReferenceImages = array_key_exists('kept_reference_images', $overrides);
         $newStoredImages = $hasReferenceImageOverride
             ? $this->storeReferenceImages($user, $overrides['reference_images'] ?? ($overrides['reference_image'] ?? null))
             : [];
-        $storedImages = $hasReferenceImageOverride
-            ? $newStoredImages
-            : $this->storedImagesForVersion($prompt, $baseVersion);
+        if ($hasReferenceImageOverride) {
+            $storedImages = $newStoredImages;
+        } elseif ($hasKeptReferenceImages) {
+            $storedImages = $this->normalizeKeptReferenceImages($overrides['kept_reference_images']);
+        } else {
+            $storedImages = $this->storedImagesForVersion($prompt, $baseVersion);
+        }
         $referenceImagePayloads = $this->buildReferenceImagePayloads($storedImages);
         $containsInternalContext = $storedImages !== []
             || $contextNotes !== ''
@@ -611,7 +616,7 @@ class PromptStudioService
             ->map(function (array $message): array {
                 return [
                     'role' => ($message['role'] ?? null) === 'user' ? 'user' : 'assistant',
-                    'content' => Str::limit(trim((string) ($message['content'] ?? '')), 900, ''),
+                    'content' => Str::limit(trim((string) ($message['content'] ?? '')), 1500, ''),
                     'timestamp' => trim((string) ($message['timestamp'] ?? '')),
                 ];
             })
@@ -918,6 +923,35 @@ class PromptStudioService
         }
 
         return [];
+    }
+
+    /**
+     * Normalize kept reference images (filtered subset from existing version metadata).
+     *
+     * @param  mixed  $keptImages
+     * @return list<array{path: string, mime: string, size: int, label: string}>
+     */
+    protected function normalizeKeptReferenceImages(mixed $keptImages): array
+    {
+        if (! is_array($keptImages)) {
+            return [];
+        }
+
+        $stored = [];
+        foreach ($keptImages as $index => $image) {
+            if (! is_array($image) || empty($image['path']) || empty($image['mime'])) {
+                continue;
+            }
+
+            $stored[] = [
+                'label' => (string) ($image['label'] ?? 'Gambar '.($index + 1)),
+                'path' => (string) $image['path'],
+                'mime' => (string) $image['mime'],
+                'size' => (int) ($image['size'] ?? 0),
+            ];
+        }
+
+        return $stored;
     }
 
     protected function resolveBaseVersion(GeneratedPrompt $prompt, ?GeneratedPromptVersion $baseVersion): ?GeneratedPromptVersion

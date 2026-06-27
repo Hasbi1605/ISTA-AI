@@ -743,14 +743,14 @@ class PromptStudioTest extends TestCase
                 UploadedFile::fake()->image('awal.png', 200, 200),
             ])
             ->call('generate')
-            ->assertSee('Menggunakan 1 gambar referensi dari Versi 1')
+            ->assertSee('reference-image')
             ->set('revisionReferenceImages', [
                 UploadedFile::fake()->image('baru.png', 240, 320),
             ])
             ->call('sendPromptChat', 'Gunakan gambar baru ini sebagai acuan utama versi berikutnya')
             ->assertSet('revisionReferenceImages', [])
             ->assertSet('showPromptConfiguration', false)
-            ->assertSee('Menggunakan 1 gambar referensi dari Versi 2')
+            ->assertSee('reference-image')
             ->assertSee('A revised prompt based on the newly attached reference image.');
 
         $prompt = GeneratedPrompt::with(['currentVersion', 'versions'])->findOrFail($component->get('activePromptId'));

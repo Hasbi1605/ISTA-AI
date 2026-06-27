@@ -82,7 +82,7 @@
                     @endauth
 
                     @php
-                        $prompyEnabled = auth()->check() && config('features.prompy');
+                        $prompyEnabled = config('features.prompy');
                     @endphp
                     <div @class([
                         'mx-auto mt-10 grid grid-cols-1 gap-3',
@@ -92,12 +92,15 @@
                         @auth
                         <a href="{{ route('chat') }}" class="rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-sm font-semibold text-stone-700 transition hover:border-ista-primary/30 hover:text-ista-primary dark:border-gray-800 dark:bg-gray-800/80 dark:text-gray-100 dark:hover:border-ista-primary/50">Buka Chat</a>
                         <a href="{{ route('chat', ['tab' => 'memo']) }}" class="rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-sm font-semibold text-stone-700 transition hover:border-ista-primary/30 hover:text-ista-primary dark:border-gray-800 dark:bg-gray-800/80 dark:text-gray-100 dark:hover:border-ista-primary/50">Buka Memo</a>
-                        @if(config('features.prompy'))
+                        @if($prompyEnabled)
                         <a href="{{ route('chat', ['tab' => 'prompy']) }}" class="rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-sm font-semibold text-stone-700 transition hover:border-ista-primary/30 hover:text-ista-primary dark:border-gray-800 dark:bg-gray-800/80 dark:text-gray-100 dark:hover:border-ista-primary/50">Buka Prompy</a>
                         @endif
                         @else
                         <a href="{{ route('guest-chat') }}" class="rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-sm font-semibold text-stone-700 transition hover:border-ista-primary/30 hover:text-ista-primary dark:border-gray-800 dark:bg-gray-800/80 dark:text-gray-100 dark:hover:border-ista-primary/50">Buka Chat</a>
                         <a href="{{ route('guest-memo') }}" class="rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-sm font-semibold text-stone-700 transition hover:border-ista-primary/30 hover:text-ista-primary dark:border-gray-800 dark:bg-gray-800/80 dark:text-gray-100 dark:hover:border-ista-primary/50">Buka Memo</a>
+                        @if($prompyEnabled)
+                        <a href="{{ route('guest-prompy') }}" class="rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-sm font-semibold text-stone-700 transition hover:border-ista-primary/30 hover:text-ista-primary dark:border-gray-800 dark:bg-gray-800/80 dark:text-gray-100 dark:hover:border-ista-primary/50">Buka Prompy</a>
+                        @endif
                         @endauth
                     </div>
 

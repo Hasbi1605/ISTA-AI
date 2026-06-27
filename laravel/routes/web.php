@@ -7,6 +7,7 @@ use App\Http\Controllers\Documents\DocumentExportController;
 use App\Http\Controllers\Documents\DocumentPreviewController;
 use App\Http\Controllers\Memos\MemoFileController;
 use App\Http\Controllers\OnlyOfficeCallbackController;
+use App\Http\Controllers\Prompts\PromptReferenceImageController;
 use App\Livewire\Admin\AdminAccounts;
 use App\Livewire\Admin\AdminDashboard;
 use App\Livewire\Admin\AdminDocuments;
@@ -35,6 +36,12 @@ Route::get('/guest-memo', function () {
 
     return redirect()->route('login');
 })->name('guest-memo');
+
+Route::get('/guest-prompy', function () {
+    session()->put('url.intended', route('chat', ['tab' => 'prompy']));
+
+    return redirect()->route('login');
+})->name('guest-prompy');
 
 Route::view('profile', 'profile')
     ->middleware(['auth', 'active'])
@@ -100,6 +107,11 @@ Route::middleware(['auth', 'active', 'verified'])
         Route::get('/stream', [DocumentPreviewController::class, 'stream'])->name('stream');
         Route::get('/html', [DocumentPreviewController::class, 'html'])->name('html');
     });
+
+Route::get('prompts/{prompt}/reference-image/{imageIndex}', [PromptReferenceImageController::class, 'show'])
+    ->middleware(['auth', 'active', 'verified'])
+    ->whereNumber(['prompt', 'imageIndex'])
+    ->name('prompts.reference-image');
 
 Route::middleware(['web'])
     ->prefix('admin')
