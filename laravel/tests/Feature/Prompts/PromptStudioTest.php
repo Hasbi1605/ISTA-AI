@@ -364,7 +364,7 @@ class PromptStudioTest extends TestCase
     {
         $user = User::factory()->create();
 
-        GeneratedPrompt::create([
+        $prompt = GeneratedPrompt::create([
             'user_id' => $user->id,
             'platform' => 'gpt_image_2',
             'platform_label' => 'ChatGPT Images / GPT Image',
@@ -382,6 +382,8 @@ class PromptStudioTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(PrompyStudio::class)
+            ->assertSee('Belum ada paket prompt')
+            ->call('selectPrompt', $prompt->id)
             ->assertSee('Prompt utama')
             ->assertSee('A polished state ceremony poster')
             ->assertSee('Salin semua')
@@ -422,7 +424,7 @@ class PromptStudioTest extends TestCase
             180,
         ).'LONG_PRESENTATION_PROMPT_END_MARKER';
 
-        GeneratedPrompt::create([
+        $prompt = GeneratedPrompt::create([
             'user_id' => $user->id,
             'platform' => 'gemini_nano_banana',
             'platform_label' => 'Gemini / Nano Banana',
@@ -442,6 +444,7 @@ class PromptStudioTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(PrompyStudio::class)
+            ->call('selectPrompt', $prompt->id)
             ->assertSee('LONG_PRESENTATION_PROMPT_END_MARKER')
             ->assertSee('flex-1 overflow-y-auto px-4 py-4', false)
             ->assertSee('whitespace-pre-wrap rounded-2xl', false)
@@ -480,13 +483,15 @@ class PromptStudioTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(PrompyStudio::class)
-            ->assertSee('Second prompt output')
+            ->assertSet('activePromptId', null)
+            ->assertSet('isComposingNewPrompt', true)
+            ->assertDontSee('Second prompt output')
             ->call('selectPrompt', $first->id)
             ->assertSet('isComposingNewPrompt', false)
             ->assertSee('First prompt output');
     }
 
-    public function test_initial_active_prompt_follows_recently_updated_history(): void
+    public function test_initial_prompy_state_starts_new_prompt_even_with_recent_history(): void
     {
         $user = User::factory()->create();
 
@@ -517,8 +522,10 @@ class PromptStudioTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(PrompyStudio::class)
-            ->assertSet('activePromptId', $recentlyUpdated->id)
-            ->assertSee('Recently updated output')
+            ->assertSet('activePromptId', null)
+            ->assertSet('isComposingNewPrompt', true)
+            ->assertSee('Belum ada paket prompt')
+            ->assertDontSee('Recently updated output')
             ->assertDontSee('Recently created output')
             ->assertSee('data-prompy-history-id="'.$recentlyUpdated->id.'"', false)
             ->assertSee('data-prompy-history-id="'.$recentlyCreated->id.'"', false);
@@ -543,7 +550,10 @@ class PromptStudioTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(PrompyStudio::class)
-            ->assertSee('Existing prompt output')
+            ->assertSet('activePromptId', null)
+            ->assertSet('isComposingNewPrompt', true)
+            ->assertSee('Belum ada paket prompt')
+            ->assertDontSee('Existing prompt output')
             ->call('startNewPrompt')
             ->assertSet('activePromptId', null)
             ->assertSet('isComposingNewPrompt', true)

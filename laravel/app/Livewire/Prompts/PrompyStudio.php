@@ -61,21 +61,14 @@ class PrompyStudio extends Component
 
     public bool $showPromptConfiguration = true;
 
-    public bool $isComposingNewPrompt = false;
+    public bool $isComposingNewPrompt = true;
 
     public ?string $statusMessage = null;
 
     public function mount(): void
     {
-        $latestPrompt = GeneratedPrompt::with(['currentVersion', 'versions'])
-            ->where('user_id', Auth::id())
-            ->orderByDesc('updated_at')
-            ->orderByDesc('id')
-            ->first();
-
-        if ($latestPrompt) {
-            $this->activatePromptModel($latestPrompt);
-        }
+        $this->isComposingNewPrompt = true;
+        $this->showPromptConfiguration = true;
     }
 
     public function selectPlatform(string $key): void
