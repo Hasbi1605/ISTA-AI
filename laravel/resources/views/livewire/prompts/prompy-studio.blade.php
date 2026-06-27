@@ -33,6 +33,7 @@
         selectedPromptType: @entangle('promptType'),
         referenceImages: [],
         referenceImageFiles: [],
+        referenceImageSyncing: false,
         referenceImageDragging: false,
         referenceImageUploading: false,
         referenceImageUploadFailed: false,
@@ -43,6 +44,7 @@
         referenceDocumentDropError: '',
         revisionReferenceImages: [],
         revisionReferenceImageFiles: [],
+        revisionReferenceImageSyncing: false,
         revisionReferenceImageUploading: false,
         revisionReferenceImageUploadFailed: false,
         revisionReferenceImageDropError: '',
@@ -110,6 +112,7 @@
             this.$refs.revisionReferenceDocumentInput?.click();
         },
         handleReferenceImageChange(event) {
+            if (this.referenceImageSyncing) return;
             const files = event.target.files || [];
             if (files.length === 0) return;
             this.setReferenceImageFiles(files);
@@ -118,6 +121,7 @@
             this.setReferenceDocumentFiles(event.target.files || []);
         },
         handleRevisionReferenceImageChange(event) {
+            if (this.revisionReferenceImageSyncing) return;
             const files = event.target.files || [];
             if (files.length === 0) return;
             this.setRevisionReferenceImageFiles(files);
@@ -184,9 +188,13 @@
             try {
                 const transfer = new DataTransfer();
                 this.referenceImageFiles.forEach((file) => transfer.items.add(file));
+                this.referenceImageSyncing = true;
                 input.files = transfer.files;
                 input.dispatchEvent(new Event('change', { bubbles: true }));
-            } catch (_) {}
+            } catch (_) {
+            } finally {
+                this.referenceImageSyncing = false;
+            }
         },
         setReferenceDocumentFiles(fileList) {
             const files = Array.from(fileList || []);
@@ -262,9 +270,13 @@
             try {
                 const transfer = new DataTransfer();
                 this.revisionReferenceImageFiles.forEach((file) => transfer.items.add(file));
+                this.revisionReferenceImageSyncing = true;
                 input.files = transfer.files;
                 input.dispatchEvent(new Event('change', { bubbles: true }));
-            } catch (_) {}
+            } catch (_) {
+            } finally {
+                this.revisionReferenceImageSyncing = false;
+            }
         },
         setRevisionReferenceDocumentFiles(fileList) {
             const files = Array.from(fileList || []);

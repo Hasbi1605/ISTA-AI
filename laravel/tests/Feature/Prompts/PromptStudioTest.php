@@ -568,6 +568,20 @@ class PromptStudioTest extends TestCase
             ->assertDontSee('Existing prompt output');
     }
 
+    public function test_reference_image_upload_sync_ignores_synthetic_change_events(): void
+    {
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->test(PrompyStudio::class)
+            ->assertSee('referenceImageSyncing: false', false)
+            ->assertSee('revisionReferenceImageSyncing: false', false)
+            ->assertSee('if (this.referenceImageSyncing) return;', false)
+            ->assertSee('if (this.revisionReferenceImageSyncing) return;', false)
+            ->assertSee('this.referenceImageSyncing = true;', false)
+            ->assertSee('this.revisionReferenceImageSyncing = true;', false);
+    }
+
     public function test_revision_creates_new_prompt_version(): void
     {
         Storage::fake('local');
