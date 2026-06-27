@@ -886,17 +886,24 @@
                 </div>
             @elseif($activePrompt)
                 @if($activeReferenceImages->isNotEmpty())
-                    <div class="mb-2 flex items-center gap-2" x-data="{ refImgs: @js($activeReferenceImages->toArray()) }" x-init="excludedActiveRefImages = []">
-                        <template x-for="(img, idx) in refImgs.filter((_, i) => !excludedActiveRefImages.includes(i))" :key="idx">
-                            <div class="relative group">
-                                <button type="button" @click="activeRefImageModalUrl = img.url; activeRefImageModalLabel = img.label" class="block h-10 w-10 overflow-hidden rounded-md border border-stone-200 shadow-sm transition hover:ring-2 hover:ring-ista-primary/40 dark:border-gray-700">
-                                    <img :src="img.url" :alt="img.label" class="h-full w-full object-cover" />
+                    <div
+                        wire:key="prompy-active-reference-images-{{ $activePrompt->id }}-{{ $activeVersion?->id ?? 'none' }}-{{ md5($activeReferenceImages->pluck('url')->implode('|')) }}"
+                        class="mb-2 flex items-center gap-2"
+                        x-init="excludedActiveRefImages = []">
+                        @foreach($activeReferenceImages as $imgIdx => $image)
+                            <div
+                                wire:key="prompy-active-reference-image-{{ $activePrompt->id }}-{{ $activeVersion?->id ?? 'none' }}-{{ $imgIdx }}"
+                                x-show="!excludedActiveRefImages.includes({{ $imgIdx }})"
+                                x-cloak
+                                class="relative group">
+                                <button type="button" @click="activeRefImageModalUrl = @js($image['url']); activeRefImageModalLabel = @js($image['label'])" class="block h-10 w-10 overflow-hidden rounded-md border border-stone-200 shadow-sm transition hover:ring-2 hover:ring-ista-primary/40 dark:border-gray-700">
+                                    <img src="{{ $image['url'] }}" alt="{{ $image['label'] }}" class="h-full w-full object-cover" />
                                 </button>
-                                <button type="button" @click="excludedActiveRefImages.push(refImgs.indexOf(img))" class="absolute -right-1 -top-1 z-10 hidden h-4 w-4 items-center justify-center rounded-full bg-black/70 text-white group-hover:flex hover:bg-red-600" aria-label="Hapus acuan">
+                                <button type="button" @click="excludedActiveRefImages.push({{ $imgIdx }})" class="absolute -right-1 -top-1 z-10 hidden h-4 w-4 items-center justify-center rounded-full bg-black/70 text-white group-hover:flex hover:bg-red-600" aria-label="Hapus acuan">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
                             </div>
-                        </template>
+                        @endforeach
                     </div>
                 @endif
                 <form @submit.prevent="submitPrompyRevision($wire, $refs.prompyInput)" class="chat-form relative rounded-xl shadow-sm bg-white dark:bg-gray-800 border border-stone-200/60 dark:border-gray-700 transition-colors">

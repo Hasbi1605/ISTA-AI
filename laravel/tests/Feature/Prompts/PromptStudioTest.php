@@ -5,6 +5,7 @@ namespace Tests\Feature\Prompts;
 use App\Livewire\Prompts\PrompyStudio;
 use App\Models\AIUsageEvent;
 use App\Models\GeneratedPrompt;
+use App\Models\GeneratedPromptVersion;
 use App\Models\User;
 use App\Services\Prompts\PromptStudioService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -489,6 +490,83 @@ class PromptStudioTest extends TestCase
             ->call('selectPrompt', $first->id)
             ->assertSet('isComposingNewPrompt', false)
             ->assertSee('First prompt output');
+    }
+
+    public function test_active_reference_image_thumbnails_follow_selected_prompt(): void
+    {
+        $user = User::factory()->create();
+
+        $first = GeneratedPrompt::create([
+            'user_id' => $user->id,
+            'platform' => 'gpt_image_2',
+            'platform_label' => 'ChatGPT Images / GPT Image',
+            'prompt_type' => 'image',
+            'prompt_type_label' => 'Gambar',
+            'title' => 'Prompt Logo Pertama',
+            'idea' => 'gambar pertama',
+            'package' => $this->fakePackageResponse(['main_prompt' => 'First prompt output']),
+            'created_at' => now()->subMinute(),
+            'updated_at' => now()->subMinute(),
+        ]);
+        $firstVersion = GeneratedPromptVersion::create([
+            'generated_prompt_id' => $first->id,
+            'version_number' => 1,
+            'package' => $this->fakePackageResponse(['main_prompt' => 'First prompt output']),
+            'reference_images' => [[
+                'label' => 'Gambar 1',
+                'path' => 'prompt-references/'.$user->id.'/first.png',
+                'mime' => 'image/png',
+                'size' => 123,
+            ]],
+        ]);
+        $first->forceFill(['current_version_id' => $firstVersion->id])->save();
+
+        $second = GeneratedPrompt::create([
+            'user_id' => $user->id,
+            'platform' => 'gpt_image_2',
+            'platform_label' => 'ChatGPT Images / GPT Image',
+            'prompt_type' => 'poster_infographic',
+            'prompt_type_label' => 'Poster / Infografis',
+            'title' => 'Prompt Menu Kedua',
+            'idea' => 'gambar kedua',
+            'package' => $this->fakePackageResponse(['main_prompt' => 'Second prompt output']),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $secondVersion = GeneratedPromptVersion::create([
+            'generated_prompt_id' => $second->id,
+            'version_number' => 1,
+            'package' => $this->fakePackageResponse(['main_prompt' => 'Second prompt output']),
+            'reference_images' => [[
+                'label' => 'Gambar 1',
+                'path' => 'prompt-references/'.$user->id.'/second.png',
+                'mime' => 'image/png',
+                'size' => 456,
+            ]],
+        ]);
+        $second->forceFill(['current_version_id' => $secondVersion->id])->save();
+
+        $firstUrl = route('prompts.reference-image', [
+            'prompt' => $first->id,
+            'imageIndex' => 0,
+            'version' => $firstVersion->id,
+        ]);
+        $secondUrl = route('prompts.reference-image', [
+            'prompt' => $second->id,
+            'imageIndex' => 0,
+            'version' => $secondVersion->id,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(PrompyStudio::class)
+            ->call('selectPrompt', $first->id)
+            ->assertSee($firstUrl, false)
+            ->assertDontSee($secondUrl, false)
+            ->assertSee('wire:key="prompy-active-reference-images-', false)
+            ->call('selectPrompt', $second->id)
+            ->assertSee($secondUrl, false)
+            ->assertDontSee($firstUrl, false)
+            ->assertDontSee('refImgs', false);
     }
 
     public function test_initial_prompy_state_starts_new_prompt_even_with_recent_history(): void
