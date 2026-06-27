@@ -39,6 +39,8 @@
         referenceImageUploadFailed: false,
         referenceImageDropError: '',
         referenceDocuments: [],
+        referenceDocumentFiles: [],
+        referenceDocumentSyncing: false,
         referenceDocumentUploading: false,
         referenceDocumentUploadFailed: false,
         referenceDocumentDropError: '',
@@ -49,6 +51,8 @@
         revisionReferenceImageUploadFailed: false,
         revisionReferenceImageDropError: '',
         revisionReferenceDocuments: [],
+        revisionReferenceDocumentFiles: [],
+        revisionReferenceDocumentSyncing: false,
         revisionReferenceDocumentUploading: false,
         revisionReferenceDocumentUploadFailed: false,
         revisionReferenceDocumentDropError: '',
@@ -63,6 +67,11 @@
                 this.copied = id;
                 setTimeout(() => { if (this.copied === id) this.copied = null; }, 1500);
             });
+        },
+        openReferenceImageModal(image) {
+            if (!image?.url) return;
+            this.activeRefImageModalUrl = image.url;
+            this.activeRefImageModalLabel = image.name ? `${image.label} - ${image.name}` : image.label;
         },
         scrollPrompyChatToBottom() {
             this.$nextTick(() => {
@@ -118,6 +127,7 @@
             this.setReferenceImageFiles(files);
         },
         handleReferenceDocumentChange(event) {
+            if (this.referenceDocumentSyncing) return;
             this.setReferenceDocumentFiles(event.target.files || []);
         },
         handleRevisionReferenceImageChange(event) {
@@ -127,6 +137,7 @@
             this.setRevisionReferenceImageFiles(files);
         },
         handleRevisionReferenceDocumentChange(event) {
+            if (this.revisionReferenceDocumentSyncing) return;
             this.setRevisionReferenceDocumentFiles(event.target.files || []);
         },
         releaseReferenceImageUrls() {
@@ -170,7 +181,12 @@
         },
         removeReferenceImageAt(index) {
             if (index < 0 || index >= this.referenceImageFiles.length) return;
-            if (this.referenceImages[index]?.url) URL.revokeObjectURL(this.referenceImages[index].url);
+            const removedImage = this.referenceImages[index] || null;
+            if (removedImage?.url && this.activeRefImageModalUrl === removedImage.url) {
+                this.activeRefImageModalUrl = null;
+                this.activeRefImageModalLabel = '';
+            }
+            if (removedImage?.url) URL.revokeObjectURL(removedImage.url);
             this.referenceImageFiles.splice(index, 1);
             this.referenceImages = this.referenceImageFiles.map((file, i) => ({
                 name: file.name,
@@ -197,29 +213,46 @@
             }
         },
         setReferenceDocumentFiles(fileList) {
-            const files = Array.from(fileList || []);
+            const newFiles = Array.from(fileList || []);
             this.referenceDocumentDropError = '';
             this.referenceDocumentUploadFailed = false;
 
-            if (files.length > 3) {
-                this.referenceDocumentDropError = 'Dokumen acuan maksimal 3 file.';
-                this.clearReferenceDocumentInput();
-                return false;
-            }
-
-            for (const file of files) {
+            for (const file of newFiles) {
                 if (!this.validateReferenceDocumentFile(file)) {
-                    this.clearReferenceDocumentInput();
+                    this.syncReferenceDocumentInput();
                     return false;
                 }
             }
 
-            this.referenceDocuments = files.map((file, index) => ({
+            const merged = [...this.referenceDocumentFiles, ...newFiles];
+            if (merged.length > 3) {
+                this.referenceDocumentDropError = 'Dokumen acuan maksimal 3 file.';
+                this.syncReferenceDocumentInput();
+                return false;
+            }
+
+            this.referenceDocumentFiles = merged;
+            this.referenceDocuments = merged.map((file, index) => ({
                 name: file.name,
                 label: `Dokumen ${index + 1}`,
             }));
 
+            this.syncReferenceDocumentInput();
             return true;
+        },
+        syncReferenceDocumentInput() {
+            const input = this.$refs.referenceDocumentInput;
+            if (!input) return;
+            try {
+                const transfer = new DataTransfer();
+                this.referenceDocumentFiles.forEach((file) => transfer.items.add(file));
+                this.referenceDocumentSyncing = true;
+                input.files = transfer.files;
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+            } catch (_) {
+            } finally {
+                this.referenceDocumentSyncing = false;
+            }
         },
         setRevisionReferenceImageFiles(fileList) {
             const newFiles = Array.from(fileList || []);
@@ -279,29 +312,46 @@
             }
         },
         setRevisionReferenceDocumentFiles(fileList) {
-            const files = Array.from(fileList || []);
+            const newFiles = Array.from(fileList || []);
             this.revisionReferenceDocumentDropError = '';
             this.revisionReferenceDocumentUploadFailed = false;
 
-            if (files.length > 3) {
-                this.revisionReferenceDocumentDropError = 'Dokumen revisi maksimal 3 file.';
-                this.clearRevisionReferenceDocumentInput();
-                return false;
-            }
-
-            for (const file of files) {
+            for (const file of newFiles) {
                 if (!this.validateRevisionReferenceDocumentFile(file)) {
-                    this.clearRevisionReferenceDocumentInput();
+                    this.syncRevisionReferenceDocumentInput();
                     return false;
                 }
             }
 
-            this.revisionReferenceDocuments = files.map((file, index) => ({
+            const merged = [...this.revisionReferenceDocumentFiles, ...newFiles];
+            if (merged.length > 3) {
+                this.revisionReferenceDocumentDropError = 'Dokumen revisi maksimal 3 file.';
+                this.syncRevisionReferenceDocumentInput();
+                return false;
+            }
+
+            this.revisionReferenceDocumentFiles = merged;
+            this.revisionReferenceDocuments = merged.map((file, index) => ({
                 name: file.name,
                 label: `Dokumen ${index + 1}`,
             }));
 
+            this.syncRevisionReferenceDocumentInput();
             return true;
+        },
+        syncRevisionReferenceDocumentInput() {
+            const input = this.$refs.revisionReferenceDocumentInput;
+            if (!input) return;
+            try {
+                const transfer = new DataTransfer();
+                this.revisionReferenceDocumentFiles.forEach((file) => transfer.items.add(file));
+                this.revisionReferenceDocumentSyncing = true;
+                input.files = transfer.files;
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+            } catch (_) {
+            } finally {
+                this.revisionReferenceDocumentSyncing = false;
+            }
         },
         clearReferenceImageState() {
             this.referenceImageDragging = false;
@@ -311,6 +361,10 @@
             this.clearReferenceImageInput();
         },
         clearReferenceImageInput() {
+            if (this.referenceImages.some((image) => image?.url && image.url === this.activeRefImageModalUrl)) {
+                this.activeRefImageModalUrl = null;
+                this.activeRefImageModalLabel = '';
+            }
             this.releaseReferenceImageUrls();
             this.referenceImages = [];
             this.referenceImageFiles = [];
@@ -327,6 +381,7 @@
         },
         clearReferenceDocumentInput() {
             this.referenceDocuments = [];
+            this.referenceDocumentFiles = [];
 
             if (this.$refs.referenceDocumentInput) {
                 this.$refs.referenceDocumentInput.value = '';
@@ -355,6 +410,7 @@
         },
         clearRevisionReferenceDocumentInput() {
             this.revisionReferenceDocuments = [];
+            this.revisionReferenceDocumentFiles = [];
 
             if (this.$refs.revisionReferenceDocumentInput) {
                 this.$refs.revisionReferenceDocumentInput.value = '';
@@ -651,16 +707,18 @@
                         <div x-show="referenceImages.length > 0" x-cloak class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
                             <template x-for="(image, imgIdx) in referenceImages" :key="image.label">
                                 <div class="relative overflow-hidden rounded-lg border border-stone-200 bg-white text-left shadow-sm dark:border-gray-700 dark:bg-gray-900">
-                                    <button type="button" @click="removeReferenceImageAt(imgIdx)" class="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-red-600" aria-label="Hapus gambar">
+                                    <button type="button" @click.stop="removeReferenceImageAt(imgIdx)" class="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-red-600" aria-label="Hapus gambar">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
                                     </button>
-                                    <div class="aspect-[4/3] bg-stone-100 dark:bg-gray-800">
-                                        <img :src="image.url" :alt="image.label" class="h-full w-full object-cover">
-                                    </div>
-                                    <div class="min-w-0 px-2 py-1.5">
-                                        <p class="truncate text-[11px] font-bold text-stone-700 dark:text-gray-200" x-text="image.label"></p>
-                                        <p class="truncate text-[10.5px] text-stone-400 dark:text-gray-500" x-text="image.name"></p>
-                                    </div>
+                                    <button type="button" @click="openReferenceImageModal(image)" class="block w-full cursor-zoom-in text-left transition hover:opacity-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ista-primary" :aria-label="`Buka preview ${image.label}`">
+                                        <div class="aspect-[4/3] bg-stone-100 dark:bg-gray-800">
+                                            <img :src="image.url" :alt="image.label" class="h-full w-full object-cover">
+                                        </div>
+                                        <div class="min-w-0 px-2 py-1.5">
+                                            <p class="truncate text-[11px] font-bold text-stone-700 dark:text-gray-200" x-text="image.label"></p>
+                                            <p class="truncate text-[10.5px] text-stone-400 dark:text-gray-500" x-text="image.name"></p>
+                                        </div>
+                                    </button>
                                 </div>
                             </template>
                         </div>
@@ -700,7 +758,7 @@
                                 </svg>
                             </span>
                             <span class="min-w-0 flex-1">
-                                <span class="block truncate text-[12px] font-semibold" x-text="referenceDocuments.length ? `${referenceDocuments.length} dokumen dipilih` : 'Pilih dokumen acuan'"></span>
+                                <span class="block truncate text-[12px] font-semibold" x-text="referenceDocuments.length ? `${referenceDocuments.length} dokumen dipilih — klik untuk tambah` : 'Pilih dokumen acuan'"></span>
                                 <span class="mt-0.5 block text-[11px] leading-relaxed opacity-75">Opsional. PDF/DOCX/XLSX/CSV, maksimal 3 dokumen, masing-masing 10 MB.</span>
                             </span>
                         </button>
@@ -958,7 +1016,7 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M14 3v5h5M8 13h8M8 17h5" />
                                     </svg>
                                     <span x-show="revisionReferenceDocumentUploading" x-cloak class="h-3.5 w-3.5 rounded-full border-2 border-current/50 border-t-transparent animate-spin" aria-hidden="true"></span>
-                                    <span x-text="revisionReferenceDocuments.length ? 'Ganti file' : 'Lampirkan file'"></span>
+                                    <span x-text="revisionReferenceDocuments.length ? 'Tambah file' : 'Lampirkan file'"></span>
                                 </button>
                             </div>
                             <button type="submit"

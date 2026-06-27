@@ -582,6 +582,35 @@ class PromptStudioTest extends TestCase
             ->assertSee('this.revisionReferenceImageSyncing = true;', false);
     }
 
+    public function test_config_reference_image_preview_can_open_full_size_modal(): void
+    {
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->test(PrompyStudio::class)
+            ->assertSee('openReferenceImageModal(image)', false)
+            ->assertSee('cursor-zoom-in', false)
+            ->assertSee(':aria-label="`Buka preview ${image.label}`"', false)
+            ->assertSee('@click.stop="removeReferenceImageAt(imgIdx)"', false);
+    }
+
+    public function test_reference_document_upload_sync_appends_like_reference_images(): void
+    {
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->test(PrompyStudio::class)
+            ->assertSee('if (this.referenceDocumentSyncing) return;', false)
+            ->assertSee('if (this.revisionReferenceDocumentSyncing) return;', false)
+            ->assertSee('const merged = [...this.referenceDocumentFiles, ...newFiles];', false)
+            ->assertSee('const merged = [...this.revisionReferenceDocumentFiles, ...newFiles];', false)
+            ->assertSee('this.referenceDocumentSyncing = true;', false)
+            ->assertSee('this.revisionReferenceDocumentSyncing = true;', false)
+            ->assertSee('syncReferenceDocumentInput()', false)
+            ->assertSee('syncRevisionReferenceDocumentInput()', false)
+            ->assertSee('dokumen dipilih — klik untuk tambah', false);
+    }
+
     public function test_revision_creates_new_prompt_version(): void
     {
         Storage::fake('local');
