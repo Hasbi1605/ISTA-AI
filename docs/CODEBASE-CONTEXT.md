@@ -34,7 +34,7 @@ Keduanya berkomunikasi via HTTP dengan bearer token bersama. Vector store = Chro
 ## 2. Backend Context & Mapping — Laravel (`laravel/`)
 
 Catatan penting: **UI interaktif user/admin ada di Livewire components**, bukan controller.
-Controller di-pakai untuk SSE, file, callback, OAuth, dan admin auth. **Tidak ada `api.php`
+Controller di-pakai untuk SSE, file, callback, prompt reference image, dan admin auth. **Tidak ada `api.php`
 maupun `channels.php`** (SSE = HTTP biasa, tanpa broadcast channel).
 
 ### 2.1 Controllers (`app/Http/Controllers`)
@@ -80,7 +80,7 @@ Subfolder:
 - **web.php:** dashboard `/`; route user seperti `profile`, `chat/{id?}` (ChatIndex), `chat/stream/{conversationId}` (SSE), memo, dan dokumen memakai `auth+active` (serta `verified` sesuai kebutuhan) agar akun nonaktif tidak bisa memakai aplikasi lewat sesi lama; `onlyoffice/callback/{memo}` (JWT + trusted OnlyOffice URL scheme/host/port); grup `chat/memos/*` (download/export-pdf/force-save/signed); legacy `memos/*` redirect ke `/chat?tab=memo`; tidak ada lagi route `chat/presentations/*` atau callback OnlyOffice presentasi; `documents/*` (content-html, extract-tables, export, preview/*); admin auth (`/admin/login`, logout, password change); admin app (`auth+verified+admin+admin.password_changed`): `/admin`, `/users`, `/usage`, `/errors`, `/documents`, `/knowledge`; super-admin: `/admin/accounts`.
 - **auth.php:** Volt pages login/forgot/reset/verify/confirm; register → redirect login register-view hanya jika `PUBLIC_REGISTRATION_ENABLED=true` (production private default tertutup).
 - **Horizon:** `/horizon` memakai middleware `web+auth+verified+super_admin+admin.password_changed` dan gate `viewHorizon`; hanya super-admin aktif yang tidak sedang wajib ganti password boleh akses. `App\Console\Commands\CompatibleHorizonWorkCommand` menggantikan binding `horizon:work` agar Horizon 5.45 tetap kompatibel dengan opsi worker Laravel 13 `--stop-when-empty-for`, mencegah worker crash-loop di production.
-- **console.php:** `documents:purge-deleted --days=7` (03:00), `chat:resolve-stale-responses --minutes=10` (tiap menit).
+- **console.php:** `documents:purge-deleted --days=7` tetap terjadwal sebagai no-op kompatibilitas karena dokumen kini hard-delete; `chat:resolve-stale-responses --minutes=10` berjalan tiap menit.
 
 ### 2.6 Frontend Laravel (`resources/`)
 - **js/**: `app.js` (registrasi Alpine+Livewire), `bootstrap.js`, **`chat-page.js`** (client berat: Alpine `chatLayout` tab chat/memo/Prompy (`prompyEnabled` gating tab), `prompyWorkspace` untuk sidebar/mobile panel Prompy, drag-drop upload, `assistantTypewriter`, `chatMessages`). **SSE**: `openChatStream(...)` membangun `/chat/stream/{id}?...` lalu `new EventSource(url)` (dilacak di `activeEventSources`), render typewriter markdown (marked + DOMPurify); koordinasi placeholder via `$wire.on` (`assistant-output`, `model-name`, `assistant-sources`, dll) + marker localStorage.
@@ -191,5 +191,5 @@ Chat streaming (RAG/web/knowledge/general), upload + RAG dokumen, generate memo 
 - Public self-registration ditutup default di production agar knowledge/dokumen privat hanya diakses akun yang disetujui.
 - Callback OnlyOffice memo memakai JWT ber-`exp`, key segar, anti-replay, validasi DOCX, dan URL download yang harus cocok scheme/host/port trusted.
 - Email input user-controlled memakai `App\Rules\NoEmailHeaderInjection` di auth/profile/admin untuk menolak CR/LF/control chars sebelum email dipakai di reset/register/admin account flows.
-- Token, secret OnlyOffice, kredensial DB, OAuth, API key provider → hanya di `.env` lokal/deploy, jangan commit. Jangan commit dokumen produksi, dump DB, service-account JSON, atau data Chroma.
+- Token, secret OnlyOffice, kredensial DB, kredensial deploy/email, API key provider → hanya di `.env` lokal/deploy, jangan commit. Jangan commit dokumen produksi, dump DB, service-account JSON, atau data Chroma.
 - Akses dokumen: signed URL, private disk, otorisasi server-side. Baca `docs/data-flow-privacy.md` sebelum pakai data nyata.

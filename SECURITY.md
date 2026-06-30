@@ -2,39 +2,47 @@
 
 ## Supported Versions
 
-Security fixes are currently handled on the `main` branch. If releases are added later, this policy should be updated with supported version ranges.
+Security fix saat ini ditangani di branch `main`. Jika nanti ada release
+versioning, bagian ini perlu diperbarui dengan daftar versi yang masih disupport.
 
 ## Reporting a Vulnerability
 
-Please do not open a public issue for vulnerabilities that could expose secrets, private documents, user data, tokens, or infrastructure details.
+Jangan membuka public issue untuk vulnerability yang bisa mengekspos secret,
+dokumen privat, data user, token, atau detail infrastructure.
 
-For now, report security concerns by contacting the repository maintainer through the GitHub profile linked from this repository. Include:
+Untuk saat ini, laporkan security concern ke maintainer repository melalui profil
+GitHub yang terhubung dengan repo ini. Sertakan:
 
-- A short summary of the issue.
-- Affected component or path.
-- Safe reproduction steps using local/test data only.
-- Impact and suggested mitigation if known.
+- ringkasan issue;
+- komponen atau path terdampak;
+- langkah reproduksi aman memakai data lokal/test;
+- impact dan saran mitigasi bila diketahui.
 
-Do not include real API keys, service account JSON, production documents, database exports, session cookies, or private user data in the report.
+Jangan menyertakan API key asli, service account, dokumen production, database
+export, session cookie, private key, atau data user privat.
 
 ## Secret Handling
 
-ISTA AI uses environment variables for provider keys, internal service tokens, database passwords, OAuth secrets, and document editor secrets.
+ISTA AI memakai environment variable untuk provider key, token internal,
+password database, secret editor dokumen, email provider, dan kredensial deploy.
 
-Never commit:
+Jangan commit:
 
-- Real `.env` files.
-- Database dumps or local SQLite files.
-- Chroma vector data.
-- Google service account JSON files.
-- OAuth client secret files.
-- Private keys, certificates, or deployment credentials.
+- file `.env` asli;
+- dump database atau file SQLite lokal;
+- data Chroma/vector;
+- dokumen production;
+- service-account JSON;
+- private key, certificate, atau deploy credential;
+- file berisi token/API key/password.
 
-If a secret is committed or shared outside a trusted local machine, revoke and rotate it immediately. Removing the file from the latest commit is not enough if it already reached git history or a remote.
+Jika secret pernah ter-commit atau dibagikan keluar mesin terpercaya, revoke dan
+rotate segera. Menghapus file dari commit terbaru saja tidak cukup bila secret
+sudah masuk git history atau remote.
 
 ## Local Security Checks
 
-Recommended checks before publishing a branch:
+Check dasar sebelum publish branch:
 
 ```bash
 git status --short --ignored .env.droplet laravel/.env laravel/.env.backup laravel/.env.production python-ai/.env
@@ -42,4 +50,16 @@ git ls-files | rg -i '(^|/)(\.env|.*secret.*|.*credential.*|.*token.*|.*key.*|.*
 git diff --check
 ```
 
-Use a dedicated secret scanner such as Gitleaks or TruffleHog when available, especially before making a repository public or submitting it for external review.
+Gunakan secret scanner seperti Gitleaks atau TruffleHog bila tersedia, terutama
+sebelum repo dibuka lebih luas atau diserahkan untuk review eksternal.
+
+## Data Privacy
+
+Sebelum memakai data nyata, baca:
+
+- [docs/09-SECURITY-PRIVACY.md](docs/09-SECURITY-PRIVACY.md)
+- [docs/data-flow-privacy.md](docs/data-flow-privacy.md)
+
+Provider AI/search eksternal dapat menerima prompt, chat history, chunk dokumen,
+embedding input, reference image Prompy, atau query web sesuai fitur yang dipakai.
+Pastikan pemilik data menyetujui klasifikasi dokumen dan provider aktif.

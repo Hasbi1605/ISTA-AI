@@ -1,38 +1,28 @@
 # Contributing to ISTA AI
 
-Thanks for helping improve ISTA AI. The project is maintained with small, reviewable changes, explicit planning for complex work, and verification before a change is considered done.
+Terima kasih sudah membantu memperbaiki ISTA AI. Project ini dikelola dengan
+perubahan kecil, scoped, dan diverifikasi sesuai area yang disentuh.
 
-## Working Principles
+## Prinsip Kerja
 
-- Keep changes focused and easy to review.
-- Prefer tests for behavior changes.
-- Do not commit secrets, production data, private documents, database dumps, or local vector data.
-- Update docs when setup, deployment, security, or maintainer workflows change.
-- Follow the existing Laravel and Python structure instead of introducing broad refactors.
+- Jaga perubahan tetap fokus dan mudah direview.
+- Jangan commit secret, `.env` asli, dokumen produksi, dump database, private key, atau data Chroma.
+- Ikuti pola yang sudah ada di Laravel dan Python.
+- Untuk behavior change, tambahkan atau jalankan test yang relevan.
+- Update dokumentasi bila setup, deployment, security, flow user/admin, atau kontrak lintas-service berubah.
+- Untuk perubahan kompleks, tulis plan singkat di percakapan/PR description. Repo ini tidak memakai folder `issue/`.
 
-## Before You Start
+## Area Project
 
-For complex changes, create or update a markdown plan in `issue/` with:
+- `laravel/` - web app, Livewire UI, auth, admin, queue, upload, memo, OnlyOffice callback.
+- `python-ai/` - FastAPI service, chat, RAG, embeddings, export, memo, Prompy Studio.
+- `docs/` - handover, deployment, operasi, security/privacy.
+- `deploy/` dan Docker Compose - template deployment.
+- `benchmarks/` - benchmark manual provider/RAG.
 
-- Background and goal.
-- Scope and out-of-scope items.
-- Files likely to change.
-- Risks.
-- Implementation steps.
-- Verification plan.
+## Verifikasi
 
-Small documentation fixes do not need a full issue plan.
-
-## Development Areas
-
-- Laravel app: `laravel/`
-- Python AI services: `python-ai/`
-- Deployment and operations: `docs/`, `deploy/`, Docker Compose files
-- Manual benchmarks: `benchmarks/`
-
-## Verification
-
-Run checks close to the area you changed.
+Jalankan check dekat dengan area yang diubah.
 
 Laravel:
 
@@ -46,22 +36,29 @@ Python:
 cd python-ai && source venv/bin/activate && pytest
 ```
 
-General checks:
+Frontend build:
+
+```bash
+cd laravel && npm run build
+```
+
+General:
 
 ```bash
 git diff --check
 ```
 
-If a full test run is too expensive for a small change, state exactly which checks were run and why they are enough.
+Jika perubahan hanya dokumentasi, jelaskan check dokumentasi yang dijalankan.
 
-## Pull Request Checklist
+## Checklist Sebelum Commit/PR
 
-- Scope is clear and limited.
-- No real env files or credentials are included.
-- Relevant tests or checks ran successfully.
-- Docs are updated when behavior or setup changes.
-- Security-sensitive changes explain risk and verification.
+- Scope jelas dan terbatas.
+- Tidak ada secret/data privat.
+- Test atau check relevan sudah dijalankan.
+- Dokumentasi terkait diperbarui.
+- Perubahan security-sensitive menjelaskan risiko dan verifikasi.
 
 ## Security
 
-See [SECURITY.md](SECURITY.md) before reporting vulnerabilities or handling secrets.
+Jangan membuka vulnerability atau data privat di public issue. Ikuti
+[SECURITY.md](SECURITY.md).

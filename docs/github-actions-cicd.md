@@ -68,7 +68,7 @@ Workflow sengaja memakai `git pull --ff-only`. Jika server punya perubahan manua
 
 ## Catatan Keamanan
 
-- Jangan simpan `.env.droplet`, API key, OAuth secret, dump database, service-account JSON, atau data Chroma di GitHub secrets kecuali memang dibutuhkan workflow. Untuk workflow ini, secret aplikasi tetap berada di server.
+- Jangan simpan `.env.droplet`, API key aplikasi, secret provider, dump database, service-account JSON, atau data Chroma di GitHub secrets kecuali memang dibutuhkan workflow. Untuk workflow ini, secret aplikasi tetap berada di server.
 - Gunakan deploy key khusus dengan akses minimum.
 - Jika GitHub Environment `production` diberi required reviewers, deploy otomatis akan menunggu approval setelah CI lulus.
 - `ISTA_DEPLOY_URL` hanya dipakai untuk request `HEAD /up`; jangan masukkan endpoint yang membuka data privat.

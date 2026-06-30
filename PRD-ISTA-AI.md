@@ -45,7 +45,7 @@ WebSockets.
 
 | Persona     | Description               | Key Needs                                                      |
 | -------------| ---------------------------| ----------------------------------------------------------------|
-| Staff user  | Palace employee           | Chat over private docs, generate/edit memos, import from Drive |
+| Staff user  | Palace employee           | Chat over private docs, upload local docs, generate/edit memos, create Prompy prompt packages |
 | Admin       | Operational administrator | Monitor usage/errors, manage documents/users/knowledge         |
 | Super Admin | System owner              | All admin access + manage admin accounts with audit trail      |
 
@@ -79,6 +79,7 @@ WebSockets.
 | FR-U6 | Users can generate an official memorandum (`.docx`) from a structured form / chat context. |
 | FR-U7 | Users can edit a generated memo via OnlyOffice (signed URL + JWT) with force-save persistence and versioning. |
 | FR-U8 | Users can export documents/memos (HTML → PDF/DOCX) and download memo files. |
+| FR-U9 | Users can create and revise Prompy Studio prompt packages for external AI platforms without ISTA AI calling those target platforms. |
 | FR-U10 | Chat history, conversations, and memo versions persist per user. |
 | FR-U11 | Each chat answer records an AI usage event (feature, model, latency, status). |
 
@@ -96,6 +97,8 @@ WebSockets.
 | FR-A8  | Admins can manage the internal knowledge base (CRUD + ingest pipeline).                    |
 | FR-A9  | **Super Admins** can manage admin accounts (create/disable/role) with an audit trail.      |
 | FR-A10 | Admin account changes are recorded in an immutable audit log (before/after snapshots).     |
+| FR-A11 | Admin access requires 2FA TOTP enrollment/verification before entering the main admin app. |
+| FR-A12 | Admin sessions have an absolute lifetime independent of sliding activity.                  |
 
 ### 2.3 Non-Functional Requirements
 
@@ -123,10 +126,10 @@ WebSockets.
 | BR-4 | Active documents force RAG mode; answers must prioritize explicit document content and avoid fabrication. |
 | BR-5 | When the document has no answer, the assistant offers to continue via web search or general knowledge (no fabrication). |
 | BR-6 | Assistant messages are persisted idempotently via a single-runner claim to prevent duplicates. |
-| BR-7 | Admin access requires the `admin` role, an active account, and a completed forced password change. |
+| BR-7 | Admin access requires the `admin` role, an active account, a completed forced password change when flagged, a valid 2FA session, and a non-expired absolute session lifetime. |
 | BR-8 | Internal knowledge documents use scope `global_internal` / audience `all_users`. |
 | BR-9 | Stale "in-progress" chat responses are resolved automatically after 10 minutes (scheduled). |
-| BR-10 | Soft-deleted documents are purged after 7 days (scheduled). |
+| BR-10 | Document deletion is hard-delete based; `documents:purge-deleted` is retained only as a no-op compatibility command. |
 
 ---
 
@@ -179,13 +182,25 @@ Admins curate an internal knowledge base. Knowledge documents are ingested via t
 (scope `global_internal`, audience `all_users`). This powers internal-knowledge answers in
 general chat for all users. Reuses the document validator + ingest pipeline.
 
-### 3.6 Google Drive Integration (removed)
-The Google Drive integration (OAuth connect/callback, the `GoogleDrivePicker`, and document
-export to Drive) has been removed entirely. Documents are now added only via local upload
-(PDF/DOCX/XLSX/CSV), and answers/documents are exported via local download. The
-`cloud_storage_files` and `google_drive_oauth_connections` tables have been dropped.
+### 3.6 Prompy Studio
+Prompy Studio is a prompt-package generator for external AI platforms. Users provide an
+idea, target platform (ChatGPT Images/GPT Image, Gemini/Nano Banana, Canva AI, or
+Universal), output type, optional reference images, and optional reference documents.
+Laravel validates and stores owner-scoped prompt history; python-ai generates or revises a
+structured prompt package through `/api/prompts/generate` and routes natural follow-up chat
+through `/api/prompts/chat`.
 
-### 3.7 Admin Console
+Reference images are analyzed by the configured vision model before the final prompt is
+generated. Reference documents are extracted as temporary context notes. ISTA AI does **not**
+call the target platforms and does **not** generate images, video, or decks directly.
+
+### 3.7 Google Drive Integration (removed)
+The legacy Google Drive import/export integration has been removed entirely. Documents are
+now added only via local upload (PDF/DOCX/XLSX/CSV), and answers/documents are exported via
+local download. The `cloud_storage_files` and `google_drive_oauth_connections` tables have
+been dropped.
+
+### 3.8 Admin Console
 A dedicated admin app (separate login, role-gated) with:
 - **Dashboard** — KPI metrics via `AdminMetricsService`.
 - **Usage** — AI usage analytics (feature, model, latency, status) from `ai_usage_events`.
@@ -195,7 +210,7 @@ A dedicated admin app (separate login, role-gated) with:
 - **Knowledge** — internal knowledge base CRUD + ingest actions.
 - **Accounts (Super Admin)** — admin account management + audit trail.
 
-### 3.8 AI Model Routing & Configuration
+### 3.9 AI Model Routing & Configuration
 A single `python-ai/config/ai_config.yaml` is the source of truth for chat model cascade
 (GitHub Models GPT-4.1/4o/mini/nano with dual tokens → Groq Llama 3.3 → Mistral → Bedrock),
 embeddings (OpenAI large/small → Bedrock Titan V2), retrieval (LangSearch search+rerank
@@ -203,11 +218,11 @@ top_k=5, hybrid BM25 0.3, HyDE smart), chunking (1500/150, PDR child 256 / paren
 all prompts (persona, RAG, web, summarization, memo, knowledge, HyDE, fallback). The router
 falls back across models/accounts on rate-limit (429) or context-size (413) errors.
 
-### 3.9 Authentication, Authorization & Security
+### 3.10 Authentication, Authorization & Security
 Standard user auth (login/register/email verification/forgot/reset via Volt pages) plus a
-separate admin login with forced password change, role/active-account guards, presence
-tracking, CSP security headers, shared bearer token to python-ai, and signed-URL document
-access.
+separate admin login with forced password change, 2FA TOTP, absolute admin session lifetime,
+role/active-account guards, presence tracking, CSP security headers, shared bearer token to
+python-ai, and signed-URL document access.
 
 ---
 
@@ -282,9 +297,24 @@ access.
 6. User downloads the memo or exports it to PDF (chat/memos/{memo}/download | export-pdf).
 ```
 
+#### 4.1.7 Flow: Prompy Studio
+```
+1. User opens the Prompy tab in the chat workspace.
+2. User writes an idea, chooses a target platform and output type, and optionally attaches
+   reference images or reference documents.
+3. PromptStudioService validates inputs and calls python /api/prompts/generate.
+4. Python optionally analyzes reference images with the configured vision model, then returns
+   a structured prompt package.
+5. Laravel stores the package as GeneratedPrompt + GeneratedPromptVersion.
+6. User can ask natural follow-up questions; /api/prompts/chat decides whether to answer,
+   clarify, or revise.
+7. Clear revision instructions create a new prompt version; normal discussion is stored as
+   chat_messages.
+```
+
 ### 4.2 Admin Flow
 
-#### 4.2.1 Flow: Admin Login (+ Forced Password Change)
+#### 4.2.1 Flow: Admin Login (+ Forced Password Change + 2FA)
 ```
 1. Admin opens /admin/login (separate from user login).
 2. Admin submits credentials (rate-limited 10/min).
@@ -292,8 +322,11 @@ access.
 3. On success:
    → If force_password_change is true → redirected to /admin/password/change; must set a new
      password before accessing the rest of /admin/*.
+   → If 2FA is not enrolled → redirected to /admin/2fa/setup.
+   → If 2FA is enrolled but the session is not verified → redirected to /admin/2fa/challenge.
    → Otherwise → admin dashboard.
-4. last_admin_login_at / last_admin_login_ip are recorded.
+4. last_admin_login_at / last_admin_login_ip are recorded; 2FA actions are audited.
+5. EnforceAdminSessionLifetime logs the admin out after the configured absolute lifetime.
 ```
 
 #### 4.2.2 Flow: Monitor Usage & Errors
@@ -340,7 +373,7 @@ access.
 processing → ready        (ingest + index succeeded)
 processing → error        (ingest failed)
 preview: pending → ready | failed   (HTML render)
-soft-deleted → purged     (after 7 days, scheduled)
+deleted                   (hard-delete via document lifecycle)
 ```
 
 ### 4.4 State — Knowledge Document Status
@@ -370,7 +403,7 @@ else:
 
 | Layer | Technology |
 |-------|------------|
-| Web app | Laravel (PHP 8.2+) + **Livewire/Volt + Blade + Alpine.js** + Tailwind (Vite) |
+| Web app | Laravel (PHP 8.3+, Docker/CI on PHP 8.4) + **Livewire/Volt + Blade + Alpine.js** + Tailwind (Vite) |
 | AI service | **FastAPI** + Pydantic 2, **litellm** (multi-provider routing), ChromaDB, rank-bm25, tiktoken |
 | Streaming chat | **SSE** (`EventSource`) — not WebSocket/Echo |
 | App data store | MySQL |
@@ -407,7 +440,8 @@ processing (heavier ingestion/export).
 ### 5.3 Architecture Patterns
 
 - **Livewire-as-controller:** interactive user/admin UI lives in Livewire components, not
-  classic controllers. Controllers handle SSE, files, callbacks, OAuth, and admin auth.
+  classic controllers. Controllers handle SSE, files, callbacks, prompt reference images,
+  and admin auth.
 - **No `api.php` / `channels.php`:** SSE is plain HTTP; there is no broadcast channel.
 - **Thin Laravel services bridging to Python:** `AIService`, `ChatOrchestrationService`,
   `DocumentLifecycleService`, `MemoGenerationService`, `KnowledgeLifecycleService`.
@@ -432,7 +466,9 @@ GET  /chat/memos/{memo}/signed-file     # signed memo file
 GET  /chat/memos/{memo}/download | /export-pdf ; POST /{memo}/force-save
 GET  /documents/{document}/content-html | /extract-tables ; POST /documents/export
 GET  /documents/{document}/preview/{status,stream,html}
+GET  /prompts/{prompt}/reference-image/{imageIndex}
 GET/POST /admin/login ; POST /admin/logout ; GET/POST /admin/password/change
+GET/POST /admin/2fa/setup ; GET/POST /admin/2fa/challenge
 GET  /admin , /admin/users, /admin/usage, /admin/errors, /admin/documents, /admin/knowledge
 GET  /admin/accounts                    # super admin
 # auth.php: login, register→login, forgot/reset password, verify-email, confirm-password (Volt)
@@ -449,6 +485,7 @@ Document service:
   POST /api/documents/extract-tables | /extract-content | /export | /summarize
   POST /api/knowledge/process | DELETE /api/knowledge/{filename}
   POST /api/memos/generate-body
+  POST /api/prompts/generate | /api/prompts/chat ; GET /api/prompts/profiles
 ```
 
 ### 5.5 Middleware & Guards
@@ -458,7 +495,9 @@ Document service:
 | `auth`, `verified` | Authenticated + email-verified users |
 | `admin` (`EnsureUserIsAdmin`) | Restricts the admin app to active admins |
 | `super_admin` (`EnsureUserIsSuperAdmin`) | Restricts admin-account management to super admins |
+| `admin.session` (`EnforceAdminSessionLifetime`) | Enforces an absolute admin session lifetime |
 | `admin.password_changed` (`EnsureAdminPasswordChanged`) | Enforces forced password change before admin app |
+| `admin.2fa` (`EnsureTwoFactorVerified`) | Requires admin TOTP enrollment/session verification |
 | `UpdateUserPresence` | Tracks user presence (last_seen_at / last_active_feature) |
 | `AddSecurityHeaders` | Adds CSP & security headers |
 
@@ -466,7 +505,7 @@ Document service:
 
 | Command | Schedule | Function |
 |---------|----------|----------|
-| `documents:purge-deleted --days=7` | daily 03:00 | Purges soft-deleted documents older than 7 days |
+| `documents:purge-deleted --days=7` | daily 03:00 | No-op compatibility command; documents now use hard delete |
 | `chat:resolve-stale-responses --minutes=10` | every minute | Resolves stale in-progress chat responses |
 
 ---
@@ -661,8 +700,8 @@ users (actor) 1───* admin_account_audits *───1 users (target)
   and must not fabricate details not present; it offers web/general fallback when unanswered.
 - **Idempotent persistence:** assistant messages are claimed once (single-runner) to avoid
   duplicates between the SSE path and the async job path.
-- **Stale recovery:** in-progress chat responses are resolved after 10 minutes; soft-deleted
-  documents purged after 7 days.
+- **Stale recovery:** in-progress chat responses are resolved after 10 minutes; the legacy
+  document purge command is a no-op because documents now use hard delete.
 
 ### 7.2 Security & Privacy Constraints
 - python-ai is protected by a shared bearer token with constant-time verification.
@@ -670,7 +709,8 @@ users (actor) 1───* admin_account_audits *───1 users (target)
 - Document access uses signed URLs, private disks, and server-side authorization; OnlyOffice
   uses signed URL + JWT.
 - Security headers including CSP are applied; markdown is sanitized (DOMPurify) on render.
-- Secrets (AI provider keys, OnlyOffice secret, DB/OAuth credentials, `AI_SERVICE_TOKEN`)
+- Secrets (AI provider keys, OnlyOffice secret, DB credentials, email provider credentials,
+  deploy credentials, `AI_SERVICE_TOKEN`)
   live only in local/deploy `.env` and must never be committed.
 - Production documents, DB dumps, service-account JSON, and Chroma data must not be committed.
 
@@ -813,10 +853,10 @@ Format: Given / When / Then. Written to drive functional test generation.
 - When the user exports it
 - Then the content is converted to the requested format (PDF/DOCX) and returned
 
-**AC-DOC-6 — Purge soft-deleted**
-- Given a soft-deleted document older than 7 days
-- When the daily purge command runs
-- Then the document and its vectors are removed
+**AC-DOC-6 — Delete document**
+- Given an authorized user deletes a document
+- When the document lifecycle runs
+- Then the document record/storage file/vector metadata are removed through the hard-delete path
 
 ### 8.4 Memos
 
@@ -840,7 +880,31 @@ Format: Given / When / Then. Written to drive functional test generation.
 - When the body is generated
 - Then it follows naskah-dinas formatting and does not fabricate names/NIP/positions not in the configuration
 
-### 8.5 Knowledge Base (Admin)
+### 8.5 Prompy Studio
+
+**AC-PROMPY-1 — Generate prompt package**
+- Given an authenticated user with an idea, target platform, and output type
+- When they generate a prompt package
+- Then a GeneratedPrompt and GeneratedPromptVersion are stored for that user only
+
+**AC-PROMPY-2 — Reference image analysis**
+- Given valid JPG/PNG reference images
+- When the user generates a prompt package
+- Then python-ai analyzes the images with the configured vision model and uses the safe visual brief in the prompt package generation
+
+**AC-PROMPY-3 — Natural follow-up vs revision**
+- Given an existing prompt package
+- When the user asks a normal review/question
+- Then the message is answered as chat_messages without creating a new version
+- When the user gives a clear change instruction
+- Then a new GeneratedPromptVersion is created
+
+**AC-PROMPY-4 — No target-platform execution**
+- Given a generated Prompy package
+- When output is returned to the user
+- Then ISTA AI has not called the target platform and has not generated image/video/deck files
+
+### 8.6 Knowledge Base (Admin)
 
 **AC-KB-1 — Ingest knowledge document**
 - Given an admin on /admin/knowledge
@@ -857,7 +921,7 @@ Format: Given / When / Then. Written to drive functional test generation.
 - When the pipeline errors
 - Then status becomes failed with error_code/error_message recorded
 
-### 8.6 Admin Console
+### 8.7 Admin Console
 
 **AC-ADM-1 — Separate admin login**
 - Given an admin
@@ -869,27 +933,37 @@ Format: Given / When / Then. Written to drive functional test generation.
 - When they log in
 - Then they are routed to /admin/password/change and cannot access other /admin/* until they change it
 
-**AC-ADM-3 — Role-gated admin app**
+**AC-ADM-3 — 2FA required**
+- Given an admin with no verified 2FA session
+- When they attempt to access the main admin app
+- Then they must enroll or complete the 2FA challenge before access
+
+**AC-ADM-4 — Absolute session lifetime**
+- Given an admin whose session exceeds the configured absolute lifetime
+- When they request an admin page
+- Then they are logged out and redirected to /admin/login
+
+**AC-ADM-5 — Role-gated admin app**
 - Given a non-admin user
 - When they try to open /admin
 - Then access is denied
 
-**AC-ADM-4 — Usage analytics**
+**AC-ADM-6 — Usage analytics**
 - Given existing ai_usage_events
 - When the admin opens /admin/usage
 - Then usage metrics (feature, model, latency, status) are shown with filters and pagination
 
-**AC-ADM-5 — Error monitoring**
+**AC-ADM-7 — Error monitoring**
 - Given failed AI events
 - When the admin opens /admin/errors
 - Then the failed events are listed for triage
 
-**AC-ADM-6 — User presence**
+**AC-ADM-8 — User presence**
 - Given active users
 - When the admin opens /admin/users
 - Then user presence (online/last active) is displayed
 
-### 8.7 Admin Accounts (Super Admin)
+### 8.8 Admin Accounts (Super Admin)
 
 **AC-SADM-1 — Accounts restricted to super admin**
 - Given a regular admin (not super admin)
@@ -901,7 +975,7 @@ Format: Given / When / Then. Written to drive functional test generation.
 - When they create/disable an admin or change a role
 - Then an admin_account_audits entry is written with actor, target, before/after snapshots, IP, and user agent
 
-### 8.8 Security & Privacy
+### 8.9 Security & Privacy
 
 **AC-SEC-1 — python-ai token required**
 - Given a request to a python-ai endpoint without/with an invalid bearer token
@@ -930,7 +1004,9 @@ Format: Given / When / Then. Written to drive functional test generation.
 | Export document | `/documents/export` | POST | User |
 | Memo force-save (OnlyOffice) | `/onlyoffice/callback/{memo}` | POST | Signed/JWT |
 | Memo download / export PDF | `/chat/memos/{memo}/download` / `/export-pdf` | GET | User |
+| Prompy reference image | `/prompts/{prompt}/reference-image/{imageIndex}` | GET | User |
 | Admin login | `/admin/login` | POST | Public (guest) |
+| Admin 2FA setup/challenge | `/admin/2fa/setup` / `/admin/2fa/challenge` | GET/POST | Admin |
 | Admin dashboard | `/admin` | GET | Admin |
 | Admin usage | `/admin/usage` | GET | Admin |
 | Admin knowledge | `/admin/knowledge` | GET | Admin |
@@ -938,6 +1014,7 @@ Format: Given / When / Then. Written to drive functional test generation.
 | AI chat (internal) | `/api/chat` | POST (SSE) | Bearer token |
 | Document process (internal) | `/api/documents/process` | POST | Bearer token |
 | Knowledge process (internal) | `/api/knowledge/process` | POST | Bearer token |
+| Prompy generate/chat (internal) | `/api/prompts/generate` / `/api/prompts/chat` | POST | Bearer token |
 | Memo generate (internal) | `/api/memos/generate-body` | POST | Bearer token |
 
 ## Appendix B — Roles & Access
