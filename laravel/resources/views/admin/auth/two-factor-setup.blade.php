@@ -36,10 +36,15 @@
                     ISTA <span class="font-light italic text-ista-gold dark:text-amber-300">AI</span>
                 </span>
                 <p class="mt-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-stone-400 dark:text-gray-500">Admin Console</p>
-                <h1 class="mt-2 text-2xl font-semibold text-stone-900 dark:text-gray-50">Aktifkan Two-Factor Authentication</h1>
+                <h1 class="mt-2 text-2xl font-semibold text-stone-900 dark:text-gray-50">Aktifkan Verifikasi 2 Langkah</h1>
                 <p class="mt-2 max-w-sm text-sm leading-relaxed text-stone-500 dark:text-gray-400">
-                    Akses admin wajib dilindungi 2FA. Pindai QR berikut dengan aplikasi authenticator (Google Authenticator, Authy, dll), lalu masukkan kode 6 digit untuk mengonfirmasi.
+                    Demi keamanan, akun admin <strong class="font-semibold text-stone-700 dark:text-gray-200">wajib</strong> mengaktifkan verifikasi 2 langkah sebelum masuk ke dashboard.
                 </p>
+                <ol class="mt-3 max-w-sm space-y-1 text-left text-sm leading-relaxed text-stone-500 dark:text-gray-400">
+                    <li>1. Pasang aplikasi <strong class="font-semibold text-stone-700 dark:text-gray-200">Google Authenticator</strong> atau <strong class="font-semibold text-stone-700 dark:text-gray-200">Authy</strong> di ponsel Anda.</li>
+                    <li>2. Pindai (scan) kode QR di bawah ini dengan aplikasi tersebut.</li>
+                    <li>3. Masukkan 6 angka yang muncul di aplikasi untuk mengaktifkan.</li>
+                </ol>
             </div>
 
             <section class="rounded-2xl border border-stone-200 bg-white/95 p-6 shadow-sm backdrop-blur dark:border-gray-800 dark:bg-gray-900/80 sm:p-8">
@@ -49,18 +54,29 @@
                     </div>
                 @endif
 
-                <div class="flex flex-col items-center">
+                <div class="flex flex-col items-center" x-data="{ copied: false }">
                     <div class="rounded-xl border border-stone-200 bg-white p-3 dark:border-gray-700 dark:bg-white">
                         {!! $qrSvg !!}
                     </div>
-                    <p class="mt-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-stone-500 dark:text-gray-400">Kode rahasia manual</p>
-                    <code class="mt-1 break-all rounded-md bg-stone-100 px-2 py-1 text-sm font-medium text-stone-700 dark:bg-gray-800 dark:text-gray-200">{{ $secret }}</code>
+                    <p class="mt-4 text-center text-[12px] text-stone-500 dark:text-gray-400">
+                        Tidak bisa memindai? Masukkan kode ini secara manual di aplikasi Anda:
+                    </p>
+                    <div class="mt-2 flex items-center gap-2">
+                        <code x-ref="secret" class="break-all rounded-md bg-stone-100 px-2 py-1 text-sm font-medium tracking-wide text-stone-700 dark:bg-gray-800 dark:text-gray-200">{{ $secret }}</code>
+                        <button type="button"
+                                @click="navigator.clipboard.writeText($refs.secret.textContent.trim()); copied = true; setTimeout(() => copied = false, 2000)"
+                                class="inline-flex items-center gap-1 rounded-md border border-stone-300 px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-stone-500 transition hover:border-ista-primary/40 hover:text-ista-primary dark:border-gray-700 dark:text-gray-300"
+                                aria-label="Salin kode">
+                            <span x-show="!copied">Salin</span>
+                            <span x-show="copied" x-cloak>Tersalin</span>
+                        </button>
+                    </div>
                 </div>
 
                 <form method="POST" action="{{ route('admin.2fa.confirm') }}" class="mt-6 space-y-4" novalidate>
                     @csrf
                     <div>
-                        <label for="code" class="block text-[11px] font-semibold uppercase tracking-[0.16em] text-stone-500 dark:text-gray-400">Kode dari aplikasi</label>
+                        <label for="code" class="block text-[11px] font-semibold uppercase tracking-[0.16em] text-stone-500 dark:text-gray-400">Masukkan 6 angka dari aplikasi</label>
                         <input id="code"
                                type="text"
                                name="code"
@@ -69,12 +85,12 @@
                                autofocus
                                required
                                class="mt-2 w-full rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-center text-lg font-semibold tracking-[0.4em] text-stone-800 shadow-[inset_0_1px_0_rgba(28,25,23,0.03)] transition placeholder:tracking-normal placeholder:text-stone-400 focus:border-ista-primary focus:outline-none focus:ring-2 focus:ring-ista-primary/15 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:placeholder:text-gray-500"
-                               placeholder="000000">
+                               placeholder="123456">
                     </div>
 
                     <button type="submit"
                             class="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-ista-primary px-4 text-sm font-semibold uppercase tracking-wider text-amber-300 shadow-sm transition hover:bg-stone-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/40 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900">
-                        Aktifkan 2FA
+                        Konfirmasi &amp; Aktifkan
                     </button>
                 </form>
 

@@ -29,7 +29,7 @@ class AdminTwoFactorTest extends TestCase
         $response = $this->actingAs($admin)->get(route('admin.2fa.setup'));
 
         $response->assertOk();
-        $response->assertSee('Aktifkan Two-Factor Authentication');
+        $response->assertSee('Aktifkan Verifikasi 2 Langkah');
         $response->assertSee('<svg', false);
 
         $admin->refresh();

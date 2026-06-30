@@ -36,9 +36,9 @@
                     ISTA <span class="font-light italic text-ista-gold dark:text-amber-300">AI</span>
                 </span>
                 <p class="mt-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-stone-400 dark:text-gray-500">Admin Console</p>
-                <h1 class="mt-2 text-2xl font-semibold text-stone-900 dark:text-gray-50">Verifikasi Two-Factor</h1>
+                <h1 class="mt-2 text-2xl font-semibold text-stone-900 dark:text-gray-50">Verifikasi 2 Langkah</h1>
                 <p class="mt-2 max-w-sm text-sm leading-relaxed text-stone-500 dark:text-gray-400">
-                    Masukkan kode 6 digit dari aplikasi authenticator Anda. Jika tidak punya akses, gunakan salah satu recovery code.
+                    Masukkan 6 angka yang muncul di aplikasi authenticator Anda. Jika ponsel tidak tersedia, masukkan salah satu kode pemulihan.
                 </p>
             </div>
 
@@ -61,7 +61,7 @@
                                autofocus
                                required
                                class="mt-2 w-full rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-center text-lg font-semibold tracking-[0.3em] text-stone-800 shadow-[inset_0_1px_0_rgba(28,25,23,0.03)] transition placeholder:tracking-normal placeholder:text-stone-400 focus:border-ista-primary focus:outline-none focus:ring-2 focus:ring-ista-primary/15 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:placeholder:text-gray-500"
-                               placeholder="000000">
+                               placeholder="123456">
                     </div>
 
                     <label class="flex items-center gap-2 text-sm text-stone-600 dark:text-gray-300">

@@ -35,15 +35,15 @@
                 <span class="ista-brand-title text-[1.9rem] leading-none text-ista-primary not-italic dark:text-amber-200">
                     ISTA <span class="font-light italic text-ista-gold dark:text-amber-300">AI</span>
                 </span>
-                <h1 class="mt-4 text-2xl font-semibold text-stone-900 dark:text-gray-50">Simpan Recovery Codes</h1>
+                <h1 class="mt-4 text-2xl font-semibold text-stone-900 dark:text-gray-50">Simpan Kode Pemulihan</h1>
                 <p class="mt-2 max-w-sm text-sm leading-relaxed text-stone-500 dark:text-gray-400">
-                    2FA berhasil diaktifkan. Simpan kode pemulihan ini di tempat aman. Setiap kode hanya dapat dipakai sekali bila Anda kehilangan akses ke aplikasi authenticator.
+                    Verifikasi 2 langkah berhasil diaktifkan. Simpan kode pemulihan ini di tempat aman, misalnya password manager. Kode ini bisa dipakai untuk masuk jika ponsel Anda hilang.
                 </p>
             </div>
 
-            <section class="rounded-2xl border border-stone-200 bg-white/95 p-6 shadow-sm backdrop-blur dark:border-gray-800 dark:bg-gray-900/80 sm:p-8">
+            <section class="rounded-2xl border border-stone-200 bg-white/95 p-6 shadow-sm backdrop-blur dark:border-gray-800 dark:bg-gray-900/80 sm:p-8" x-data="{ saved: false }">
                 <div class="rounded-lg border border-amber-200 bg-amber-50/70 p-3 text-[12px] text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
-                    Kode ini tidak akan ditampilkan lagi. Pastikan Anda menyalinnya sekarang.
+                    Kode ini hanya ditampilkan sekali. Pastikan Anda menyalinnya sekarang. Setiap kode hanya dapat dipakai satu kali.
                 </div>
 
                 <ul class="mt-4 grid grid-cols-2 gap-2">
@@ -52,9 +52,17 @@
                     @endforeach
                 </ul>
 
+                <label class="mt-5 flex items-center gap-2 text-sm text-stone-600 dark:text-gray-300">
+                    <input type="checkbox" x-model="saved"
+                           class="h-4 w-4 rounded border-stone-300 text-ista-primary focus:ring-ista-primary/30 dark:border-gray-600 dark:bg-gray-900">
+                    Saya sudah menyimpan kode pemulihan ini di tempat aman.
+                </label>
+
                 <a href="{{ route('admin.dashboard') }}"
-                   class="mt-6 inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-ista-primary px-4 text-sm font-semibold uppercase tracking-wider text-amber-300 shadow-sm transition hover:bg-stone-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/40 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900">
-                    Saya sudah menyimpan, lanjut ke Admin
+                   x-bind:class="saved ? '' : 'pointer-events-none opacity-50'"
+                   x-bind:aria-disabled="saved ? 'false' : 'true'"
+                   class="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-ista-primary px-4 text-sm font-semibold uppercase tracking-wider text-amber-300 shadow-sm transition hover:bg-stone-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/40 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900">
+                    Lanjut ke Dashboard
                 </a>
             </section>
         </main>
