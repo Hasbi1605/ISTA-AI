@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Admin\AdminLoginController;
 use App\Http\Controllers\Admin\AdminPasswordChangeController;
+use App\Http\Controllers\Admin\TwoFactorChallengeController;
+use App\Http\Controllers\Admin\TwoFactorSetupController;
 use App\Http\Controllers\Chat\ChatStreamController;
 use App\Http\Controllers\Documents\DocumentExportController;
 use App\Http\Controllers\Documents\DocumentPreviewController;
@@ -133,15 +135,30 @@ Route::middleware(['web'])
         // Force password change endpoints require the same active-admin guard as the
         // rest of /admin/*. We deliberately omit `admin.password_changed` here to avoid
         // a redirect loop while the flag is still true.
-        Route::middleware(['auth', 'verified', 'admin'])->group(function () {
+        Route::middleware(['auth', 'verified', 'admin', 'admin.session'])->group(function () {
             Route::get('/password/change', [AdminPasswordChangeController::class, 'show'])->name('password.change');
             Route::post('/password/change', [AdminPasswordChangeController::class, 'update'])
                 ->middleware('throttle:10,1')
                 ->name('password.update');
         });
+
+        // Two-factor enrollment & challenge. These intentionally omit the `admin.2fa`
+        // gate (they are the destination of that gate) but still require an active,
+        // verified admin whose password is already rotated.
+        Route::middleware(['auth', 'verified', 'admin', 'admin.session', 'admin.password_changed'])->group(function () {
+            Route::get('/2fa/setup', [TwoFactorSetupController::class, 'show'])->name('2fa.setup');
+            Route::post('/2fa/setup', [TwoFactorSetupController::class, 'confirm'])
+                ->middleware('throttle:6,1')
+                ->name('2fa.confirm');
+
+            Route::get('/2fa/challenge', [TwoFactorChallengeController::class, 'show'])->name('2fa.challenge');
+            Route::post('/2fa/challenge', [TwoFactorChallengeController::class, 'verify'])
+                ->middleware('throttle:6,1')
+                ->name('2fa.verify');
+        });
     });
 
-Route::middleware(['auth', 'verified', 'admin', 'admin.password_changed'])
+Route::middleware(['auth', 'verified', 'admin', 'admin.session', 'admin.password_changed', 'admin.2fa'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
@@ -153,7 +170,7 @@ Route::middleware(['auth', 'verified', 'admin', 'admin.password_changed'])
         Route::get('/knowledge', AdminKnowledge::class)->name('knowledge');
     });
 
-Route::middleware(['auth', 'verified', 'super_admin', 'admin.password_changed'])
+Route::middleware(['auth', 'verified', 'super_admin', 'admin.session', 'admin.password_changed', 'admin.2fa'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {

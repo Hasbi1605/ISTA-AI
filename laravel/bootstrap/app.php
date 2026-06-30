@@ -1,7 +1,9 @@
 <?php
 
 use App\Http\Middleware\AddSecurityHeaders;
+use App\Http\Middleware\EnforceAdminSessionLifetime;
 use App\Http\Middleware\EnsureAdminPasswordChanged;
+use App\Http\Middleware\EnsureTwoFactorVerified;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Http\Middleware\EnsureUserIsSuperAdmin;
@@ -36,6 +38,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin' => EnsureUserIsAdmin::class,
             'super_admin' => EnsureUserIsSuperAdmin::class,
             'admin.password_changed' => EnsureAdminPasswordChanged::class,
+            'admin.session' => EnforceAdminSessionLifetime::class,
+            'admin.2fa' => EnsureTwoFactorVerified::class,
             'presence' => UpdateUserPresence::class,
         ]);
 

@@ -30,6 +30,12 @@ class AdminAccountAudit extends Model
 
     public const ACTION_REGULAR_USER_DELETED = 'regular_user_deleted';
 
+    public const ACTION_TWO_FACTOR_ENABLED = 'admin_two_factor_enabled';
+
+    public const ACTION_TWO_FACTOR_VERIFIED = 'admin_two_factor_verified';
+
+    public const ACTION_TWO_FACTOR_FAILED = 'admin_two_factor_failed';
+
     protected $fillable = [
         'actor_id',
         'target_user_id',

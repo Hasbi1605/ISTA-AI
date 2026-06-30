@@ -34,7 +34,7 @@ class AdminAccessTest extends TestCase
             'role' => User::ROLE_ADMIN,
         ]);
 
-        $response = $this->actingAs($admin)->get('/admin');
+        $response = $this->actingAsVerifiedAdmin($admin)->get('/admin');
 
         $response->assertStatus(200);
         $response->assertSee('Ringkasan Operasional', false);
@@ -47,7 +47,7 @@ class AdminAccessTest extends TestCase
             'role' => User::ROLE_SUPER_ADMIN,
         ]);
 
-        $response = $this->actingAs($superAdmin)->get('/admin');
+        $response = $this->actingAsVerifiedAdmin($superAdmin)->get('/admin');
 
         $response->assertStatus(200);
         $response->assertSee('Ringkasan Operasional', false);

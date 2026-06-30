@@ -49,6 +49,9 @@ class User extends Authenticatable implements MustVerifyEmail
         'force_password_change',
         'last_admin_login_at',
         'last_admin_login_ip',
+        'two_factor_secret',
+        'two_factor_recovery_codes',
+        'two_factor_confirmed_at',
     ];
 
     /**
@@ -59,6 +62,8 @@ class User extends Authenticatable implements MustVerifyEmail
     protected $hidden = [
         'password',
         'remember_token',
+        'two_factor_secret',
+        'two_factor_recovery_codes',
     ];
 
     protected function casts(): array
@@ -71,6 +76,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'disabled_at' => 'datetime',
             'force_password_change' => 'boolean',
             'last_admin_login_at' => 'datetime',
+            'two_factor_confirmed_at' => 'datetime',
         ];
     }
 
@@ -115,6 +121,14 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
+     * Determine whether the user has completed two-factor authentication setup.
+     */
+    public function hasTwoFactorEnabled(): bool
+    {
+        return $this->two_factor_confirmed_at !== null;
+    }
+
+    /**
      * Audit log entries where this user is the actor.
      */
     public function adminAuditActions()
@@ -128,6 +142,14 @@ class User extends Authenticatable implements MustVerifyEmail
     public function adminAuditTargets()
     {
         return $this->hasMany(AdminAccountAudit::class, 'target_user_id');
+    }
+
+    /**
+     * Trusted devices that may skip the 2FA challenge.
+     */
+    public function trustedDevices()
+    {
+        return $this->hasMany(TrustedDevice::class);
     }
 
     /**

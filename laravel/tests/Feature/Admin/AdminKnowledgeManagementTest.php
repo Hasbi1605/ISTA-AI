@@ -24,7 +24,7 @@ class AdminKnowledgeManagementTest extends TestCase
     {
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
 
-        $response = $this->actingAs($admin)->get('/admin/knowledge');
+        $response = $this->actingAsVerifiedAdmin($admin)->get('/admin/knowledge');
 
         $response->assertOk();
         $response->assertSee('Knowledge Base Internal', false);
@@ -38,7 +38,7 @@ class AdminKnowledgeManagementTest extends TestCase
     {
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
 
-        $response = $this->actingAs($admin)->get('/admin/knowledge');
+        $response = $this->actingAsVerifiedAdmin($admin)->get('/admin/knowledge');
 
         $response->assertOk();
         $response->assertSee('admin-knowledge-main-stack admin-knowledge-main-stack--full', false);

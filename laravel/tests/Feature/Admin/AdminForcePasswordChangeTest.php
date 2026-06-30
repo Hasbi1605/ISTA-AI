@@ -79,7 +79,7 @@ class AdminForcePasswordChangeTest extends TestCase
         $this->assertTrue(Hash::check('BrandNew_PassW0rd!', $admin->password));
 
         // After change, dashboard is accessible without redirect.
-        $this->actingAs($admin)
+        $this->actingAsVerifiedAdmin($admin)
             ->get('/admin')
             ->assertOk();
     }

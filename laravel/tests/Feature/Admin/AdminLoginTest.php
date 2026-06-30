@@ -172,4 +172,49 @@ class AdminLoginTest extends TestCase
         $response->assertRedirect(route('admin.login'));
         $this->assertGuest();
     }
+
+    public function test_repeated_failed_logins_trigger_progressive_lockout(): void
+    {
+        $admin = User::factory()->create([
+            'role' => User::ROLE_ADMIN,
+            'is_active' => true,
+            'password' => Hash::make('correct-pass-1234'),
+        ]);
+
+        // Three failed attempts arm the exponential delay.
+        for ($i = 0; $i < 3; $i++) {
+            $this->post('/admin/login', [
+                'email' => $admin->email,
+                'password' => 'wrong-pass',
+            ])->assertSessionHasErrors('email');
+        }
+
+        // The next attempt is blocked by the lockout window, even with the
+        // correct password, and the error mentions a wait time.
+        $response = $this->post('/admin/login', [
+            'email' => $admin->email,
+            'password' => 'correct-pass-1234',
+        ]);
+
+        $response->assertSessionHasErrors('email');
+        $this->assertGuest();
+        $errors = session('errors')->getBag('default')->first('email');
+        $this->assertStringContainsString('detik', $errors);
+    }
+
+    public function test_successful_login_stamps_admin_session_start(): void
+    {
+        $admin = User::factory()->create([
+            'role' => User::ROLE_ADMIN,
+            'is_active' => true,
+            'password' => Hash::make('correct-pass-1234'),
+        ]);
+
+        $this->post('/admin/login', [
+            'email' => $admin->email,
+            'password' => 'correct-pass-1234',
+        ])->assertRedirect(route('admin.dashboard'));
+
+        $this->assertNotNull(session('admin_session_started_at'));
+    }
 }

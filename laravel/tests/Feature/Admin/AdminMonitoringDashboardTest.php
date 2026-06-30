@@ -40,7 +40,7 @@ class AdminMonitoringDashboardTest extends TestCase
         $this->makeEvent($user->id, AIUsageEvent::FEATURE_CHAT, AIUsageEvent::ACTION_COMPLETED, AIUsageEvent::STATUS_SUCCESS, $now->copy()->subHour(), 'req-1', 1200);
         $this->makeEvent($user->id, AIUsageEvent::FEATURE_DOCUMENT_RAG, AIUsageEvent::ACTION_FAILED, AIUsageEvent::STATUS_ERROR, $now->copy()->subMinutes(15), 'req-2', 700, 'rag_timeout');
 
-        $response = $this->actingAs($admin)->get('/admin');
+        $response = $this->actingAsVerifiedAdmin($admin)->get('/admin');
         $response->assertOk();
         $response->assertSee('Ringkasan Operasional', false);
         $response->assertSee('Aktivitas Terbaru', false);
@@ -89,7 +89,7 @@ class AdminMonitoringDashboardTest extends TestCase
             'last_seen_at' => $now->copy()->subDays(2),
         ]);
 
-        $response = $this->actingAs($admin)->get('/admin/users');
+        $response = $this->actingAsVerifiedAdmin($admin)->get('/admin/users');
         $response->assertOk();
         $response->assertSeeText('User & Presence');
         $response->assertDontSeeText('User dan Presence');
@@ -440,7 +440,7 @@ class AdminMonitoringDashboardTest extends TestCase
             'model_provider' => 'github_models',
         ]);
 
-        $response = $this->actingAs($admin)->get('/admin/errors');
+        $response = $this->actingAsVerifiedAdmin($admin)->get('/admin/errors');
         $response->assertOk();
         $response->assertSee('Error Operasional', false);
         $response->assertSee('admin-errors-kpi-card', false);
@@ -549,7 +549,7 @@ class AdminMonitoringDashboardTest extends TestCase
             'file_size_bytes' => 2048,
         ]);
 
-        $response = $this->actingAs($admin)->get('/admin/documents');
+        $response = $this->actingAsVerifiedAdmin($admin)->get('/admin/documents');
         $response->assertOk();
         $response->assertSee('Dokumen User', false);
         $response->assertSee('admin-documents-kpi-card', false);
@@ -828,11 +828,11 @@ class AdminMonitoringDashboardTest extends TestCase
             'searchable_text' => $secret,
         ]);
 
-        $this->actingAs($admin)->get('/admin')->assertOk()->assertDontSee($secret);
-        $this->actingAs($admin)->get('/admin/users')->assertOk()->assertDontSee($secret);
-        $this->actingAs($admin)->get('/admin/usage')->assertOk()->assertDontSee($secret);
-        $this->actingAs($admin)->get('/admin/errors')->assertOk()->assertDontSee($secret);
-        $this->actingAs($admin)->get('/admin/documents')->assertOk()->assertDontSee($secret);
+        $this->actingAsVerifiedAdmin($admin)->get('/admin')->assertOk()->assertDontSee($secret);
+        $this->actingAsVerifiedAdmin($admin)->get('/admin/users')->assertOk()->assertDontSee($secret);
+        $this->actingAsVerifiedAdmin($admin)->get('/admin/usage')->assertOk()->assertDontSee($secret);
+        $this->actingAsVerifiedAdmin($admin)->get('/admin/errors')->assertOk()->assertDontSee($secret);
+        $this->actingAsVerifiedAdmin($admin)->get('/admin/documents')->assertOk()->assertDontSee($secret);
 
         Carbon::setTestNow();
     }
@@ -841,7 +841,7 @@ class AdminMonitoringDashboardTest extends TestCase
     {
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
 
-        $response = $this->actingAs($admin)->get('/admin');
+        $response = $this->actingAsVerifiedAdmin($admin)->get('/admin');
         $response->assertOk();
         $response->assertSee(route('admin.users'), false);
         $response->assertSee(route('admin.usage'), false);
@@ -857,12 +857,12 @@ class AdminMonitoringDashboardTest extends TestCase
         // Malformed start/end dates from the query string must not raise
         // a 500. The page should render normally and ignore the invalid
         // values rather than passing them into Carbon::parse().
-        $response = $this->actingAs($admin)->get('/admin/usage?startDate=not-a-date&endDate=also-bad');
+        $response = $this->actingAsVerifiedAdmin($admin)->get('/admin/usage?startDate=not-a-date&endDate=also-bad');
         $response->assertOk();
         $response->assertSee('Usage Events', false);
 
         // Empty values must also be tolerated.
-        $response = $this->actingAs($admin)->get('/admin/usage?startDate=&endDate=');
+        $response = $this->actingAsVerifiedAdmin($admin)->get('/admin/usage?startDate=&endDate=');
         $response->assertOk();
         $response->assertSee('Usage Events', false);
     }

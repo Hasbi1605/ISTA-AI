@@ -16,7 +16,7 @@ class AdminLayoutTest extends TestCase
             'role' => User::ROLE_ADMIN,
         ]);
 
-        $response = $this->actingAs($admin)->get('/admin');
+        $response = $this->actingAsVerifiedAdmin($admin)->get('/admin');
 
         $response->assertStatus(200);
 
@@ -50,7 +50,7 @@ class AdminLayoutTest extends TestCase
             'role' => User::ROLE_SUPER_ADMIN,
         ]);
 
-        $response = $this->actingAs($superAdmin)->get('/admin');
+        $response = $this->actingAsVerifiedAdmin($superAdmin)->get('/admin');
 
         $response->assertStatus(200);
         $response->assertSee('Account Management', false);
@@ -63,7 +63,7 @@ class AdminLayoutTest extends TestCase
             'role' => User::ROLE_ADMIN,
         ]);
 
-        $response = $this->actingAs($admin)->get('/admin');
+        $response = $this->actingAsVerifiedAdmin($admin)->get('/admin');
 
         $response->assertStatus(200);
         $response->assertDontSee('AI Configuration', false);
@@ -97,7 +97,7 @@ class AdminLayoutTest extends TestCase
             'role' => User::ROLE_ADMIN,
         ]);
 
-        $response = $this->actingAs($admin)->get('/admin');
+        $response = $this->actingAsVerifiedAdmin($admin)->get('/admin');
 
         $response->assertStatus(200);
         $response->assertSee("'theme'", false);
@@ -113,7 +113,7 @@ class AdminLayoutTest extends TestCase
             'role' => User::ROLE_ADMIN,
         ]);
 
-        $response = $this->actingAs($admin)->get('/admin');
+        $response = $this->actingAsVerifiedAdmin($admin)->get('/admin');
 
         $response->assertStatus(200);
         $response->assertSee(route('chat'), false);

@@ -11,8 +11,8 @@ use Illuminate\Auth\Events\Lockout;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -23,6 +23,16 @@ class AdminLoginController extends Controller
      * Generic message returned for any login failure to avoid account enumeration.
      */
     private const GENERIC_FAILURE_MESSAGE = 'Email atau password salah, atau akun tidak dapat mengakses admin.';
+
+    /**
+     * Failed attempts allowed before a progressive delay kicks in.
+     */
+    private const MAX_ATTEMPTS_BEFORE_DELAY = 3;
+
+    /**
+     * Upper bound for the exponential lockout delay (seconds).
+     */
+    private const MAX_DELAY_SECONDS = 300;
 
     public function __construct(private readonly AdminAccountAuditService $audit) {}
 
@@ -60,7 +70,7 @@ class AdminLoginController extends Controller
         }
 
         if ($reason !== null) {
-            RateLimiter::hit($this->throttleKey($request, $email));
+            $this->recordFailedAttempt($request, $email);
 
             $this->audit->record(
                 AdminAccountAudit::ACTION_LOGIN_FAILED,
@@ -80,13 +90,14 @@ class AdminLoginController extends Controller
 
         Auth::login($user, false);
         $request->session()->regenerate();
+        $request->session()->put('admin_session_started_at', now()->timestamp);
 
         $user->forceFill([
             'last_admin_login_at' => now(),
             'last_admin_login_ip' => $request->ip(),
         ])->save();
 
-        RateLimiter::clear($this->throttleKey($request, $email));
+        $this->clearFailedAttempts($request, $email);
 
         $this->audit->record(
             AdminAccountAudit::ACTION_LOGIN_SUCCESS,
@@ -119,17 +130,21 @@ class AdminLoginController extends Controller
         return redirect()->route('admin.login');
     }
 
+    /**
+     * Throw a validation error while the email+IP pair is in a lockout window.
+     */
     private function ensureIsNotRateLimited(Request $request, string $email): void
     {
-        $key = $this->throttleKey($request, $email);
+        $lockKey = $this->throttleKey($request, $email).':locked_until';
+        $lockedUntil = (int) Cache::get($lockKey, 0);
 
-        if (! RateLimiter::tooManyAttempts($key, 5)) {
+        if ($lockedUntil <= now()->timestamp) {
             return;
         }
 
         event(new Lockout($request));
 
-        $seconds = RateLimiter::availableIn($key);
+        $seconds = $lockedUntil - now()->timestamp;
 
         throw ValidationException::withMessages([
             'email' => trans('auth.throttle', [
@@ -137,6 +152,41 @@ class AdminLoginController extends Controller
                 'minutes' => max(1, (int) ceil($seconds / 60)),
             ]),
         ]);
+    }
+
+    /**
+     * Record a failed attempt and apply an exponential lockout once the
+     * threshold is exceeded: 2^(attempts - threshold) seconds, capped.
+     */
+    private function recordFailedAttempt(Request $request, string $email): void
+    {
+        $key = $this->throttleKey($request, $email);
+        $attempts = (int) Cache::get($key.':count', 0) + 1;
+
+        Cache::put($key.':count', $attempts, now()->addMinutes(30));
+
+        if ($attempts < self::MAX_ATTEMPTS_BEFORE_DELAY) {
+            return;
+        }
+
+        $delaySeconds = min(
+            (int) pow(2, $attempts - self::MAX_ATTEMPTS_BEFORE_DELAY),
+            self::MAX_DELAY_SECONDS,
+        );
+
+        Cache::put(
+            $key.':locked_until',
+            now()->timestamp + $delaySeconds,
+            now()->addSeconds($delaySeconds),
+        );
+    }
+
+    private function clearFailedAttempts(Request $request, string $email): void
+    {
+        $key = $this->throttleKey($request, $email);
+
+        Cache::forget($key.':count');
+        Cache::forget($key.':locked_until');
     }
 
     private function throttleKey(Request $request, string $email): string

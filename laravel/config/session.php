@@ -34,6 +34,20 @@ return [
 
     'lifetime' => (int) env('SESSION_LIFETIME', 120),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Admin Absolute Session Lifetime
+    |--------------------------------------------------------------------------
+    |
+    | Maximum lifetime (in minutes) for an authenticated admin session,
+    | regardless of activity. Unlike "lifetime" above (which is a sliding/idle
+    | window), this is an absolute cap: once exceeded the admin is logged out
+    | and must authenticate again. Defaults to 12 hours.
+    |
+    */
+
+    'admin_absolute_lifetime' => (int) env('ADMIN_SESSION_ABSOLUTE_LIFETIME', 720),
+
     'expire_on_close' => env('SESSION_EXPIRE_ON_CLOSE', false),
 
     /*

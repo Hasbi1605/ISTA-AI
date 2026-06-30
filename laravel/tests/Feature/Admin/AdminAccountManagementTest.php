@@ -24,7 +24,7 @@ class AdminAccountManagementTest extends TestCase
             'is_active' => true,
         ]);
 
-        $response = $this->actingAs($superAdmin)->get('/admin/accounts');
+        $response = $this->actingAsVerifiedAdmin($superAdmin)->get('/admin/accounts');
 
         $response->assertOk();
         $response->assertSee('Account Management');
