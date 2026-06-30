@@ -78,7 +78,7 @@ Subfolder:
 
 ### 2.5 Routes (`routes/`) — hanya `web.php`, `auth.php`, `console.php`
 - **web.php:** dashboard `/`; route user seperti `profile`, `chat/{id?}` (ChatIndex), `chat/stream/{conversationId}` (SSE), memo, dan dokumen memakai `auth+active` (serta `verified` sesuai kebutuhan) agar akun nonaktif tidak bisa memakai aplikasi lewat sesi lama; `onlyoffice/callback/{memo}` (JWT + trusted OnlyOffice URL scheme/host/port); grup `chat/memos/*` (download/export-pdf/force-save/signed); legacy `memos/*` redirect ke `/chat?tab=memo`; tidak ada lagi route `chat/presentations/*` atau callback OnlyOffice presentasi; `documents/*` (content-html, extract-tables, export, preview/*); admin auth (`/admin/login`, logout, password change); admin app (`auth+verified+admin+admin.password_changed`): `/admin`, `/users`, `/usage`, `/errors`, `/documents`, `/knowledge`; super-admin: `/admin/accounts`.
-- **auth.php:** Volt pages login/forgot/reset/verify/confirm; register → redirect login register-view hanya jika `PUBLIC_REGISTRATION_ENABLED=true` (production private default tertutup).
+- **auth.php:** Volt pages login/forgot/reset/verify/confirm; register → redirect login register-view; pendaftaran mandiri **aktif default di semua environment** dan hanya tertutup bila `PUBLIC_REGISTRATION_ENABLED=false` di env.
 - **Horizon:** `/horizon` memakai middleware `web+auth+verified+super_admin+admin.password_changed` dan gate `viewHorizon`; hanya super-admin aktif yang tidak sedang wajib ganti password boleh akses. `App\Console\Commands\CompatibleHorizonWorkCommand` menggantikan binding `horizon:work` agar Horizon 5.45 tetap kompatibel dengan opsi worker Laravel 13 `--stop-when-empty-for`, mencegah worker crash-loop di production.
 - **console.php:** `documents:purge-deleted --days=7` tetap terjadwal sebagai no-op kompatibilitas karena dokumen kini hard-delete; `chat:resolve-stale-responses --minutes=10` berjalan tiap menit.
 
@@ -169,7 +169,7 @@ Chat streaming (RAG/web/knowledge/general), upload + RAG dokumen, generate memo 
   - Urutan middleware grup admin: `auth → verified → admin/super_admin → admin.session → admin.password_changed → admin.2fa`, sehingga akun nonaktif/role salah ditolak lebih dulu, ganti password dipaksa sebelum 2FA, dan halaman setup/challenge 2FA tidak memicu loop.
 
 ### 5.3 Flow Registrasi
-- Deployment private/production default menutup registrasi mandiri dengan `PUBLIC_REGISTRATION_ENABLED=false`.
+- Pendaftaran mandiri (akun non-admin) **aktif default di semua environment** (`config('auth.registration.enabled')` default `true`). Bisa ditutup tanpa deploy dengan `PUBLIC_REGISTRATION_ENABLED=false` di `.env` environment terkait.
 - Saat flag mati, `/register` kembali ke `/login`, tombol/form register disembunyikan, dan action Livewire `register()`/OTP register menolak pembuatan akun.
 - Saat flag aktif, flow lama tetap: user isi form login register-view → OTP email via `PendingRegistrationWorkflowService` → akun dibuat verified setelah OTP valid.
 
@@ -188,7 +188,7 @@ Chat streaming (RAG/web/knowledge/general), upload + RAG dokumen, generate memo 
 - python-ai dilindungi bearer token (`verify_token`); jangan log isi prompt/dokumen.
 - **Anti prompt injection (chat):** guardrail keamanan berprioritas tertinggi (`prompts.security.guardrails` di `ai_config.yaml`, fallback `config_loader.DEFAULT_PROMPTS["security"]["guardrails"]`, getter `get_security_preamble()`) disuntikkan otomatis ke paling depan setiap system prompt chat oleh `llm_manager._apply_security_guardrail()` di chokepoint `_stream_with_cascade` — sehingga mencakup semua lane (general/web/RAG/knowledge, termasuk override `runtime_config`). Guardrail menolak kebocoran/printout system prompt, upaya override instruksi ("abaikan instruksi sebelumnya", "STOP", "kamu sekarang admin"), role-play (mis. "nenek"), penyusunan ulang/penggabungan kata, dan instruksi yang disandikan (Base64/ROT13/leetspeak); instruksi di dalam dokumen/web/teks tempelan diperlakukan sebagai DATA, bukan perintah. Ubah teks guardrail hanya di `ai_config.yaml` (single source of truth), jangan hardcode.
 - ChromaDB dipakai embedded oleh service Python melalui volume `chroma_data`; compose production tidak mempublish port Chroma ke publik.
-- Public self-registration ditutup default di production agar knowledge/dokumen privat hanya diakses akun yang disetujui.
+- Public self-registration **aktif default** (`PUBLIC_REGISTRATION_ENABLED` default `true`); operator dapat menutupnya per-environment dengan `PUBLIC_REGISTRATION_ENABLED=false` bila ingin akses dokumen/knowledge privat hanya untuk akun yang disetujui admin.
 - Callback OnlyOffice memo memakai JWT ber-`exp`, key segar, anti-replay, validasi DOCX, dan URL download yang harus cocok scheme/host/port trusted.
 - Email input user-controlled memakai `App\Rules\NoEmailHeaderInjection` di auth/profile/admin untuk menolak CR/LF/control chars sebelum email dipakai di reset/register/admin account flows.
 - Token, secret OnlyOffice, kredensial DB, kredensial deploy/email, API key provider → hanya di `.env` lokal/deploy, jangan commit. Jangan commit dokumen produksi, dump DB, service-account JSON, atau data Chroma.

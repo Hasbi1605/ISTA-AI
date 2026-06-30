@@ -115,7 +115,10 @@ return [
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
     'registration' => [
-        'enabled' => env('PUBLIC_REGISTRATION_ENABLED', env('APP_ENV') !== 'production'),
+        // Pendaftaran mandiri (akun non-admin) aktif secara default di semua
+        // environment. Tetap bisa ditutup tanpa deploy dengan
+        // PUBLIC_REGISTRATION_ENABLED=false di .env environment terkait.
+        'enabled' => (bool) env('PUBLIC_REGISTRATION_ENABLED', true),
     ],
 
     'otp_registration' => [
