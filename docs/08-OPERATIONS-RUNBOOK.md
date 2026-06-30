@@ -80,7 +80,7 @@ chmod 600 .env.droplet .env.droplet.bak.*
 Storage dan Chroma:
 
 - Gunakan snapshot server/volume bila tersedia.
-- Jangan menjalankan `docker volume prune` sebelum backup dan review volume.
+- `docker volume prune` baru layak dipertimbangkan setelah backup dan review volume.
 
 ## Troubleshooting Cepat
 
@@ -109,7 +109,7 @@ Storage dan Chroma:
 ### Admin terkunci 2FA
 
 - Gunakan recovery code bila tersedia.
-- Jika kehilangan 2FA/recovery code, butuh prosedur super-admin atau perubahan database yang diaudit secara manual. Jangan lakukan tanpa persetujuan pemilik sistem.
+- Jika kehilangan 2FA/recovery code, pemulihan membutuhkan prosedur super-admin atau perubahan database yang diaudit secara manual. Perubahan manual seperti itu perlu persetujuan pemilik sistem.
 
 ## Cleanup Aman
 
@@ -123,7 +123,7 @@ docker image prune
 docker container prune
 ```
 
-Jangan jalankan tanpa backup:
+Perintah berikut berisiko jika belum ada backup:
 
 ```bash
 docker volume prune

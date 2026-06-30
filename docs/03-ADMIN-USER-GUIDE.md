@@ -14,8 +14,8 @@ Proteksi admin:
 
 - rate limit route login;
 - lockout progresif setelah beberapa percobaan gagal;
-- forced password change bila akun ditandai wajib ganti password;
-- 2FA TOTP wajib;
+- forced password change bila akun ditandai perlu mengganti password;
+- 2FA TOTP;
 - trusted device 30 hari bila dipilih;
 - absolute session lifetime admin;
 - audit log untuk aksi admin penting.
@@ -91,4 +91,4 @@ Gunakan password sementara yang kuat, lalu paksa admin mengganti password pada l
 - Cek `/admin/documents` untuk pipeline dokumen yang stuck.
 - Cek `/admin/knowledge` setelah upload knowledge baru.
 - Cek log Docker bila error berulang.
-- Jangan menyalin isi prompt/dokumen privat ke issue publik.
+- Hindari menyalin isi prompt/dokumen privat ke issue publik.

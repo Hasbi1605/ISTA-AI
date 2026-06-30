@@ -1,97 +1,114 @@
-# Server and Domain Migration Checklist
+# Server and Domain Migration Notes
 
-Checklist ini dipakai bila ISTA AI dipindah ke server/hosting atau domain milik
-Istana.
+Dokumen ini menjelaskan hal yang perlu diperhatikan bila ISTA AI dipindahkan ke
+server, hosting, atau domain milik Istana. Bentuknya sengaja dibuat sebagai
+catatan migrasi, bukan daftar instruksi kaku, karena detail akhir biasanya
+bergantung pada kebijakan infrastruktur yang dipakai.
 
-## Sebelum Migrasi
+## Gambaran Migrasi
 
-- [ ] Tentukan domain final.
-- [ ] Tentukan server final dan akses SSH operator.
-- [ ] Tentukan apakah akan memakai GitHub Actions deploy atau deploy manual.
-- [ ] Backup `.env.droplet` production lama.
-- [ ] Backup MySQL.
-- [ ] Backup Laravel storage.
-- [ ] Backup Chroma data bila indeks dokumen ingin dipertahankan.
-- [ ] Catat versi commit production yang sedang berjalan.
+ISTA AI relatif mudah dipindahkan selama source code, environment, database,
+storage file, dan data Chroma diperlakukan sebagai satu paket. Source code dapat
+diambil dari branch `main`, sedangkan konfigurasi production berada di
+`.env.droplet` server dan tidak ikut disimpan di Git.
 
-## DNS dan TLS
+Data yang biasanya perlu dibawa dari server lama adalah database MySQL, Laravel
+storage, dan Chroma data. Jika indeks dokumen tidak perlu dipertahankan, Chroma
+dapat dibangun ulang melalui ingest ulang dokumen, tetapi keputusan itu perlu
+disesuaikan dengan waktu proses dan ukuran dokumen.
 
-- [ ] Arahkan A/AAAA/CNAME domain final ke server baru.
-- [ ] Jika memakai Cloudflare, mulai dari DNS-only sampai TLS origin sehat.
-- [ ] Set `APP_DOMAIN` di `.env.droplet`.
-- [ ] Set `APP_URL=https://DOMAIN_FINAL`.
-- [ ] Set `LETSENCRYPT_EMAIL`.
-- [ ] Jalankan Caddy/Compose dan pastikan sertifikat TLS terbit.
+## Domain dan TLS
 
-## Laravel Env yang Perlu Dicek
+Domain final memengaruhi `APP_DOMAIN`, `APP_URL`, konfigurasi Caddy, cookie
+session, dan URL publik OnlyOffice. Pada deployment Docker Compose saat ini,
+Caddy menangani reverse proxy publik dan TLS otomatis. Jika domain memakai
+Cloudflare atau proxy lain, mode DNS/TLS perlu disesuaikan agar request publik
+tetap sampai ke Caddy dengan header proxy yang benar.
 
-- [ ] `APP_URL`
-- [ ] `APP_DOMAIN`
-- [ ] `SESSION_DOMAIN` bila domain cookie perlu dibatasi.
-- [ ] `SESSION_SECURE_COOKIE=true` untuk HTTPS production.
-- [ ] `TRUSTED_PROXIES`
-- [ ] `PUBLIC_REGISTRATION_ENABLED=false` untuk deployment private.
-- [ ] `FEATURE_PROMPY=true` bila Prompy tetap aktif.
-- [ ] `AI_SERVICE_URL` dan `AI_DOCUMENT_SERVICE_URL` mengarah ke service internal.
-- [ ] `AI_SERVICE_TOKEN` sama dengan Python.
+Nilai yang biasanya ikut berubah saat domain pindah:
+
+- `APP_DOMAIN`
+- `APP_URL`
+- `LETSENCRYPT_EMAIL`
+- `SESSION_DOMAIN` bila cookie dibatasi per domain
+- `SESSION_SECURE_COOKIE` untuk HTTPS production
+- `ONLYOFFICE_PUBLIC_URL`
+- `ISTA_DEPLOY_URL` bila GitHub Actions tetap dipakai
+
+## Environment Laravel dan Python
+
+Laravel dan Python berkomunikasi lewat URL internal Docker network. Dalam model
+Compose yang sama, nilai internal biasanya tetap seperti ini:
+
+```text
+AI_SERVICE_URL=http://python-ai:8001
+AI_DOCUMENT_SERVICE_URL=http://python-ai-docs:8002
+ONLYOFFICE_INTERNAL_URL=http://onlyoffice
+ONLYOFFICE_LARAVEL_INTERNAL_URL=http://laravel:8000
+```
+
+`AI_SERVICE_TOKEN` perlu sama antara Laravel dan Python. Secret provider AI,
+LangSearch, OnlyOffice, database, dan email tetap berada di `.env.droplet` server
+baru. Jika IP atau environment provider berubah, beberapa provider mungkin perlu
+allowlist atau pengaturan ulang dari dashboard masing-masing.
 
 ## OnlyOffice
 
-- [ ] `ONLYOFFICE_PUBLIC_URL=https://DOMAIN_FINAL` atau host publik OnlyOffice yang dipakai.
-- [ ] `ONLYOFFICE_INTERNAL_URL=http://onlyoffice` bila tetap satu Compose network.
-- [ ] `ONLYOFFICE_LARAVEL_INTERNAL_URL=http://laravel:8000` bila tetap satu Compose network.
-- [ ] `ONLYOFFICE_JWT_SECRET` tetap sama jika membuka dokumen lama yang masih aktif.
-- [ ] `ONLYOFFICE_SIGNED_URL_SECRET` disimpan aman.
-- [ ] Smoke test buka memo DOCX dan force-save.
+OnlyOffice sensitif terhadap URL publik dan internal. URL publik dipakai browser,
+sedangkan URL internal dipakai komunikasi antar-container. Jika domain berubah,
+bagian yang paling sering perlu dicek adalah `ONLYOFFICE_PUBLIC_URL`, JWT secret,
+signed URL secret, dan kemampuan OnlyOffice memanggil balik Laravel.
 
-## GitHub Actions
+Cara paling sederhana membuktikan bagian ini sehat adalah membuka memo DOCX dari
+aplikasi, membuat perubahan kecil, lalu memastikan force-save menghasilkan versi
+baru.
 
-Jika deploy otomatis tetap dipakai, update repository secrets:
+## GitHub Actions dan Deploy Otomatis
 
-- [ ] `ISTA_DEPLOY_HOST`
-- [ ] `ISTA_DEPLOY_USER`
-- [ ] `ISTA_DEPLOY_SSH_KEY`
-- [ ] `ISTA_DEPLOY_PORT`
-- [ ] `ISTA_DEPLOY_PATH`
-- [ ] `ISTA_DEPLOY_URL`
-- [ ] `ISTA_DEPLOY_KNOWN_HOSTS`
+Jika server baru tetap memakai deploy otomatis dari GitHub Actions, secret
+deploy di repository perlu menunjuk ke server baru. Secret yang terkait deploy
+adalah:
 
-Pastikan deploy key sudah dipasang di server baru dan user SSH bisa menjalankan
-`git` serta `docker compose`.
+- `ISTA_DEPLOY_HOST`
+- `ISTA_DEPLOY_USER`
+- `ISTA_DEPLOY_SSH_KEY`
+- `ISTA_DEPLOY_PORT`
+- `ISTA_DEPLOY_PATH`
+- `ISTA_DEPLOY_URL`
+- `ISTA_DEPLOY_KNOWN_HOSTS`
 
-## Provider dan Email
+Workflow production sengaja memakai `git pull --ff-only`. Artinya deploy akan
+berhenti bila checkout di server punya perubahan manual atau history divergen.
+Perilaku itu membantu menjaga production tetap bisa ditelusuri dari Git.
 
-- [ ] Provider AI/search key masih valid di environment baru.
-- [ ] SMTP/Resend/MAIL config masih bisa mengirim email verification/reset.
-- [ ] Jika IP/server berubah, cek allowlist provider bila ada.
+## Urutan Restore yang Aman
 
-## Data Restore
+Secara umum, migrasi paling aman dilakukan dengan menyiapkan server baru,
+mengisi `.env.droplet`, lalu merestore database, Laravel storage, dan Chroma
+sebelum service dibuka untuk pengguna. Setelah container berjalan, migration
+Laravel dijalankan dari service `laravel`.
 
-Urutan aman:
+Contoh pola production saat ini:
 
-1. Deploy source code di server baru.
-2. Isi `.env.droplet`.
-3. Restore database.
-4. Restore Laravel storage.
-5. Restore Chroma data bila dipakai.
-6. Jalankan Compose.
-7. Jalankan migration.
-8. Smoke test fitur utama.
+```bash
+docker compose --env-file .env.droplet -f docker-compose.production.yml up -d --build
+docker compose --env-file .env.droplet -f docker-compose.production.yml exec -T laravel php artisan migrate --force
+docker compose --env-file .env.droplet -f docker-compose.production.yml restart laravel horizon scheduler
+```
 
-## Smoke Test Setelah Migrasi
+## Pembuktian Setelah Migrasi
 
-- [ ] `curl -I https://DOMAIN_FINAL/up`.
-- [ ] Login user.
-- [ ] Chat umum.
-- [ ] Upload dokumen kecil dan tanya dari dokumen.
-- [ ] Generate memo dan buka di OnlyOffice.
-- [ ] Prompy Studio generate prompt sederhana.
-- [ ] Admin login, 2FA, dashboard, usage, knowledge.
-- [ ] GitHub Actions deploy berikutnya berhasil bila CI/CD dipakai.
+Pembuktian migrasi cukup difokuskan pada jalur yang mewakili semua komponen
+besar: halaman `/up`, login, chat pendek, upload dokumen kecil sampai ready,
+tanya jawab berbasis dokumen, generate memo dan buka di OnlyOffice, Prompy
+Studio generate prompt sederhana, serta admin login dengan 2FA. Jika CI/CD tetap
+dipakai, satu push kecil berikutnya juga dapat dipakai untuk memastikan deploy
+otomatis sudah mengarah ke server baru.
 
 ## Rollback
 
-- Simpan server lama sampai smoke test server baru selesai.
-- Simpan backup database/storage sebelum migration di server baru.
-- Jika deploy otomatis gagal, kembalikan `ISTA_DEPLOY_*` ke server lama atau jalankan deploy manual.
-- Jika domain sudah diarahkan dan perlu rollback cepat, turunkan TTL DNS sebelum migrasi.
+Server lama sebaiknya tidak langsung dimatikan sebelum domain, data, dan fitur
+utama terbukti berjalan di server baru. Jika perlu rollback cepat, DNS bisa
+dikembalikan ke server lama selama data belum berubah jauh. Untuk migrasi yang
+melibatkan data aktif, rollback perlu mempertimbangkan perubahan database dan
+storage yang sudah terjadi di server baru.

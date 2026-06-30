@@ -22,7 +22,7 @@ diatur lewat env secret dan `python-ai/config/ai_config.yaml`.
 - Chat memakai SSE (`EventSource`), bukan WebSocket.
 - Google Drive import/export sudah dihapus.
 - Generator PPTX internal sudah dihapus. Fitur deck/visual dipusatkan ke Prompy Studio sebagai generator paket prompt.
-- Admin wajib melewati login terpisah, forced password change bila diset, 2FA TOTP, dan absolute session lifetime.
+- Admin memakai login terpisah, forced password change bila diset, 2FA TOTP, dan absolute session lifetime.
 
 ## Fitur yang Bisa Didemokan
 
@@ -33,7 +33,7 @@ diatur lewat env secret dan `python-ai/config/ai_config.yaml`.
 - Prompy Studio: buat prompt gambar/presentasi/poster/video storyboard, tambah reference image atau dokumen acuan, revisi lewat composer.
 - Admin dashboard: usage, errors, documents, users, knowledge, dan accounts untuk super-admin.
 
-## Hal yang Harus Diputuskan Pemilik Sistem
+## Keputusan yang Perlu Disepakati
 
 - Klasifikasi dokumen apa saja yang boleh diproses oleh provider AI eksternal.
 - Provider AI/search mana yang disetujui untuk production formal.
@@ -42,20 +42,19 @@ diatur lewat env secret dan `python-ai/config/ai_config.yaml`.
 - Domain final dan server/hosting final milik Istana.
 - Siapa yang menjadi super-admin awal dan bagaimana rotasi akses dilakukan.
 
-## Checklist Handover
+## Alur Baca Handover
 
-- [ ] Mentor membaca `README.md` dan dokumen ini.
-- [ ] Developer/operator membaca `docs/04-ARCHITECTURE.md`.
-- [ ] Operator membaca `docs/05-ENVIRONMENT.md`, `docs/06-DEPLOYMENT.md`, dan `docs/08-OPERATIONS-RUNBOOK.md`.
-- [ ] Pemilik data membaca `docs/09-SECURITY-PRIVACY.md` dan `docs/data-flow-privacy.md`.
-- [ ] `.env.droplet` production disimpan aman di luar repo.
-- [ ] Secret deploy GitHub Actions sudah dipetakan di `docs/github-actions-cicd.md`.
-- [ ] Backup production minimal sudah diuji restore.
-- [ ] Domain final sudah dipetakan dengan checklist `docs/07-SERVER-DOMAIN-MIGRATION.md`.
+Untuk review awal, mentor cukup mulai dari `README.md`, dokumen ini, dan
+`docs/01-PRODUCT-OVERVIEW.md`. Bagian teknis seperti arsitektur, environment,
+deployment, runbook, security/privacy, dan database bisa dibuka sesuai kebutuhan
+ketika pembahasan sudah masuk ke operasional atau pemindahan server.
+
+File `.env.droplet`, secret deploy, backup production, dan domain final sebaiknya
+dibahas sebagai bagian dari serah-terima akses, bukan dimasukkan ke repository.
 
 ## Batasan Penting
 
 - Repo tidak menyimpan data produksi.
 - Sistem belum menjadi pengganti kebijakan arsip atau klasifikasi dokumen resmi.
-- Jawaban AI harus tetap diverifikasi manusia, terutama untuk dokumen dinas.
+- Jawaban AI tetap perlu diverifikasi manusia, terutama untuk dokumen dinas.
 - Prompy Studio membuat teks prompt, bukan langsung membuat gambar, video, atau deck di platform eksternal.

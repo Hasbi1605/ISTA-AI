@@ -10,7 +10,7 @@ lebih lengkap ada di `docs/data-flow-privacy.md`.
 - Akses dokumen/memo memakai auth, policy, signed URL, dan server-side authorization.
 - Python AI hanya menerima request internal dengan bearer token.
 - Prompt, isi dokumen, dan secret tidak boleh ditulis ke log.
-- Keputusan penggunaan provider eksternal harus disetujui pemilik data.
+- Keputusan penggunaan provider eksternal perlu disetujui pemilik data.
 
 ## Proteksi User dan Dokumen
 
@@ -25,7 +25,7 @@ lebih lengkap ada di `docs/data-flow-privacy.md`.
 - Admin memakai `/admin/login` terpisah.
 - Login gagal memakai pesan generik dan lockout progresif.
 - Admin dapat dipaksa mengganti password sebelum masuk panel.
-- 2FA TOTP wajib untuk route admin utama.
+- 2FA TOTP digunakan untuk route admin utama.
 - Trusted device disimpan dengan token hashed.
 - Sesi admin punya absolute lifetime.
 - Aksi akun admin diaudit di `admin_account_audits`.
@@ -42,7 +42,7 @@ lebih lengkap ada di `docs/data-flow-privacy.md`.
 - OnlyOffice berjalan self-hosted sebagai document server.
 - File memo dibuka melalui signed URL sementara.
 - Callback memakai JWT.
-- URL internal/publik OnlyOffice harus disetel benar saat migrasi domain/server.
+- URL internal/publik OnlyOffice perlu disesuaikan saat migrasi domain/server.
 
 ## Provider Eksternal
 
@@ -64,11 +64,14 @@ Provider dikontrol oleh env secret dan `python-ai/config/ai_config.yaml`.
 - Chroma menyimpan representasi/chunk dokumen dan perlu diperlakukan sebagai data sensitif.
 - Retensi data belum menggantikan kebijakan arsip resmi.
 
-## Checklist Sebelum Demo atau Handover
+## Catatan Demo dan Handover
 
-- [ ] Gunakan data dummy atau data yang sudah disetujui.
-- [ ] Pastikan `.env` dan secret tidak masuk Git.
-- [ ] Pastikan provider yang aktif sudah diketahui mentor/pemilik data.
-- [ ] Matikan registrasi mandiri bila deployment private.
-- [ ] Siapkan akun admin/super-admin dengan 2FA.
-- [ ] Uji backup database/storage/Chroma bila data perlu dipertahankan.
+Untuk demo, paling aman memakai data dummy atau data yang sudah disetujui. Mentor
+atau pemilik data perlu mengetahui provider AI/search yang aktif karena sebagian
+fitur dapat mengirim prompt, chunk dokumen, reference image, atau query web ke
+provider eksternal.
+
+Pada deployment private, registrasi mandiri tetap ditutup dan akun admin disiapkan
+dengan 2FA. Jika data production perlu dipertahankan, backup database, storage,
+dan Chroma perlu dipahami sebagai satu paket karena ketiganya saling melengkapi
+saat restore.

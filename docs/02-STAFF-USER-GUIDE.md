@@ -30,8 +30,8 @@ sebutkan bahwa jawaban perlu konteks terbaru agar web search dapat dipertimbangk
 5. Pilih dokumen sebagai konteks aktif.
 6. Ajukan pertanyaan tentang isi dokumen.
 
-Jika jawaban tidak ada di dokumen, ISTA AI seharusnya menyatakan bahwa informasi
-tidak ditemukan dan menawarkan jalur lain, bukan mengarang.
+Jika jawaban tidak ada di dokumen, desain ISTA AI adalah menyatakan bahwa
+informasi tidak ditemukan dan menawarkan jalur lain, bukan mengarang.
 
 ## Memo
 
@@ -65,7 +65,8 @@ menghasilkan gambar/video. Output Prompy adalah teks prompt.
 
 ## Praktik Aman
 
-- Jangan upload dokumen yang belum disetujui untuk diproses AI.
-- Jangan menyalin prompt Prompy yang berisi data sensitif ke platform eksternal tanpa izin.
-- Periksa ulang memo dan jawaban AI sebelum dipakai sebagai rujukan resmi.
-- Logout setelah memakai perangkat bersama.
+Gunakan dokumen yang memang sudah disetujui untuk diproses AI. Prompt Prompy
+yang berisi data sensitif juga perlu ditinjau sebelum disalin ke platform
+eksternal. Untuk memo dan jawaban AI, pemeriksaan manusia tetap penting sebelum
+dipakai sebagai rujukan resmi. Pada perangkat bersama, logout setelah selesai
+memakai aplikasi.

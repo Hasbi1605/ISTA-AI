@@ -73,5 +73,5 @@ users (actor) 1-* admin_account_audits *-1 users (target)
 
 ## Catatan Data Sensitif
 
-- `documents`, `memos`, `memo_versions`, `generated_prompts`, dan Chroma data harus diperlakukan sebagai data privat.
+- `documents`, `memos`, `memo_versions`, `generated_prompts`, dan Chroma data perlu diperlakukan sebagai data privat.
 - Backup database saja belum cukup bila ingin restore penuh; storage file dan Chroma juga perlu dipertimbangkan.

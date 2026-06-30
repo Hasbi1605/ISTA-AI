@@ -16,8 +16,8 @@ dicommit.
 | --- | --- |
 | `APP_NAME` | Nama aplikasi |
 | `APP_ENV` | `local`, `production`, dll |
-| `APP_KEY` | Kunci Laravel, wajib unik |
-| `APP_DEBUG` | Harus `false` di production |
+| `APP_KEY` | Kunci Laravel yang dibuat unik per environment |
+| `APP_DEBUG` | Mode debug; production memakai `false` |
 | `APP_URL` | URL publik aplikasi |
 | `APP_DOMAIN` | Domain yang dipakai Caddy/production |
 | `LETSENCRYPT_EMAIL` | Email untuk TLS Caddy/Let's Encrypt |
@@ -31,7 +31,7 @@ dicommit.
 | `REDIS_*` | Redis queue/cache |
 | `QUEUE_CONNECTION` | Production memakai Redis |
 | `CACHE_STORE` | Store cache Laravel |
-| `REDIS_QUEUE_RETRY_AFTER`, `DB_QUEUE_RETRY_AFTER` | Harus lebih panjang dari job dokumen besar |
+| `REDIS_QUEUE_RETRY_AFTER`, `DB_QUEUE_RETRY_AFTER` | Durasi retry queue untuk job dokumen besar |
 
 ## Auth dan Admin
 
@@ -76,7 +76,7 @@ Urutan model dan prompt berada di `python-ai/config/ai_config.yaml`.
 | `ONLYOFFICE_JWT_SECRET` | Secret JWT editor/callback |
 | `ONLYOFFICE_SIGNED_URL_SECRET` | Secret signed URL file memo |
 | `ONLYOFFICE_SIGNED_URL_TTL_MINUTES` | TTL signed URL memo |
-| `ONLYOFFICE_DOCUMENTSERVER_TAG` | Versi image OnlyOffice, jangan `latest` |
+| `ONLYOFFICE_DOCUMENTSERVER_TAG` | Versi image OnlyOffice; production memakai tag spesifik, bukan `latest` |
 
 Gunakan secret berbeda untuk `APP_KEY`, `AI_SERVICE_TOKEN`,
 `ONLYOFFICE_JWT_SECRET`, dan `ONLYOFFICE_SIGNED_URL_SECRET`.
@@ -89,12 +89,10 @@ Gunakan secret berbeda untuk `APP_KEY`, `AI_SERVICE_TOKEN`,
 
 `FEATURE_PRESENTATION` hanya fallback legacy untuk env lama.
 
-## Checklist Production
+## Catatan Production
 
-- `APP_DEBUG=false`.
-- `APP_URL` memakai HTTPS domain final.
-- `PUBLIC_REGISTRATION_ENABLED=false` untuk deployment private.
-- `AI_SERVICE_TOKEN` kuat dan sama di Laravel/Python.
-- Secret provider AI/search sudah terisi sesuai provider yang dipakai.
-- OnlyOffice secret sudah unik dan tag image dipin.
-- `.env.droplet` ada di server, permission dibatasi, dan tidak masuk Git.
+Production memakai `APP_DEBUG=false`, `APP_URL` HTTPS dengan domain final, dan
+`PUBLIC_REGISTRATION_ENABLED=false` untuk deployment private. `AI_SERVICE_TOKEN`
+perlu sama di Laravel dan Python, sementara secret provider AI/search serta
+OnlyOffice disimpan di `.env.droplet` server. File `.env.droplet` tidak masuk Git
+dan aksesnya sebaiknya dibatasi ke operator yang memang menangani deployment.

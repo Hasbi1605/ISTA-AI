@@ -39,7 +39,7 @@ docker compose --env-file .env.droplet -f docker-compose.production.yml exec -T 
 docker compose --env-file .env.droplet -f docker-compose.production.yml restart laravel horizon scheduler
 ```
 
-Smoke check:
+Pembuktian paling sederhana setelah service naik adalah endpoint `/up`:
 
 ```bash
 curl -I https://DOMAIN/up
@@ -53,7 +53,7 @@ Workflow `.github/workflows/ci-cd.yml` menjalankan:
 2. Python dependency install, `pip check`, pytest.
 3. Pada `push main`, deploy production via SSH bila secret tersedia.
 
-Secret GitHub yang diperlukan:
+Secret GitHub yang terkait deploy:
 
 - `ISTA_DEPLOY_HOST`
 - `ISTA_DEPLOY_USER`
@@ -76,20 +76,17 @@ docker compose --env-file .env.droplet -f docker-compose.production.yml restart 
 docker compose --env-file .env.droplet -f docker-compose.production.yml exec -T laravel php artisan horizon:status
 ```
 
-## Validasi Setelah Deploy
+## Pembuktian Setelah Deploy
 
-- `docker compose ... ps` semua service utama `running`.
-- `/up` publik mengembalikan status sehat.
-- `python-ai` `/api/ready` sehat dari internal network.
-- `python-ai-docs` `/api/ready` sehat dari internal network.
-- Login user berhasil.
-- Chat pendek berhasil.
-- Upload dokumen kecil sampai ready.
-- Generate memo dan buka OnlyOffice berhasil.
-- Admin login + 2FA berhasil.
+Setelah deploy, pembuktian difokuskan pada service utama yang saling terhubung.
+`docker compose ... ps` menunjukkan container berjalan, `/up` membuktikan Laravel
+publik sehat, sedangkan `/api/ready` pada `python-ai` dan `python-ai-docs`
+membuktikan service internal siap menerima request. Setelah itu cukup uji jalur
+produk yang mewakili stack penuh: login, chat pendek, upload satu dokumen kecil
+sampai ready, generate memo dan buka OnlyOffice, lalu admin login dengan 2FA.
 
 ## Catatan
 
 - `git pull --ff-only` sengaja dipakai agar deploy gagal bila server punya perubahan manual.
-- Jangan edit file tracked langsung di server production kecuali sedang emergency dan dicatat.
+- Perubahan file tracked langsung di server production sebaiknya hanya terjadi saat emergency dan tetap dicatat.
 - `.env.droplet` tetap berada di server, bukan di GitHub secret aplikasi.

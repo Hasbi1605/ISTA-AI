@@ -7,8 +7,8 @@ DOCX melalui OnlyOffice, membuat paket prompt melalui Prompy Studio, dan
 memantau operasional lewat panel admin.
 
 Repo ini berisi source code, template konfigurasi, dan dokumentasi handover.
-Jangan commit dokumen produksi, dump database, file `.env` asli, API key,
-service-account JSON, private key, atau data Chroma.
+Dokumen produksi, dump database, file `.env` asli, API key, service-account JSON,
+private key, dan data Chroma tidak disimpan di repository.
 
 ## Status Saat Ini
 
@@ -33,7 +33,7 @@ service-account JSON, private key, atau data Chroma.
 - Prompy Studio untuk menyusun, merevisi, dan menyimpan paket prompt.
 - Admin dashboard untuk usage, error, dokumen, user, knowledge, dan admin account.
 - Keamanan admin: login terpisah, lockout progresif, forced password change,
-  2FA TOTP wajib, trusted device, absolute session lifetime, dan audit log.
+  2FA TOTP, trusted device, absolute session lifetime, dan audit log.
 
 ## Arsitektur Ringkas
 
@@ -72,7 +72,7 @@ paling enak dibaca:
 - [docs/04-ARCHITECTURE.md](docs/04-ARCHITECTURE.md) - arsitektur teknis ringkas.
 - [docs/05-ENVIRONMENT.md](docs/05-ENVIRONMENT.md) - environment variable penting.
 - [docs/06-DEPLOYMENT.md](docs/06-DEPLOYMENT.md) - setup server dan CI/CD.
-- [docs/07-SERVER-DOMAIN-MIGRATION.md](docs/07-SERVER-DOMAIN-MIGRATION.md) - checklist pindah server/domain.
+- [docs/07-SERVER-DOMAIN-MIGRATION.md](docs/07-SERVER-DOMAIN-MIGRATION.md) - catatan pindah server/domain.
 - [docs/08-OPERATIONS-RUNBOOK.md](docs/08-OPERATIONS-RUNBOOK.md) - runbook operasional.
 - [docs/09-SECURITY-PRIVACY.md](docs/09-SECURITY-PRIVACY.md) - keamanan dan alur data.
 - [docs/10-DATABASE-SUMMARY.md](docs/10-DATABASE-SUMMARY.md) - ringkasan tabel penting.
@@ -171,7 +171,7 @@ Sebelum memakai data nyata, baca:
 
 Poin penting:
 
-- `AI_SERVICE_TOKEN` wajib sama antara Laravel dan Python, dan tidak boleh memakai placeholder.
+- `AI_SERVICE_TOKEN` perlu sama antara Laravel dan Python, dan tidak memakai placeholder.
 - Provider AI/search eksternal dapat menerima prompt, chat history, chunk dokumen,
   embedding input, reference image Prompy, atau query web sesuai fitur yang dipakai.
 - OnlyOffice berjalan self-hosted, tetapi tetap memakai signed URL + JWT.
@@ -179,8 +179,8 @@ Poin penting:
 
 ## Contributing
 
-Lihat [CONTRIBUTING.md](CONTRIBUTING.md). Perubahan harus scoped, tidak membawa
-secret/data privat, dan menyertakan verifikasi yang relevan.
+Lihat [CONTRIBUTING.md](CONTRIBUTING.md). Perubahan sebaiknya scoped, tidak
+membawa secret/data privat, dan menyertakan verifikasi yang relevan.
 
 ## License
 
