@@ -682,6 +682,29 @@ class PromptStudioTest extends TestCase
             ->assertSee('@click.stop="removeReferenceImageAt(imgIdx)"', false);
     }
 
+    public function test_reference_images_can_be_reordered_via_drag(): void
+    {
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->test(PrompyStudio::class)
+            // Stable per-file key so SortableJS reorders without duplicating Alpine nodes.
+            ->assertSee(':key="image.id"', false)
+            ->assertSee('referenceImageUid(file)', false)
+            // Config composer drag wiring (rendered by default).
+            ->assertSee('initReferenceImageSortable($el)', false)
+            ->assertSee('moveReferenceImage(evt.oldIndex, evt.newIndex)', false)
+            ->assertSee('x-ref="referenceImageGrid"', false)
+            // Revision composer drag wiring lives in the always-present x-data definitions.
+            ->assertSee('initRevisionReferenceImageSortable(el) {', false)
+            ->assertSee('moveRevisionReferenceImage(oldIndex, newIndex) {', false)
+            // Draggable tiles, X button excluded from drag, and DOM revert for Alpine sync.
+            ->assertSee('data-ref-image-item', false)
+            ->assertSee('data-no-drag', false)
+            ->assertSee('restoreSortableDom(evt)', false)
+            ->assertSee('Seret gambar untuk mengubah urutan', false);
+    }
+
     public function test_reference_document_upload_sync_appends_like_reference_images(): void
     {
         $user = User::factory()->create();

@@ -38,6 +38,7 @@
         referenceImageUploading: false,
         referenceImageUploadFailed: false,
         referenceImageDropError: '',
+        referenceImageSortable: null,
         referenceDocuments: [],
         referenceDocumentFiles: [],
         referenceDocumentSyncing: false,
@@ -50,6 +51,7 @@
         revisionReferenceImageUploading: false,
         revisionReferenceImageUploadFailed: false,
         revisionReferenceImageDropError: '',
+        revisionReferenceImageSortable: null,
         revisionReferenceDocuments: [],
         revisionReferenceDocumentFiles: [],
         revisionReferenceDocumentSyncing: false,
@@ -150,6 +152,83 @@
                 if (image.url) URL.revokeObjectURL(image.url);
             });
         },
+        referenceImageUid(file) {
+            if (!file) return `ref-${Math.random().toString(36).slice(2, 10)}`;
+            if (!file.__prompyUid) {
+                file.__prompyUid = (window.crypto?.randomUUID?.() || `ref-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`);
+            }
+            return file.__prompyUid;
+        },
+        restoreSortableDom(evt) {
+            const list = evt?.from;
+            const node = evt?.item;
+            if (!list || !node) return;
+            // Revert SortableJS' DOM mutation so Alpine stays the single source of truth.
+            list.removeChild(node);
+            const reference = list.children[evt.oldIndex] || null;
+            list.insertBefore(node, reference);
+        },
+        relabelReferenceImages(images) {
+            return images.map((image, i) => ({ ...image, label: `Gambar ${i + 1}` }));
+        },
+        moveReferenceImage(oldIndex, newIndex) {
+            const total = this.referenceImageFiles.length;
+            if (oldIndex === newIndex) return;
+            if (oldIndex < 0 || newIndex < 0 || oldIndex >= total || newIndex >= total) return;
+            const [movedFile] = this.referenceImageFiles.splice(oldIndex, 1);
+            this.referenceImageFiles.splice(newIndex, 0, movedFile);
+            const [movedImage] = this.referenceImages.splice(oldIndex, 1);
+            this.referenceImages.splice(newIndex, 0, movedImage);
+            this.referenceImages = this.relabelReferenceImages(this.referenceImages);
+            this.syncReferenceImageInput();
+        },
+        moveRevisionReferenceImage(oldIndex, newIndex) {
+            const total = this.revisionReferenceImageFiles.length;
+            if (oldIndex === newIndex) return;
+            if (oldIndex < 0 || newIndex < 0 || oldIndex >= total || newIndex >= total) return;
+            const [movedFile] = this.revisionReferenceImageFiles.splice(oldIndex, 1);
+            this.revisionReferenceImageFiles.splice(newIndex, 0, movedFile);
+            const [movedImage] = this.revisionReferenceImages.splice(oldIndex, 1);
+            this.revisionReferenceImages.splice(newIndex, 0, movedImage);
+            this.revisionReferenceImages = this.relabelReferenceImages(this.revisionReferenceImages);
+            this.syncRevisionReferenceImageInput();
+        },
+        initReferenceImageSortable(el) {
+            if (!el || this.referenceImageSortable || !window.Sortable) return;
+            this.referenceImageSortable = window.Sortable.create(el, {
+                animation: 160,
+                delay: 160,
+                delayOnTouchOnly: true,
+                touchStartThreshold: 6,
+                draggable: '[data-ref-image-item]',
+                filter: '[data-no-drag]',
+                preventOnFilter: false,
+                ghostClass: 'opacity-40',
+                onEnd: (evt) => {
+                    if (evt.oldIndex == null || evt.newIndex == null || evt.oldIndex === evt.newIndex) return;
+                    this.restoreSortableDom(evt);
+                    this.moveReferenceImage(evt.oldIndex, evt.newIndex);
+                },
+            });
+        },
+        initRevisionReferenceImageSortable(el) {
+            if (!el || this.revisionReferenceImageSortable || !window.Sortable) return;
+            this.revisionReferenceImageSortable = window.Sortable.create(el, {
+                animation: 160,
+                delay: 160,
+                delayOnTouchOnly: true,
+                touchStartThreshold: 6,
+                draggable: '[data-ref-image-item]',
+                filter: '[data-no-drag]',
+                preventOnFilter: false,
+                ghostClass: 'opacity-40',
+                onEnd: (evt) => {
+                    if (evt.oldIndex == null || evt.newIndex == null || evt.oldIndex === evt.newIndex) return;
+                    this.restoreSortableDom(evt);
+                    this.moveRevisionReferenceImage(evt.oldIndex, evt.newIndex);
+                },
+            });
+        },
         setReferenceImageFiles(fileList) {
             const newFiles = Array.from(fileList || []);
             this.referenceImageDropError = '';
@@ -171,6 +250,7 @@
 
             this.referenceImageFiles = merged;
             this.referenceImages = merged.map((file, index) => ({
+                id: this.referenceImageUid(file),
                 name: file.name,
                 label: `Gambar ${index + 1}`,
                 url: URL.createObjectURL(file),
@@ -189,6 +269,7 @@
             if (removedImage?.url) URL.revokeObjectURL(removedImage.url);
             this.referenceImageFiles.splice(index, 1);
             this.referenceImages = this.referenceImageFiles.map((file, i) => ({
+                id: this.referenceImageUid(file),
                 name: file.name,
                 label: `Gambar ${i + 1}`,
                 url: URL.createObjectURL(file),
@@ -275,6 +356,7 @@
 
             this.revisionReferenceImageFiles = merged;
             this.revisionReferenceImages = merged.map((file, index) => ({
+                id: this.referenceImageUid(file),
                 name: file.name,
                 label: `Gambar ${index + 1}`,
                 url: URL.createObjectURL(file),
@@ -288,6 +370,7 @@
             if (this.revisionReferenceImages[index]?.url) URL.revokeObjectURL(this.revisionReferenceImages[index].url);
             this.revisionReferenceImageFiles.splice(index, 1);
             this.revisionReferenceImages = this.revisionReferenceImageFiles.map((file, i) => ({
+                id: this.referenceImageUid(file),
                 name: file.name,
                 label: `Gambar ${i + 1}`,
                 url: URL.createObjectURL(file),
@@ -704,10 +787,10 @@
                                 <span class="mt-0.5 block text-[11px] leading-relaxed opacity-75">Opsional. JPG/PNG, maksimal 5 gambar, masing-masing 5 MB.</span>
                             </span>
                         </button>
-                        <div x-show="referenceImages.length > 0" x-cloak class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                            <template x-for="(image, imgIdx) in referenceImages" :key="image.label">
-                                <div class="relative overflow-hidden rounded-lg border border-stone-200 bg-white text-left shadow-sm dark:border-gray-700 dark:bg-gray-900">
-                                    <button type="button" @click.stop="removeReferenceImageAt(imgIdx)" class="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-red-600" aria-label="Hapus gambar">
+                        <div x-show="referenceImages.length > 0" x-cloak x-ref="referenceImageGrid" x-init="$nextTick(() => initReferenceImageSortable($el))" class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                            <template x-for="(image, imgIdx) in referenceImages" :key="image.id">
+                                <div data-ref-image-item class="group relative cursor-grab select-none overflow-hidden rounded-lg border border-stone-200 bg-white text-left shadow-sm active:cursor-grabbing dark:border-gray-700 dark:bg-gray-900">
+                                    <button type="button" data-no-drag @click.stop="removeReferenceImageAt(imgIdx)" class="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-red-600" aria-label="Hapus gambar">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
                                     </button>
                                     <button type="button" @click="openReferenceImageModal(image)" class="block w-full cursor-zoom-in text-left transition hover:opacity-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ista-primary" :aria-label="`Buka preview ${image.label}`">
@@ -722,6 +805,7 @@
                                 </div>
                             </template>
                         </div>
+                        <p x-show="referenceImages.length > 1" x-cloak class="mt-1.5 text-[10.5px] leading-relaxed text-stone-400 dark:text-gray-500">Seret gambar untuk mengubah urutan. Gambar 1 dianalisis lebih dulu.</p>
                         <p x-show="referenceImageDropError" x-cloak class="memo-config-error" x-text="referenceImageDropError"></p>
                         @error('referenceImages') <p class="memo-config-error">{{ $message }}</p> @enderror
                         @error('referenceImages.*') <p class="memo-config-error">{{ $message }}</p> @enderror
@@ -959,10 +1043,10 @@
                                     Hapus
                                 </button>
                             </div>
-                            <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                                <template x-for="(image, imgIdx) in revisionReferenceImages" :key="image.label">
-                                    <div class="relative overflow-hidden rounded-md border border-emerald-200 bg-white text-left dark:border-emerald-900/70 dark:bg-gray-900">
-                                        <button type="button" @click="removeRevisionReferenceImageAt(imgIdx)" class="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-red-600" aria-label="Hapus gambar">
+                            <div x-ref="revisionReferenceImageGrid" x-init="$nextTick(() => initRevisionReferenceImageSortable($el))" class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                                <template x-for="(image, imgIdx) in revisionReferenceImages" :key="image.id">
+                                    <div data-ref-image-item class="group relative cursor-grab select-none overflow-hidden rounded-md border border-emerald-200 bg-white text-left active:cursor-grabbing dark:border-emerald-900/70 dark:bg-gray-900">
+                                        <button type="button" data-no-drag @click="removeRevisionReferenceImageAt(imgIdx)" class="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-red-600" aria-label="Hapus gambar">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
                                         </button>
                                         <div class="aspect-[4/3] bg-emerald-100/70 dark:bg-gray-800">
@@ -976,6 +1060,7 @@
                                 </template>
                             </div>
                         </div>
+                        <p x-show="revisionReferenceImages.length > 1" x-cloak class="mt-1.5 text-[10.5px] leading-relaxed text-emerald-700/80 dark:text-emerald-300/70">Seret gambar untuk mengubah urutan. Gambar 1 dianalisis lebih dulu.</p>
                         <p x-show="revisionReferenceImageDropError" x-cloak class="memo-config-error" x-text="revisionReferenceImageDropError"></p>
 
                         <div x-show="revisionReferenceDocuments.length > 0" x-cloak class="mt-2 rounded-lg border border-sky-200 bg-sky-50/70 p-2 dark:border-sky-900/60 dark:bg-sky-950/20">

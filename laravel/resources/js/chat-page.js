@@ -1,5 +1,9 @@
 import DOMPurify from 'dompurify';
 import { marked } from 'marked';
+import Sortable from 'sortablejs';
+
+// Expose SortableJS for inline Alpine components (e.g. Prompy reference image reorder).
+window.Sortable = window.Sortable || Sortable;
 
 let hasRegisteredChatPageData = false;
 const CHAT_PENDING_STORAGE_KEY = 'ista.chat.pendingResponses.v1';
