@@ -47,6 +47,8 @@
         referenceDocumentUploading: false,
         referenceDocumentUploadFailed: false,
         referenceDocumentDropError: '',
+        referenceDocumentDragging: false,
+        prompyConfigDragging: false,
         revisionReferenceImages: [],
         revisionReferenceImageFiles: [],
         revisionReferenceImageSyncing: false,
@@ -60,6 +62,7 @@
         revisionReferenceDocumentUploading: false,
         revisionReferenceDocumentUploadFailed: false,
         revisionReferenceDocumentDropError: '',
+        revisionComposerDragging: false,
         prompyRevisionText: '',
         prompyRevisionLoading: false,
         isSwitchingPrompt: false,
@@ -101,6 +104,7 @@
                 textarea.dispatchEvent(new Event('input', { bubbles: true }));
                 this.scrollPrompyChatToBottom();
 
+                this.syncRevisionAttachmentsBeforeSubmit();
                 await $wire.sendPromptChat(message);
             } catch (error) {
                 textarea.value = message;
@@ -183,7 +187,6 @@
             const [movedImage] = this.referenceImages.splice(oldIndex, 1);
             this.referenceImages.splice(newIndex, 0, movedImage);
             this.referenceImages = this.relabelReferenceImages(this.referenceImages);
-            this.syncReferenceImageInput();
         },
         moveRevisionReferenceImage(oldIndex, newIndex) {
             const total = this.revisionReferenceImageFiles.length;
@@ -194,7 +197,6 @@
             const [movedImage] = this.revisionReferenceImages.splice(oldIndex, 1);
             this.revisionReferenceImages.splice(newIndex, 0, movedImage);
             this.revisionReferenceImages = this.relabelReferenceImages(this.revisionReferenceImages);
-            this.syncRevisionReferenceImageInput();
         },
         destroyReferenceImageSortable() {
             if (!this.referenceImageSortable) return;
@@ -259,22 +261,32 @@
             this.referenceImageDropError = '';
             this.referenceImageUploadFailed = false;
 
-            for (const file of newFiles) {
-                if (!this.validateReferenceImageFile(file)) {
-                    this.clearReferenceImageInput();
-                    return false;
-                }
-            }
+            const previousCount = this.referenceImageFiles.length;
+            const merge = window.istaMergeFilesWithCap?.(
+                this.referenceImageFiles,
+                newFiles,
+                5,
+                (file) => this.validateReferenceImageFile(file),
+            ) || { accepted: [], rejected: [], errors: [] };
 
-            const merged = [...this.referenceImageFiles, ...newFiles];
-            if (merged.length > 5) {
-                this.referenceImageDropError = 'Gambar referensi maksimal 5 file.';
+            if (merge.accepted.length === 0) {
+                this.referenceImageDropError = merge.errors[0] || 'Tidak ada gambar yang bisa ditambahkan.';
                 this.clearReferenceImageInput();
+
                 return false;
             }
 
-            this.referenceImageFiles = merged;
-            this.referenceImages = merged.map((file, index) => ({
+            const addedCount = merge.accepted.length - previousCount;
+
+            if (merge.errors.length > 0) {
+                this.referenceImageDropError = addedCount > 0
+                    ? `${addedCount} gambar ditambahkan. ${merge.errors[0]}`
+                    : merge.errors[0];
+            }
+
+            this.releaseReferenceImageUrls();
+            this.referenceImageFiles = merge.accepted;
+            this.referenceImages = merge.accepted.map((file, index) => ({
                 id: this.referenceImageUid(file),
                 name: file.name,
                 label: `Gambar ${index + 1}`,
@@ -282,6 +294,7 @@
             }));
 
             this.syncReferenceImageInput();
+
             return true;
         },
         removeReferenceImageAt(index) {
@@ -308,10 +321,8 @@
             const input = this.$refs.referenceImageInput;
             if (!input) return;
             try {
-                const transfer = new DataTransfer();
-                this.referenceImageFiles.forEach((file) => transfer.items.add(file));
                 this.referenceImageSyncing = true;
-                input.files = transfer.files;
+                window.istaAssignFilesToInput?.(input, this.referenceImageFiles);
                 input.dispatchEvent(new Event('change', { bubbles: true }));
             } catch (_) {
             } finally {
@@ -323,37 +334,45 @@
             this.referenceDocumentDropError = '';
             this.referenceDocumentUploadFailed = false;
 
-            for (const file of newFiles) {
-                if (!this.validateReferenceDocumentFile(file)) {
-                    this.syncReferenceDocumentInput();
-                    return false;
-                }
-            }
+            const previousCount = this.referenceDocumentFiles.length;
+            const merge = window.istaMergeFilesWithCap?.(
+                this.referenceDocumentFiles,
+                newFiles,
+                3,
+                (file) => this.validateReferenceDocumentFile(file),
+            ) || { accepted: [], rejected: [], errors: [] };
 
-            const merged = [...this.referenceDocumentFiles, ...newFiles];
-            if (merged.length > 3) {
-                this.referenceDocumentDropError = 'Dokumen acuan maksimal 3 file.';
+            if (merge.accepted.length === 0) {
+                this.referenceDocumentDropError = merge.errors[0] || 'Tidak ada dokumen yang bisa ditambahkan.';
                 this.syncReferenceDocumentInput();
+
                 return false;
             }
 
-            this.referenceDocumentFiles = merged;
-            this.referenceDocuments = merged.map((file, index) => ({
+            const addedCount = merge.accepted.length - previousCount;
+
+            if (merge.errors.length > 0) {
+                this.referenceDocumentDropError = addedCount > 0
+                    ? `${addedCount} dokumen ditambahkan. ${merge.errors[0]}`
+                    : merge.errors[0];
+            }
+
+            this.referenceDocumentFiles = merge.accepted;
+            this.referenceDocuments = merge.accepted.map((file, index) => ({
                 name: file.name,
                 label: `Dokumen ${index + 1}`,
             }));
 
             this.syncReferenceDocumentInput();
+
             return true;
         },
         syncReferenceDocumentInput() {
             const input = this.$refs.referenceDocumentInput;
             if (!input) return;
             try {
-                const transfer = new DataTransfer();
-                this.referenceDocumentFiles.forEach((file) => transfer.items.add(file));
                 this.referenceDocumentSyncing = true;
-                input.files = transfer.files;
+                window.istaAssignFilesToInput?.(input, this.referenceDocumentFiles);
                 input.dispatchEvent(new Event('change', { bubbles: true }));
             } catch (_) {
             } finally {
@@ -365,22 +384,32 @@
             this.revisionReferenceImageDropError = '';
             this.revisionReferenceImageUploadFailed = false;
 
-            for (const file of newFiles) {
-                if (!this.validateRevisionReferenceImageFile(file)) {
-                    this.clearRevisionReferenceImageInput();
-                    return false;
-                }
-            }
+            const previousCount = this.revisionReferenceImageFiles.length;
+            const merge = window.istaMergeFilesWithCap?.(
+                this.revisionReferenceImageFiles,
+                newFiles,
+                5,
+                (file) => this.validateRevisionReferenceImageFile(file),
+            ) || { accepted: [], rejected: [], errors: [] };
 
-            const merged = [...this.revisionReferenceImageFiles, ...newFiles];
-            if (merged.length > 5) {
-                this.revisionReferenceImageDropError = 'Gambar revisi maksimal 5 file.';
+            if (merge.accepted.length === 0) {
+                this.revisionReferenceImageDropError = merge.errors[0] || 'Tidak ada gambar yang bisa ditambahkan.';
                 this.clearRevisionReferenceImageInput();
+
                 return false;
             }
 
-            this.revisionReferenceImageFiles = merged;
-            this.revisionReferenceImages = merged.map((file, index) => ({
+            const addedCount = merge.accepted.length - previousCount;
+
+            if (merge.errors.length > 0) {
+                this.revisionReferenceImageDropError = addedCount > 0
+                    ? `${addedCount} gambar ditambahkan. ${merge.errors[0]}`
+                    : merge.errors[0];
+            }
+
+            this.releaseRevisionReferenceImageUrls();
+            this.revisionReferenceImageFiles = merge.accepted;
+            this.revisionReferenceImages = merge.accepted.map((file, index) => ({
                 id: this.referenceImageUid(file),
                 name: file.name,
                 label: `Gambar ${index + 1}`,
@@ -388,6 +417,7 @@
             }));
 
             this.syncRevisionReferenceImageInput();
+
             return true;
         },
         removeRevisionReferenceImageAt(index) {
@@ -409,10 +439,8 @@
             const input = this.$refs.revisionReferenceImageInput;
             if (!input) return;
             try {
-                const transfer = new DataTransfer();
-                this.revisionReferenceImageFiles.forEach((file) => transfer.items.add(file));
                 this.revisionReferenceImageSyncing = true;
-                input.files = transfer.files;
+                window.istaAssignFilesToInput?.(input, this.revisionReferenceImageFiles);
                 input.dispatchEvent(new Event('change', { bubbles: true }));
             } catch (_) {
             } finally {
@@ -424,37 +452,45 @@
             this.revisionReferenceDocumentDropError = '';
             this.revisionReferenceDocumentUploadFailed = false;
 
-            for (const file of newFiles) {
-                if (!this.validateRevisionReferenceDocumentFile(file)) {
-                    this.syncRevisionReferenceDocumentInput();
-                    return false;
-                }
-            }
+            const previousCount = this.revisionReferenceDocumentFiles.length;
+            const merge = window.istaMergeFilesWithCap?.(
+                this.revisionReferenceDocumentFiles,
+                newFiles,
+                3,
+                (file) => this.validateRevisionReferenceDocumentFile(file),
+            ) || { accepted: [], rejected: [], errors: [] };
 
-            const merged = [...this.revisionReferenceDocumentFiles, ...newFiles];
-            if (merged.length > 3) {
-                this.revisionReferenceDocumentDropError = 'Dokumen revisi maksimal 3 file.';
+            if (merge.accepted.length === 0) {
+                this.revisionReferenceDocumentDropError = merge.errors[0] || 'Tidak ada dokumen yang bisa ditambahkan.';
                 this.syncRevisionReferenceDocumentInput();
+
                 return false;
             }
 
-            this.revisionReferenceDocumentFiles = merged;
-            this.revisionReferenceDocuments = merged.map((file, index) => ({
+            const addedCount = merge.accepted.length - previousCount;
+
+            if (merge.errors.length > 0) {
+                this.revisionReferenceDocumentDropError = addedCount > 0
+                    ? `${addedCount} dokumen ditambahkan. ${merge.errors[0]}`
+                    : merge.errors[0];
+            }
+
+            this.revisionReferenceDocumentFiles = merge.accepted;
+            this.revisionReferenceDocuments = merge.accepted.map((file, index) => ({
                 name: file.name,
                 label: `Dokumen ${index + 1}`,
             }));
 
             this.syncRevisionReferenceDocumentInput();
+
             return true;
         },
         syncRevisionReferenceDocumentInput() {
             const input = this.$refs.revisionReferenceDocumentInput;
             if (!input) return;
             try {
-                const transfer = new DataTransfer();
-                this.revisionReferenceDocumentFiles.forEach((file) => transfer.items.add(file));
                 this.revisionReferenceDocumentSyncing = true;
-                input.files = transfer.files;
+                window.istaAssignFilesToInput?.(input, this.revisionReferenceDocumentFiles);
                 input.dispatchEvent(new Event('change', { bubbles: true }));
             } catch (_) {
             } finally {
@@ -527,88 +563,173 @@
             }
         },
         validateReferenceImageFile(file) {
-            if (!file) return false;
+            if (!file) return { valid: false, message: 'File tidak valid.' };
 
             if (!['image/jpeg', 'image/png'].includes(file.type)) {
-                this.referenceImageDropError = 'Gunakan gambar JPG atau PNG.';
-                return false;
+                return { valid: false, message: 'Gunakan gambar JPG atau PNG.' };
             }
 
             if (file.size > 5 * 1024 * 1024) {
-                this.referenceImageDropError = 'Ukuran gambar maksimal 5 MB.';
-                return false;
+                return { valid: false, message: 'Ukuran gambar maksimal 5 MB.' };
             }
 
-            this.referenceImageDropError = '';
-            return true;
+            return { valid: true };
         },
         validateReferenceDocumentFile(file) {
-            if (!file) return false;
+            if (!file) return { valid: false, message: 'File tidak valid.' };
 
             const allowedExtensions = ['pdf', 'docx', 'xlsx', 'csv'];
             const extension = (file.name.split('.').pop() || '').toLowerCase();
 
             if (!allowedExtensions.includes(extension)) {
-                this.referenceDocumentDropError = 'Gunakan PDF, DOCX, XLSX, atau CSV.';
-                return false;
+                return { valid: false, message: 'Gunakan PDF, DOCX, XLSX, atau CSV.' };
             }
 
             if (file.size > 10 * 1024 * 1024) {
-                this.referenceDocumentDropError = 'Ukuran dokumen maksimal 10 MB.';
-                return false;
+                return { valid: false, message: 'Ukuran dokumen maksimal 10 MB.' };
             }
 
-            this.referenceDocumentDropError = '';
-            return true;
+            return { valid: true };
         },
         validateRevisionReferenceImageFile(file) {
-            if (!file) return false;
+            if (!file) return { valid: false, message: 'File tidak valid.' };
 
             if (!['image/jpeg', 'image/png'].includes(file.type)) {
-                this.revisionReferenceImageDropError = 'Gunakan gambar JPG atau PNG.';
-                return false;
+                return { valid: false, message: 'Gunakan gambar JPG atau PNG.' };
             }
 
             if (file.size > 5 * 1024 * 1024) {
-                this.revisionReferenceImageDropError = 'Ukuran gambar maksimal 5 MB.';
-                return false;
+                return { valid: false, message: 'Ukuran gambar maksimal 5 MB.' };
             }
 
-            this.revisionReferenceImageDropError = '';
-            return true;
+            return { valid: true };
         },
         validateRevisionReferenceDocumentFile(file) {
-            if (!file) return false;
+            if (!file) return { valid: false, message: 'File tidak valid.' };
 
             const allowedExtensions = ['pdf', 'docx', 'xlsx', 'csv'];
             const extension = (file.name.split('.').pop() || '').toLowerCase();
 
             if (!allowedExtensions.includes(extension)) {
-                this.revisionReferenceDocumentDropError = 'Gunakan PDF, DOCX, XLSX, atau CSV.';
-                return false;
+                return { valid: false, message: 'Gunakan PDF, DOCX, XLSX, atau CSV.' };
             }
 
             if (file.size > 10 * 1024 * 1024) {
-                this.revisionReferenceDocumentDropError = 'Ukuran dokumen maksimal 10 MB.';
-                return false;
+                return { valid: false, message: 'Ukuran dokumen maksimal 10 MB.' };
             }
 
-            this.revisionReferenceDocumentDropError = '';
-            return true;
+            return { valid: true };
+        },
+        syncPrompyAttachmentsBeforeGenerate() {
+            if (this.referenceImageFiles.length > 0) {
+                this.syncReferenceImageInput();
+            }
+
+            if (this.referenceDocumentFiles.length > 0) {
+                this.syncReferenceDocumentInput();
+            }
+        },
+        syncRevisionAttachmentsBeforeSubmit() {
+            if (this.revisionReferenceImageFiles.length > 0) {
+                this.syncRevisionReferenceImageInput();
+            }
+
+            if (this.revisionReferenceDocumentFiles.length > 0) {
+                this.syncRevisionReferenceDocumentInput();
+            }
         },
         dropReferenceImage(event) {
+            event.stopPropagation();
             this.referenceImageDragging = false;
             const files = event.dataTransfer?.files;
-            const newFiles = Array.from(files || []);
 
-            const total = this.referenceImageFiles.length + newFiles.length;
-            if (total > 5) {
-                this.referenceImageDropError = 'Gambar referensi maksimal 5 file.';
+            if (!files?.length) {
                 return;
             }
 
-            if (!this.setReferenceImageFiles(files || [])) {
+            this.setReferenceImageFiles(files);
+        },
+        dropReferenceDocument(event) {
+            event.stopPropagation();
+            this.referenceDocumentDragging = false;
+            const files = event.dataTransfer?.files;
+
+            if (!files?.length) {
                 return;
+            }
+
+            this.setReferenceDocumentFiles(files);
+        },
+        dropRevisionReferenceImage(event) {
+            event.stopPropagation();
+            this.revisionComposerDragging = false;
+            const files = event.dataTransfer?.files;
+
+            if (!files?.length) {
+                return;
+            }
+
+            this.setRevisionReferenceImageFiles(files);
+        },
+        dropRevisionReferenceDocument(event) {
+            event.stopPropagation();
+            this.revisionComposerDragging = false;
+            const files = event.dataTransfer?.files;
+
+            if (!files?.length) {
+                return;
+            }
+
+            this.setRevisionReferenceDocumentFiles(files);
+        },
+        dropPrompyConfigPanel(event) {
+            event.stopPropagation();
+            this.prompyConfigDragging = false;
+            this.referenceImageDragging = false;
+            this.referenceDocumentDragging = false;
+            const files = event.dataTransfer?.files;
+
+            if (!files?.length) {
+                return;
+            }
+
+            const classified = window.istaClassifyPrompyDroppedFiles?.(files) || { kind: 'empty' };
+
+            if (classified.kind === 'mixed') {
+                this.referenceImageDropError = '';
+                this.referenceDocumentDropError = 'Seret hanya gambar atau hanya dokumen, tidak keduanya sekaligus.';
+
+                return;
+            }
+
+            if (classified.kind === 'images') {
+                this.setReferenceImageFiles(classified.images);
+            } else if (classified.kind === 'documents') {
+                this.setReferenceDocumentFiles(classified.documents);
+            }
+        },
+        dropRevisionComposer(event) {
+            event.stopPropagation();
+            this.revisionComposerDragging = false;
+            const files = event.dataTransfer?.files;
+
+            if (!files?.length) {
+                return;
+            }
+
+            const classified = window.istaClassifyPrompyDroppedFiles?.(files) || { kind: 'empty' };
+
+            if (classified.kind === 'mixed') {
+                this.revisionReferenceImageDropError = '';
+                this.revisionReferenceDocumentDropError = 'Seret hanya gambar atau hanya dokumen, tidak keduanya sekaligus.';
+
+                return;
+            }
+
+            if (classified.kind === 'images') {
+                this.setRevisionReferenceImageFiles(classified.images);
+            } else if (classified.kind === 'documents') {
+                this.setRevisionReferenceDocumentFiles(classified.documents);
             }
         },
         referenceImageCardClass() {
@@ -736,13 +857,22 @@
             @endif
 
             @if(! $activePrompt || $showPromptConfiguration)
-            <form id="prompy-form" wire:submit.prevent="generate" class="chat-form memo-config-panel">
+            <form id="prompy-form" @submit.prevent="syncPrompyAttachmentsBeforeGenerate(); $wire.generate()" class="chat-form memo-config-panel relative">
                 <div class="border-b border-stone-100 bg-white px-4 py-4 dark:border-gray-800 dark:bg-gray-900">
                     <h2 class="mt-1 text-[15px] font-bold text-stone-900 dark:text-gray-100">Konfigurasi Prompt</h2>
                     <p class="mt-1 max-w-[26rem] text-[12px] leading-relaxed text-stone-500 dark:text-gray-400">Isi ide, target, dan referensi visual untuk membuat paket prompt.</p>
                 </div>
 
-                <div class="memo-config-section bg-stone-50/65 dark:bg-gray-950/20">
+                <div
+                    class="memo-config-section relative bg-stone-50/65 dark:bg-gray-950/20"
+                    @dragenter.prevent="prompyConfigDragging = true"
+                    @dragover.prevent="prompyConfigDragging = true"
+                    @dragleave.prevent="prompyConfigDragging = false"
+                    @drop.prevent="dropPrompyConfigPanel($event)"
+                >
+                    <div x-show="prompyConfigDragging" x-cloak x-transition.opacity class="pointer-events-none absolute inset-2 z-20 flex items-center justify-center rounded-xl border-2 border-dashed border-ista-primary/50 bg-ista-primary/5 dark:border-amber-400/50 dark:bg-amber-900/10">
+                        <span class="rounded-full bg-white/90 px-3 py-1.5 text-[12px] font-semibold text-ista-primary shadow-sm dark:bg-gray-900/90 dark:text-amber-200">Seret gambar (maks. 5) atau dokumen acuan (maks. 3)</span>
+                    </div>
                     <div>
                         <label class="memo-config-label">Ide / permintaan <span class="text-red-500">*</span></label>
                         <textarea wire:model="idea" rows="4" maxlength="{{ \App\Services\Prompts\PromptStudioService::IDEA_MAX_LENGTH }}"
@@ -863,8 +993,12 @@
                         <button
                             type="button"
                             @click="chooseReferenceDocument()"
+                            @dragenter.prevent="referenceDocumentDragging = true"
+                            @dragover.prevent="referenceDocumentDragging = true"
+                            @dragleave.prevent="referenceDocumentDragging = false"
+                            @drop.prevent="dropReferenceDocument($event)"
                             class="group flex w-full items-center gap-3 rounded-lg border border-dashed px-3 py-2.5 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ista-primary"
-                            :class="referenceDocuments.length > 0 && !referenceDocumentUploading && !referenceDocumentUploadFailed ? 'border-sky-300 bg-sky-50/80 text-sky-800 dark:border-sky-800/60 dark:bg-sky-900/20 dark:text-sky-200' : 'border-stone-200 bg-white text-stone-700 hover:border-ista-primary/40 hover:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-amber-400/40'"
+                            :class="referenceDocumentDragging ? 'border-ista-primary bg-ista-primary/5 text-ista-primary dark:border-amber-400/60 dark:bg-amber-900/10 dark:text-amber-200' : (referenceDocuments.length > 0 && !referenceDocumentUploading && !referenceDocumentUploadFailed ? 'border-sky-300 bg-sky-50/80 text-sky-800 dark:border-sky-800/60 dark:bg-sky-900/20 dark:text-sky-200' : 'border-stone-200 bg-white text-stone-700 hover:border-ista-primary/40 hover:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-amber-400/40')"
                         >
                             <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-current/15 bg-white/70 dark:bg-gray-950/30">
                                 <svg x-show="!referenceDocumentUploading && (referenceDocuments.length === 0 || referenceDocumentUploadFailed)" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -877,7 +1011,7 @@
                                 </svg>
                             </span>
                             <span class="min-w-0 flex-1">
-                                <span class="block truncate text-[12px] font-semibold" x-text="referenceDocuments.length ? `${referenceDocuments.length} dokumen dipilih — klik untuk tambah` : 'Pilih dokumen acuan'"></span>
+                                <span class="block truncate text-[12px] font-semibold" x-text="referenceDocuments.length ? `${referenceDocuments.length} dokumen dipilih — klik untuk tambah` : 'Pilih atau seret dokumen acuan'"></span>
                                 <span class="mt-0.5 block text-[11px] leading-relaxed opacity-75">Opsional. PDF/DOCX/XLSX/CSV, maksimal 3 dokumen, masing-masing 10 MB.</span>
                             </span>
                         </button>
@@ -994,7 +1128,7 @@
                             wire:loading.attr="disabled"
                             wire:target="generate,generateConfiguredPrompt,generateConfiguredRevision,referenceImages,referenceDocuments"
                             :disabled="referenceImageUploading || referenceDocumentUploading"
-                            @click="showPrompyPreviewPanel()"
+                            @click="syncPrompyAttachmentsBeforeGenerate(); showPrompyPreviewPanel()"
                             class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-ista-primary px-4 text-[13px] font-semibold text-white shadow-sm transition hover:bg-ista-dark active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50">
                         <span wire:loading.remove wire:target="generate,generateConfiguredPrompt,generateConfiguredRevision">{{ $activePrompt ? 'Buat ulang dari konfigurasi' : 'Buat Prompt' }}</span>
                         <span wire:loading.inline-flex wire:target="generate,generateConfiguredPrompt,generateConfiguredRevision" class="items-center gap-2">
@@ -1025,7 +1159,14 @@
                         @endforeach
                     </div>
                 @endif
-                <form @submit.prevent="submitPrompyRevision($wire, $refs.prompyInput)" class="chat-form relative rounded-xl shadow-sm bg-white dark:bg-gray-800 border border-stone-200/60 dark:border-gray-700 transition-colors">
+                <form @submit.prevent="submitPrompyRevision($wire, $refs.prompyInput)" class="chat-form relative rounded-xl shadow-sm bg-white dark:bg-gray-800 border border-stone-200/60 dark:border-gray-700 transition-colors"
+                      @dragenter.prevent="revisionComposerDragging = true"
+                      @dragover.prevent="revisionComposerDragging = true"
+                      @dragleave.prevent="revisionComposerDragging = false"
+                      @drop.prevent="dropRevisionComposer($event)">
+                    <div x-show="revisionComposerDragging" x-cloak x-transition.opacity class="pointer-events-none absolute inset-2 z-20 flex items-center justify-center rounded-lg border-2 border-dashed border-ista-primary/50 bg-ista-primary/5 dark:border-amber-400/50 dark:bg-amber-900/10">
+                        <span class="rounded-full bg-white/90 px-3 py-1.5 text-[12px] font-semibold text-ista-primary shadow-sm dark:bg-gray-900/90 dark:text-amber-200">Seret gambar (maks. 5) atau dokumen (maks. 3)</span>
+                    </div>
                     <div class="px-3 pb-3 pt-3 w-full">
                         <input
                             x-ref="revisionReferenceImageInput"
