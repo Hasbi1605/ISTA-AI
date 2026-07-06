@@ -506,6 +506,106 @@ const saveStoredConversationIds = (storageKey, ids) => {
 
 const isDarkThemeEnabled = () => localStorage.getItem('theme') === 'dark';
 
+const CHAT_ATTACHMENT_EXTENSIONS = ['pdf', 'docx', 'xlsx', 'csv'];
+const CHAT_MAX_FILES_PER_DROP = 5;
+
+const assignFilesToInput = (input, files = []) => {
+    if (!input) {
+        return false;
+    }
+
+    const list = Array.from(files || []).filter(Boolean);
+
+    if (list.length === 0) {
+        return false;
+    }
+
+    try {
+        const transfer = new DataTransfer();
+        list.forEach((file) => transfer.items.add(file));
+        input.files = transfer.files;
+
+        return true;
+    } catch (_) {
+        return false;
+    }
+};
+
+const mergeFilesWithCap = (existing = [], incoming = [], max, validateFn) => {
+    const accepted = [...existing];
+    const rejected = [];
+    const errors = [];
+    const incomingList = Array.from(incoming || []);
+    const slotsBefore = Math.max(0, max - accepted.length);
+
+    incomingList.forEach((file) => {
+        if (accepted.length >= max) {
+            rejected.push(file);
+
+            return;
+        }
+
+        const result = validateFn ? validateFn(file) : true;
+        const valid = result === true || (result && result.valid !== false);
+        const message = typeof result === 'object' && result ? result.message : null;
+
+        if (!valid) {
+            rejected.push(file);
+
+            if (message) {
+                errors.push(message);
+            }
+
+            return;
+        }
+
+        accepted.push(file);
+    });
+
+    if (rejected.length > 0) {
+        const overCap = incomingList.length > slotsBefore;
+
+        if (overCap) {
+            errors.push(`${rejected.length} file ditolak (maksimal ${max} total).`);
+        }
+    }
+
+    return {
+        accepted,
+        rejected,
+        errors: [...new Set(errors.filter(Boolean))],
+    };
+};
+
+const classifyPrompyDroppedFiles = (files = []) => {
+    const list = Array.from(files || []).filter(Boolean);
+
+    if (list.length === 0) {
+        return { kind: 'empty', images: [], documents: [] };
+    }
+
+    const images = list.filter((file) => ['image/jpeg', 'image/png'].includes(file.type));
+    const documents = list.filter((file) => {
+        const extension = (file.name.split('.').pop() || '').toLowerCase();
+
+        return ['pdf', 'docx', 'xlsx', 'csv'].includes(extension);
+    });
+
+    if (images.length === list.length) {
+        return { kind: 'images', images, documents: [] };
+    }
+
+    if (documents.length === list.length) {
+        return { kind: 'documents', images: [], documents };
+    }
+
+    return { kind: 'mixed', images, documents };
+};
+
+window.istaAssignFilesToInput = assignFilesToInput;
+window.istaMergeFilesWithCap = mergeFilesWithCap;
+window.istaClassifyPrompyDroppedFiles = classifyPrompyDroppedFiles;
+
 const registerChatPageData = (Alpine) => {
     if (hasRegisteredChatPageData || !Alpine) {
         return;
@@ -575,7 +675,7 @@ const registerChatPageData = (Alpine) => {
         },
 
         onDragEnter(event) {
-            if (!this.prepareFileDrag(event)) {
+            if (this.activeTab !== 'chat' || !this.prepareFileDrag(event)) {
                 return;
             }
 
@@ -585,7 +685,7 @@ const registerChatPageData = (Alpine) => {
         },
 
         onDragOver(event) {
-            if (!this.prepareFileDrag(event)) {
+            if (this.activeTab !== 'chat' || !this.prepareFileDrag(event)) {
                 return;
             }
 
@@ -607,6 +707,12 @@ const registerChatPageData = (Alpine) => {
         },
 
         onDropFile(event) {
+            if (this.activeTab !== 'chat') {
+                this.resetDraggingFile();
+
+                return;
+            }
+
             if (this.hasFiles(event)) {
                 event.preventDefault();
             }
@@ -618,25 +724,12 @@ const registerChatPageData = (Alpine) => {
                 return;
             }
 
-            if (files.length > 1) {
-                this.showDropError('Hanya bisa upload 1 file sekaligus.');
-
-                return;
-            }
-
-            const input = document.querySelector('[x-ref="chatAttachmentInput"]');
-
-            if (!input) {
-                return;
-            }
-
-            input.files = files;
-            input.dispatchEvent(new Event('change', { bubbles: true }));
+            this.$dispatch('chat-files-drop', { files: Array.from(files) });
             this.showRightSidebar = true;
         },
 
         prepareFileDrag(event) {
-            if (!this.hasFiles(event)) {
+            if (this.activeTab !== 'chat' || !this.hasFiles(event)) {
                 return false;
             }
 
@@ -2776,10 +2869,18 @@ const registerChatPageData = (Alpine) => {
             extension: document.extension,
             status: document.status,
         })),
+        maxDocumentsPerUser: Number(config.maxDocumentsPerUser || 10),
+        userDocumentCount: Number(config.userDocumentCount || 0),
         isSendingMessage: false,
         sendError: '',
         messageAcked: false,
         _pendingLoadingContext: 'general',
+        attachmentSyncing: false,
+        attachmentQueue: [],
+        attachmentQueueProcessing: false,
+        attachmentQueueIndex: 0,
+        attachmentQueueTotal: 0,
+        attachmentQueueLabel: '',
 
         init() {
             if (this.promptDraft) {
@@ -3037,6 +3138,140 @@ const registerChatPageData = (Alpine) => {
 
             input.value = '';
             input.click();
+        },
+
+        handleAttachmentPickerChange(event) {
+            if (this.attachmentSyncing) {
+                return;
+            }
+
+            const files = Array.from(event.target.files || []);
+
+            if (files.length === 0) {
+                return;
+            }
+
+            event.target.value = '';
+            this.enqueueAttachmentUploads(files);
+        },
+
+        handleDroppedFiles(event) {
+            const files = Array.from(event.detail?.files || []);
+
+            if (files.length === 0) {
+                return;
+            }
+
+            this.enqueueAttachmentUploads(files);
+        },
+
+        validateChatAttachmentFile(file) {
+            const extension = (file?.name?.split('.').pop() || '').toLowerCase();
+
+            if (!CHAT_ATTACHMENT_EXTENSIONS.includes(extension)) {
+                return {
+                    valid: false,
+                    message: 'Lampiran chat harus berupa file PDF, DOCX, XLSX, atau CSV.',
+                };
+            }
+
+            if (file.size > 50 * 1024 * 1024) {
+                return {
+                    valid: false,
+                    message: 'Ukuran lampiran chat tidak boleh lebih dari 50 MB.',
+                };
+            }
+
+            return { valid: true };
+        },
+
+        enqueueAttachmentUploads(files) {
+            const remainingQuota = Math.max(0, this.maxDocumentsPerUser - this.userDocumentCount);
+
+            if (remainingQuota <= 0) {
+                this.sendError = 'Limit kuota dokumen tercapai (Maksimal 10 dokumen).';
+
+                return;
+            }
+
+            const dropCap = Math.min(CHAT_MAX_FILES_PER_DROP, remainingQuota);
+            const { accepted, rejected, errors } = mergeFilesWithCap([], files, dropCap, (file) => this.validateChatAttachmentFile(file));
+
+            if (accepted.length === 0) {
+                this.sendError = errors[0] || 'Tidak ada file yang bisa diunggah.';
+
+                return;
+            }
+
+            if (errors.length > 0 || rejected.length > 0) {
+                const detail = errors[0] || `${rejected.length} file ditolak.`;
+                this.sendError = `${accepted.length} file diterima. ${detail}`;
+            }
+
+            this.attachmentQueue.push(...accepted);
+            this.processAttachmentQueue();
+        },
+
+        async processAttachmentQueue() {
+            if (this.attachmentQueueProcessing) {
+                return;
+            }
+
+            this.attachmentQueueProcessing = true;
+            this.attachmentQueueTotal = this.attachmentQueue.length;
+            this.$dispatch('open-sidebar-right');
+
+            while (this.attachmentQueue.length > 0) {
+                const file = this.attachmentQueue.shift();
+                this.attachmentQueueIndex = this.attachmentQueueTotal - this.attachmentQueue.length;
+                this.attachmentQueueLabel = file.name;
+                this.$wire.set('attachmentUploadStatus', null);
+                this.$wire.set('attachmentUploadMessage', '');
+
+                const status = await this.uploadSingleAttachment(file);
+
+                if (status === 'success') {
+                    this.userDocumentCount += 1;
+                } else {
+                    const message = this.$wire.attachmentUploadMessage || 'Upload gagal.';
+
+                    this.sendError = message;
+
+                    if (message.includes('Terlalu banyak') || message.includes('Limit kuota')) {
+                        this.attachmentQueue = [];
+                        break;
+                    }
+                }
+            }
+
+            this.attachmentQueueProcessing = false;
+            this.attachmentQueueIndex = 0;
+            this.attachmentQueueTotal = 0;
+            this.attachmentQueueLabel = '';
+        },
+
+        uploadSingleAttachment(file) {
+            return new Promise((resolve) => {
+                this.$wire.upload(
+                    'chatAttachment',
+                    file,
+                    () => {
+                        const startedAt = Date.now();
+                        const poll = window.setInterval(() => {
+                            const status = this.$wire.attachmentUploadStatus;
+
+                            if (status === 'success' || status === 'error') {
+                                window.clearInterval(poll);
+                                resolve(status);
+                            } else if (Date.now() - startedAt > 30000) {
+                                window.clearInterval(poll);
+                                resolve('timeout');
+                            }
+                        }, 75);
+                    },
+                    () => resolve('error'),
+                );
+            });
         },
 
         scrollChatToBottom(smooth = false) {
