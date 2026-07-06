@@ -557,8 +557,8 @@ class TestPDRParentIsolation:
             "get_embeddings_with_fallback",
             lambda *args, **kwargs: (object(), "fake", 0),
         )
-        monkeypatch.setattr(rag_retrieval, "Chroma", lambda *args, **kwargs: FakeVectorStore())
-        monkeypatch.setattr(rag_hybrid, "Chroma", FakeChroma)
+        monkeypatch.setattr(rag_retrieval, "get_chroma_store", lambda *args, **kwargs: FakeVectorStore())
+        monkeypatch.setattr(rag_hybrid, "get_chroma_store", lambda *args, **kwargs: FakeChroma(*args, **kwargs))
         monkeypatch.setattr(rag_hybrid, "PARENT_COLLECTION_NAME", PARENT_COLLECTION_NAME)
 
         chunks, success = rag_retrieval.search_relevant_chunks(
@@ -644,8 +644,8 @@ class TestPDRParentIsolation:
             "get_embeddings_with_fallback",
             lambda *args, **kwargs: (object(), "fake", 0),
         )
-        monkeypatch.setattr(rag_retrieval, "Chroma", lambda *args, **kwargs: LegacyVectorStore())
-        monkeypatch.setattr(rag_hybrid, "Chroma", MissingParentCollection)
+        monkeypatch.setattr(rag_retrieval, "get_chroma_store", lambda *args, **kwargs: LegacyVectorStore())
+        monkeypatch.setattr(rag_hybrid, "get_chroma_store", lambda *args, **kwargs: MissingParentCollection(*args, **kwargs))
 
         chunks, success = rag_retrieval.search_relevant_chunks(
             query="child content retrieve",
@@ -691,7 +691,7 @@ class TestPDRParentIsolation:
             "get_embeddings_with_fallback",
             lambda *args, **kwargs: (object(), "fake", 0),
         )
-        monkeypatch.setattr(rag_retrieval, "Chroma", lambda *args, **kwargs: RecoverableVectorStore())
+        monkeypatch.setattr(rag_retrieval, "get_chroma_store", lambda *args, **kwargs: RecoverableVectorStore())
 
         chunks, success = rag_retrieval.search_relevant_chunks(
             query="apa isi dokumen administrasi",

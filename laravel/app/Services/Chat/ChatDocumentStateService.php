@@ -4,16 +4,61 @@ namespace App\Services\Chat;
 
 use App\Models\Document;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 
 class ChatDocumentStateService
 {
+    private const CACHE_TTL_SECONDS = 4;
+
     /**
      * @return array{documents: Collection<int, Document>, has_documents_in_progress: bool}
      */
-    public function loadAvailableDocuments(int $userId): array
+    public function loadAvailableDocuments(int $userId, bool $forceRefresh = false): array
     {
-        $documents = Document::where('user_id', $userId)
-            ->orderBy('created_at', 'desc')
+        if ($userId <= 0) {
+            return [
+                'documents' => collect(),
+                'has_documents_in_progress' => false,
+            ];
+        }
+
+        $cacheKey = $this->cacheKey($userId);
+
+        if ($forceRefresh) {
+            Cache::forget($cacheKey);
+        }
+
+        /** @var array{documents: Collection<int, Document>, has_documents_in_progress: bool} $state */
+        $state = Cache::remember($cacheKey, self::CACHE_TTL_SECONDS, fn () => $this->fetchAvailableDocuments($userId));
+
+        return $state;
+    }
+
+    public function invalidateAvailableDocumentsCache(int $userId): void
+    {
+        if ($userId > 0) {
+            Cache::forget($this->cacheKey($userId));
+        }
+    }
+
+    /**
+     * @return array{documents: Collection<int, Document>, has_documents_in_progress: bool}
+     */
+    private function fetchAvailableDocuments(int $userId): array
+    {
+        $documents = Document::query()
+            ->where('user_id', $userId)
+            ->select([
+                'id',
+                'user_id',
+                'original_name',
+                'status',
+                'file_size_bytes',
+                'mime_type',
+                'created_at',
+            ])
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->get();
 
         return [
@@ -142,5 +187,10 @@ class ChatDocumentStateService
     private function normalizeDocumentIds(array $documentIds): array
     {
         return array_values(array_map('intval', $documentIds));
+    }
+
+    private function cacheKey(int $userId): string
+    {
+        return "ista:chat:documents:{$userId}";
     }
 }

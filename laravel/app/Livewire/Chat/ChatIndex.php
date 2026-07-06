@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\Admin\AIUsageEventService;
 use App\Services\AIService;
 use App\Services\Chat\ChatDocumentStateService;
+use App\Services\Chat\ChatPendingRefreshNotifier;
 use App\Services\ChatOrchestrationService;
 use App\Services\DocumentLifecycleService;
 use App\Support\UserFacingError;
@@ -76,10 +77,18 @@ class ChatIndex extends Component
 
     public $streamingConversationId = null;
 
+    public bool $memoTabMounted = false;
+
+    public bool $prompyTabMounted = false;
+
+    public bool $messagesHasOlder = false;
+
     // Maximum chats to show before "Show More"
     const MAX_VISIBLE_CHATS = 10;
 
     private const HISTORY_LOAD_LIMIT = 100;
+
+    private const MESSAGE_UI_LIMIT = 50;
 
     public function mount($id = null)
     {
@@ -133,9 +142,9 @@ class ChatIndex extends Component
         return app(ChatDocumentStateService::class);
     }
 
-    public function loadAvailableDocuments()
+    public function loadAvailableDocuments(bool $forceRefresh = false): void
     {
-        $state = $this->chatDocumentStateService()->loadAvailableDocuments((int) Auth::id());
+        $state = $this->chatDocumentStateService()->loadAvailableDocuments((int) Auth::id(), $forceRefresh);
 
         $this->availableDocuments = $state['documents'];
         $this->hasDocumentsInProgress = $state['has_documents_in_progress'];
@@ -143,28 +152,68 @@ class ChatIndex extends Component
 
     public function loadConversation($id, bool $clearNewMessageId = true)
     {
-        $conversation = Conversation::where('id', $id)
+        Conversation::query()
+            ->whereKey($id)
             ->where('user_id', Auth::id())
-            ->with(['messages' => function ($query) {
-                $query->orderBy('created_at', 'asc')
-                    ->orderBy('id', 'asc');
-            }])
             ->firstOrFail();
 
-        $this->currentConversationId = $conversation->id;
-        $this->messages = $conversation->messages->toArray();
+        $this->currentConversationId = (int) $id;
+        $this->hydrateConversationMessages((int) $id);
         $this->preservedStreamMessageId = null;
         $this->streamingConversationId = null;
         if ($clearNewMessageId) {
             $this->newMessageId = null;
         }
-        $this->dispatch('conversation-activated', id: $conversation->id);
+        $this->dispatch('conversation-activated', id: (int) $id);
+    }
+
+    public function loadOlderMessages(): void
+    {
+        if (! $this->currentConversationId || ! $this->messagesHasOlder) {
+            return;
+        }
+
+        $conversationId = (int) $this->currentConversationId;
+        $oldestLoadedId = collect($this->messages)
+            ->pluck('id')
+            ->filter(fn ($id) => (int) $id > 0)
+            ->min();
+
+        if ($oldestLoadedId === null) {
+            $this->messagesHasOlder = false;
+
+            return;
+        }
+
+        $older = Message::query()
+            ->where('conversation_id', $conversationId)
+            ->where('id', '<', (int) $oldestLoadedId)
+            ->orderByDesc('id')
+            ->limit(self::MESSAGE_UI_LIMIT + 1)
+            ->get();
+
+        if ($older->isEmpty()) {
+            $this->messagesHasOlder = false;
+
+            return;
+        }
+
+        $hasMoreOlder = $older->count() > self::MESSAGE_UI_LIMIT;
+        $batch = ($hasMoreOlder ? $older->take(self::MESSAGE_UI_LIMIT) : $older)
+            ->sortBy('id')
+            ->values()
+            ->map(fn (Message $message) => $message->toArray())
+            ->all();
+
+        $this->messages = array_merge($batch, $this->messages);
+        $this->messagesHasOlder = $hasMoreOlder;
     }
 
     public function startNewChat()
     {
         $this->currentConversationId = null;
         $this->messages = [];
+        $this->messagesHasOlder = false;
         $this->prompt = '';
         $this->selectedDocuments = [];
         $this->conversationDocuments = [];
@@ -246,7 +295,7 @@ class ChatIndex extends Component
             $this->selectedDocuments = $stateService->removeDocumentIds($this->selectedDocuments, (int) $documentId);
             $this->conversationDocuments = $stateService->removeDocumentIds($this->conversationDocuments, (int) $documentId);
 
-            $this->loadAvailableDocuments();
+            $this->loadAvailableDocuments(forceRefresh: true);
             session()->flash('message', 'Dokumen berhasil dihapus.');
         } catch (\Throwable $e) {
             report($e);
@@ -277,7 +326,7 @@ class ChatIndex extends Component
                 $documentIds,
             );
 
-            $this->loadAvailableDocuments();
+            $this->loadAvailableDocuments(forceRefresh: true);
             session()->flash('message', 'Dokumen terpilih berhasil dihapus.');
         } catch (\Throwable $e) {
             report($e);
@@ -319,7 +368,7 @@ class ChatIndex extends Component
             $documentLifecycleService->dispatchProcessing($document);
             $this->selectedDocuments = $this->chatDocumentStateService()->removeDocumentIds($this->selectedDocuments, (int) $documentId);
             $this->conversationDocuments = $this->chatDocumentStateService()->removeDocumentIds($this->conversationDocuments, (int) $documentId);
-            $this->loadAvailableDocuments();
+            $this->loadAvailableDocuments(forceRefresh: true);
             session()->flash('message', 'Dokumen dijadwalkan ulang untuk diproses. Jika gagal lagi, unggah ulang file sumber.');
         } catch (\Throwable $e) {
             report($e);
@@ -389,7 +438,7 @@ class ChatIndex extends Component
             session()->flash('message', 'Dokumen berhasil diunggah dan sedang diproses.');
             $this->attachmentUploadStatus = 'success';
             $this->attachmentUploadMessage = 'Upload berhasil. Dokumen sedang diproses.';
-            $this->loadAvailableDocuments();
+            $this->loadAvailableDocuments(forceRefresh: true);
         } catch (ValidationException $e) {
             $errors = $e->validator->errors();
             $message = $errors->first('file') ?: ($errors->first('chatAttachment') ?: 'Upload gagal. Periksa format file dan coba lagi.');
@@ -496,7 +545,7 @@ class ChatIndex extends Component
         $this->prompt = '';
         $this->sources = [];
 
-        $history = $orchestrator->buildHistory($this->messages);
+        $history = $this->buildConversationHistory($conversationIdForRequest, $orchestrator);
         $webSearchMode = (bool) $this->webSearchMode;
 
         Conversation::query()
@@ -565,6 +614,30 @@ class ChatIndex extends Component
         if ((int) $this->streamingConversationId === (int) $conversationId) {
             $this->streamingConversationId = null;
         }
+    }
+
+    public function pollPendingChatSignals(): void
+    {
+        if ($this->pendingConversationIds === []) {
+            return;
+        }
+
+        $userId = (int) Auth::id();
+
+        if ($userId <= 0) {
+            return;
+        }
+
+        $signals = app(ChatPendingRefreshNotifier::class)->pullSignals(
+            $userId,
+            $this->pendingConversationIds,
+        );
+
+        if ($signals === []) {
+            return;
+        }
+
+        $this->refreshPendingChatState();
     }
 
     public function refreshPendingChatState(?int $alreadyStreamedMessageId = null, bool $preserveActiveStream = false, ?int $streamConversationId = null): void
@@ -682,6 +755,7 @@ class ChatIndex extends Component
         // Normalisasi di render() menjamin tab valid setelah hidrasi #[Url]
         // (initial load) maupun update live, sehingga panel tidak pernah kosong.
         $this->tab = $this->normalizeTab($this->tab);
+        $this->syncMountedTabs();
 
         return view('livewire.chat.chat-index', [
             'prompyEnabled' => $this->prompyEnabled(),
@@ -727,6 +801,18 @@ class ChatIndex extends Component
     public function updatedTab(string $value): void
     {
         $this->tab = $this->normalizeTab($value);
+        $this->syncMountedTabs();
+    }
+
+    private function syncMountedTabs(): void
+    {
+        if ($this->tab === 'memo') {
+            $this->memoTabMounted = true;
+        }
+
+        if ($this->tab === 'prompy' && $this->prompyEnabled()) {
+            $this->prompyTabMounted = true;
+        }
     }
 
     private function conversationHasPendingResponse(Conversation $conversation): bool
@@ -740,6 +826,37 @@ class ChatIndex extends Component
         $createdAt = $latestMessage->created_at;
 
         return $createdAt === null || $createdAt->greaterThan(now()->subMinutes(30));
+    }
+
+    private function hydrateConversationMessages(int $conversationId): void
+    {
+        $recent = Message::query()
+            ->where('conversation_id', $conversationId)
+            ->orderByDesc('id')
+            ->limit(self::MESSAGE_UI_LIMIT + 1)
+            ->get();
+
+        $this->messagesHasOlder = $recent->count() > self::MESSAGE_UI_LIMIT;
+        $this->messages = ($this->messagesHasOlder ? $recent->take(self::MESSAGE_UI_LIMIT) : $recent)
+            ->sortBy('id')
+            ->values()
+            ->map(fn (Message $message) => $message->toArray())
+            ->all();
+    }
+
+    private function buildConversationHistory(int $conversationId, ChatOrchestrationService $orchestrator): array
+    {
+        $dbMessages = Message::query()
+            ->where('conversation_id', $conversationId)
+            ->orderBy('id', 'asc')
+            ->get(['role', 'content'])
+            ->map(fn (Message $message) => [
+                'role' => (string) $message->role,
+                'content' => (string) $message->content,
+            ])
+            ->all();
+
+        return $orchestrator->buildHistory($dbMessages);
     }
 
     private function syncActiveAssistantMessageIntoState(int $conversationId, int $assistantId): void

@@ -7,6 +7,7 @@ use App\Models\Conversation;
 use App\Models\Message;
 use App\Services\Admin\AIUsageEventService;
 use App\Services\AIService;
+use App\Services\Chat\ChatPendingRefreshNotifier;
 use App\Services\ChatOrchestrationService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -91,11 +92,15 @@ class GenerateChatResponse implements ShouldQueue
         }
 
         if ($documentContextError !== null) {
-            if ($orchestrator->saveErrorMessage($this->conversationId, $documentContextError, $this->userId) !== null) {
+            $saved = $orchestrator->saveErrorMessage($this->conversationId, $documentContextError, $this->userId);
+
+            if ($saved !== null) {
                 Conversation::query()
                     ->whereKey($this->conversationId)
                     ->where('user_id', $this->userId)
                     ->touch();
+
+                $this->notifyPendingRefresh($saved);
             }
 
             $usageEvents->failed(
@@ -172,11 +177,15 @@ class GenerateChatResponse implements ShouldQueue
             $errorContent = substr($fullResponse, strlen(AIService::ERROR_SENTINEL));
             $errorContent = trim($errorContent) !== '' ? trim($errorContent) : 'Maaf, ISTA AI gagal merespon. Silakan coba lagi.';
 
-            if ($orchestrator->saveErrorMessage($this->conversationId, $errorContent, $this->userId) !== null) {
+            $saved = $orchestrator->saveErrorMessage($this->conversationId, $errorContent, $this->userId);
+
+            if ($saved !== null) {
                 Conversation::query()
                     ->whereKey($this->conversationId)
                     ->where('user_id', $this->userId)
                     ->touch();
+
+                $this->notifyPendingRefresh($saved);
             }
 
             $usageEvents->failed(
@@ -227,6 +236,8 @@ class GenerateChatResponse implements ShouldQueue
                 ->whereKey($this->conversationId)
                 ->where('user_id', $this->userId)
                 ->touch();
+
+            $this->notifyPendingRefresh($saved);
 
             $usageEvents->completed(
                 feature: $feature,
@@ -302,7 +313,22 @@ class GenerateChatResponse implements ShouldQueue
                 ->whereKey($this->conversationId)
                 ->where('user_id', $this->userId)
                 ->touch();
+
+            $this->notifyPendingRefresh($saved);
         }
+    }
+
+    private function notifyPendingRefresh(?Message $saved): void
+    {
+        if ($saved === null) {
+            return;
+        }
+
+        app(ChatPendingRefreshNotifier::class)->signal(
+            $this->userId,
+            $this->conversationId,
+            (int) $saved->id,
+        );
     }
 
     private function resolveChatFeature(bool $webSearchMode, bool $hasDocumentContext): string

@@ -1445,4 +1445,17 @@ class MemoWorkspaceTest extends TestCase
 
         return [$memo, $version];
     }
+
+    public function test_memo_workspace_exposes_async_loading_feedback(): void
+    {
+        $user = User::factory()->create(['email_verified_at' => now()]);
+
+        Livewire::actingAs($user)
+            ->test(MemoWorkspace::class)
+            ->assertSee('memo-loading.window', false)
+            ->assertSee('memo-loaded.window', false)
+            ->assertSee('Memuat memo.', false)
+            ->assertSee('wire:target="startNewMemo"', false)
+            ->assertSee('x-show="isSwitchingMemo"', false);
+    }
 }

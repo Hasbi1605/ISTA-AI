@@ -27,6 +27,8 @@
     x-on:prompy-reference-document-cleared.window="clearReferenceDocumentState()"
     x-on:prompy-revision-reference-image-cleared.window="clearRevisionReferenceImageState()"
     x-on:prompy-revision-reference-document-cleared.window="clearRevisionReferenceDocumentState()"
+    x-on:prompt-loading.window="isSwitchingPrompt = true"
+    x-on:prompt-loaded.window="isSwitchingPrompt = false"
     x-data="{
         copied: null,
         selectedPlatform: @entangle('platform'),
@@ -60,6 +62,7 @@
         revisionReferenceDocumentDropError: '',
         prompyRevisionText: '',
         prompyRevisionLoading: false,
+        isSwitchingPrompt: false,
         activeRefImageModalUrl: null,
         activeRefImageModalLabel: '',
         excludedActiveRefImages: @entangle('excludedActiveReferenceImages'),
@@ -193,9 +196,24 @@
             this.revisionReferenceImages = this.relabelReferenceImages(this.revisionReferenceImages);
             this.syncRevisionReferenceImageInput();
         },
+        destroyReferenceImageSortable() {
+            if (!this.referenceImageSortable) return;
+            this.referenceImageSortable.destroy();
+            this.referenceImageSortable = null;
+        },
+        destroyRevisionReferenceImageSortable() {
+            if (!this.revisionReferenceImageSortable) return;
+            this.revisionReferenceImageSortable.destroy();
+            this.revisionReferenceImageSortable = null;
+        },
         initReferenceImageSortable(el) {
-            if (!el || this.referenceImageSortable || !window.Sortable) return;
-            this.referenceImageSortable = window.Sortable.create(el, {
+            if (!el) return;
+
+            window.ensureIstaSortable?.().then((Sortable) => {
+                if (!Sortable || !el.isConnected) return;
+
+                this.destroyReferenceImageSortable();
+                this.referenceImageSortable = Sortable.create(el, {
                 animation: 160,
                 delay: 160,
                 delayOnTouchOnly: true,
@@ -210,10 +228,16 @@
                     this.moveReferenceImage(evt.oldIndex, evt.newIndex);
                 },
             });
+            });
         },
         initRevisionReferenceImageSortable(el) {
-            if (!el || this.revisionReferenceImageSortable || !window.Sortable) return;
-            this.revisionReferenceImageSortable = window.Sortable.create(el, {
+            if (!el) return;
+
+            window.ensureIstaSortable?.().then((Sortable) => {
+                if (!Sortable || !el.isConnected) return;
+
+                this.destroyRevisionReferenceImageSortable();
+                this.revisionReferenceImageSortable = Sortable.create(el, {
                 animation: 160,
                 delay: 160,
                 delayOnTouchOnly: true,
@@ -227,6 +251,7 @@
                     this.restoreSortableDom(evt);
                     this.moveRevisionReferenceImage(evt.oldIndex, evt.newIndex);
                 },
+            });
             });
         },
         setReferenceImageFiles(fileList) {
@@ -441,6 +466,7 @@
             this.referenceImageUploading = false;
             this.referenceImageUploadFailed = false;
             this.referenceImageDropError = '';
+            this.destroyReferenceImageSortable();
             this.clearReferenceImageInput();
         },
         clearReferenceImageInput() {
@@ -474,6 +500,7 @@
             this.revisionReferenceImageUploading = false;
             this.revisionReferenceImageUploadFailed = false;
             this.revisionReferenceImageDropError = '';
+            this.destroyRevisionReferenceImageSortable();
             this.clearRevisionReferenceImageInput();
         },
         clearRevisionReferenceImageInput() {
@@ -639,6 +666,14 @@
         </div>
 
         <div class="flex-1 overflow-y-auto bg-transparent px-4 py-4 space-y-4" x-ref="prompyChatBox" id="prompy-chat-box">
+            <div x-show="isSwitchingPrompt" x-transition.opacity x-cloak class="px-2" role="status" aria-live="polite">
+                <span class="sr-only">Memuat prompt.</span>
+                <div class="inline-flex items-center gap-1.5 rounded-full border border-stone-200/70 bg-white/75 px-3 py-2 text-stone-400 shadow-sm backdrop-blur-sm dark:border-gray-800 dark:bg-gray-900/75 dark:text-gray-500" aria-hidden="true">
+                    <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.2s]"></span>
+                    <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.1s]"></span>
+                    <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-current"></span>
+                </div>
+            </div>
             @if($statusMessage)
                 <div
                     x-data="{ show: true }"
@@ -787,7 +822,7 @@
                                 <span class="mt-0.5 block text-[11px] leading-relaxed opacity-75">Opsional. JPG/PNG, maksimal 5 gambar, masing-masing 5 MB.</span>
                             </span>
                         </button>
-                        <div x-show="referenceImages.length > 0" x-cloak x-ref="referenceImageGrid" x-init="$nextTick(() => initReferenceImageSortable($el))" class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                        <div x-show="referenceImages.length > 0" x-cloak x-ref="referenceImageGrid" x-init="$nextTick(() => initReferenceImageSortable($el)); return () => destroyReferenceImageSortable();" class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
                             <template x-for="(image, imgIdx) in referenceImages" :key="image.id">
                                 <div data-ref-image-item class="group relative cursor-grab select-none overflow-hidden rounded-lg border border-stone-200 bg-white text-left shadow-sm active:cursor-grabbing dark:border-gray-700 dark:bg-gray-900">
                                     <button type="button" data-no-drag @click.stop="removeReferenceImageAt(imgIdx)" class="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-red-600" aria-label="Hapus gambar">
@@ -1043,7 +1078,7 @@
                                     Hapus
                                 </button>
                             </div>
-                            <div x-ref="revisionReferenceImageGrid" x-init="$nextTick(() => initRevisionReferenceImageSortable($el))" class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                            <div x-ref="revisionReferenceImageGrid" x-init="$nextTick(() => initRevisionReferenceImageSortable($el)); return () => destroyRevisionReferenceImageSortable();" class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
                                 <template x-for="(image, imgIdx) in revisionReferenceImages" :key="image.id">
                                     <div data-ref-image-item class="group relative cursor-grab select-none overflow-hidden rounded-md border border-emerald-200 bg-white text-left active:cursor-grabbing dark:border-emerald-900/70 dark:bg-gray-900">
                                         <button type="button" data-no-drag @click="removeRevisionReferenceImageAt(imgIdx)" class="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-red-600" aria-label="Hapus gambar">
@@ -1116,9 +1151,10 @@
                                     wire:target="sendPromptChat,revisionReferenceImages,revisionReferenceDocuments"
                                     :disabled="prompyRevisionLoading || revisionReferenceImageUploading || revisionReferenceDocumentUploading || $wire.isGenerating"
                                     class="bg-ista-primary hover:bg-ista-dark dark:bg-ista-primary dark:hover:bg-ista-dark disabled:opacity-50 disabled:cursor-not-allowed rounded-full transition-all duration-300 h-[32px] w-[32px] flex items-center justify-center group"
-                                    aria-label="Kirim pesan prompt">
-                                <img src="{{ asset('images/icons/send-light.svg') }}" alt="" class="h-[17px] w-[17px] dark:hidden brightness-0 invert" />
-                                <img src="{{ asset('images/icons/send-dark.svg') }}" alt="" class="h-[17px] w-[17px] hidden dark:block brightness-0 invert" />
+                                    :aria-label="prompyRevisionLoading ? 'Mengirim pesan prompt' : 'Kirim pesan prompt'">
+                                <span x-show="prompyRevisionLoading" x-cloak class="h-[17px] w-[17px] rounded-full border-2 border-white/70 border-t-transparent animate-spin" aria-hidden="true"></span>
+                                <img x-show="!prompyRevisionLoading" src="{{ asset('images/icons/send-light.svg') }}" alt="" class="h-[17px] w-[17px] dark:hidden brightness-0 invert" />
+                                <img x-show="!prompyRevisionLoading" src="{{ asset('images/icons/send-dark.svg') }}" alt="" class="h-[17px] w-[17px] hidden dark:block brightness-0 invert" />
                             </button>
                         </div>
                     </div>

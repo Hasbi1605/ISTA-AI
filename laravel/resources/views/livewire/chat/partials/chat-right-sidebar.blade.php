@@ -81,11 +81,12 @@
                           </svg>
                           <span wire:loading.inline-flex wire:target="deleteSelectedDocuments" class="h-3 w-3 rounded-full border border-current border-t-transparent animate-spin"></span>
                       </button>
-                      <button type="button" x-show="selectedInAvailableCount() > 0" @click="addSelectedDocumentsToChat().then(() => { if (isMobile) showRightSidebar = false; })" class="inline-flex h-7 shrink-0 items-center gap-1 rounded-md bg-ista-primary px-2.5 text-[10.5px] font-semibold text-white transition-all hover:bg-stone-800 whitespace-nowrap" title="Tambahkan dokumen terpilih ke chat" aria-label="Tambahkan dokumen terpilih ke chat" style="{{ $selectedInAvailableCount > 0 ? '' : 'display: none;' }}">
-                          <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <button type="button" x-show="selectedInAvailableCount() > 0" @click="addSelectedDocumentsToChat().then(() => { if (isMobile) showRightSidebar = false; })" wire:loading.attr="disabled" wire:target="addSelectedDocumentsToChat" class="inline-flex h-7 shrink-0 items-center gap-1 rounded-md bg-ista-primary px-2.5 text-[10.5px] font-semibold text-white transition-all hover:bg-stone-800 whitespace-nowrap disabled:opacity-60" title="Tambahkan dokumen terpilih ke chat" aria-label="Tambahkan dokumen terpilih ke chat" style="{{ $selectedInAvailableCount > 0 ? '' : 'display: none;' }}">
+                          <svg wire:loading.remove wire:target="addSelectedDocumentsToChat" xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                           </svg>
-                           Pakai
+                          <span wire:loading.inline-flex wire:target="addSelectedDocumentsToChat" class="h-3 w-3 rounded-full border border-white/70 border-t-transparent animate-spin" aria-hidden="true"></span>
+                           <span wire:loading.remove wire:target="addSelectedDocumentsToChat">Pakai</span>
                       </button>
               </div>
 

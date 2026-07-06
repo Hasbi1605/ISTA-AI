@@ -152,11 +152,14 @@
                         </a>
                         <button type="button" wire:click="deleteConversation({{ $conversation->id }})"
                                 wire:confirm="Hapus chat \"{{ $conversation->title }}\"? Riwayat percakapan ini tidak bisa dikembalikan."
-                                class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 focus:opacity-100 focus-visible:opacity-100 hover:bg-red-100 dark:hover:bg-red-500/20 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-all duration-200"
+                                wire:loading.attr="disabled"
+                                wire:target="deleteConversation"
+                                class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 focus:opacity-100 focus-visible:opacity-100 hover:bg-red-100 dark:hover:bg-red-500/20 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-all duration-200 disabled:opacity-50"
                                 title="Hapus chat" aria-label="Hapus chat {{ $conversation->title }}">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg wire:loading.remove wire:target="deleteConversation" xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                             </svg>
+                            <span wire:loading.inline-flex wire:target="deleteConversation" class="h-3.5 w-3.5 rounded-full border border-current border-t-transparent animate-spin" aria-hidden="true"></span>
                         </button>
                     </li>
                 @empty

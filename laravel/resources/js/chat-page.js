@@ -1,9 +1,21 @@
 import DOMPurify from 'dompurify';
 import { marked } from 'marked';
-import Sortable from 'sortablejs';
 
-// Expose SortableJS for inline Alpine components (e.g. Prompy reference image reorder).
-window.Sortable = window.Sortable || Sortable;
+let sortableModulePromise = null;
+
+window.ensureIstaSortable = async () => {
+    if (window.Sortable) {
+        return window.Sortable;
+    }
+
+    sortableModulePromise ??= import('sortablejs').then(({ default: Sortable }) => {
+        window.Sortable = Sortable;
+
+        return Sortable;
+    });
+
+    return sortableModulePromise;
+};
 
 let hasRegisteredChatPageData = false;
 const CHAT_PENDING_STORAGE_KEY = 'ista.chat.pendingResponses.v1';
@@ -2154,6 +2166,7 @@ const registerChatPageData = (Alpine) => {
             const promptLoadToken = this.promptLoadToken + 1;
             this.promptLoadToken = promptLoadToken;
             this.loadingPromptId = promptId;
+            window.dispatchEvent(new CustomEvent('prompt-loading', { detail: { promptId } }));
 
             return Promise.resolve(this.$wire.selectPrompt(promptId))
                 .then(() => {
@@ -2187,6 +2200,8 @@ const registerChatPageData = (Alpine) => {
                     if (this.loadingPromptId === promptId) {
                         this.loadingPromptId = null;
                     }
+
+                    window.dispatchEvent(new CustomEvent('prompt-loaded', { detail: { promptId } }));
                 });
         },
     }));
@@ -2333,6 +2348,7 @@ const registerChatPageData = (Alpine) => {
             const memoLoadToken = this.memoLoadToken + 1;
             this.memoLoadToken = memoLoadToken;
             this.loadingMemoId = memoId;
+            window.dispatchEvent(new CustomEvent('memo-loading', { detail: { memoId } }));
             const shouldSyncActiveEditor = Number.isFinite(previousMemoId)
                 && previousMemoId > 0
                 && this.hasOnlyOfficeChangesToSync();
@@ -2370,6 +2386,8 @@ const registerChatPageData = (Alpine) => {
                     if (this.loadingMemoId === memoId) {
                         this.loadingMemoId = null;
                     }
+
+                    window.dispatchEvent(new CustomEvent('memo-loaded', { detail: { memoId } }));
                 });
         },
 
@@ -3317,6 +3335,7 @@ const registerChatPageData = (Alpine) => {
         showMemoSidebar: !window.matchMedia('(max-width: 1023px)').matches,
         isMobile: window.matchMedia('(max-width: 1023px)').matches,
         memoMobilePanel: 'chat',
+        isSwitchingMemo: false,
         memoRevisionText: '',
         memoRevisionLoading: false,
         memoLoadingPhase: 'Membuat ulang memo',

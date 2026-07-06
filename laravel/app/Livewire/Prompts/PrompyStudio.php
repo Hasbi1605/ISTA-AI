@@ -87,10 +87,7 @@ class PrompyStudio extends Component
 
     public function selectPrompt(int $promptId): void
     {
-        $prompt = GeneratedPrompt::with(['currentVersion', 'versions'])
-            ->where('id', $promptId)
-            ->where('user_id', Auth::id())
-            ->first();
+        $prompt = $this->loadActivePromptModel((int) Auth::id(), $promptId);
 
         if ($prompt) {
             $this->activatePromptModel($prompt);
@@ -434,21 +431,36 @@ class PrompyStudio extends Component
     {
         $userId = (int) Auth::id();
 
-        $prompts = GeneratedPrompt::with(['currentVersion', 'versions' => fn ($query) => $query->orderBy('version_number')])
+        $prompts = GeneratedPrompt::query()
             ->where('user_id', $userId)
+            ->select([
+                'id',
+                'user_id',
+                'title',
+                'idea',
+                'platform',
+                'prompt_type',
+                'platform_label',
+                'prompt_type_label',
+                'updated_at',
+                'current_version_id',
+            ])
             ->orderByDesc('updated_at')
             ->orderByDesc('id')
             ->limit(self::HISTORY_LOAD_LIMIT)
             ->get();
 
         $activePrompt = null;
-        if (! $this->isComposingNewPrompt) {
-            $activePrompt = $this->activePromptId
-                ? $prompts->firstWhere('id', (int) $this->activePromptId)
-                : null;
+        $activeVersion = null;
+        $activeVersionId = null;
 
-            if (! $activePrompt) {
-                $activePrompt = $prompts->first();
+        if (! $this->isComposingNewPrompt) {
+            if ($this->activePromptId) {
+                $activePrompt = $this->loadActivePromptModel($userId, (int) $this->activePromptId);
+            }
+
+            if (! $activePrompt && $prompts->isNotEmpty()) {
+                $activePrompt = $this->loadActivePromptModel($userId, (int) $prompts->first()->id);
 
                 if ($activePrompt) {
                     $this->activatePromptModel($activePrompt);
@@ -456,8 +468,6 @@ class PrompyStudio extends Component
             }
         }
 
-        $activeVersion = null;
-        $activeVersionId = null;
         if ($activePrompt) {
             $activeVersion = $this->activePromptVersionId
                 ? $activePrompt->versions->firstWhere('id', (int) $this->activePromptVersionId)
@@ -476,6 +486,18 @@ class PrompyStudio extends Component
             'platforms' => PromptStudioService::PLATFORMS,
             'promptTypes' => PromptStudioService::PROMPT_TYPES,
         ]);
+    }
+
+    private function loadActivePromptModel(int $userId, int $promptId): ?GeneratedPrompt
+    {
+        return GeneratedPrompt::query()
+            ->where('user_id', $userId)
+            ->whereKey($promptId)
+            ->with([
+                'currentVersion',
+                'versions' => fn ($query) => $query->orderBy('version_number'),
+            ])
+            ->first();
     }
 
     private function activatePromptModel(GeneratedPrompt $prompt): void

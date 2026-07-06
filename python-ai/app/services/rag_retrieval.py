@@ -2,10 +2,10 @@ import logging
 from typing import List, Tuple, Dict
 from collections import Counter
 
-from langchain_chroma import Chroma
 from langchain_core.documents import Document
 
 from app.env_utils import get_env_bool, get_env_int
+from app.services.chroma_store import get_chroma_store
 from app.services.rag_config import CHROMA_PATH, VECTOR_COLLECTION_NAME
 from app.services.rag_embeddings import get_embeddings_with_fallback
 from app.services.rag_prompt import build_rag_prompt as _build_rag_prompt
@@ -94,10 +94,10 @@ def search_relevant_chunks(query: str, filenames: List[str] = None, top_k: int =
         if embeddings is None:
             return [], False
 
-        vectorstore = Chroma(
-            collection_name=VECTOR_COLLECTION_NAME,
+        vectorstore = get_chroma_store(
+            VECTOR_COLLECTION_NAME,
             embedding_function=embeddings,
-            persist_directory=CHROMA_PATH
+            persist_directory=CHROMA_PATH,
         )
 
         user_filter = {"user_id": str(user_id)}

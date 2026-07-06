@@ -2,10 +2,10 @@ import re
 import logging
 from typing import List, Tuple, Dict, Optional
 
-from langchain_chroma import Chroma
+from app.services.chroma_store import get_chroma_store
+from app.services.rag_config import CHROMA_PATH, PARENT_COLLECTION_NAME
 
 from app.env_utils import get_env
-from app.services.rag_config import CHROMA_PATH, PARENT_COLLECTION_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -263,8 +263,8 @@ def _resolve_pdr_parents(
     parent_collections = []
 
     try:
-        parent_store = Chroma(
-            collection_name=PARENT_COLLECTION_NAME,
+        parent_store = get_chroma_store(
+            PARENT_COLLECTION_NAME,
             persist_directory=CHROMA_PATH,
         )
         parent_collections.append(parent_store._collection)

@@ -1,4 +1,5 @@
-<div x-data="chatLayout({ activeTab: $wire.entangle('tab').live, prompyEnabled: @js($prompyEnabled) })"
+<div data-ista-chat-shell
+     x-data="chatLayout({ activeTab: $wire.entangle('tab').live, prompyEnabled: @js($prompyEnabled) })"
      x-on:dragenter.window="onDragEnter($event)"
      x-on:dragover.window="onDragOver($event)"
      x-on:dragleave.window="onDragLeave($event)"
@@ -32,10 +33,10 @@
     {{-- ===== CHAT TAB CONTENT ===== --}}
     <div x-show="activeTab === 'chat'" class="flex w-full h-full overflow-hidden">
         @if(! empty($pendingConversationIds))
-            {{-- Polling 3s: jalur utama untuk mendeteksi assistant message yang sudah selesai dipersist.
-                 GenerateChatResponse tidak dispatch event setelah selesai, sehingga polling tetap
-                 dibutuhkan sebagai satu-satunya mekanisme refresh. --}}
-            <div wire:poll.3s="refreshPendingChatState" class="hidden" aria-hidden="true"></div>
+            {{-- Poll ringan 5s: cek cache signal dari GenerateChatResponse; full refresh hanya bila ada sinyal. --}}
+            <div wire:poll.5s="pollPendingChatSignals" class="hidden" aria-hidden="true"></div>
+            {{-- Fallback reconcile 60s bila sinyal cache terlewat (TTL/eviction/restart). --}}
+            <div wire:poll.60s="refreshPendingChatState" class="hidden" aria-hidden="true"></div>
         @endif
 
         <!-- LEFT SIDEBAR: Chat History -->
@@ -94,12 +95,14 @@
     </div>
 
     {{-- ===== MEMO TAB CONTENT ===== --}}
+    @if($memoTabMounted)
     <div x-show="activeTab === 'memo'" x-cloak class="flex w-full h-full overflow-hidden">
         <livewire:memos.memo-workspace />
     </div>
+    @endif
 
     {{-- ===== PROMPY TAB CONTENT ===== --}}
-    @if($prompyEnabled)
+    @if($prompyEnabled && $prompyTabMounted)
     <div x-show="activeTab === 'prompy'" x-cloak class="flex w-full h-full overflow-hidden">
         <livewire:prompts.prompy-workspace />
     </div>

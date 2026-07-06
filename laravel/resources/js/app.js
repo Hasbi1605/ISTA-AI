@@ -1,5 +1,4 @@
 import './bootstrap';
-import './chat-page';
 
 const syncAppViewportHeight = () => {
     const height = window.visualViewport?.height || window.innerHeight;
@@ -17,3 +16,7 @@ window.addEventListener('orientationchange', () => {
     window.setTimeout(syncAppViewportHeight, 80);
 }, { passive: true });
 window.visualViewport?.addEventListener('resize', syncAppViewportHeight, { passive: true });
+
+if (document.querySelector('[data-ista-chat-shell]')) {
+    import('./chat-page');
+}

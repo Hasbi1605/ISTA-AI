@@ -1,10 +1,9 @@
 import logging
 from typing import Tuple, List
 
-from langchain_chroma import Chroma
-
 from app.env_utils import get_env_int
-from app.services.rag_config import CHROMA_PATH
+from app.services.chroma_store import get_chroma_store
+from app.services.rag_config import CHROMA_PATH, VECTOR_COLLECTION_NAME
 from app.services.rag_embeddings import get_embeddings_with_fallback, count_tokens
 from app.services.rag_hybrid import _exclude_parent_corpus
 
@@ -32,10 +31,10 @@ def get_document_chunks_for_summarization(
         if embeddings is None:
             return False, [], 0
 
-        vectorstore = Chroma(
-            collection_name="documents_collection",
+        vectorstore = get_chroma_store(
+            VECTOR_COLLECTION_NAME,
             embedding_function=embeddings,
-            persist_directory=CHROMA_PATH
+            persist_directory=CHROMA_PATH,
         )
 
         if document_id:

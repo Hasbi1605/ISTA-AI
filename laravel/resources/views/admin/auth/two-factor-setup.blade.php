@@ -10,10 +10,6 @@
 
     <link rel="icon" type="image/png" href="{{ asset('images/ista/logo.png') }}">
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-
     <script>
         if (localStorage.theme === 'dark') {
             document.documentElement.classList.add('dark');
@@ -21,7 +17,7 @@
             document.documentElement.classList.remove('dark');
         }
     </script>
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @vite(['resources/css/app.css', 'resources/css/admin.css', 'resources/js/app.js'])
 </head>
 <body class="ista-shell ista-display-sans min-h-screen bg-[#fafaf9] text-stone-800 transition-colors duration-300 dark:bg-gray-950 dark:text-gray-100">
     <div class="relative flex min-h-screen w-full items-center justify-center overflow-hidden px-4 py-10">

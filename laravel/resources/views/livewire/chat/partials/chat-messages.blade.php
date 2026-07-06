@@ -31,6 +31,21 @@
             </p>
         </div>
     @else
+    @if($messagesHasOlder)
+        <div class="flex justify-center pb-2">
+            <button type="button"
+                    wire:click="loadOlderMessages"
+                    wire:loading.attr="disabled"
+                    wire:target="loadOlderMessages"
+                    class="inline-flex items-center gap-2 rounded-full border border-stone-200/80 bg-white/90 px-4 py-1.5 text-[12px] font-semibold text-stone-600 transition-colors hover:border-ista-primary/30 hover:text-ista-primary disabled:opacity-60 dark:border-gray-700 dark:bg-gray-900/80 dark:text-gray-300 dark:hover:text-amber-200">
+                <span wire:loading.remove wire:target="loadOlderMessages">Muat pesan lebih lama</span>
+                <span wire:loading.inline-flex wire:target="loadOlderMessages" class="items-center gap-2">
+                    <span class="h-3 w-3 rounded-full border border-current border-t-transparent animate-spin" aria-hidden="true"></span>
+                    Memuat...
+                </span>
+            </button>
+        </div>
+    @endif
 
     @foreach($messages as $message)
         @php

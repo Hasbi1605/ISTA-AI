@@ -10,6 +10,7 @@ use App\Models\Document;
 use App\Models\Message;
 use App\Models\User;
 use App\Services\AIService;
+use App\Services\Chat\ChatPendingRefreshNotifier;
 use App\Services\ChatOrchestrationService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\QueryException;
@@ -549,7 +550,8 @@ class ChatUiTest extends TestCase
             ->assertSee('min-w-0 flex-1 truncate', false)
             ->assertSee('bg-sky-500', false)
             ->assertDontSee('ml-auto h-3 w-3 shrink-0 rounded-full border', false)
-            ->assertSee('wire:poll.3s="refreshPendingChatState"', false)
+            ->assertSee('wire:poll.5s="pollPendingChatSignals"', false)
+            ->assertSee('wire:poll.60s="refreshPendingChatState"', false)
             ->assertSee('navigateToConversation($event,', false)
             ->assertSee('navigateToNewChat($event)', false)
             ->assertSee('chat-history-item', false)
@@ -765,6 +767,100 @@ class ChatUiTest extends TestCase
         );
     }
 
+    public function test_load_conversation_limits_messages_to_recent_ui_window(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::create([
+            'user_id' => $user->id,
+            'title' => 'Long conversation window',
+        ]);
+
+        for ($i = 1; $i <= 55; $i++) {
+            Message::create([
+                'conversation_id' => $conversation->id,
+                'role' => $i % 2 === 1 ? 'user' : 'assistant',
+                'content' => "Message {$i}",
+            ]);
+        }
+
+        $component = Livewire::actingAs($user)
+            ->test(ChatIndex::class, ['id' => $conversation->id])
+            ->assertSet('messagesHasOlder', true)
+            ->assertSee('Muat pesan lebih lama', false);
+
+        $messages = collect($component->get('messages'));
+        $this->assertCount(50, $messages);
+        $this->assertSame('Message 6', $messages->first()['content']);
+        $this->assertSame('Message 55', $messages->last()['content']);
+    }
+
+    public function test_load_older_messages_prepends_previous_batch(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::create([
+            'user_id' => $user->id,
+            'title' => 'Load older messages',
+        ]);
+
+        for ($i = 1; $i <= 55; $i++) {
+            Message::create([
+                'conversation_id' => $conversation->id,
+                'role' => $i % 2 === 1 ? 'user' : 'assistant',
+                'content' => "Message {$i}",
+            ]);
+        }
+
+        $component = Livewire::actingAs($user)
+            ->test(ChatIndex::class, ['id' => $conversation->id])
+            ->assertSet('messagesHasOlder', true)
+            ->call('loadOlderMessages')
+            ->assertSet('messagesHasOlder', false);
+
+        $messages = collect($component->get('messages'));
+        $this->assertCount(55, $messages);
+        $this->assertSame('Message 1', $messages->first()['content']);
+        $this->assertSame('Message 55', $messages->last()['content']);
+    }
+
+    public function test_send_message_builds_history_from_database_not_truncated_ui_window(): void
+    {
+        config()->set('services.ai_service.max_history_messages', 4);
+
+        $user = User::factory()->create();
+        $conversation = Conversation::create([
+            'user_id' => $user->id,
+            'title' => 'History from DB',
+        ]);
+
+        for ($i = 1; $i <= 60; $i++) {
+            Message::create([
+                'conversation_id' => $conversation->id,
+                'role' => $i % 2 === 1 ? 'user' : 'assistant',
+                'content' => "Turn {$i}",
+                'created_at' => now()->addSeconds($i),
+                'updated_at' => now()->addSeconds($i),
+            ]);
+        }
+
+        Queue::fake();
+        Cache::flush();
+
+        $component = Livewire::actingAs($user)
+            ->test(ChatIndex::class, ['id' => $conversation->id])
+            ->assertSet('messagesHasOlder', true)
+            ->set('prompt', 'Pertanyaan lanjutan')
+            ->call('sendMessage')
+            ->assertDispatched('user-message-acked');
+
+        Queue::assertPushed(GenerateChatResponse::class, function (GenerateChatResponse $job) {
+            $contents = array_column($job->history, 'content');
+
+            return in_array('Turn 59', $contents, true)
+                && ($job->history[array_key_last($job->history)]['content'] ?? null) === 'Pertanyaan lanjutan'
+                && ! in_array('Turn 6', $contents, true);
+        });
+    }
+
     public function test_generate_chat_response_saves_error_message_when_ai_service_returns_sentinel(): void
     {
         $user = User::factory()->create();
@@ -805,6 +901,23 @@ class ChatUiTest extends TestCase
             'is_error' => false,
             'content' => '❌ Kesalahan sistem saat menghubungi otak AI. Silakan coba lagi nanti.',
         ]);
+
+        $assistant = Message::query()
+            ->where('conversation_id', $conversation->id)
+            ->where('role', 'assistant')
+            ->latest('id')
+            ->first();
+
+        $this->assertNotNull($assistant);
+
+        $signals = app(ChatPendingRefreshNotifier::class)->pullSignals(
+            (int) $user->id,
+            [(int) $conversation->id],
+        );
+
+        $this->assertCount(1, $signals);
+        $this->assertSame((int) $conversation->id, $signals[0]['conversationId']);
+        $this->assertSame((int) $assistant->id, $signals[0]['messageId']);
     }
 
     public function test_message_is_error_is_cast_to_boolean(): void
@@ -1233,6 +1346,71 @@ class ChatUiTest extends TestCase
             ->assertSet('pendingConversationIds', [])
             ->assertSet('newMessageId', $assistant->id)
             ->assertSee('Jawaban background sudah selesai.', false)
+            ->assertDispatched('chat-pending-state-updated', pendingConversationIds: [])
+            ->assertDispatched('assistant-message-persisted', function (string $_event, array $payload) use ($conversation, $assistant) {
+                return (int) ($payload['conversationId'] ?? 0) === (int) $conversation->id
+                    && (int) ($payload['messageId'] ?? 0) === (int) $assistant->id;
+            });
+    }
+
+    public function test_poll_pending_chat_signals_skips_refresh_without_job_signal(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::create([
+            'user_id' => $user->id,
+            'title' => 'Poll tanpa signal',
+        ]);
+
+        Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'user',
+            'content' => 'Menunggu jawaban job.',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ChatIndex::class, ['id' => $conversation->id])
+            ->assertSet('pendingConversationIds', [$conversation->id])
+            ->call('pollPendingChatSignals')
+            ->assertSet('pendingConversationIds', [$conversation->id])
+            ->assertNotDispatched('assistant-message-persisted');
+    }
+
+    public function test_poll_pending_chat_signals_refreshes_after_job_signal(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::create([
+            'user_id' => $user->id,
+            'title' => 'Poll dengan signal job',
+        ]);
+
+        Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'user',
+            'content' => 'Menunggu jawaban job.',
+        ]);
+
+        $component = Livewire::actingAs($user)
+            ->test(ChatIndex::class, ['id' => $conversation->id])
+            ->assertSet('pendingConversationIds', [$conversation->id]);
+
+        $assistant = Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'assistant',
+            'content' => 'Jawaban dari job fallback.',
+        ]);
+        $conversation->touch();
+
+        app(ChatPendingRefreshNotifier::class)->signal(
+            (int) $user->id,
+            (int) $conversation->id,
+            (int) $assistant->id,
+        );
+
+        $component
+            ->call('pollPendingChatSignals')
+            ->assertSet('pendingConversationIds', [])
+            ->assertSet('newMessageId', $assistant->id)
+            ->assertSee('Jawaban dari job fallback.', false)
             ->assertDispatched('chat-pending-state-updated', pendingConversationIds: [])
             ->assertDispatched('assistant-message-persisted', function (string $_event, array $payload) use ($conversation, $assistant) {
                 return (int) ($payload['conversationId'] ?? 0) === (int) $conversation->id
@@ -1848,5 +2026,58 @@ class ChatUiTest extends TestCase
             ->test(ChatIndex::class)
             ->set('tab', 'prompy')
             ->assertSet('tab', 'chat');
+    }
+
+    public function test_chat_exposes_async_loading_feedback(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::create([
+            'user_id' => $user->id,
+            'title' => 'Percakapan Uji Loading',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ChatIndex::class)
+            ->assertSee('Mengunggah lampiran...', false)
+            ->assertSee('wire:target="addSelectedDocumentsToChat"', false);
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['id' => $conversation->id])
+            ->test(ChatIndex::class)
+            ->assertSee('wire:target="deleteConversation"', false);
+    }
+
+    public function test_chat_tab_lazy_mounts_memo_and_prompy_workspaces(): void
+    {
+        config(['features.prompy' => true]);
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->test(ChatIndex::class)
+            ->assertSet('tab', 'chat')
+            ->assertSet('memoTabMounted', false)
+            ->assertSet('prompyTabMounted', false)
+            ->assertSee('data-ista-chat-shell', false)
+            ->assertDontSee('x-data="memoWorkspace"', false)
+            ->assertDontSee('x-data="prompyWorkspace"', false);
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['tab' => 'memo'])
+            ->test(ChatIndex::class)
+            ->assertSet('memoTabMounted', true)
+            ->assertSet('prompyTabMounted', false)
+            ->assertSee('Konfigurasi Memo', false);
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['tab' => 'prompy'])
+            ->test(ChatIndex::class)
+            ->assertSet('prompyTabMounted', true)
+            ->assertSee('Prompy Studio', false);
+
+        Livewire::actingAs($user)
+            ->test(ChatIndex::class)
+            ->set('tab', 'memo')
+            ->assertSet('memoTabMounted', true)
+            ->assertSee('Konfigurasi Memo', false);
     }
 }

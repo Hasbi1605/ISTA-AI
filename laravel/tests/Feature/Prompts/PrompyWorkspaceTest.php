@@ -46,4 +46,18 @@ class PrompyWorkspaceTest extends TestCase
         $this->assertFalse(Schema::hasTable('presentations'));
         $this->assertFalse(Schema::hasTable('presentation_versions'));
     }
+
+    public function test_workspace_exposes_async_loading_feedback(): void
+    {
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->test(PrompyWorkspace::class)
+            ->assertSee('prompt-loading.window', false)
+            ->assertSee('prompt-loaded.window', false)
+            ->assertSee('Memuat prompt.', false)
+            ->assertSee('wire:target="startNewPrompt"', false)
+            ->assertSee('prompyRevisionLoading: false', false)
+            ->assertSee('x-show="isSwitchingPrompt"', false);
+    }
 }

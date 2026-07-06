@@ -57,6 +57,15 @@
 
     {{-- Dynamic Configuration / Chat Area --}}
     <div class="flex-1 overflow-y-auto bg-transparent px-4 py-4 space-y-4" x-ref="memoChatBox" id="memo-chat-box">
+        <div x-show="isSwitchingMemo" x-transition.opacity x-cloak class="px-2" role="status" aria-live="polite">
+            <span class="sr-only">Memuat memo.</span>
+            <div class="inline-flex items-center gap-1.5 rounded-full border border-stone-200/70 bg-white/75 px-3 py-2 text-stone-400 shadow-sm backdrop-blur-sm dark:border-gray-800 dark:bg-gray-900/75 dark:text-gray-500" aria-hidden="true">
+                <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.2s]"></span>
+                <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.1s]"></span>
+                <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-current"></span>
+            </div>
+        </div>
+
         @if ($activeMemoId)
             <div class="rounded-lg border border-stone-200 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                 <div class="flex items-start justify-between gap-3">
@@ -369,9 +378,10 @@
                                 wire:target="sendMemoChat,generateRevisionFromChat"
                                 :disabled="memoRevisionLoading || $wire.isGenerating"
                                 class="bg-ista-primary hover:bg-ista-dark dark:bg-ista-primary dark:hover:bg-ista-dark disabled:opacity-50 disabled:cursor-not-allowed rounded-full transition-all duration-300 h-[32px] w-[32px] flex items-center justify-center group"
-                                aria-label="Kirim revisi memo">
-                            <img src="{{ asset('images/icons/send-light.svg') }}" alt="" class="h-[17px] w-[17px] dark:hidden brightness-0 invert" />
-                            <img src="{{ asset('images/icons/send-dark.svg') }}" alt="" class="h-[17px] w-[17px] hidden dark:block brightness-0 invert" />
+                                :aria-label="memoRevisionLoading ? 'Mengirim revisi memo' : 'Kirim revisi memo'">
+                            <span x-show="memoRevisionLoading" x-cloak class="h-[17px] w-[17px] rounded-full border-2 border-white/70 border-t-transparent animate-spin" aria-hidden="true"></span>
+                            <img x-show="!memoRevisionLoading" src="{{ asset('images/icons/send-light.svg') }}" alt="" class="h-[17px] w-[17px] dark:hidden brightness-0 invert" />
+                            <img x-show="!memoRevisionLoading" src="{{ asset('images/icons/send-dark.svg') }}" alt="" class="h-[17px] w-[17px] hidden dark:block brightness-0 invert" />
                         </button>
                     </div>
                 </div>

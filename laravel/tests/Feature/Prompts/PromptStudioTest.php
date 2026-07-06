@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\Prompts\PromptStudioService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
@@ -693,16 +694,55 @@ class PromptStudioTest extends TestCase
             ->assertSee('referenceImageUid(file)', false)
             // Config composer drag wiring (rendered by default).
             ->assertSee('initReferenceImageSortable($el)', false)
+            ->assertSee('destroyReferenceImageSortable()', false)
             ->assertSee('moveReferenceImage(evt.oldIndex, evt.newIndex)', false)
             ->assertSee('x-ref="referenceImageGrid"', false)
+            ->assertSee('return () => destroyReferenceImageSortable();', false)
             // Revision composer drag wiring lives in the always-present x-data definitions.
             ->assertSee('initRevisionReferenceImageSortable(el) {', false)
+            ->assertSee('destroyRevisionReferenceImageSortable()', false)
             ->assertSee('moveRevisionReferenceImage(oldIndex, newIndex) {', false)
             // Draggable tiles, X button excluded from drag, and DOM revert for Alpine sync.
             ->assertSee('data-ref-image-item', false)
             ->assertSee('data-no-drag', false)
             ->assertSee('restoreSortableDom(evt)', false)
-            ->assertSee('Seret gambar untuk mengubah urutan', false);
+            ->assertSee('Seret gambar untuk mengubah urutan', false)
+            // Init must destroy stale instances instead of skipping when already initialized.
+            ->assertSee('this.destroyReferenceImageSortable();', false)
+            ->assertSee('this.destroyRevisionReferenceImageSortable();', false)
+            ->assertSee('window.ensureIstaSortable?.().then((Sortable) => {', false)
+            ->assertDontSee('this.referenceImageSortable || !window.Sortable', false)
+            ->assertDontSee('this.revisionReferenceImageSortable || !window.Sortable', false);
+    }
+
+    public function test_reference_image_sortable_wiring_survives_prompt_configuration_toggle(): void
+    {
+        Storage::fake('local');
+        $user = User::factory()->create();
+
+        Http::fake([
+            config('services.ai.url').'/api/prompts/generate' => Http::response([
+                'main_prompt' => 'A configured prompt package.',
+                'notes_id' => 'Catatan ID.',
+                'variants' => [],
+                'negative_prompt' => '',
+                'settings' => [],
+            ], 200),
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(PrompyStudio::class)
+            ->set('idea', 'Buat poster acara')
+            ->call('selectPlatform', 'gpt_image_2')
+            ->call('selectPromptType', 'image')
+            ->call('generate')
+            ->assertSet('showPromptConfiguration', false)
+            ->assertSee('return () => destroyRevisionReferenceImageSortable();', false)
+            ->set('showPromptConfiguration', true)
+            ->assertSee('initReferenceImageSortable($el)', false)
+            ->assertSee('destroyReferenceImageSortable()', false)
+            ->assertSee('return () => destroyReferenceImageSortable();', false)
+            ->assertSee('this.destroyReferenceImageSortable();', false);
     }
 
     public function test_reference_document_upload_sync_appends_like_reference_images(): void
@@ -1220,5 +1260,44 @@ class PromptStudioTest extends TestCase
             ->call('generate');
 
         $this->assertDatabaseCount('generated_prompts', 0);
+    }
+
+    public function test_prompy_compose_mode_does_not_query_prompt_versions_for_sidebar_history(): void
+    {
+        $user = User::factory()->create();
+
+        foreach (['Prompt A', 'Prompt B', 'Prompt C'] as $index => $title) {
+            $prompt = GeneratedPrompt::create([
+                'user_id' => $user->id,
+                'platform' => 'gpt_image_2',
+                'platform_label' => 'ChatGPT Images / GPT Image',
+                'prompt_type' => 'image',
+                'prompt_type_label' => 'Gambar',
+                'title' => $title,
+                'idea' => strtolower($title),
+                'package' => $this->fakePackageResponse(['main_prompt' => $title.' output']),
+            ]);
+
+            GeneratedPromptVersion::create([
+                'generated_prompt_id' => $prompt->id,
+                'version_number' => 1,
+                'package' => $this->fakePackageResponse(['main_prompt' => $title.' output']),
+            ]);
+        }
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        Livewire::actingAs($user)
+            ->test(PrompyStudio::class)
+            ->assertSet('isComposingNewPrompt', true)
+            ->assertSee('Prompt A', false)
+            ->assertSee('Prompt B', false);
+
+        $versionQueries = collect(DB::getQueryLog())
+            ->pluck('query')
+            ->filter(fn (string $query) => str_contains(strtolower($query), 'generated_prompt_versions'));
+
+        $this->assertCount(0, $versionQueries);
     }
 }

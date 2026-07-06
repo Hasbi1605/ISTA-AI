@@ -6,6 +6,7 @@ use App\Models\Document;
 use App\Models\User;
 use App\Services\Chat\ChatDocumentStateService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
 
 class ChatDocumentStateServiceTest extends TestCase
@@ -47,6 +48,43 @@ class ChatDocumentStateServiceTest extends TestCase
         $this->assertSame([10], $service->addSelectedDocumentsToChat([10, 12], [10]));
         $this->assertSame([10, 12], $service->addDocumentIds([10], [10, 12]));
         $this->assertSame([10], $service->removeDocumentIds([10, 12], 12));
+    }
+
+    public function test_load_available_documents_uses_short_lived_cache_until_force_refresh(): void
+    {
+        Cache::flush();
+
+        $user = User::factory()->create();
+        $this->createDocument($user, ['status' => 'ready']);
+
+        $service = app(ChatDocumentStateService::class);
+        $cached = $service->loadAvailableDocuments($user->id);
+
+        $this->assertCount(1, $cached['documents']);
+
+        $this->createDocument($user, ['status' => 'ready', 'original_name' => 'second.pdf']);
+
+        $stillCached = $service->loadAvailableDocuments($user->id);
+        $this->assertCount(1, $stillCached['documents']);
+
+        $fresh = $service->loadAvailableDocuments($user->id, forceRefresh: true);
+        $this->assertCount(2, $fresh['documents']);
+    }
+
+    public function test_invalidate_available_documents_cache_clears_cached_state(): void
+    {
+        Cache::flush();
+
+        $user = User::factory()->create();
+        $service = app(ChatDocumentStateService::class);
+
+        $service->loadAvailableDocuments($user->id);
+        $this->createDocument($user, ['status' => 'ready']);
+
+        $service->invalidateAvailableDocumentsCache($user->id);
+        $state = $service->loadAvailableDocuments($user->id);
+
+        $this->assertCount(1, $state['documents']);
     }
 
     private function createDocument(User $user, array $overrides = []): Document

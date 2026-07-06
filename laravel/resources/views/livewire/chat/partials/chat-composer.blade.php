@@ -37,6 +37,7 @@
 
             <div wire:loading.flex wire:target="chatAttachment" class="px-5 pt-4 items-center gap-2 text-[12px] text-ista-primary dark:text-[#8E81FF]">
                 <span class="h-2 w-2 rounded-full bg-current animate-ping"></span>
+                <span>Mengunggah lampiran...</span>
             </div>
 
             @if($isUploadingAttachment)

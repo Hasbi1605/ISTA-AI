@@ -1,0 +1,3050 @@
+@import './fonts.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+    /* ----- Admin Design System ----- */
+
+    .ista-display-sans {
+        font-family: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
+    }
+
+    .admin-shell {
+        height: var(--app-viewport-height);
+        min-height: var(--app-viewport-height);
+        overflow: hidden;
+        background:
+            radial-gradient(circle at top left, rgba(212, 175, 55, 0.05) 0%, transparent 28%),
+            linear-gradient(180deg, #fffdf9 0%, #fbfaf8 42%, #f8f6f1 100%);
+        @apply text-stone-800 dark:text-gray-100;
+    }
+
+    .dark .admin-shell {
+        background:
+            radial-gradient(circle at top left, rgba(245, 158, 11, 0.04) 0%, transparent 30%),
+            radial-gradient(circle at bottom right, rgba(139, 8, 54, 0.10) 0%, transparent 36%),
+            #0b1220;
+    }
+
+    .admin-sidebar {
+        @apply fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-stone-200/80 bg-white/95 shadow-[18px_0_35px_rgba(28,25,23,0.04)] backdrop-blur-xl transition-transform duration-200 dark:border-gray-800 dark:bg-gray-950/95 dark:shadow-none lg:static lg:z-auto lg:translate-x-0;
+        height: var(--app-viewport-height);
+        min-height: 0;
+        flex: 0 0 18rem;
+    }
+
+    .admin-content {
+        @apply flex min-w-0 flex-1 flex-col overflow-hidden;
+        height: var(--app-viewport-height);
+        min-height: 0;
+    }
+
+    .admin-topbar {
+        @apply z-20 flex w-full flex-none items-center justify-between gap-4 border-b border-stone-200/80 bg-white/90 px-4 py-3 backdrop-blur-xl dark:border-gray-800 dark:bg-gray-900/90 sm:px-5 lg:px-6;
+    }
+
+    .admin-main {
+        @apply mx-auto w-full max-w-[96rem] flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5 lg:px-6;
+        min-height: 0;
+    }
+
+    .admin-breadcrumb {
+        @apply flex items-center gap-3 text-sm font-semibold;
+    }
+
+    .admin-icon-button {
+        @apply inline-flex h-9 w-9 items-center justify-center rounded-lg text-stone-900 transition hover:bg-stone-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/30 dark:text-gray-100 dark:hover:bg-gray-800;
+    }
+
+    .admin-action-button {
+        @apply inline-flex h-9 items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-900 shadow-[0_1px_0_rgba(28,25,23,0.03)] transition hover:border-ista-primary/30 hover:text-ista-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/30 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100 dark:hover:border-ista-primary/40 dark:hover:text-amber-300;
+    }
+
+    .admin-sidebar-heading {
+        @apply px-2 pb-2.5 text-[0.65rem] font-bold uppercase text-stone-400 dark:text-gray-500;
+        letter-spacing: 0;
+    }
+
+    .admin-nav-link {
+        @apply flex min-h-[2.9rem] items-center gap-3 rounded-lg px-3.5 py-2.5 text-stone-900 transition hover:bg-stone-100 hover:text-ista-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/25 dark:text-gray-200 dark:hover:bg-gray-900 dark:hover:text-amber-300;
+    }
+
+    .admin-nav-link__icon {
+        @apply flex h-5 w-5 flex-none items-center justify-center text-stone-900 transition group-hover:text-ista-primary dark:text-gray-300 dark:group-hover:text-amber-300;
+    }
+
+    .admin-nav-link--active {
+        @apply bg-ista-primary/[0.08] text-ista-primary shadow-[inset_3px_0_0_0_theme(colors.ista-primary)] dark:bg-ista-primary/15 dark:text-amber-300;
+    }
+
+    .admin-nav-link--active .admin-nav-link__icon {
+        @apply text-ista-primary dark:text-amber-300;
+    }
+
+    .admin-section {
+        @apply rounded-xl border border-stone-200/80 bg-white shadow-[0_8px_24px_rgba(28,25,23,0.04)] transition-colors dark:border-gray-800 dark:bg-gray-900/80;
+    }
+
+    .admin-section__header {
+        @apply flex flex-wrap items-start justify-between gap-3 border-b border-stone-100 px-5 py-4 dark:border-gray-800;
+    }
+
+    .admin-section__body {
+        @apply px-5 py-4;
+    }
+
+    .admin-section__footer {
+        @apply border-t border-stone-100 px-5 py-3 text-xs text-stone-500 dark:border-gray-800 dark:text-gray-400;
+    }
+
+    .admin-kpi {
+        @apply flex flex-col rounded-xl border border-stone-200/80 bg-white p-5 shadow-[0_8px_24px_rgba(28,25,23,0.04)] transition-colors dark:border-gray-800 dark:bg-gray-900/80;
+    }
+
+    .admin-kpi__icon {
+        @apply flex h-9 w-9 items-center justify-center rounded-lg border border-stone-200 bg-stone-50 text-stone-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400;
+    }
+
+    .admin-kpi--primary { @apply border-ista-primary/20 bg-gradient-to-br from-ista-primary/[0.06] to-transparent dark:border-ista-primary/30; }
+    .admin-kpi--gold { @apply border-amber-200/70 bg-gradient-to-br from-amber-100/40 to-transparent dark:border-amber-500/20; }
+    .admin-kpi--success { @apply border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-transparent dark:border-emerald-500/20; }
+    .admin-kpi--warning { @apply border-amber-200/70 bg-gradient-to-br from-amber-50 to-transparent dark:border-amber-500/20; }
+    .admin-kpi--danger { @apply border-rose-200/70 bg-gradient-to-br from-rose-50 to-transparent dark:border-rose-500/20; }
+
+    .admin-table-wrapper {
+        @apply overflow-x-auto rounded-xl border border-stone-200/80 bg-white dark:border-gray-800 dark:bg-gray-900/80;
+    }
+
+    .admin-table {
+        @apply w-full border-collapse text-sm text-stone-700 dark:text-gray-200;
+    }
+
+    .admin-table__th {
+        @apply border-b border-stone-200 bg-white px-4 py-3 text-left text-[11px] font-bold uppercase text-stone-500 dark:border-gray-800 dark:bg-gray-900/80 dark:text-gray-400;
+        letter-spacing: 0;
+    }
+
+    .admin-table__th[data-align="right"], .admin-table__td[data-align="right"] { text-align: right; }
+    .admin-table__th[data-align="center"], .admin-table__td[data-align="center"] { text-align: center; }
+
+    .admin-table__td {
+        @apply border-b border-stone-100 px-4 py-3 align-middle dark:border-gray-800;
+    }
+
+    .admin-table tbody tr:last-child .admin-table__td {
+        @apply border-b-0;
+    }
+
+    .admin-table__empty {
+        @apply px-4 py-6 text-center text-xs font-medium text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-badge {
+        @apply inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold;
+    }
+
+    .admin-badge--neutral { @apply border-stone-200 bg-stone-50 text-stone-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300; }
+    .admin-badge--success { @apply border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300; }
+    .admin-badge--warning { @apply border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300; }
+    .admin-badge--danger { @apply border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300; }
+    .admin-badge--info { @apply border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-300/10 dark:text-amber-300; }
+    .admin-badge--gold { @apply border-amber-300 bg-amber-100/70 text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-300; }
+    .admin-badge--primary { @apply border-ista-primary/30 bg-ista-primary/10 text-ista-primary dark:border-ista-primary/40 dark:bg-ista-primary/20 dark:text-amber-300; }
+
+    .admin-status-chip {
+        @apply inline-flex min-w-[4.8rem] items-center justify-center gap-1.5 rounded-full px-2.5 py-1 text-[0.64rem] font-bold ring-1;
+        letter-spacing: 0;
+    }
+
+    .admin-status-chip > span {
+        @apply h-1.5 w-1.5 rounded-full;
+    }
+
+    .admin-status-chip--success {
+        @apply bg-emerald-50 text-emerald-700 ring-emerald-100 dark:bg-emerald-400/10 dark:text-emerald-300 dark:ring-emerald-300/20;
+    }
+
+    .admin-status-chip--success > span { @apply bg-emerald-500; }
+
+    .admin-status-chip--warning {
+        @apply bg-amber-50 text-amber-700 ring-amber-100 dark:bg-amber-400/10 dark:text-amber-300 dark:ring-amber-300/20;
+    }
+
+    .admin-status-chip--warning > span { @apply bg-amber-500; }
+
+    .admin-status-chip--danger {
+        @apply bg-rose-50 text-rose-700 ring-rose-100 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-400/20;
+    }
+
+    .admin-status-chip--danger > span { @apply bg-rose-500; }
+
+    .admin-status-chip--neutral {
+        @apply bg-stone-100 text-stone-600 ring-stone-200 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-700;
+    }
+
+    .admin-status-chip--neutral > span { @apply bg-stone-400 dark:bg-gray-500; }
+
+    .admin-pagination {
+        @apply grid w-full gap-2 text-[0.72rem] text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-pagination__summary {
+        @apply min-w-0 font-medium;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .admin-pagination__nav {
+        @apply min-w-0 max-w-full overflow-x-auto overflow-y-hidden pb-1;
+    }
+
+    .admin-pagination__list.pagination {
+        @apply m-0 ml-auto flex w-max min-w-0 max-w-full list-none flex-nowrap items-center justify-end gap-1.5 p-0;
+    }
+
+    .admin-pagination__item.page-item {
+        @apply flex shrink-0;
+    }
+
+    .admin-pagination__link.page-link {
+        @apply inline-flex h-8 min-w-8 shrink-0 items-center justify-center rounded-md border border-stone-200 bg-white px-2.5 text-[0.72rem] font-semibold leading-none text-stone-600 transition hover:border-ista-primary/40 hover:bg-ista-primary/5 hover:text-ista-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/25 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300 dark:hover:border-amber-300/40 dark:hover:bg-amber-300/10 dark:hover:text-amber-300;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .admin-pagination__item.active .admin-pagination__link,
+    .admin-pagination__link--active {
+        @apply border-ista-primary bg-ista-primary text-white shadow-[0_8px_18px_rgba(139,8,54,0.16)] hover:border-ista-primary hover:bg-ista-primary hover:text-white dark:border-amber-300 dark:bg-amber-300 dark:text-gray-950 dark:hover:border-amber-300 dark:hover:bg-amber-300 dark:hover:text-gray-950;
+    }
+
+    .admin-pagination__item.disabled .admin-pagination__link,
+    .admin-pagination__link--disabled {
+        @apply cursor-not-allowed bg-stone-50 text-stone-300 hover:border-stone-200 hover:bg-stone-50 hover:text-stone-300 dark:bg-gray-900 dark:text-gray-600 dark:hover:border-gray-800 dark:hover:bg-gray-900 dark:hover:text-gray-600;
+    }
+
+    .admin-pagination__link--ellipsis {
+        @apply min-w-7 border-transparent bg-transparent px-1 text-stone-400 shadow-none hover:border-transparent hover:bg-transparent hover:text-stone-400 dark:bg-transparent dark:text-gray-500 dark:hover:border-transparent dark:hover:bg-transparent dark:hover:text-gray-500;
+    }
+
+    .admin-empty-state {
+        @apply flex flex-col items-center justify-center rounded-xl border border-dashed border-stone-200 bg-stone-50/40 px-6 py-10 text-center dark:border-gray-800 dark:bg-gray-900/40;
+    }
+
+    .admin-panel .admin-empty-state {
+        @apply px-4 py-7;
+        min-height: 10rem;
+    }
+
+    .admin-empty-state__icon {
+        @apply mb-3 flex h-10 w-10 items-center justify-center rounded-full border border-stone-200 bg-white text-stone-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400;
+    }
+
+    .admin-loading {
+        @apply flex flex-col gap-2;
+    }
+
+    .admin-loading__bar {
+        @apply h-3 w-full overflow-hidden rounded bg-stone-100 dark:bg-gray-800;
+    }
+
+    .admin-loading__bar > span {
+        @apply block h-full w-1/2 animate-pulse rounded bg-gradient-to-r from-stone-200 via-stone-100 to-stone-200 dark:from-gray-700 dark:via-gray-800 dark:to-gray-700;
+    }
+
+    .admin-filter {
+        @apply flex flex-col gap-1.5;
+    }
+
+    .admin-filter__label {
+        @apply text-[11px] font-bold uppercase tracking-[0.08em] text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-filter__control {
+        @apply h-10 rounded-lg border border-stone-200 bg-white px-3 text-sm text-stone-800 transition focus:border-ista-primary focus:outline-none focus:ring-2 focus:ring-ista-primary/15 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100;
+    }
+
+    .admin-tabs {
+        @apply border-b border-stone-200 dark:border-gray-800;
+    }
+
+    .admin-tabs__list {
+        @apply flex flex-wrap items-center gap-x-2 gap-y-1;
+    }
+
+    .admin-tabs__tab {
+        @apply -mb-px inline-flex items-center gap-2 border-b-2 border-transparent px-3 py-2 text-sm font-medium text-stone-500 transition hover:text-ista-primary dark:text-gray-400 dark:hover:text-amber-300;
+    }
+
+    .admin-tabs__tab--active {
+        @apply border-ista-primary text-ista-primary dark:border-amber-300 dark:text-amber-300;
+    }
+
+    .admin-tabs__count {
+        @apply rounded-full border border-stone-200 bg-stone-50 px-2 py-0.5 text-[10.5px] font-semibold text-stone-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300;
+    }
+
+    .admin-page-title {
+        @apply ista-brand-title text-2xl text-stone-900 not-italic dark:text-gray-100;
+    }
+
+    .admin-users-page {
+        @apply pb-6 text-stone-900 dark:text-gray-100;
+    }
+
+    .admin-users-hero {
+        @apply mb-4 flex flex-wrap items-start justify-between gap-4;
+    }
+
+    .admin-users-eyebrow {
+        @apply text-[0.64rem] font-bold uppercase text-ista-primary dark:text-amber-300;
+        letter-spacing: 0;
+    }
+
+    .admin-users-title {
+        font-family: "Fraunces", serif;
+        @apply mt-1 text-[1.38rem] font-semibold leading-tight text-stone-950 dark:text-gray-100;
+        letter-spacing: 0;
+    }
+
+    .admin-users-title span {
+        font-family: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
+        @apply text-[1.12rem] font-semibold not-italic;
+    }
+
+    .admin-users-description {
+        @apply mt-2 max-w-xl text-[0.82rem] leading-relaxed text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-users-readonly {
+        @apply px-3.5 py-1.5 text-[0.72rem] font-medium;
+    }
+
+    .admin-users-kpi-grid {
+        @apply grid gap-3 sm:grid-cols-2 xl:grid-cols-4;
+    }
+
+    .admin-users-kpi-card {
+        @apply flex min-h-[5.75rem] items-start gap-3 rounded-lg border border-stone-200/80 bg-white px-3.5 pb-3.5 pt-4 shadow-[0_8px_24px_rgba(28,25,23,0.04)] transition-colors dark:border-gray-800 dark:bg-gray-900/80;
+    }
+
+    .admin-users-kpi-card__marker {
+        @apply mt-1.5 flex w-3 flex-none items-center justify-center;
+    }
+
+    .admin-users-kpi-card__marker span {
+        @apply block h-2 w-2 rounded-full;
+    }
+
+    .admin-users-kpi-card--primary .admin-users-kpi-card__marker span { @apply bg-ista-primary dark:bg-amber-300; }
+    .admin-users-kpi-card--success .admin-users-kpi-card__marker span { @apply bg-emerald-500; }
+    .admin-users-kpi-card--warning .admin-users-kpi-card__marker span { @apply bg-amber-500; }
+    .admin-users-kpi-card--neutral .admin-users-kpi-card__marker span { @apply bg-stone-400 dark:bg-gray-500; }
+
+    .admin-users-kpi-card__label {
+        @apply text-xs font-medium text-stone-700 dark:text-gray-200;
+    }
+
+    .admin-users-kpi-card strong {
+        @apply mt-1.5 block text-2xl font-semibold leading-none text-stone-950 dark:text-gray-100;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .admin-users-kpi-card__description {
+        @apply mt-1.5 text-[0.7rem] font-medium text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-users-kpi-card--success .admin-users-kpi-card__description { @apply text-emerald-600 dark:text-emerald-400; }
+    .admin-users-kpi-card--warning .admin-users-kpi-card__description { @apply text-amber-600 dark:text-amber-400; }
+
+    .admin-users-filter-panel {
+        @apply mt-3 overflow-hidden rounded-lg;
+    }
+
+    .admin-users-filter-panel__header {
+        @apply flex flex-wrap items-start justify-between gap-3 px-4 pt-3.5;
+    }
+
+    .admin-users-filter-panel__header h3,
+    .admin-users-table-panel__header h3 {
+        @apply text-[0.95rem] font-semibold text-stone-950 dark:text-gray-100;
+    }
+
+    .admin-users-reset-group {
+        @apply flex items-center justify-end;
+    }
+
+    .admin-users-reset-group > span {
+        @apply text-[0.6rem] font-bold uppercase text-stone-500 dark:text-gray-400;
+        letter-spacing: 0;
+    }
+
+    .admin-users-reset-button {
+        @apply inline-flex items-center gap-1.5 text-[0.72rem] font-semibold text-ista-primary transition hover:text-rose-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/30 dark:text-rose-300 dark:hover:text-rose-200;
+    }
+
+    .admin-users-filter-grid {
+        @apply grid gap-3 px-4 pb-3.5 pt-3 md:grid-cols-[minmax(15rem,1fr)_minmax(10rem,0.7fr)_minmax(10rem,0.85fr)_minmax(5rem,0.25fr)];
+    }
+
+    .admin-users-filter-grid--compact {
+        @apply md:grid-cols-[minmax(15rem,1fr)_minmax(10rem,0.42fr)];
+    }
+
+    .admin-users-filter {
+        @apply flex flex-col gap-1.5;
+    }
+
+    .admin-users-filter span {
+        @apply text-[0.6rem] font-bold uppercase text-stone-500 dark:text-gray-400;
+        letter-spacing: 0;
+    }
+
+    .admin-users-control,
+    .admin-users-search-control {
+        @apply h-9 w-full rounded-lg border border-stone-200 bg-white text-xs text-stone-800 shadow-[inset_0_1px_0_rgba(28,25,23,0.02)] transition focus:border-ista-primary focus:outline-none focus:ring-2 focus:ring-ista-primary/15 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100;
+    }
+
+    .admin-users-control {
+        @apply px-3;
+    }
+
+    .admin-users-search-control {
+        @apply flex items-center gap-2 px-3 text-stone-500 focus-within:border-ista-primary focus-within:ring-2 focus-within:ring-ista-primary/15 dark:text-gray-400;
+    }
+
+    .admin-users-control--search {
+        @apply h-auto min-w-0 flex-1 border-0 bg-transparent p-0 shadow-none placeholder:text-stone-400 focus:border-0 focus:ring-0 dark:bg-transparent dark:placeholder:text-gray-500;
+    }
+
+    .admin-users-table-panel {
+        @apply mt-3 overflow-hidden rounded-lg;
+    }
+
+    .admin-users-table-panel__header {
+        @apply px-4 pb-2.5 pt-3.5;
+    }
+
+    .admin-users-table-panel__header p {
+        @apply mt-1 text-[0.72rem] text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-users-table-panel__body {
+        @apply px-3.5 pb-3.5;
+    }
+
+    .admin-users-table {
+        @apply rounded-lg;
+    }
+
+    .admin-users-table .admin-table__th {
+        @apply bg-white px-3 py-2.5 text-[0.61rem] text-stone-500 dark:bg-gray-900/80 dark:text-gray-400;
+    }
+
+    .admin-users-table .admin-table__td {
+        @apply px-3 py-2;
+    }
+
+    .admin-users-table .admin-badge {
+        @apply whitespace-nowrap px-2 py-0.5 text-[0.65rem];
+    }
+
+    .admin-users-table tbody tr {
+        @apply transition hover:bg-stone-50/80 dark:hover:bg-gray-800/50;
+    }
+
+    .admin-users-user-cell {
+        @apply flex min-w-[12rem] items-center gap-2.5;
+    }
+
+    .admin-user-avatar {
+        @apply flex h-7 w-7 flex-none items-center justify-center rounded-full bg-ista-primary text-[0.62rem] font-bold text-amber-200 shadow-sm;
+    }
+
+    .admin-users-user-cell__name {
+        @apply block truncate text-xs font-semibold text-stone-800 dark:text-gray-100;
+    }
+
+    .admin-users-user-cell__email {
+        @apply block truncate text-[0.68rem] text-stone-500 dark:text-gray-500;
+    }
+
+    .admin-users-status-badge {
+        @apply min-w-[4.1rem] justify-center whitespace-nowrap px-2 py-0.5 text-[0.65rem];
+    }
+
+    .admin-users-status-dot {
+        @apply h-1.5 w-1.5 rounded-full;
+    }
+
+    .admin-users-status-dot--online { @apply bg-emerald-500; }
+    .admin-users-status-dot--idle { @apply bg-amber-500; }
+    .admin-users-status-dot--offline { @apply bg-stone-400 dark:bg-gray-500; }
+
+    .admin-users-muted {
+        @apply text-[0.72rem] text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-users-feature {
+        @apply font-mono text-[0.66rem] uppercase text-stone-500 dark:text-gray-400;
+        letter-spacing: 0;
+    }
+
+    .admin-users-number {
+        @apply font-mono text-[0.72rem] font-medium text-stone-800 dark:text-gray-200;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .admin-users-total-cell {
+        @apply inline-grid min-w-[5.25rem] justify-items-end gap-0.5 text-[0.68rem] leading-tight text-stone-500 dark:text-gray-400;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .admin-users-total-cell__primary {
+        @apply whitespace-nowrap font-medium text-stone-700 dark:text-gray-200;
+    }
+
+    .admin-users-total-cell__meta {
+        @apply whitespace-nowrap;
+    }
+
+    .admin-users-alert {
+        @apply mx-4 mt-3 flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-[0.74rem] font-medium;
+    }
+
+    .admin-users-alert--success {
+        @apply border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300;
+    }
+
+    .admin-users-alert button {
+        @apply inline-flex h-7 w-7 flex-none items-center justify-center rounded-md transition hover:bg-black/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/25 dark:hover:bg-white/10;
+    }
+
+    .admin-users-delete-button {
+        @apply inline-flex h-7 w-7 items-center justify-center rounded-md border border-rose-200 bg-rose-50 text-rose-700 transition hover:border-ista-primary/40 hover:bg-ista-primary hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/25 dark:border-rose-400/20 dark:bg-rose-500/10 dark:text-rose-300 dark:hover:border-amber-300/40 dark:hover:bg-amber-300 dark:hover:text-gray-950;
+    }
+
+    .admin-users-pagination {
+        @apply mt-3 border-t border-stone-100 pt-3 dark:border-gray-800;
+    }
+
+    .admin-usage-page {
+        @apply pb-6 text-stone-900 dark:text-gray-100;
+    }
+
+    .admin-usage-hero {
+        @apply mb-4 flex flex-wrap items-start justify-between gap-4;
+    }
+
+    .admin-usage-eyebrow {
+        @apply text-[0.64rem] font-bold uppercase text-ista-primary dark:text-amber-300;
+        letter-spacing: 0;
+    }
+
+    .admin-usage-title {
+        font-family: "Fraunces", serif;
+        @apply mt-1 text-[1.38rem] font-semibold leading-tight text-stone-950 dark:text-gray-100;
+        letter-spacing: 0;
+    }
+
+    .admin-usage-description {
+        @apply mt-2 max-w-xl text-[0.82rem] leading-relaxed text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-usage-readonly {
+        @apply px-3.5 py-1.5 text-[0.72rem] font-medium;
+    }
+
+    .admin-usage-kpi-grid {
+        @apply grid gap-3 sm:grid-cols-2 xl:grid-cols-4;
+    }
+
+    .admin-usage-kpi-card {
+        @apply flex min-h-[5.75rem] items-start gap-3 rounded-lg border border-stone-200/80 bg-white px-3.5 pb-3.5 pt-4 shadow-[0_8px_24px_rgba(28,25,23,0.04)] transition-colors dark:border-gray-800 dark:bg-gray-900/80;
+    }
+
+    .admin-usage-kpi-card__marker {
+        @apply mt-1.5 flex w-3 flex-none items-center justify-center;
+    }
+
+    .admin-usage-kpi-card__marker span {
+        @apply block h-2 w-2 rounded-full;
+    }
+
+    .admin-usage-kpi-card--primary .admin-usage-kpi-card__marker span { @apply bg-ista-primary dark:bg-amber-300; }
+    .admin-usage-kpi-card--success .admin-usage-kpi-card__marker span { @apply bg-emerald-500; }
+    .admin-usage-kpi-card--warning .admin-usage-kpi-card__marker span { @apply bg-amber-500; }
+    .admin-usage-kpi-card--danger .admin-usage-kpi-card__marker span { @apply bg-rose-500; }
+
+    .admin-usage-kpi-card__label {
+        @apply text-xs font-medium text-stone-700 dark:text-gray-200;
+    }
+
+    .admin-usage-kpi-card strong {
+        @apply mt-1.5 block text-2xl font-semibold leading-none text-stone-950 dark:text-gray-100;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .admin-usage-kpi-card__description {
+        @apply mt-1.5 text-[0.7rem] font-medium text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-usage-kpi-card--success .admin-usage-kpi-card__description { @apply text-emerald-600 dark:text-emerald-400; }
+    .admin-usage-kpi-card--warning .admin-usage-kpi-card__description { @apply text-amber-600 dark:text-amber-400; }
+    .admin-usage-kpi-card--danger .admin-usage-kpi-card__description { @apply text-rose-600 dark:text-rose-400; }
+
+    .admin-usage-filter-panel {
+        @apply mt-3 overflow-hidden rounded-lg;
+    }
+
+    .admin-usage-filter-panel__header,
+    .admin-usage-table-panel__header,
+    .admin-usage-distribution-panel__header {
+        @apply flex flex-wrap items-start justify-between gap-3 px-4 pt-3.5;
+    }
+
+    .admin-usage-filter-panel__header h3,
+    .admin-usage-table-panel__header h3,
+    .admin-usage-distribution-panel__header h3 {
+        @apply text-[0.95rem] font-semibold text-stone-950 dark:text-gray-100;
+    }
+
+    .admin-usage-table-panel__header p,
+    .admin-usage-distribution-panel__header p {
+        @apply mt-1 text-[0.72rem] text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-usage-reset-group {
+        @apply flex flex-wrap items-center justify-end gap-3;
+    }
+
+    .admin-usage-reset-button {
+        @apply inline-flex items-center gap-1.5 text-[0.72rem] font-semibold text-ista-primary transition hover:text-rose-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/30 dark:text-rose-300 dark:hover:text-rose-200;
+    }
+
+    .admin-usage-lifecycle-toggle {
+        @apply inline-flex h-7 cursor-pointer items-center gap-2 rounded-full border border-stone-200 bg-stone-50 px-2.5 text-[0.66rem] font-semibold text-stone-500 transition hover:border-ista-primary/30 hover:text-ista-primary dark:border-gray-800 dark:bg-gray-950 dark:text-gray-400 dark:hover:border-amber-300/30 dark:hover:text-amber-300;
+    }
+
+    .admin-usage-lifecycle-toggle input {
+        @apply h-3.5 w-3.5 rounded border-stone-300 text-ista-primary focus:ring-ista-primary/20 dark:border-gray-700 dark:bg-gray-900;
+    }
+
+    .admin-usage-filter-grid {
+        @apply grid gap-3 px-4 pb-3.5 pt-3 md:grid-cols-2 xl:grid-cols-4;
+    }
+
+    .admin-usage-filter {
+        @apply flex flex-col gap-1.5;
+    }
+
+    .admin-usage-filter span {
+        @apply text-[0.6rem] font-bold uppercase text-stone-500 dark:text-gray-400;
+        letter-spacing: 0;
+    }
+
+    .admin-usage-control {
+        @apply h-9 w-full rounded-lg border border-stone-200 bg-white px-3 text-xs text-stone-800 shadow-[inset_0_1px_0_rgba(28,25,23,0.02)] transition focus:border-ista-primary focus:outline-none focus:ring-2 focus:ring-ista-primary/15 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100;
+    }
+
+    .admin-usage-content-grid {
+        @apply mt-3 grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1.85fr)_minmax(18rem,0.7fr)];
+    }
+
+    .admin-usage-table-panel,
+    .admin-usage-distribution-panel {
+        @apply min-w-0 overflow-hidden rounded-lg;
+    }
+
+    .admin-usage-table-panel__body,
+    .admin-usage-distribution-panel__body {
+        @apply min-w-0 px-3.5 pb-3.5 pt-3;
+    }
+
+    .admin-usage-table {
+        @apply min-w-0 rounded-lg;
+    }
+
+    .admin-usage-table .admin-table__th {
+        @apply bg-white px-3 py-2.5 text-[0.61rem] text-stone-500 dark:bg-gray-900/80 dark:text-gray-400;
+    }
+
+    .admin-usage-table .admin-table__td {
+        @apply px-3 py-2;
+    }
+
+    .admin-usage-table .admin-badge {
+        @apply whitespace-nowrap px-2 py-0.5 text-[0.65rem];
+    }
+
+    .admin-usage-table tbody tr {
+        @apply transition hover:bg-stone-50/80 dark:hover:bg-gray-800/50;
+    }
+
+    .admin-usage-user-cell {
+        @apply flex min-w-[10rem] flex-col;
+    }
+
+    .admin-usage-user-cell__name {
+        @apply block truncate text-xs font-semibold text-stone-800 dark:text-gray-100;
+    }
+
+    .admin-usage-user-cell__email {
+        @apply block truncate text-[0.68rem] text-stone-500 dark:text-gray-500;
+    }
+
+    .admin-usage-status-badge {
+        @apply min-w-[4.3rem] justify-center;
+    }
+
+    .admin-usage-feature {
+        @apply block max-w-[12rem] truncate font-mono text-[0.66rem] uppercase text-stone-500 dark:text-gray-400;
+        letter-spacing: 0;
+    }
+
+    .admin-usage-model {
+        @apply inline-block max-w-[8.5rem] truncate rounded-md bg-amber-50 px-2 py-0.5 text-[0.66rem] font-semibold text-ista-primary ring-1 ring-amber-100 dark:bg-amber-300/10 dark:text-amber-200 dark:ring-amber-300/20;
+    }
+
+    .admin-usage-model--muted {
+        @apply bg-stone-50 text-stone-400 ring-stone-100 dark:bg-gray-900 dark:text-gray-500 dark:ring-gray-800;
+    }
+
+    .admin-usage-number {
+        @apply whitespace-nowrap font-mono text-[0.72rem] font-medium text-stone-800 dark:text-gray-200;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .admin-usage-muted {
+        @apply text-[0.72rem] text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-usage-pagination {
+        @apply mt-3 min-w-0 overflow-visible border-t border-stone-100 pt-3 dark:border-gray-800;
+    }
+
+    .admin-usage-distribution-list {
+        @apply space-y-3;
+    }
+
+    .admin-usage-distribution-list li {
+        @apply rounded-lg border border-stone-100 bg-stone-50/40 p-3 dark:border-gray-800 dark:bg-gray-950/40;
+    }
+
+    .admin-usage-distribution-list__top {
+        @apply flex items-center justify-between gap-3;
+    }
+
+    .admin-usage-distribution-list__top span {
+        @apply truncate font-mono text-[0.66rem] uppercase text-stone-600 dark:text-gray-300;
+        letter-spacing: 0;
+    }
+
+    .admin-usage-distribution-list__top strong {
+        @apply text-xs font-semibold text-stone-900 dark:text-gray-100;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .admin-usage-distribution-bar {
+        @apply mt-2 h-1.5 overflow-hidden rounded-full bg-stone-200/70 dark:bg-gray-800;
+    }
+
+    .admin-usage-distribution-bar span {
+        @apply block h-full rounded-full bg-ista-primary/80 dark:bg-amber-300/80;
+    }
+
+    .admin-usage-distribution-list__meta {
+        @apply mt-2 flex flex-wrap items-center justify-between gap-2 text-[0.62rem] font-semibold uppercase text-stone-400 dark:text-gray-500;
+        letter-spacing: 0;
+    }
+
+    .admin-documents-page {
+        @apply pb-6 text-stone-900 dark:text-gray-100;
+    }
+
+    .admin-documents-hero {
+        @apply mb-4 flex flex-wrap items-start justify-between gap-4;
+    }
+
+    .admin-documents-eyebrow {
+        @apply text-[0.64rem] font-bold uppercase text-ista-primary dark:text-amber-300;
+        letter-spacing: 0;
+    }
+
+    .admin-documents-title {
+        font-family: "Fraunces", serif;
+        @apply mt-1 text-[1.38rem] font-semibold leading-tight text-stone-950 dark:text-gray-100;
+        letter-spacing: 0;
+    }
+
+    .admin-documents-description {
+        @apply mt-2 max-w-xl text-[0.82rem] leading-relaxed text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-documents-readonly {
+        @apply px-3.5 py-1.5 text-[0.72rem] font-medium;
+    }
+
+    .admin-documents-kpi-grid {
+        @apply grid gap-3 sm:grid-cols-2 xl:grid-cols-4;
+    }
+
+    .admin-documents-kpi-card {
+        @apply flex min-h-[5.75rem] items-start gap-3 rounded-lg border border-stone-200/80 bg-white px-3.5 pb-3.5 pt-4 shadow-[0_8px_24px_rgba(28,25,23,0.04)] transition-colors dark:border-gray-800 dark:bg-gray-900/80;
+    }
+
+    .admin-documents-kpi-card__marker {
+        @apply mt-1.5 flex w-3 flex-none items-center justify-center;
+    }
+
+    .admin-documents-kpi-card__marker span {
+        @apply block h-2 w-2 rounded-full;
+    }
+
+    .admin-documents-kpi-card--primary .admin-documents-kpi-card__marker span { @apply bg-ista-primary dark:bg-amber-300; }
+    .admin-documents-kpi-card--success .admin-documents-kpi-card__marker span { @apply bg-emerald-500; }
+    .admin-documents-kpi-card--warning .admin-documents-kpi-card__marker span { @apply bg-amber-500; }
+    .admin-documents-kpi-card--danger .admin-documents-kpi-card__marker span { @apply bg-rose-500; }
+
+    .admin-documents-kpi-card__label {
+        @apply text-xs font-medium text-stone-700 dark:text-gray-200;
+    }
+
+    .admin-documents-kpi-card strong {
+        @apply mt-1.5 block text-2xl font-semibold leading-none text-stone-950 dark:text-gray-100;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .admin-documents-kpi-card__description {
+        @apply mt-1.5 text-[0.7rem] font-medium text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-documents-kpi-card--success .admin-documents-kpi-card__description { @apply text-emerald-600 dark:text-emerald-400; }
+    .admin-documents-kpi-card--warning .admin-documents-kpi-card__description { @apply text-amber-600 dark:text-amber-400; }
+    .admin-documents-kpi-card--danger .admin-documents-kpi-card__description { @apply text-rose-600 dark:text-rose-400; }
+
+    .admin-documents-filter-panel {
+        @apply mt-3 overflow-hidden rounded-lg;
+    }
+
+    .admin-documents-filter-panel__header,
+    .admin-documents-table-panel__header,
+    .admin-documents-distribution-panel__header {
+        @apply flex flex-wrap items-start justify-between gap-3 px-4 pt-3.5;
+    }
+
+    .admin-documents-filter-panel__header h3,
+    .admin-documents-table-panel__header h3,
+    .admin-documents-distribution-panel__header h3 {
+        @apply text-[0.95rem] font-semibold text-stone-950 dark:text-gray-100;
+    }
+
+    .admin-documents-table-panel__header p,
+    .admin-documents-distribution-panel__header p {
+        @apply mt-1 text-[0.72rem] text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-documents-reset-group {
+        @apply flex items-center justify-end;
+    }
+
+    .admin-documents-reset-button {
+        @apply inline-flex items-center gap-1.5 text-[0.72rem] font-semibold text-ista-primary transition hover:text-rose-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/30 dark:text-rose-300 dark:hover:text-rose-200;
+    }
+
+    .admin-documents-filter-grid {
+        @apply grid gap-3 px-4 pb-3.5 pt-3 md:grid-cols-2 xl:grid-cols-6;
+    }
+
+    .admin-documents-filter {
+        @apply flex flex-col gap-1.5;
+    }
+
+    .admin-documents-filter span {
+        @apply text-[0.6rem] font-bold uppercase text-stone-500 dark:text-gray-400;
+        letter-spacing: 0;
+    }
+
+    .admin-documents-control {
+        @apply h-9 w-full rounded-lg border border-stone-200 bg-white px-3 text-xs text-stone-800 shadow-[inset_0_1px_0_rgba(28,25,23,0.02)] transition placeholder:text-stone-400 focus:border-ista-primary focus:outline-none focus:ring-2 focus:ring-ista-primary/15 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100 dark:placeholder:text-gray-500;
+    }
+
+    .admin-documents-insight-grid {
+        @apply mt-3 grid gap-3 xl:grid-cols-[minmax(18rem,0.78fr)_minmax(0,1.22fr)];
+    }
+
+    .admin-documents-table-panel,
+    .admin-documents-distribution-panel {
+        @apply overflow-hidden rounded-lg;
+    }
+
+    .admin-documents-table-panel {
+        @apply mt-3;
+    }
+
+    .admin-documents-table-panel__body,
+    .admin-documents-distribution-panel__body {
+        @apply px-3.5 pb-3.5 pt-3;
+    }
+
+    .admin-documents-table {
+        @apply rounded-lg;
+    }
+
+    .admin-documents-table .admin-table__th {
+        @apply bg-white px-3 py-2.5 text-[0.61rem] text-stone-500 dark:bg-gray-900/80 dark:text-gray-400;
+    }
+
+    .admin-documents-table .admin-table__td {
+        @apply px-3 py-2;
+    }
+
+    .admin-documents-table .admin-badge {
+        @apply whitespace-nowrap px-2 py-0.5 text-[0.65rem];
+    }
+
+    .admin-documents-table tbody tr {
+        @apply transition hover:bg-stone-50/80 dark:hover:bg-gray-800/50;
+    }
+
+    .admin-documents-file-cell {
+        @apply flex min-w-[10rem] items-center gap-3;
+    }
+
+    .admin-documents-user-row {
+        @apply flex min-w-[9rem] items-center gap-2.5;
+    }
+
+    .admin-documents-avatar {
+        @apply inline-flex h-8 w-8 flex-none items-center justify-center rounded-full bg-ista-primary text-[0.64rem] font-bold text-amber-200 ring-2 ring-white dark:bg-rose-900 dark:text-amber-200 dark:ring-gray-900;
+        letter-spacing: 0;
+    }
+
+    .admin-documents-user-cell {
+        @apply flex min-w-0 flex-col;
+    }
+
+    .admin-documents-file-icon {
+        @apply inline-flex h-[34px] w-[34px] flex-none items-center justify-center rounded-lg border border-stone-200/60 bg-white/80 backdrop-blur-sm dark:border-gray-700 dark:bg-gray-800;
+    }
+
+    .admin-documents-file-icon svg {
+        @apply h-[18px] w-[18px] shrink-0;
+    }
+
+    .admin-documents-file-icon--modal {
+        @apply h-10 w-10;
+    }
+
+    .admin-documents-file-icon--modal svg {
+        @apply h-[21px] w-[21px];
+    }
+
+    .admin-documents-file-icon--pdf { color: #FF2056; }
+    .admin-documents-file-icon--csv,
+    .admin-documents-file-icon--xlsx { color: #32CD32; }
+    .admin-documents-file-icon--docx { color: #2B7FFF; }
+    .admin-documents-file-icon--txt,
+    .admin-documents-file-icon--file { color: #62748E; }
+    .admin-documents-file-icon--image { color: #FD9A00; }
+
+    .admin-documents-file-cell__name,
+    .admin-documents-user-cell__name {
+        @apply block truncate text-xs font-semibold text-stone-800 dark:text-gray-100;
+    }
+
+    .admin-documents-file-cell__meta,
+    .admin-documents-user-cell__email {
+        @apply block truncate text-[0.68rem] text-stone-500 dark:text-gray-500;
+    }
+
+    .admin-documents-type-label {
+        @apply font-mono text-[0.68rem] font-medium uppercase text-stone-500 dark:text-gray-400;
+        letter-spacing: 0;
+    }
+
+    .admin-documents-status-chip {
+        @apply inline-flex min-w-[4.8rem] items-center justify-center gap-1.5 rounded-full px-2 py-1 text-[0.64rem] font-bold ring-1;
+        letter-spacing: 0;
+    }
+
+    .admin-documents-status-chip > span {
+        @apply h-1.5 w-1.5 rounded-full;
+    }
+
+    .admin-documents-status-chip--success {
+        @apply bg-emerald-50 text-emerald-700 ring-emerald-100 dark:bg-emerald-400/10 dark:text-emerald-300 dark:ring-emerald-300/20;
+    }
+
+    .admin-documents-status-chip--success > span { @apply bg-emerald-500; }
+
+    .admin-documents-status-chip--warning {
+        @apply bg-amber-50 text-amber-700 ring-amber-100 dark:bg-amber-400/10 dark:text-amber-300 dark:ring-amber-300/20;
+    }
+
+    .admin-documents-status-chip--warning > span { @apply bg-amber-500; }
+
+    .admin-documents-status-chip--danger {
+        @apply bg-rose-50 text-rose-700 ring-rose-100 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-400/20;
+    }
+
+    .admin-documents-status-chip--danger > span { @apply bg-rose-500; }
+
+    .admin-documents-status-chip--neutral {
+        @apply bg-stone-100 text-stone-600 ring-stone-200 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-700;
+    }
+
+    .admin-documents-status-chip--neutral > span { @apply bg-stone-400; }
+
+    .admin-documents-number {
+        @apply whitespace-nowrap font-mono text-[0.72rem] font-medium text-stone-800 dark:text-gray-200;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .admin-documents-unsynced {
+        @apply inline-flex h-6 min-w-6 items-center justify-center rounded-md bg-stone-50 px-2 font-mono text-[0.72rem] font-semibold text-stone-400 ring-1 ring-stone-100 dark:bg-gray-950 dark:text-gray-500 dark:ring-gray-800;
+    }
+
+    .admin-documents-muted {
+        @apply text-[0.72rem] text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-documents-pipeline {
+        @apply min-w-[8.5rem];
+    }
+
+    .admin-documents-pipeline__track {
+        @apply h-1.5 overflow-hidden rounded-full bg-stone-200/70 dark:bg-gray-800;
+    }
+
+    .admin-documents-pipeline__bar {
+        @apply block h-full rounded-full transition-all;
+    }
+
+    .admin-documents-pipeline__bar--success {
+        @apply bg-emerald-500/85 dark:bg-emerald-300/85;
+    }
+
+    .admin-documents-pipeline__bar--warning {
+        @apply bg-amber-500/85 dark:bg-amber-300/85;
+    }
+
+    .admin-documents-pipeline__bar--danger {
+        @apply bg-rose-500/85 dark:bg-rose-300/85;
+    }
+
+    .admin-documents-pipeline__meta {
+        @apply mt-1.5 flex items-center justify-between gap-2 text-[0.62rem] font-semibold uppercase text-stone-400 dark:text-gray-500;
+        letter-spacing: 0;
+    }
+
+    .admin-documents-detail-button {
+        @apply inline-flex h-7 items-center justify-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 text-[0.68rem] font-semibold text-stone-700 transition hover:border-ista-primary/30 hover:text-ista-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/25 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200 dark:hover:border-amber-300/30 dark:hover:text-amber-300;
+    }
+
+    .admin-documents-table-footer {
+        @apply border-t border-stone-100 px-3 py-3 text-[0.74rem] text-stone-500 dark:border-gray-800 dark:text-gray-400;
+    }
+
+    .admin-documents-pagination {
+        @apply w-full;
+    }
+
+    .admin-documents-type-donut-card {
+        @apply grid items-center gap-4 sm:grid-cols-[8rem_1fr];
+    }
+
+    .admin-documents-type-donut {
+        @apply relative mx-auto flex h-28 w-28 items-center justify-center rounded-full;
+        background: var(--document-donut);
+    }
+
+    .admin-documents-type-donut::after {
+        content: "";
+        @apply absolute inset-4 rounded-full bg-white shadow-[inset_0_0_0_1px_rgba(231,229,228,0.9)] dark:bg-gray-900 dark:shadow-[inset_0_0_0_1px_rgba(31,41,55,0.95)];
+    }
+
+    .admin-documents-type-donut span,
+    .admin-documents-type-donut em {
+        @apply relative z-10 block text-center;
+    }
+
+    .admin-documents-type-donut span {
+        @apply text-lg font-semibold leading-none text-stone-950 dark:text-gray-100;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .admin-documents-type-donut em {
+        @apply mt-1 text-[0.62rem] not-italic font-semibold uppercase text-stone-400 dark:text-gray-500;
+        letter-spacing: 0;
+    }
+
+    .admin-documents-type-legend {
+        @apply grid gap-2;
+    }
+
+    .admin-documents-type-legend li {
+        @apply grid grid-cols-[auto_1fr_auto] items-center gap-2 rounded-lg border border-stone-100 bg-stone-50/45 px-2.5 py-2 dark:border-gray-800 dark:bg-gray-950/40;
+    }
+
+    .admin-documents-type-legend li > span {
+        @apply h-2.5 w-2.5 rounded-full;
+    }
+
+    .admin-documents-type-legend strong {
+        @apply block truncate font-mono text-[0.66rem] font-semibold uppercase text-stone-700 dark:text-gray-200;
+        letter-spacing: 0;
+    }
+
+    .admin-documents-type-legend em {
+        @apply mt-0.5 block text-[0.6rem] not-italic font-semibold uppercase text-stone-400 dark:text-gray-500;
+        letter-spacing: 0;
+    }
+
+    .admin-documents-type-legend b,
+    .admin-documents-pipeline-summary b {
+        @apply font-mono text-xs font-semibold text-stone-900 dark:text-gray-100;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .admin-documents-status-list {
+        @apply space-y-2.5;
+    }
+
+    .admin-documents-status-list li {
+        @apply flex items-center gap-3 rounded-lg border border-stone-100 bg-stone-50/40 p-3 dark:border-gray-800 dark:bg-gray-950/40;
+    }
+
+    .admin-documents-status-list div {
+        @apply min-w-0 flex-1;
+    }
+
+    .admin-documents-status-list strong {
+        @apply block truncate text-xs font-semibold text-stone-800 dark:text-gray-100;
+    }
+
+    .admin-documents-status-list em {
+        @apply mt-0.5 block text-[0.62rem] not-italic text-stone-400 dark:text-gray-500;
+    }
+
+    .admin-documents-pipeline-summary {
+        @apply grid gap-2 sm:grid-cols-5;
+    }
+
+    .admin-documents-pipeline-summary__item {
+        @apply grid min-h-[5rem] grid-cols-[auto_1fr] gap-x-2 rounded-lg border border-stone-100 bg-stone-50/45 p-3 dark:border-gray-800 dark:bg-gray-950/40;
+    }
+
+    .admin-documents-pipeline-summary__item > span {
+        @apply mt-1.5 h-2 w-2 rounded-full bg-stone-400;
+    }
+
+    .admin-documents-pipeline-summary__item div {
+        @apply min-w-0;
+    }
+
+    .admin-documents-pipeline-summary__item strong {
+        @apply block truncate text-xs font-semibold text-stone-900 dark:text-gray-100;
+    }
+
+    .admin-documents-pipeline-summary__item em {
+        @apply mt-0.5 block text-[0.62rem] not-italic leading-snug text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-documents-pipeline-summary__item b {
+        @apply col-span-2 mt-2 text-lg leading-none;
+    }
+
+    .admin-documents-pipeline-summary__item--primary > span { @apply bg-ista-primary dark:bg-amber-300; }
+    .admin-documents-pipeline-summary__item--success > span { @apply bg-emerald-500; }
+    .admin-documents-pipeline-summary__item--warning > span { @apply bg-amber-500; }
+    .admin-documents-pipeline-summary__item--danger > span { @apply bg-rose-500; }
+
+    .admin-documents-status-dot {
+        @apply h-2 w-2 flex-none rounded-full;
+    }
+
+    .admin-documents-status-dot--success { @apply bg-emerald-500; }
+    .admin-documents-status-dot--warning { @apply bg-amber-500; }
+    .admin-documents-status-dot--danger { @apply bg-rose-500; }
+    .admin-documents-status-dot--neutral { @apply bg-stone-400 dark:bg-gray-500; }
+
+    .admin-documents-modal {
+        @apply fixed inset-0 z-50 flex items-center justify-center p-4;
+    }
+
+    .admin-documents-modal__backdrop {
+        @apply absolute inset-0 bg-stone-950/35 backdrop-blur-sm dark:bg-black/60;
+    }
+
+    .admin-documents-modal__panel {
+        @apply relative flex max-h-[86vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-stone-200 bg-white shadow-[0_24px_80px_rgba(28,25,23,0.24)] dark:border-gray-800 dark:bg-gray-950;
+    }
+
+    .admin-documents-modal__header {
+        @apply flex flex-none items-start justify-between gap-4 border-b border-stone-100 px-5 py-4 dark:border-gray-800;
+    }
+
+    .admin-documents-modal__title-row {
+        @apply flex min-w-0 items-center gap-3;
+    }
+
+    .admin-documents-modal__eyebrow {
+        @apply text-[0.6rem] font-bold uppercase text-ista-primary dark:text-amber-300;
+        letter-spacing: 0;
+    }
+
+    .admin-documents-modal__header h3 {
+        @apply mt-1 truncate text-lg font-semibold text-stone-950 dark:text-gray-100;
+    }
+
+    .admin-documents-modal__code {
+        @apply mt-2 inline-block rounded-md bg-stone-50 px-2 py-0.5 font-mono text-[0.68rem] font-semibold uppercase text-stone-600 ring-1 ring-stone-100 dark:bg-gray-900 dark:text-gray-300 dark:ring-gray-800;
+        letter-spacing: 0;
+    }
+
+    .admin-documents-modal__close {
+        @apply inline-flex h-8 w-8 flex-none items-center justify-center rounded-lg text-stone-500 transition hover:bg-stone-100 hover:text-stone-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/25 dark:text-gray-400 dark:hover:bg-gray-900 dark:hover:text-gray-100;
+    }
+
+    .admin-documents-modal__body {
+        @apply min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-4;
+    }
+
+    .admin-documents-modal__summary-grid {
+        @apply grid gap-3 md:grid-cols-2 xl:grid-cols-3;
+    }
+
+    .admin-documents-modal__summary-grid > div {
+        @apply rounded-lg border border-stone-100 bg-stone-50/50 p-3 dark:border-gray-800 dark:bg-gray-900/50;
+    }
+
+    .admin-documents-modal__summary-grid span,
+    .admin-documents-modal__metadata dt {
+        @apply block text-[0.6rem] font-bold uppercase text-stone-400 dark:text-gray-500;
+        letter-spacing: 0;
+    }
+
+    .admin-documents-modal__summary-grid strong {
+        @apply mt-1 block truncate text-xs font-semibold text-stone-900 dark:text-gray-100;
+    }
+
+    .admin-documents-modal__summary-grid strong.admin-documents-status-chip,
+    .admin-documents-modal__summary-grid strong.admin-status-chip {
+        @apply inline-flex;
+    }
+
+    .admin-documents-modal__summary-grid em {
+        @apply mt-1 block truncate text-[0.68rem] not-italic text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-documents-modal__section {
+        @apply mt-4 rounded-lg border border-stone-100 bg-white p-3.5 dark:border-gray-800 dark:bg-gray-900/40;
+    }
+
+    .admin-documents-modal__section-heading {
+        @apply flex items-center justify-between gap-3;
+    }
+
+    .admin-documents-modal__section h4 {
+        @apply text-[0.82rem] font-semibold text-stone-950 dark:text-gray-100;
+    }
+
+    .admin-documents-modal__section-heading span {
+        @apply text-xs font-semibold text-stone-500 dark:text-gray-400;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .admin-documents-modal__section p {
+        @apply mt-2 text-[0.76rem] leading-relaxed text-stone-600 dark:text-gray-300;
+    }
+
+    .admin-documents-modal__metadata {
+        @apply mt-2 grid gap-2 md:grid-cols-2;
+    }
+
+    .admin-documents-modal__metadata div {
+        @apply min-w-0 rounded-md bg-stone-50 px-2.5 py-2 dark:bg-gray-950/70;
+    }
+
+    .admin-documents-modal__metadata dd {
+        @apply mt-1 truncate font-mono text-[0.68rem] text-stone-700 dark:text-gray-300;
+    }
+
+    .admin-documents-drawer {
+        @apply fixed inset-0 z-50 flex justify-end;
+    }
+
+    .admin-documents-drawer__backdrop {
+        @apply absolute inset-0 bg-stone-950/35 backdrop-blur-sm dark:bg-black/60;
+    }
+
+    .admin-documents-drawer__panel {
+        @apply relative flex h-full w-full max-w-xl flex-col overflow-hidden border-l border-stone-200 bg-white shadow-[0_24px_80px_rgba(28,25,23,0.24)] dark:border-gray-800 dark:bg-gray-950;
+    }
+
+    .admin-documents-drawer__header {
+        @apply flex flex-none items-start justify-between gap-4 border-b border-stone-100 px-5 py-4 dark:border-gray-800;
+    }
+
+    .admin-documents-drawer__title-row {
+        @apply flex min-w-0 items-center gap-3;
+    }
+
+    .admin-documents-drawer__eyebrow {
+        @apply text-[0.6rem] font-bold uppercase text-ista-primary dark:text-amber-300;
+        letter-spacing: 0;
+    }
+
+    .admin-documents-drawer__header h3 {
+        @apply mt-1 truncate text-lg font-semibold text-stone-950 dark:text-gray-100;
+    }
+
+    .admin-documents-drawer__close {
+        @apply inline-flex h-8 w-8 flex-none items-center justify-center rounded-lg text-stone-500 transition hover:bg-stone-100 hover:text-stone-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/25 dark:text-gray-400 dark:hover:bg-gray-900 dark:hover:text-gray-100;
+    }
+
+    .admin-documents-drawer__body {
+        @apply min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-4;
+    }
+
+    .admin-documents-drawer__summary {
+        @apply grid gap-3 sm:grid-cols-2;
+    }
+
+    .admin-documents-drawer__summary > div {
+        @apply min-w-0 rounded-lg border border-stone-100 bg-stone-50/50 p-3 dark:border-gray-800 dark:bg-gray-900/50;
+    }
+
+    .admin-documents-drawer__summary span,
+    .admin-documents-metadata-grid dt {
+        @apply block text-[0.6rem] font-bold uppercase text-stone-400 dark:text-gray-500;
+        letter-spacing: 0;
+    }
+
+    .admin-documents-drawer__summary strong {
+        @apply mt-1 block truncate text-xs font-semibold text-stone-900 dark:text-gray-100;
+    }
+
+    .admin-documents-drawer__summary strong.admin-documents-status-chip,
+    .admin-documents-drawer__summary strong.admin-status-chip {
+        @apply inline-flex;
+    }
+
+    .admin-documents-drawer__summary em {
+        @apply mt-1 block truncate text-[0.68rem] not-italic text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-documents-drawer__section {
+        @apply mt-4 rounded-lg border border-stone-100 bg-white p-3.5 dark:border-gray-800 dark:bg-gray-900/40;
+    }
+
+    .admin-documents-drawer__section-heading {
+        @apply flex items-center justify-between gap-3;
+    }
+
+    .admin-documents-drawer__section h4 {
+        @apply text-[0.82rem] font-semibold text-stone-950 dark:text-gray-100;
+    }
+
+    .admin-documents-drawer__section-heading span {
+        @apply text-xs font-semibold text-stone-500 dark:text-gray-400;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .admin-documents-pipeline--drawer {
+        @apply mt-3;
+    }
+
+    .admin-documents-stage-list {
+        @apply mt-3 grid gap-2 sm:grid-cols-4;
+    }
+
+    .admin-documents-stage-list__item {
+        @apply rounded-lg border border-stone-100 bg-stone-50/50 px-2.5 py-2 dark:border-gray-800 dark:bg-gray-950/50;
+    }
+
+    .admin-documents-stage-list__item span {
+        @apply mb-2 block h-1.5 w-full rounded-full bg-stone-200 dark:bg-gray-800;
+    }
+
+    .admin-documents-stage-list__item strong {
+        @apply block text-[0.68rem] font-semibold text-stone-600 dark:text-gray-300;
+    }
+
+    .admin-documents-stage-list__item--done span { @apply bg-emerald-500 dark:bg-emerald-300; }
+    .admin-documents-stage-list__item--active span { @apply bg-amber-500 dark:bg-amber-300; }
+    .admin-documents-stage-list__item--failed span { @apply bg-rose-500 dark:bg-rose-300; }
+
+    .admin-documents-metadata-grid {
+        @apply mt-3 grid gap-2 sm:grid-cols-2;
+    }
+
+    .admin-documents-metadata-grid div {
+        @apply min-w-0 rounded-md bg-stone-50 px-2.5 py-2 dark:bg-gray-950/70;
+    }
+
+    .admin-documents-metadata-grid dd {
+        @apply mt-1 break-words text-[0.74rem] font-semibold text-stone-700 dark:text-gray-200;
+    }
+
+    .admin-knowledge-page {
+        @apply pb-6 text-stone-900 dark:text-gray-100;
+    }
+
+    .admin-knowledge-hero {
+        @apply mb-4 flex flex-wrap items-start justify-between gap-4;
+    }
+
+    .admin-knowledge-eyebrow {
+        @apply text-[0.64rem] font-bold uppercase text-ista-primary dark:text-amber-300;
+        letter-spacing: 0;
+    }
+
+    .admin-knowledge-title {
+        font-family: "Fraunces", serif;
+        @apply mt-1 text-[1.38rem] font-semibold leading-tight text-stone-950 dark:text-gray-100;
+        letter-spacing: 0;
+    }
+
+    .admin-knowledge-description {
+        @apply mt-2 max-w-xl text-[0.82rem] leading-relaxed text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-knowledge-readonly {
+        @apply px-3.5 py-1.5 text-[0.72rem] font-medium;
+    }
+
+    .admin-knowledge-alert {
+        @apply mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200;
+    }
+
+    .admin-knowledge-pipeline-sync {
+        @apply mb-4 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-300/20 dark:bg-amber-300/10 dark:text-amber-100;
+    }
+
+    .admin-knowledge-pipeline-sync__spinner {
+        @apply mt-0.5 h-4 w-4 flex-none animate-spin rounded-full border-2 border-current border-t-transparent;
+    }
+
+    .admin-knowledge-pipeline-sync strong {
+        @apply block text-[0.78rem] font-semibold;
+    }
+
+    .admin-knowledge-pipeline-sync em {
+        @apply mt-0.5 block text-[0.7rem] not-italic opacity-80;
+    }
+
+    .admin-knowledge-kpi-grid {
+        @apply grid gap-3 sm:grid-cols-2 xl:grid-cols-4;
+    }
+
+    .admin-knowledge-kpi-card {
+        @apply block min-h-[5.75rem] overflow-hidden rounded-lg border border-stone-200/80 bg-white p-0 shadow-[0_8px_24px_rgba(28,25,23,0.04)] transition-colors dark:border-gray-800 dark:bg-gray-900/80;
+    }
+
+    .admin-knowledge-kpi-card__header {
+        @apply flex items-center gap-2.5 border-b border-stone-200/80 px-4 py-2.5 text-ista-primary dark:border-gray-800 dark:text-amber-300;
+    }
+
+    .admin-knowledge-kpi-card__icon {
+        @apply inline-flex h-4 w-4 flex-none items-center justify-center;
+    }
+
+    .admin-knowledge-kpi-card__label {
+        @apply truncate text-[0.72rem] font-bold uppercase text-ista-primary dark:text-amber-300;
+        letter-spacing: 0;
+    }
+
+    .admin-knowledge-kpi-card__body {
+        @apply min-w-0 px-4 py-3;
+    }
+
+    .admin-knowledge-kpi-card__body strong {
+        @apply block text-2xl font-semibold leading-none text-stone-950 dark:text-gray-100;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .admin-knowledge-kpi-card__description {
+        @apply mt-1.5 text-[0.7rem] font-medium text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-knowledge-kpi-card--success .admin-knowledge-kpi-card__description { @apply text-emerald-600 dark:text-emerald-400; }
+    .admin-knowledge-kpi-card--warning .admin-knowledge-kpi-card__description { @apply text-amber-600 dark:text-amber-400; }
+    .admin-knowledge-kpi-card--danger .admin-knowledge-kpi-card__description { @apply text-rose-600 dark:text-rose-400; }
+
+    .admin-knowledge-main-stack {
+        @apply mt-3 grid content-start gap-3;
+    }
+
+    .admin-knowledge-main-stack--full {
+        @apply w-full;
+    }
+
+    .admin-knowledge-filter-panel,
+    .admin-knowledge-table-panel,
+    .admin-knowledge-upload-panel {
+        @apply overflow-hidden rounded-lg;
+    }
+
+    .admin-knowledge-filter-panel__header,
+    .admin-knowledge-table-panel__header,
+    .admin-knowledge-upload-panel__header {
+        @apply flex flex-wrap items-start justify-between gap-3 px-4 pt-3.5;
+    }
+
+    .admin-knowledge-filter-panel__header h3,
+    .admin-knowledge-table-panel__header h3,
+    .admin-knowledge-upload-panel__header h3 {
+        @apply text-[0.95rem] font-semibold text-stone-950 dark:text-gray-100;
+    }
+
+    .admin-knowledge-table-panel__header p,
+    .admin-knowledge-upload-panel__header p {
+        @apply mt-1 text-[0.72rem] text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-knowledge-table-panel__actions {
+        @apply flex flex-none items-center justify-end;
+    }
+
+    .admin-knowledge-reset-button {
+        @apply inline-flex items-center gap-1.5 text-[0.72rem] font-semibold text-ista-primary transition hover:text-rose-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/30 dark:text-rose-300 dark:hover:text-rose-200;
+    }
+
+    .admin-knowledge-filter-grid {
+        @apply grid gap-3 px-4 pb-3.5 pt-3 md:grid-cols-3;
+    }
+
+    .admin-knowledge-filter {
+        @apply flex flex-col gap-1.5;
+    }
+
+    .admin-knowledge-filter span {
+        @apply text-[0.6rem] font-bold uppercase text-stone-500 dark:text-gray-400;
+        letter-spacing: 0;
+    }
+
+    .admin-knowledge-control {
+        @apply h-9 w-full rounded-lg border border-stone-200 bg-white px-3 text-xs text-stone-800 shadow-[inset_0_1px_0_rgba(28,25,23,0.02)] transition placeholder:text-stone-400 focus:border-ista-primary focus:outline-none focus:ring-2 focus:ring-ista-primary/15 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100 dark:placeholder:text-gray-500;
+    }
+
+    .admin-knowledge-control--textarea {
+        @apply min-h-20 py-2;
+    }
+
+    .admin-knowledge-control--file {
+        @apply h-auto py-2;
+    }
+
+    .admin-knowledge-table-panel__body {
+        @apply px-3.5 pb-3.5 pt-3;
+    }
+
+    .admin-knowledge-table {
+        @apply rounded-lg;
+    }
+
+    .admin-knowledge-table .admin-table__th {
+        @apply bg-white px-3 py-2.5 text-[0.61rem] text-stone-500 dark:bg-gray-900/80 dark:text-gray-400;
+    }
+
+    .admin-knowledge-table .admin-table__td {
+        @apply px-3 py-2;
+    }
+
+    .admin-knowledge-table tbody tr {
+        @apply transition hover:bg-stone-50/80 dark:hover:bg-gray-800/50;
+    }
+
+    .admin-knowledge-table__row--recent .admin-table__td {
+        @apply bg-amber-50/80 dark:bg-amber-300/10;
+    }
+
+    .admin-knowledge-file-name {
+        @apply block truncate text-xs font-semibold text-stone-800 dark:text-gray-100;
+    }
+
+    .admin-knowledge-file-meta {
+        @apply block truncate text-[0.68rem] text-stone-500 dark:text-gray-500;
+    }
+
+    .admin-knowledge-source {
+        @apply inline-flex max-w-[9rem] truncate rounded-md bg-stone-50 px-2 py-1 text-[0.68rem] font-semibold text-stone-600 ring-1 ring-stone-100 dark:bg-gray-950 dark:text-gray-300 dark:ring-gray-800;
+    }
+
+    .admin-knowledge-error-code,
+    .admin-knowledge-error {
+        @apply text-[0.66rem] font-medium text-rose-500 dark:text-rose-300;
+    }
+
+    .admin-knowledge-error-code {
+        @apply mt-1;
+    }
+
+    .admin-knowledge-action-group {
+        @apply flex min-w-[7.1rem] flex-nowrap items-center justify-end gap-1.5;
+    }
+
+    .admin-knowledge-action {
+        @apply inline-flex h-7 w-7 flex-none items-center justify-center rounded-md border border-stone-200 bg-white p-0 text-stone-600 shadow-[0_1px_0_rgba(28,25,23,0.03)] transition hover:border-ista-primary/30 hover:bg-ista-primary/5 hover:text-ista-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/25 disabled:cursor-wait disabled:opacity-55 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300 dark:hover:border-amber-300/30 dark:hover:bg-amber-300/10 dark:hover:text-amber-300;
+    }
+
+    .admin-knowledge-action svg {
+        @apply h-3.5 w-3.5;
+    }
+
+    .admin-knowledge-action--success {
+        @apply border-emerald-100 bg-emerald-50 text-emerald-700 hover:border-emerald-200 hover:bg-emerald-100/70 hover:text-emerald-800 dark:border-emerald-300/20 dark:bg-emerald-400/10 dark:text-emerald-300 dark:hover:border-emerald-300/35 dark:hover:bg-emerald-300/15 dark:hover:text-emerald-200;
+    }
+
+    .admin-knowledge-action--warning {
+        @apply border-amber-100 bg-amber-50 text-amber-700 hover:border-amber-200 hover:bg-amber-100/70 hover:text-amber-800 dark:border-amber-300/25 dark:bg-amber-300/10 dark:text-amber-300 dark:hover:border-amber-300/40 dark:hover:bg-amber-300/15 dark:hover:text-amber-200;
+    }
+
+    .admin-knowledge-action--danger {
+        @apply border-rose-100 bg-rose-50 text-rose-700 hover:border-rose-200 hover:bg-rose-100/70 hover:text-rose-800 dark:border-rose-400/20 dark:bg-rose-500/10 dark:text-rose-300 dark:hover:border-rose-300/35 dark:hover:bg-rose-500/15 dark:hover:text-rose-200;
+    }
+
+    .admin-knowledge-upload-form {
+        @apply space-y-3 px-4 pb-4 pt-3;
+    }
+
+    .admin-knowledge-upload-form--busy {
+        @apply cursor-wait;
+    }
+
+    .admin-knowledge-upload-validation {
+        @apply rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-[0.76rem] text-rose-700 dark:border-rose-300/20 dark:bg-rose-300/10 dark:text-rose-100;
+    }
+
+    .admin-knowledge-upload-validation strong {
+        @apply block font-semibold;
+    }
+
+    .admin-knowledge-upload-validation ul {
+        @apply mt-1 list-disc space-y-0.5 pl-4;
+    }
+
+    .admin-knowledge-upload-source-note {
+        @apply -mt-1 text-[0.68rem] font-medium text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-knowledge-upload-source-note--error {
+        @apply text-rose-500 dark:text-rose-300;
+    }
+
+    .admin-knowledge-upload-note {
+        @apply text-[0.72rem] text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-knowledge-upload-button {
+        @apply inline-flex h-10 w-full items-center justify-center rounded-lg bg-ista-primary px-4 text-xs font-semibold uppercase text-amber-200 transition hover:bg-ista-primary/90 disabled:opacity-50;
+        letter-spacing: 0;
+    }
+
+    .admin-accounts-page {
+        @apply pb-6 text-stone-900 dark:text-gray-100;
+    }
+
+    .admin-accounts-hero {
+        @apply mb-4 flex flex-wrap items-start justify-between gap-4;
+    }
+
+    .admin-accounts-eyebrow {
+        @apply text-[0.64rem] font-bold uppercase text-ista-primary dark:text-amber-300;
+        letter-spacing: 0;
+    }
+
+    .admin-accounts-title {
+        font-family: "Fraunces", serif;
+        @apply mt-1 text-[1.38rem] font-semibold leading-tight text-stone-950 dark:text-gray-100;
+        letter-spacing: 0;
+    }
+
+    .admin-accounts-description {
+        @apply mt-2 max-w-xl text-[0.82rem] leading-relaxed text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-accounts-hero__actions {
+        @apply flex flex-wrap items-center justify-end gap-2;
+    }
+
+    .admin-accounts-access-badge {
+        @apply inline-flex h-8 items-center gap-2 rounded-full border border-stone-200 bg-white px-3 text-[0.7rem] font-semibold text-stone-600 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300;
+    }
+
+    .admin-accounts-access-badge span {
+        @apply h-1.5 w-1.5 rounded-full bg-amber-500 dark:bg-amber-300;
+    }
+
+    .admin-accounts-primary-button,
+    .admin-accounts-secondary-button,
+    .admin-accounts-danger-button {
+        @apply inline-flex h-8 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60;
+    }
+
+    .admin-accounts-primary-button {
+        @apply bg-ista-primary text-white shadow-[0_8px_20px_rgba(139,8,54,0.18)] hover:bg-rose-900 focus-visible:ring-ista-primary/30 dark:bg-amber-300 dark:text-gray-950 dark:hover:bg-amber-200;
+    }
+
+    .admin-accounts-table-add-button {
+        @apply h-8 px-3 text-[0.72rem];
+    }
+
+    .admin-accounts-secondary-button {
+        @apply border border-stone-200 bg-white text-stone-700 hover:border-ista-primary/30 hover:text-ista-primary focus-visible:ring-ista-primary/25 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200 dark:hover:border-amber-300/30 dark:hover:text-amber-300;
+    }
+
+    .admin-accounts-danger-button {
+        @apply bg-rose-600 text-white hover:bg-rose-700 focus-visible:ring-rose-500/25 dark:bg-rose-500 dark:hover:bg-rose-400;
+    }
+
+    .admin-accounts-kpi-grid {
+        @apply grid gap-3 sm:grid-cols-2 xl:grid-cols-4;
+    }
+
+    .admin-accounts-kpi-card {
+        @apply flex min-h-[5rem] items-start gap-3 rounded-lg border border-stone-200/80 bg-white px-3.5 py-3 shadow-[0_8px_20px_rgba(28,25,23,0.035)] transition-colors dark:border-gray-800 dark:bg-gray-900/80;
+    }
+
+    .admin-accounts-kpi-card__marker {
+        @apply mt-1.5 flex w-3 flex-none items-center justify-center;
+    }
+
+    .admin-accounts-kpi-card__marker span {
+        @apply block h-2 w-2 rounded-full;
+    }
+
+    .admin-accounts-kpi-card--primary .admin-accounts-kpi-card__marker span { @apply bg-ista-primary dark:bg-amber-300; }
+    .admin-accounts-kpi-card--success .admin-accounts-kpi-card__marker span { @apply bg-emerald-500; }
+    .admin-accounts-kpi-card--danger .admin-accounts-kpi-card__marker span { @apply bg-rose-500; }
+    .admin-accounts-kpi-card--warning .admin-accounts-kpi-card__marker span { @apply bg-amber-500; }
+
+    .admin-accounts-kpi-card__label {
+        @apply text-xs font-medium text-stone-700 dark:text-gray-200;
+    }
+
+    .admin-accounts-kpi-card strong {
+        @apply mt-1 block text-[1.55rem] font-semibold leading-none text-stone-950 dark:text-gray-100;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .admin-accounts-kpi-card__description {
+        @apply mt-1 text-[0.68rem] font-medium text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-accounts-kpi-card--success .admin-accounts-kpi-card__description { @apply text-emerald-600 dark:text-emerald-400; }
+    .admin-accounts-kpi-card--danger .admin-accounts-kpi-card__description { @apply text-rose-600 dark:text-rose-400; }
+    .admin-accounts-kpi-card--warning .admin-accounts-kpi-card__description { @apply text-amber-600 dark:text-amber-400; }
+
+    .admin-accounts-alert,
+    .admin-accounts-temp-password {
+        @apply mt-3 flex items-start justify-between gap-3 rounded-lg border px-4 py-3 text-xs;
+    }
+
+    .admin-accounts-alert--success {
+        @apply border-emerald-100 bg-emerald-50 text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-300;
+    }
+
+    .admin-accounts-alert--danger {
+        @apply border-rose-100 bg-rose-50 text-rose-700 dark:border-rose-400/20 dark:bg-rose-500/10 dark:text-rose-300;
+    }
+
+    .admin-accounts-alert button,
+    .admin-accounts-temp-password button {
+        @apply inline-flex h-6 w-6 flex-none items-center justify-center rounded-md opacity-70 transition hover:bg-black/5 hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-400/20 dark:hover:bg-white/10;
+    }
+
+    .admin-accounts-temp-password {
+        @apply border-amber-100 bg-amber-50 text-amber-800 dark:border-amber-300/20 dark:bg-amber-300/10 dark:text-amber-200;
+    }
+
+    .admin-accounts-temp-password p {
+        @apply text-xs font-semibold;
+    }
+
+    .admin-accounts-temp-password span {
+        @apply mt-0.5 block text-[0.7rem] text-amber-700/80 dark:text-amber-200/75;
+    }
+
+    .admin-accounts-temp-password code {
+        @apply mt-2 block w-fit max-w-full break-all rounded-md bg-white px-2.5 py-1.5 font-mono text-[0.76rem] font-semibold text-stone-900 ring-1 ring-amber-100 dark:bg-gray-950 dark:text-amber-100 dark:ring-amber-300/20;
+    }
+
+    .admin-accounts-filter-panel {
+        @apply mt-3 overflow-hidden rounded-lg;
+    }
+
+    .admin-accounts-filter-panel__header,
+    .admin-accounts-table-panel__header {
+        @apply flex flex-wrap items-start justify-between gap-3 px-4 pt-3;
+    }
+
+    .admin-accounts-filter-panel__header h3,
+    .admin-accounts-table-panel__header h3 {
+        @apply text-[0.95rem] font-semibold text-stone-950 dark:text-gray-100;
+    }
+
+    .admin-accounts-table-panel__header p {
+        @apply mt-1 text-[0.72rem] text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-accounts-reset-button {
+        @apply inline-flex items-center gap-1.5 text-[0.72rem] font-semibold text-ista-primary transition hover:text-rose-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/30 dark:text-rose-300 dark:hover:text-rose-200;
+    }
+
+    .admin-accounts-filter-grid {
+        @apply grid gap-3 px-4 pb-3 pt-2.5 md:grid-cols-3;
+    }
+
+    .admin-accounts-filter,
+    .admin-accounts-modal__field {
+        @apply flex flex-col gap-1.5;
+    }
+
+    .admin-accounts-filter span,
+    .admin-accounts-modal__field > span {
+        @apply text-[0.6rem] font-bold uppercase text-stone-500 dark:text-gray-400;
+        letter-spacing: 0;
+    }
+
+    .admin-accounts-control {
+        @apply h-9 w-full rounded-lg border border-stone-200 bg-white px-3 text-xs text-stone-800 shadow-[inset_0_1px_0_rgba(28,25,23,0.02)] transition placeholder:text-stone-400 focus:border-ista-primary focus:outline-none focus:ring-2 focus:ring-ista-primary/15 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100 dark:placeholder:text-gray-500;
+    }
+
+    .admin-accounts-modal__field textarea.admin-accounts-control {
+        @apply min-h-[5.25rem] resize-none py-2 leading-relaxed;
+    }
+
+    .admin-accounts-content-grid {
+        @apply mt-3 grid gap-3;
+    }
+
+    .admin-accounts-table-panel {
+        @apply overflow-hidden rounded-lg;
+    }
+
+    .admin-accounts-table-panel__body {
+        @apply px-3.5 pb-3.5;
+    }
+
+    .admin-accounts-table {
+        @apply rounded-xl;
+    }
+
+    .admin-accounts-table .admin-table {
+        @apply table-fixed;
+    }
+
+    .admin-accounts-table .admin-table__th {
+        @apply bg-white px-3 py-2.5 text-[0.61rem] text-stone-500 dark:bg-gray-900/80 dark:text-gray-400;
+    }
+
+    .admin-accounts-table .admin-table__td {
+        @apply px-3 py-2;
+    }
+
+    .admin-accounts-table .admin-badge {
+        @apply whitespace-nowrap px-2 py-0.5 text-[0.65rem];
+    }
+
+    .admin-accounts-table tbody tr {
+        @apply transition hover:bg-stone-50/80 dark:hover:bg-gray-800/50;
+    }
+
+    .admin-accounts-user-cell {
+        @apply flex min-w-0 items-center gap-2.5;
+    }
+
+    .admin-accounts-avatar {
+        @apply inline-flex h-8 w-8 flex-none items-center justify-center rounded-full bg-ista-primary text-[0.66rem] font-bold text-white shadow-[0_5px_12px_rgba(139,8,54,0.2)] ring-1 ring-ista-primary/10 dark:bg-amber-300 dark:text-gray-950 dark:ring-amber-300/20;
+        letter-spacing: 0;
+    }
+
+    .admin-accounts-user-cell__name {
+        @apply block truncate text-xs font-semibold text-stone-800 dark:text-gray-100;
+    }
+
+    .admin-accounts-user-cell__email {
+        @apply block truncate text-[0.68rem] text-stone-500 dark:text-gray-500;
+    }
+
+    .admin-accounts-role-chip,
+    .admin-accounts-status-chip,
+    .admin-accounts-security-chip {
+        @apply inline-flex items-center justify-center rounded-full px-2.5 py-1 text-[0.64rem] font-bold ring-1;
+        letter-spacing: 0;
+    }
+
+    .admin-accounts-role-chip {
+        @apply min-w-[4.2rem];
+    }
+
+    .admin-accounts-role-chip--primary {
+        @apply bg-rose-50 text-ista-primary ring-rose-100 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-400/20;
+    }
+
+    .admin-accounts-role-chip--gold {
+        @apply bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-400/10 dark:text-amber-300 dark:ring-amber-300/20;
+    }
+
+    .admin-accounts-status-chip {
+        @apply min-w-[4.4rem] gap-1.5;
+    }
+
+    .admin-accounts-status-chip__dot {
+        @apply h-1.5 w-1.5 rounded-full;
+    }
+
+    .admin-accounts-status-chip--success {
+        @apply bg-emerald-50 text-emerald-700 ring-emerald-100 dark:bg-emerald-400/10 dark:text-emerald-300 dark:ring-emerald-300/20;
+    }
+
+    .admin-accounts-status-chip--success .admin-accounts-status-chip__dot {
+        @apply bg-emerald-500 dark:bg-emerald-300;
+    }
+
+    .admin-accounts-status-chip--danger {
+        @apply bg-rose-50 text-rose-700 ring-rose-100 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-400/20;
+    }
+
+    .admin-accounts-status-chip--danger .admin-accounts-status-chip__dot {
+        @apply bg-rose-500 dark:bg-rose-300;
+    }
+
+    .admin-accounts-security-chip {
+        @apply bg-stone-100 text-stone-600 ring-stone-200 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-700;
+    }
+
+    .admin-accounts-security-chip--warning {
+        @apply bg-amber-50 text-amber-700 ring-amber-100 dark:bg-amber-400/10 dark:text-amber-300 dark:ring-amber-300/20;
+    }
+
+    .admin-accounts-muted {
+        @apply whitespace-nowrap text-[0.72rem] text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-accounts-action-group {
+        @apply flex min-w-0 flex-nowrap items-center justify-end gap-1.5;
+    }
+
+    .admin-accounts-action-button {
+        @apply inline-flex h-8 flex-none items-center justify-center rounded-md border border-stone-200 bg-white px-2.5 text-[0.66rem] font-semibold text-stone-700 shadow-[0_1px_0_rgba(28,25,23,0.03)] transition hover:border-ista-primary/30 hover:text-ista-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/25 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200 dark:hover:border-amber-300/30 dark:hover:text-amber-300;
+    }
+
+    .admin-accounts-action-button--success {
+        @apply border-emerald-100 bg-emerald-50 text-emerald-700 hover:border-emerald-200 hover:text-emerald-800 dark:border-emerald-300/20 dark:bg-emerald-400/10 dark:text-emerald-300;
+    }
+
+    .admin-accounts-action-button--danger {
+        @apply border-rose-100 bg-rose-50 text-rose-700 hover:border-rose-200 hover:text-rose-800 dark:border-rose-400/20 dark:bg-rose-500/10 dark:text-rose-300;
+    }
+
+    .admin-accounts-reset-password-button {
+        @apply inline-flex h-8 flex-none items-center justify-center whitespace-nowrap rounded-md border border-amber-200 bg-white px-2 text-[0.6rem] font-semibold text-amber-600 transition hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/25 dark:border-amber-300/30 dark:bg-gray-950 dark:text-amber-300 dark:hover:bg-amber-300/10;
+    }
+
+    .admin-accounts-toggle {
+        @apply relative inline-flex h-5 w-9 flex-none items-center rounded-full bg-stone-300 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/25 dark:bg-gray-700;
+    }
+
+    .admin-accounts-toggle span {
+        @apply ml-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform dark:bg-gray-200;
+    }
+
+    .admin-accounts-toggle--active {
+        @apply bg-ista-primary dark:bg-amber-300;
+    }
+
+    .admin-accounts-toggle--active span {
+        @apply translate-x-4 dark:bg-gray-950;
+    }
+
+    .admin-accounts-pagination {
+        @apply mt-3 border-t border-stone-100 pt-3 dark:border-gray-800;
+    }
+
+    .admin-accounts-modal {
+        @apply fixed inset-0 z-50 flex items-center justify-center p-4;
+    }
+
+    .admin-accounts-modal__backdrop {
+        @apply absolute inset-0 bg-stone-950/35 backdrop-blur-sm dark:bg-black/60;
+    }
+
+    .admin-accounts-modal__panel {
+        @apply relative flex max-h-[86vh] w-full max-w-xl flex-col overflow-hidden rounded-xl border border-stone-200 bg-white shadow-[0_24px_80px_rgba(28,25,23,0.24)] dark:border-gray-800 dark:bg-gray-950;
+    }
+
+    .admin-accounts-modal__header {
+        @apply flex flex-none items-start justify-between gap-4 border-b border-stone-100 px-5 py-4 dark:border-gray-800;
+    }
+
+    .admin-accounts-modal__eyebrow {
+        @apply text-[0.6rem] font-bold uppercase text-ista-primary dark:text-amber-300;
+        letter-spacing: 0;
+    }
+
+    .admin-accounts-modal__header h3 {
+        @apply mt-1 text-lg font-semibold text-stone-950 dark:text-gray-100;
+    }
+
+    .admin-accounts-modal__header span {
+        @apply mt-1 block text-[0.72rem] text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-accounts-modal__close {
+        @apply inline-flex h-8 w-8 flex-none items-center justify-center rounded-lg text-stone-500 transition hover:bg-stone-100 hover:text-stone-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/25 dark:text-gray-400 dark:hover:bg-gray-900 dark:hover:text-gray-100;
+    }
+
+    .admin-accounts-modal__body {
+        @apply grid min-h-0 flex-1 gap-3 overflow-y-auto px-5 py-4;
+    }
+
+    .admin-accounts-modal__field em {
+        @apply text-[0.68rem] not-italic text-rose-600 dark:text-rose-300;
+    }
+
+    .admin-accounts-checkbox {
+        @apply flex items-center gap-2 rounded-lg border border-stone-100 bg-stone-50/50 px-3 py-2.5 text-xs font-medium text-stone-700 dark:border-gray-800 dark:bg-gray-900/50 dark:text-gray-200;
+    }
+
+    .admin-accounts-checkbox input {
+        @apply h-4 w-4 rounded border-stone-300 text-ista-primary focus:ring-ista-primary/20 dark:border-gray-700 dark:bg-gray-950;
+    }
+
+    .admin-accounts-password-row {
+        @apply flex flex-col gap-2 sm:flex-row;
+    }
+
+    .admin-accounts-password-row .admin-accounts-secondary-button {
+        @apply flex-none;
+    }
+
+    .admin-accounts-modal__footer {
+        @apply flex flex-none flex-wrap items-center justify-end gap-2 border-t border-stone-100 px-5 py-4 dark:border-gray-800;
+    }
+
+    .admin-errors-page {
+        @apply pb-6 text-stone-900 dark:text-gray-100;
+    }
+
+    .admin-errors-hero {
+        @apply mb-4 flex flex-wrap items-start justify-between gap-4;
+    }
+
+    .admin-errors-eyebrow {
+        @apply text-[0.64rem] font-bold uppercase text-ista-primary dark:text-amber-300;
+        letter-spacing: 0;
+    }
+
+    .admin-errors-title {
+        font-family: "Fraunces", serif;
+        @apply mt-1 text-[1.38rem] font-semibold leading-tight text-stone-950 dark:text-gray-100;
+        letter-spacing: 0;
+    }
+
+    .admin-errors-description {
+        @apply mt-2 max-w-xl text-[0.82rem] leading-relaxed text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-errors-readonly {
+        @apply px-3.5 py-1.5 text-[0.72rem] font-medium;
+    }
+
+    .admin-errors-kpi-grid {
+        @apply grid gap-3 sm:grid-cols-2 xl:grid-cols-4;
+    }
+
+    .admin-errors-kpi-card {
+        @apply flex min-h-[5.75rem] items-start gap-3 rounded-lg border border-stone-200/80 bg-white px-3.5 pb-3.5 pt-4 shadow-[0_8px_24px_rgba(28,25,23,0.04)] transition-colors dark:border-gray-800 dark:bg-gray-900/80;
+    }
+
+    .admin-errors-kpi-card__marker {
+        @apply mt-1.5 flex w-3 flex-none items-center justify-center;
+    }
+
+    .admin-errors-kpi-card__marker span {
+        @apply block h-2 w-2 rounded-full;
+    }
+
+    .admin-errors-kpi-card--primary .admin-errors-kpi-card__marker span { @apply bg-ista-primary dark:bg-amber-300; }
+    .admin-errors-kpi-card--danger .admin-errors-kpi-card__marker span { @apply bg-rose-500; }
+    .admin-errors-kpi-card--warning .admin-errors-kpi-card__marker span { @apply bg-amber-500; }
+    .admin-errors-kpi-card--neutral .admin-errors-kpi-card__marker span { @apply bg-stone-400 dark:bg-gray-500; }
+
+    .admin-errors-kpi-card__label {
+        @apply text-xs font-medium text-stone-700 dark:text-gray-200;
+    }
+
+    .admin-errors-kpi-card strong {
+        @apply mt-1.5 block text-2xl font-semibold leading-none text-stone-950 dark:text-gray-100;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .admin-errors-kpi-card__description {
+        @apply mt-1.5 text-[0.7rem] font-medium text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-errors-kpi-card--danger .admin-errors-kpi-card__description { @apply text-rose-600 dark:text-rose-400; }
+    .admin-errors-kpi-card--warning .admin-errors-kpi-card__description { @apply text-amber-600 dark:text-amber-400; }
+
+    .admin-users-kpi-card,
+    .admin-usage-kpi-card,
+    .admin-documents-kpi-card,
+    .admin-accounts-kpi-card,
+    .admin-errors-kpi-card {
+        @apply block min-h-[5.75rem] overflow-hidden p-0;
+    }
+
+    .admin-users-kpi-card__header,
+    .admin-usage-kpi-card__header,
+    .admin-documents-kpi-card__header,
+    .admin-accounts-kpi-card__header,
+    .admin-errors-kpi-card__header {
+        @apply flex items-center gap-2.5 border-b border-stone-200/80 px-4 py-2.5 text-ista-primary dark:border-gray-800 dark:text-amber-300;
+    }
+
+    .admin-users-kpi-card__icon,
+    .admin-usage-kpi-card__icon,
+    .admin-documents-kpi-card__icon,
+    .admin-accounts-kpi-card__icon,
+    .admin-errors-kpi-card__icon {
+        @apply inline-flex h-4 w-4 flex-none items-center justify-center;
+    }
+
+    .admin-users-kpi-card__label,
+    .admin-usage-kpi-card__label,
+    .admin-documents-kpi-card__label,
+    .admin-accounts-kpi-card__label,
+    .admin-errors-kpi-card__label {
+        @apply truncate text-[0.72rem] font-bold uppercase text-ista-primary dark:text-amber-300;
+        letter-spacing: 0;
+    }
+
+    .admin-users-kpi-card__body,
+    .admin-usage-kpi-card__body,
+    .admin-documents-kpi-card__body,
+    .admin-accounts-kpi-card__body,
+    .admin-errors-kpi-card__body {
+        @apply min-w-0 px-4 py-3;
+    }
+
+    .admin-users-kpi-card__body strong,
+    .admin-usage-kpi-card__body strong,
+    .admin-documents-kpi-card__body strong,
+    .admin-accounts-kpi-card__body strong,
+    .admin-errors-kpi-card__body strong {
+        @apply mt-0;
+    }
+
+    .admin-errors-filter-panel {
+        @apply mt-3 overflow-hidden rounded-lg;
+    }
+
+    .admin-errors-filter-panel__header,
+    .admin-errors-table-panel__header,
+    .admin-errors-distribution-panel__header {
+        @apply flex flex-wrap items-start justify-between gap-3 px-4 pt-3.5;
+    }
+
+    .admin-errors-filter-panel__header h3,
+    .admin-errors-table-panel__header h3,
+    .admin-errors-distribution-panel__header h3 {
+        @apply text-[0.95rem] font-semibold text-stone-950 dark:text-gray-100;
+    }
+
+    .admin-errors-table-panel__header p,
+    .admin-errors-distribution-panel__header p {
+        @apply mt-1 text-[0.72rem] text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-errors-latest {
+        @apply rounded-full bg-rose-50 px-2.5 py-1 text-[0.66rem] font-semibold text-rose-600 ring-1 ring-rose-100 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-400/20;
+    }
+
+    .admin-errors-reset-group {
+        @apply flex items-center justify-end;
+    }
+
+    .admin-errors-reset-button {
+        @apply inline-flex items-center gap-1.5 text-[0.72rem] font-semibold text-ista-primary transition hover:text-rose-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/30 dark:text-rose-300 dark:hover:text-rose-200;
+    }
+
+    .admin-errors-filter-grid {
+        @apply grid gap-3 px-4 pb-3.5 pt-3 md:grid-cols-2 xl:grid-cols-[minmax(13rem,0.95fr)_minmax(13rem,1fr)_minmax(10rem,0.75fr)_minmax(10rem,0.75fr)];
+    }
+
+    .admin-errors-filter {
+        @apply flex flex-col gap-1.5;
+    }
+
+    .admin-errors-filter span {
+        @apply text-[0.6rem] font-bold uppercase text-stone-500 dark:text-gray-400;
+        letter-spacing: 0;
+    }
+
+    .admin-errors-control {
+        @apply h-9 w-full rounded-lg border border-stone-200 bg-white px-3 text-xs text-stone-800 shadow-[inset_0_1px_0_rgba(28,25,23,0.02)] transition placeholder:text-stone-400 focus:border-ista-primary focus:outline-none focus:ring-2 focus:ring-ista-primary/15 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100 dark:placeholder:text-gray-500;
+    }
+
+    .admin-errors-content-grid {
+        @apply mt-3 grid gap-3 xl:grid-cols-[minmax(0,1.85fr)_minmax(18rem,0.7fr)];
+    }
+
+    .admin-errors-side-grid {
+        @apply grid gap-3 content-start;
+    }
+
+    .admin-errors-table-panel,
+    .admin-errors-distribution-panel {
+        @apply overflow-hidden rounded-lg;
+    }
+
+    .admin-errors-table-panel__body,
+    .admin-errors-distribution-panel__body {
+        @apply px-3.5 pb-3.5 pt-3;
+    }
+
+    .admin-errors-table {
+        @apply rounded-lg;
+    }
+
+    .admin-errors-table .admin-table__th {
+        @apply bg-white px-3 py-2.5 text-[0.61rem] text-stone-500 dark:bg-gray-900/80 dark:text-gray-400;
+    }
+
+    .admin-errors-table .admin-table__td {
+        @apply px-3 py-2;
+    }
+
+    .admin-errors-table .admin-badge {
+        @apply whitespace-nowrap px-2 py-0.5 text-[0.65rem];
+    }
+
+    .admin-errors-table tbody tr {
+        @apply transition hover:bg-stone-50/80 dark:hover:bg-gray-800/50;
+    }
+
+    .admin-errors-user-cell {
+        @apply flex min-w-[10rem] flex-col;
+    }
+
+    .admin-errors-user-cell__name {
+        @apply block truncate text-xs font-semibold text-stone-800 dark:text-gray-100;
+    }
+
+    .admin-errors-user-cell__email {
+        @apply block truncate text-[0.68rem] text-stone-500 dark:text-gray-500;
+    }
+
+    .admin-errors-feature {
+        @apply block max-w-[12rem] truncate font-mono text-[0.66rem] uppercase text-stone-500 dark:text-gray-400;
+        letter-spacing: 0;
+    }
+
+    .admin-errors-code {
+        @apply inline-block max-w-[11rem] truncate rounded-md bg-rose-50 px-2 py-0.5 text-[0.66rem] font-semibold uppercase text-rose-600 ring-1 ring-rose-100 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-400/20;
+        letter-spacing: 0;
+    }
+
+    .admin-errors-severity {
+        @apply inline-flex min-w-[4.4rem] items-center justify-center rounded-full px-2 py-0.5 text-[0.64rem] font-bold uppercase;
+        letter-spacing: 0;
+    }
+
+    .admin-errors-severity--critical {
+        @apply bg-rose-600 text-white ring-1 ring-rose-700/20 dark:bg-rose-500 dark:text-white;
+    }
+
+    .admin-errors-severity--high {
+        @apply bg-rose-50 text-rose-700 ring-1 ring-rose-100 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-400/20;
+    }
+
+    .admin-errors-severity--medium {
+        @apply bg-amber-50 text-amber-700 ring-1 ring-amber-100 dark:bg-amber-400/10 dark:text-amber-300 dark:ring-amber-300/20;
+    }
+
+    .admin-errors-severity--low {
+        @apply bg-stone-100 text-stone-600 ring-1 ring-stone-200 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-700;
+    }
+
+    .admin-errors-status-badge {
+        @apply min-w-[4.3rem] justify-center;
+    }
+
+    .admin-errors-number {
+        @apply whitespace-nowrap font-mono text-[0.72rem] font-medium text-stone-800 dark:text-gray-200;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .admin-errors-muted {
+        @apply text-[0.72rem] text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-errors-detail-button {
+        @apply inline-flex h-7 items-center justify-center rounded-md border border-stone-200 bg-white px-2.5 text-[0.68rem] font-semibold text-stone-700 transition hover:border-ista-primary/30 hover:text-ista-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/25 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200 dark:hover:border-amber-300/30 dark:hover:text-amber-300;
+    }
+
+    .admin-errors-pagination {
+        @apply mt-3 border-t border-stone-100 pt-3 dark:border-gray-800;
+    }
+
+    .admin-errors-distribution-list {
+        @apply space-y-3;
+    }
+
+    .admin-errors-distribution-list li {
+        @apply rounded-lg border border-stone-100 bg-stone-50/40 p-3 dark:border-gray-800 dark:bg-gray-950/40;
+    }
+
+    .admin-errors-distribution-list__top {
+        @apply flex items-center justify-between gap-3;
+    }
+
+    .admin-errors-distribution-list__top span {
+        @apply truncate font-mono text-[0.66rem] uppercase text-stone-600 dark:text-gray-300;
+        letter-spacing: 0;
+    }
+
+    .admin-errors-distribution-list__top strong {
+        @apply text-xs font-semibold text-stone-900 dark:text-gray-100;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .admin-errors-distribution-bar {
+        @apply mt-2 h-1.5 overflow-hidden rounded-full bg-stone-200/70 dark:bg-gray-800;
+    }
+
+    .admin-errors-distribution-bar span {
+        @apply block h-full rounded-full bg-rose-500/80 dark:bg-rose-300/80;
+    }
+
+    .admin-errors-distribution-list__meta {
+        @apply mt-2 flex flex-wrap items-center justify-between gap-2 text-[0.62rem] font-semibold uppercase text-stone-400 dark:text-gray-500;
+        letter-spacing: 0;
+    }
+
+    .admin-errors-code-list {
+        @apply space-y-2.5;
+    }
+
+    .admin-errors-code-list li {
+        @apply flex items-center justify-between gap-3 rounded-lg border border-stone-100 bg-stone-50/40 p-3 dark:border-gray-800 dark:bg-gray-950/40;
+    }
+
+    .admin-errors-code-list span {
+        @apply block max-w-[12rem] truncate font-mono text-[0.66rem] font-semibold uppercase text-rose-600 dark:text-rose-300;
+        letter-spacing: 0;
+    }
+
+    .admin-errors-code-list em {
+        @apply mt-1 block text-[0.62rem] not-italic text-stone-400 dark:text-gray-500;
+    }
+
+    .admin-errors-code-list strong {
+        @apply flex-none text-xs font-semibold text-stone-900 dark:text-gray-100;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .admin-errors-modal {
+        @apply fixed inset-0 z-50 flex items-center justify-center p-4;
+    }
+
+    .admin-errors-modal__backdrop {
+        @apply absolute inset-0 bg-stone-950/35 backdrop-blur-sm dark:bg-black/60;
+    }
+
+    .admin-errors-modal__panel {
+        @apply relative flex max-h-[86vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-stone-200 bg-white shadow-[0_24px_80px_rgba(28,25,23,0.24)] dark:border-gray-800 dark:bg-gray-950;
+    }
+
+    .admin-errors-modal__header {
+        @apply flex flex-none items-start justify-between gap-4 border-b border-stone-100 px-5 py-4 dark:border-gray-800;
+    }
+
+    .admin-errors-modal__eyebrow {
+        @apply text-[0.6rem] font-bold uppercase text-ista-primary dark:text-amber-300;
+        letter-spacing: 0;
+    }
+
+    .admin-errors-modal__header h3 {
+        @apply mt-1 text-lg font-semibold text-stone-950 dark:text-gray-100;
+    }
+
+    .admin-errors-modal__code {
+        @apply mt-2 inline-block rounded-md bg-rose-50 px-2 py-0.5 text-[0.68rem] font-semibold uppercase text-rose-600 ring-1 ring-rose-100 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-400/20;
+        letter-spacing: 0;
+    }
+
+    .admin-errors-modal__close {
+        @apply inline-flex h-8 w-8 flex-none items-center justify-center rounded-lg text-stone-500 transition hover:bg-stone-100 hover:text-stone-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/25 dark:text-gray-400 dark:hover:bg-gray-900 dark:hover:text-gray-100;
+    }
+
+    .admin-errors-modal__body {
+        @apply min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-4;
+    }
+
+    .admin-errors-modal__summary-grid {
+        @apply grid gap-3 md:grid-cols-2 xl:grid-cols-3;
+    }
+
+    .admin-errors-modal__summary-grid > div {
+        @apply rounded-lg border border-stone-100 bg-stone-50/50 p-3 dark:border-gray-800 dark:bg-gray-900/50;
+    }
+
+    .admin-errors-modal__summary-grid span {
+        @apply block text-[0.6rem] font-bold uppercase text-stone-400 dark:text-gray-500;
+        letter-spacing: 0;
+    }
+
+    .admin-errors-modal__summary-grid strong {
+        @apply mt-1 block truncate text-xs font-semibold text-stone-900 dark:text-gray-100;
+    }
+
+    .admin-errors-modal__summary-grid strong.admin-errors-severity {
+        @apply inline-flex;
+    }
+
+    .admin-errors-modal__summary-grid strong.admin-errors-modal__trace {
+        @apply whitespace-normal break-all font-mono leading-relaxed;
+        overflow: visible;
+        text-overflow: clip;
+    }
+
+    .admin-errors-modal__summary-grid em {
+        @apply mt-1 block truncate text-[0.68rem] not-italic text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-errors-modal__section {
+        @apply mt-4 rounded-lg border border-stone-100 bg-white p-3.5 dark:border-gray-800 dark:bg-gray-900/40;
+    }
+
+    .admin-errors-modal__section h4 {
+        @apply text-[0.82rem] font-semibold text-stone-950 dark:text-gray-100;
+    }
+
+    .admin-errors-modal__section p {
+        @apply mt-2 text-[0.76rem] leading-relaxed text-stone-600 dark:text-gray-300;
+    }
+
+    .admin-errors-modal__section ul,
+    .admin-errors-modal__section ol {
+        @apply mt-2 space-y-1.5 pl-4 text-[0.76rem] leading-relaxed text-stone-600 dark:text-gray-300;
+    }
+
+    .admin-errors-modal__section ul {
+        @apply list-disc;
+    }
+
+    .admin-errors-modal__section ol {
+        @apply list-decimal;
+    }
+
+    .admin-errors-modal__metadata {
+        @apply mt-2 grid gap-2 md:grid-cols-2;
+    }
+
+    .admin-errors-modal__metadata div {
+        @apply min-w-0 rounded-md bg-stone-50 px-2.5 py-2 dark:bg-gray-950/70;
+    }
+
+    .admin-errors-modal__metadata dt {
+        @apply text-[0.58rem] font-bold uppercase text-stone-400 dark:text-gray-500;
+        letter-spacing: 0;
+    }
+
+    .admin-errors-modal__metadata dd {
+        @apply mt-1 truncate font-mono text-[0.68rem] text-stone-700 dark:text-gray-300;
+    }
+
+    .admin-overview {
+        @apply text-stone-900 dark:text-gray-100;
+    }
+
+    .admin-overview-title {
+        font-family: "Fraunces", serif;
+        @apply text-[1.55rem] font-semibold leading-tight text-stone-950 dark:text-gray-100;
+        letter-spacing: 0;
+    }
+
+    .admin-health-pulse {
+        @apply relative inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 ring-1 ring-emerald-200 dark:bg-emerald-400/10 dark:ring-emerald-400/25;
+    }
+
+    .admin-health-pulse::after {
+        @apply absolute rounded-full bg-emerald-400/30 content-[''];
+        inset: -0.28rem;
+        animation: adminHealthPulse 1.65s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+
+    .admin-health-pulse span {
+        @apply relative z-10 h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.65)] dark:bg-emerald-300;
+    }
+
+    .admin-overview-hero {
+        @apply relative grid min-h-[8.75rem] overflow-hidden p-5 lg:grid-cols-[1.1fr_0.95fr] lg:items-center lg:p-5;
+    }
+
+    .admin-hero-stats {
+        @apply grid gap-0 overflow-hidden rounded-lg bg-white/30 backdrop-blur-sm sm:grid-cols-3;
+    }
+
+    .dark .admin-hero-stats {
+        background: rgba(15, 23, 42, 0.22);
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+    }
+
+    .admin-hero-stat {
+        @apply border-stone-200/80 px-4 py-3 sm:border-l;
+    }
+
+    .dark .admin-hero-stat {
+        border-color: rgba(55, 65, 81, 0.72);
+    }
+
+    .admin-hero-stat span {
+        @apply block text-[0.72rem] font-medium leading-tight text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-hero-stat strong {
+        @apply mt-2 block text-[1.5rem] font-bold leading-none text-stone-950 dark:text-gray-100;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: 0;
+    }
+
+    .admin-hero-stat em {
+        @apply mt-2 block text-[0.7rem] leading-snug not-italic;
+    }
+
+    .admin-summary-grid {
+        @apply mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4;
+    }
+
+    .admin-summary-card {
+        @apply block min-h-[7rem] overflow-hidden rounded-lg p-0 transition hover:border-ista-primary/25 hover:shadow-[0_12px_28px_rgba(28,25,23,0.06)] focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/25 dark:hover:border-amber-300/25;
+    }
+
+    .admin-summary-card__top {
+        @apply flex items-center gap-2.5 border-b border-stone-200/80 px-4 py-2.5 text-ista-primary dark:border-gray-800 dark:text-amber-300;
+    }
+
+    .admin-summary-card__icon {
+        @apply inline-flex h-4 w-4 flex-none items-center justify-center;
+    }
+
+    .admin-summary-card__top h3 {
+        @apply truncate text-[0.72rem] font-bold uppercase text-ista-primary dark:text-amber-300;
+        letter-spacing: 0;
+    }
+
+    .admin-summary-card__body {
+        @apply px-4 py-3;
+    }
+
+    .admin-summary-card__body p {
+        @apply text-[0.7rem] font-medium text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-summary-card__body strong {
+        @apply mt-1.5 block truncate text-[1.65rem] font-bold leading-none text-stone-950 dark:text-gray-100;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .admin-summary-card__body div {
+        @apply mt-2 flex flex-wrap items-center gap-x-3 gap-y-1;
+    }
+
+    .admin-summary-card__body em {
+        @apply text-[0.68rem] not-italic text-stone-500 dark:text-gray-500;
+    }
+
+    .admin-summary-card__meta--success { @apply text-emerald-600 dark:text-emerald-400; }
+    .admin-summary-card__meta--warning { @apply text-amber-600 dark:text-amber-300; }
+    .admin-summary-card__meta--danger { @apply text-rose-600 dark:text-rose-400; }
+    .admin-summary-card__meta--neutral { @apply text-stone-500 dark:text-gray-500; }
+
+    .admin-overview-main-grid {
+        @apply mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.42fr)_minmax(20rem,0.78fr)];
+    }
+
+    .admin-activity-panel {
+        @apply mt-4;
+    }
+
+    .admin-panel {
+        @apply overflow-hidden p-0;
+    }
+
+    .admin-panel-header {
+        @apply flex min-h-[3.35rem] items-center justify-between gap-3 border-b border-stone-200/80 px-4 py-3 dark:border-gray-800;
+    }
+
+    .admin-panel-header h3 {
+        @apply text-sm font-semibold text-stone-950 dark:text-gray-100;
+    }
+
+    .admin-panel-header p {
+        @apply mt-1 text-[0.7rem] text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-panel-header a {
+        @apply text-xs font-bold text-ista-primary transition hover:text-ista-dark dark:text-amber-300 dark:hover:text-amber-200;
+    }
+
+    .admin-range-select select {
+        @apply h-8 rounded-lg border border-stone-200 bg-white px-2.5 text-xs font-medium text-stone-700 focus:border-ista-primary focus:outline-none focus:ring-2 focus:ring-ista-primary/15 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100;
+    }
+
+    .admin-line-chart {
+        @apply px-4 pb-2 pt-4;
+    }
+
+    .admin-line-chart svg {
+        @apply h-44 w-full overflow-visible;
+    }
+
+    .admin-chart-grid {
+        stroke: rgba(214, 211, 209, 0.85);
+        stroke-width: 1;
+    }
+
+    .dark .admin-chart-grid {
+        stroke: rgba(55, 65, 81, 0.85);
+    }
+
+    .admin-chart-line {
+        fill: none;
+        stroke: #a4063a;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 2.4;
+    }
+
+    .admin-chart-dot {
+        fill: #a4063a;
+        stroke: #ffffff;
+        stroke-width: 3;
+    }
+
+    .admin-chart-axis,
+    .admin-chart-label {
+        @apply fill-stone-500 text-[11px] font-medium dark:fill-gray-500;
+    }
+
+    .admin-chart-value {
+        @apply fill-stone-950 text-[10px] font-bold dark:fill-gray-100;
+    }
+
+    .admin-chart-legend {
+        @apply flex flex-wrap items-center justify-center gap-4 px-4 pb-4 text-[0.7rem] font-medium text-stone-600 dark:text-gray-400;
+    }
+
+    .admin-chart-legend span {
+        @apply inline-flex items-center gap-2;
+    }
+
+    .admin-chart-legend i {
+        @apply block h-2.5 w-2.5 rounded-full;
+    }
+
+    .admin-incident-summary {
+        @apply grid grid-cols-2 divide-x divide-stone-200/80 border-b border-stone-200/80 px-4 py-4 dark:divide-gray-800 dark:border-gray-800;
+    }
+
+    .admin-incident-summary--compact {
+        @apply py-3.5;
+    }
+
+    .admin-incident-summary span {
+        @apply block text-xs font-medium text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-incident-summary strong {
+        @apply mt-2 block text-[1.45rem] font-bold leading-none text-stone-950 dark:text-gray-100;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .admin-incident-summary em {
+        @apply mt-2 block text-xs not-italic text-stone-500 dark:text-gray-500;
+    }
+
+    .admin-incident-summary div {
+        @apply px-4 first:pl-0 last:pr-0;
+    }
+
+    .admin-overview-table {
+        @apply rounded-none border-0;
+    }
+
+    .admin-overview-table .admin-table-wrapper {
+        @apply rounded-none border-0;
+    }
+
+    .admin-row-avatar {
+        @apply flex h-8 w-8 flex-none items-center justify-center rounded-full bg-ista-primary text-xs font-bold text-amber-300;
+    }
+
+    .admin-error-list {
+        @apply divide-y divide-stone-200/80 dark:divide-gray-800;
+    }
+
+    .admin-error-list li {
+        @apply flex items-center gap-3 px-4 py-3;
+    }
+
+    .admin-error-list--compact li {
+        @apply py-3.5;
+    }
+
+    .admin-error-icon {
+        @apply flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-rose-50 text-rose-600 ring-1 ring-rose-100 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-500/20;
+    }
+
+    .admin-error-list p {
+        @apply truncate font-mono text-sm font-semibold uppercase text-stone-800 dark:text-gray-100;
+    }
+
+    .admin-error-list em {
+        @apply mt-1 block text-xs not-italic text-stone-500 dark:text-gray-500;
+    }
+
+    .admin-error-code {
+        @apply mt-1 block truncate font-mono text-[0.62rem] uppercase text-rose-500 dark:text-rose-300;
+        letter-spacing: 0;
+    }
+}
+
+@keyframes adminHealthPulse {
+    0% {
+        opacity: 0.72;
+        transform: scale(0.72);
+    }
+
+    70% {
+        opacity: 0;
+        transform: scale(1.65);
+    }
+
+    100% {
+        opacity: 0;
+        transform: scale(1.65);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .admin-health-pulse::after {
+        animation: none;
+        opacity: 0.4;
+        transform: scale(1);
+    }
+}
+    .admin-knowledge-primary-button,
+    .admin-knowledge-secondary-button {
+        @apply inline-flex h-8 items-center justify-center rounded-lg px-3 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60;
+    }
+
+    .admin-knowledge-primary-button {
+        @apply w-fit bg-ista-primary text-white shadow-[0_8px_20px_rgba(139,8,54,0.16)] hover:bg-rose-900 focus-visible:ring-ista-primary/30 dark:bg-amber-300 dark:text-gray-950 dark:hover:bg-amber-200;
+    }
+
+    .admin-knowledge-secondary-button {
+        @apply w-fit border border-stone-200 bg-white text-stone-700 hover:border-ista-primary/30 hover:text-ista-primary focus-visible:ring-ista-primary/25 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200 dark:hover:border-amber-300/30 dark:hover:text-amber-300;
+    }
+
+    .admin-knowledge-hero__actions {
+        @apply flex flex-wrap items-center justify-end gap-2;
+    }
+
+    .admin-knowledge-primary-button {
+        @apply h-9;
+    }
+
+    .admin-knowledge-secondary-button {
+        @apply h-9;
+    }
+
+    .admin-knowledge-pipeline {
+        @apply grid min-w-[7rem] gap-1.5;
+    }
+
+    .admin-knowledge-pipeline__track {
+        @apply h-1.5 overflow-hidden rounded-full bg-stone-100 dark:bg-gray-800;
+    }
+
+    .admin-knowledge-pipeline__bar {
+        @apply block h-full rounded-full;
+    }
+
+    .admin-knowledge-pipeline__bar--success { @apply bg-emerald-500 dark:bg-emerald-300; }
+    .admin-knowledge-pipeline__bar--warning { @apply bg-amber-500 dark:bg-amber-300; }
+    .admin-knowledge-pipeline__bar--danger { @apply bg-rose-500 dark:bg-rose-300; }
+    .admin-knowledge-pipeline__bar--neutral { @apply bg-stone-400 dark:bg-gray-500; }
+
+    .admin-knowledge-pipeline span {
+        @apply truncate text-[0.66rem] font-medium text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-knowledge-upload-modal {
+        @apply fixed inset-0 z-50 flex items-center justify-center p-4;
+    }
+
+    .admin-knowledge-upload-modal__backdrop {
+        @apply absolute inset-0 bg-stone-950/35 backdrop-blur-sm dark:bg-black/55;
+    }
+
+    .admin-knowledge-upload-modal__panel {
+        @apply relative flex max-h-[min(92vh,46rem)] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-stone-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-950;
+    }
+
+    .admin-knowledge-upload-modal__header {
+        @apply flex flex-none items-start justify-between gap-3 border-b border-stone-100 px-5 py-4 dark:border-gray-800;
+    }
+
+    .admin-knowledge-upload-modal__header p {
+        @apply text-[0.62rem] font-bold uppercase text-ista-primary dark:text-amber-300;
+        letter-spacing: 0;
+    }
+
+    .admin-knowledge-upload-modal__header h3 {
+        @apply mt-1 text-base font-semibold text-stone-950 dark:text-gray-100;
+    }
+
+    .admin-knowledge-upload-modal__close {
+        @apply inline-flex h-8 w-8 flex-none items-center justify-center rounded-lg text-stone-500 transition hover:bg-stone-100 hover:text-stone-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-ista-primary/25 dark:text-gray-400 dark:hover:bg-gray-900 dark:hover:text-gray-100;
+    }
+
+    .admin-knowledge-upload-modal .admin-knowledge-upload-form {
+        @apply max-h-[calc(92vh-5rem)] overflow-y-auto px-5 pb-5 pt-4;
+    }
+
+    .admin-knowledge-upload-grid {
+        @apply grid gap-3 sm:grid-cols-2;
+    }
+
+    .admin-knowledge-dropzone {
+        @apply flex cursor-pointer flex-col gap-1.5 rounded-xl border border-dashed border-stone-300 bg-stone-50/60 px-4 py-5 text-center transition hover:border-ista-primary/35 hover:bg-ista-primary/5 focus-within:border-ista-primary focus-within:ring-2 focus-within:ring-ista-primary/15 dark:border-gray-700 dark:bg-gray-900/50 dark:hover:border-amber-300/35 dark:hover:bg-amber-300/10;
+    }
+
+    .admin-knowledge-dropzone--error {
+        @apply border-rose-300 bg-rose-50/70 hover:border-rose-400 hover:bg-rose-50 dark:border-rose-300/30 dark:bg-rose-300/10 dark:hover:border-rose-300/50 dark:hover:bg-rose-300/10;
+    }
+
+    .admin-knowledge-dropzone--disabled {
+        @apply pointer-events-none cursor-wait opacity-70;
+    }
+
+    .admin-knowledge-dropzone span {
+        @apply text-[0.6rem] font-bold uppercase text-stone-500 dark:text-gray-400;
+        letter-spacing: 0;
+    }
+
+    .admin-knowledge-dropzone span em {
+        @apply ml-1 not-italic text-rose-500 dark:text-rose-300;
+        letter-spacing: 0;
+    }
+
+    .admin-knowledge-dropzone strong {
+        @apply truncate text-sm font-semibold text-stone-900 dark:text-gray-100;
+    }
+
+    .admin-knowledge-dropzone em {
+        @apply text-[0.72rem] not-italic text-stone-500 dark:text-gray-400;
+    }
+
+    .admin-knowledge-dropzone b {
+        @apply mt-1 block text-[0.72rem] font-semibold text-rose-600 dark:text-rose-200;
+    }
+
+    .admin-knowledge-upload-progress {
+        @apply hidden items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-left text-amber-900 dark:border-amber-300/20 dark:bg-amber-300/10 dark:text-amber-100;
+    }
+
+    .admin-knowledge-upload-progress--visible {
+        @apply flex;
+    }
+
+    .admin-knowledge-upload-progress--processing {
+        @apply border-ista-primary/20 bg-ista-primary/5 text-ista-primary dark:border-amber-300/20 dark:bg-amber-300/10 dark:text-amber-100;
+    }
+
+    .admin-knowledge-upload-progress__spinner {
+        @apply mt-0.5 h-4 w-4 flex-none animate-spin rounded-full border-2 border-current border-t-transparent;
+    }
+
+    .admin-knowledge-upload-progress strong {
+        @apply block text-[0.76rem] font-semibold;
+    }
+
+    .admin-knowledge-upload-progress em {
+        @apply mt-0.5 block text-[0.7rem] not-italic opacity-80;
+    }
+
+    .admin-knowledge-upload-button__loading {
+        @apply inline-flex items-center gap-2;
+    }
+
+    .admin-knowledge-upload-button__spinner {
+        @apply h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent;
+    }
+
+    .admin-knowledge-upload-modal__footer {
+        @apply flex flex-wrap items-center justify-end gap-2 border-t border-stone-100 pt-4 dark:border-gray-800;
+    }
+
+    .admin-knowledge-upload-submit-note {
+        @apply basis-full text-right text-[0.68rem] font-medium text-stone-500 dark:text-gray-400;
+    }
+
+/* Dynamic admin modifiers are composed in Blade, so keep these outside @layer
+   to prevent Tailwind from pruning production-critical color states. */
+.admin-status-chip--success {
+    background-color: #ecfdf5;
+    color: #047857;
+    --tw-ring-color: #d1fae5;
+}
+
+.admin-status-chip--success > span {
+    background-color: #10b981;
+}
+
+.admin-status-chip--warning {
+    background-color: #fffbeb;
+    color: #b45309;
+    --tw-ring-color: #fde68a;
+}
+
+.admin-status-chip--warning > span {
+    background-color: #f59e0b;
+}
+
+.admin-status-chip--danger {
+    background-color: #fff1f2;
+    color: #be123c;
+    --tw-ring-color: #ffe4e6;
+}
+
+.admin-status-chip--danger > span {
+    background-color: #f43f5e;
+}
+
+.admin-status-chip--neutral {
+    background-color: #f5f5f4;
+    color: #57534e;
+    --tw-ring-color: #e7e5e4;
+}
+
+.admin-status-chip--neutral > span {
+    background-color: #a8a29e;
+}
+
+.admin-documents-modal__summary-grid strong.admin-status-chip--success,
+.admin-documents-drawer__summary strong.admin-status-chip--success {
+    color: #047857;
+}
+
+.admin-documents-modal__summary-grid strong.admin-status-chip--warning,
+.admin-documents-drawer__summary strong.admin-status-chip--warning {
+    color: #b45309;
+}
+
+.admin-documents-modal__summary-grid strong.admin-status-chip--danger,
+.admin-documents-drawer__summary strong.admin-status-chip--danger {
+    color: #be123c;
+}
+
+.admin-documents-modal__summary-grid strong.admin-status-chip--neutral,
+.admin-documents-drawer__summary strong.admin-status-chip--neutral {
+    color: #57534e;
+}
+
+.dark .admin-status-chip--success {
+    background-color: rgba(52, 211, 153, 0.1);
+    color: #6ee7b7;
+    --tw-ring-color: rgba(110, 231, 183, 0.2);
+}
+
+.dark .admin-status-chip--warning {
+    background-color: rgba(251, 191, 36, 0.1);
+    color: #fcd34d;
+    --tw-ring-color: rgba(252, 211, 77, 0.2);
+}
+
+.dark .admin-status-chip--danger {
+    background-color: rgba(244, 63, 94, 0.1);
+    color: #fda4af;
+    --tw-ring-color: rgba(251, 113, 133, 0.2);
+}
+
+.dark .admin-status-chip--neutral {
+    background-color: #1f2937;
+    color: #d1d5db;
+    --tw-ring-color: #374151;
+}
+
+.dark .admin-documents-modal__summary-grid strong.admin-status-chip--success,
+.dark .admin-documents-drawer__summary strong.admin-status-chip--success {
+    color: #6ee7b7;
+}
+
+.dark .admin-documents-modal__summary-grid strong.admin-status-chip--warning,
+.dark .admin-documents-drawer__summary strong.admin-status-chip--warning {
+    color: #fcd34d;
+}
+
+.dark .admin-documents-modal__summary-grid strong.admin-status-chip--danger,
+.dark .admin-documents-drawer__summary strong.admin-status-chip--danger {
+    color: #fda4af;
+}
+
+.dark .admin-documents-modal__summary-grid strong.admin-status-chip--neutral,
+.dark .admin-documents-drawer__summary strong.admin-status-chip--neutral {
+    color: #d1d5db;
+}
+
+.admin-documents-file-icon--pdf {
+    color: #ff2056;
+}
+
+.admin-documents-file-icon--csv,
+.admin-documents-file-icon--xlsx {
+    color: #32cd32;
+}
+
+.admin-documents-file-icon--docx {
+    color: #2b7fff;
+}
+
+.admin-documents-file-icon--txt,
+.admin-documents-file-icon--file {
+    color: #62748e;
+}
+
+.admin-documents-file-icon--image {
+    color: #fd9a00;
+}
+
+.admin-documents-stage-list__item--done > span {
+    background-color: #10b981;
+}
+
+.admin-documents-stage-list__item--active > span {
+    background-color: #f59e0b;
+}
+
+.admin-documents-stage-list__item--failed > span {
+    background-color: #f43f5e;
+}
+
+.dark .admin-documents-stage-list__item--done > span {
+    background-color: #6ee7b7;
+}
+
+.dark .admin-documents-stage-list__item--active > span {
+    background-color: #fcd34d;
+}
+
+.dark .admin-documents-stage-list__item--failed > span {
+    background-color: #fda4af;
+}

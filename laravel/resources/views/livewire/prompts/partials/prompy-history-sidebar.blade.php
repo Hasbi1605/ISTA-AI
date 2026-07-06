@@ -75,11 +75,14 @@
     <div class="p-4 pt-2 pb-5">
         <button type="button"
                 wire:click="startNewPrompt"
+                wire:loading.attr="disabled"
+                wire:target="startNewPrompt"
                 @click="showPrompyConfigPanel(); setActivePrompt(null)"
-                class="w-full flex items-center justify-start px-4 py-2.5 rounded-lg border border-stone-200/60 dark:border-[#334155] dark:bg-transparent bg-white hover:bg-gray-50 dark:hover:bg-white/5 font-medium text-[13px] text-gray-700 dark:text-gray-200 transition-all duration-200 shadow-sm">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-[#64748B] dark:text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                class="w-full flex items-center justify-start px-4 py-2.5 rounded-lg border border-stone-200/60 dark:border-[#334155] dark:bg-transparent bg-white hover:bg-gray-50 dark:hover:bg-white/5 font-medium text-[13px] text-gray-700 dark:text-gray-200 transition-all duration-200 shadow-sm disabled:opacity-60">
+            <svg wire:loading.remove wire:target="startNewPrompt" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-[#64748B] dark:text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 5v14m-7-7h14" />
             </svg>
+            <span wire:loading.inline-flex wire:target="startNewPrompt" class="mr-2 h-4 w-4 rounded-full border-2 border-current/40 border-t-transparent animate-spin text-ista-primary" aria-hidden="true"></span>
             Prompt Baru
         </button>
     </div>
@@ -166,11 +169,14 @@
                             <button type="button"
                                     wire:click="deletePrompt({{ $prompt->id }})"
                                     wire:confirm="Hapus prompt ini?"
-                                    class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 focus:opacity-100 focus-visible:opacity-100 hover:bg-red-100 dark:hover:bg-red-500/20 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-all duration-200"
+                                    wire:loading.attr="disabled"
+                                    wire:target="deletePrompt"
+                                    class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 focus:opacity-100 focus-visible:opacity-100 hover:bg-red-100 dark:hover:bg-red-500/20 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-all duration-200 disabled:opacity-50"
                                     title="Hapus prompt" aria-label="Hapus prompt {{ $promptDisplayTitle }}">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg wire:loading.remove wire:target="deletePrompt" xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                 </svg>
+                                <span wire:loading.inline-flex wire:target="deletePrompt" class="h-3.5 w-3.5 rounded-full border border-current border-t-transparent animate-spin" aria-hidden="true"></span>
                             </button>
                         </li>
                     @empty

@@ -5,8 +5,7 @@ import re
 import unicodedata
 from typing import Any, Dict, List, Tuple
 
-from langchain_chroma import Chroma
-
+from app.services.chroma_store import get_chroma_store
 from app.config_loader import get_knowledge_internal_prompt
 from app.env_utils import get_env_bool, get_env_float, get_env_int
 from app.runtime_config import render_prompt_template, runtime_prompt
@@ -170,8 +169,8 @@ def search_internal_knowledge(
             logger.warning("Knowledge retrieval skipped: embedding provider unavailable")
             return [], False
 
-        vectorstore = Chroma(
-            collection_name=VECTOR_COLLECTION_NAME,
+        vectorstore = get_chroma_store(
+            VECTOR_COLLECTION_NAME,
             embedding_function=embeddings,
             persist_directory=CHROMA_PATH,
         )

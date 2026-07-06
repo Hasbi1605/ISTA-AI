@@ -97,7 +97,7 @@ def test_search_internal_knowledge_filters_by_safe_metadata(monkeypatch):
     monkeypatch.setenv("KNOWLEDGE_INTERNAL_TOP_K", "3")
     monkeypatch.setenv("KNOWLEDGE_INTERNAL_CANDIDATES", "9")
     monkeypatch.setenv("KNOWLEDGE_INTERNAL_MAX_DISTANCE", "1.0")
-    monkeypatch.setattr(knowledge_retrieval, "Chroma", FakeChroma)
+    monkeypatch.setattr(knowledge_retrieval, "get_chroma_store", lambda *args, **kwargs: FakeChroma(*args, **kwargs))
     monkeypatch.setattr(knowledge_retrieval, "get_embeddings_with_fallback", lambda: ("emb", "fake-embedding", 0))
     monkeypatch.setattr(knowledge_retrieval, "_exclude_parent_search_results", lambda docs: docs)
 
