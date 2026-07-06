@@ -13,6 +13,8 @@
         <title>ISTA AI</title>
         <link rel="icon" type="image/png" href="{{ asset('images/ista/logo.png') }}">
 
+        <x-font-preloads />
+
         <style>
             ::-webkit-scrollbar { width: 4px; }
             ::-webkit-scrollbar-track { background: transparent; }
@@ -26,12 +28,18 @@
     <body class="app-viewport font-sans antialiased text-gray-900 bg-[#ffffff] dark:bg-[#020618] dark:text-gray-100 transition-colors duration-200">
         <x-page-loader />
         <script>
-            // Inline script to prevent flash of unstyled content (FOUC)
-            if (localStorage.theme === 'dark') {
-                document.documentElement.classList.add('dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-            }
+            (function () {
+                function applyThemeClass() {
+                    if (localStorage.theme === 'dark') {
+                        document.documentElement.classList.add('dark');
+                    } else {
+                        document.documentElement.classList.remove('dark');
+                    }
+                }
+
+                applyThemeClass();
+                document.addEventListener('livewire:navigated', applyThemeClass);
+            })();
         </script>
         <main class="app-main-viewport w-full flex">
             {{ $slot }}

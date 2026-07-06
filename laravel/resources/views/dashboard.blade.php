@@ -11,12 +11,21 @@
 
         <link rel="icon" type="image/png" href="{{ asset('images/ista/logo.png') }}">
 
+        <x-font-preloads />
+
         <script>
-            if (localStorage.theme === 'dark') {
-                document.documentElement.classList.add('dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-            }
+            (function () {
+                function applyThemeClass() {
+                    if (localStorage.theme === 'dark') {
+                        document.documentElement.classList.add('dark');
+                    } else {
+                        document.documentElement.classList.remove('dark');
+                    }
+                }
+
+                applyThemeClass();
+                document.addEventListener('livewire:navigated', applyThemeClass);
+            })();
         </script>
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
@@ -86,16 +95,16 @@
                         'max-w-xl sm:grid-cols-2' => ! $prompyEnabled,
                     ])>
                         @auth
-                        <a href="{{ route('chat') }}" class="rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-sm font-semibold text-stone-700 transition hover:border-ista-primary/30 hover:text-ista-primary dark:border-gray-800 dark:bg-gray-800/80 dark:text-gray-100 dark:hover:border-ista-primary/50">Buka Chat</a>
-                        <a href="{{ route('chat', ['tab' => 'memo']) }}" class="rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-sm font-semibold text-stone-700 transition hover:border-ista-primary/30 hover:text-ista-primary dark:border-gray-800 dark:bg-gray-800/80 dark:text-gray-100 dark:hover:border-ista-primary/50">Buka Memo</a>
+                        <a href="{{ route('chat') }}" wire:navigate class="rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-sm font-semibold text-stone-700 transition hover:border-ista-primary/30 hover:text-ista-primary dark:border-gray-800 dark:bg-gray-800/80 dark:text-gray-100 dark:hover:border-ista-primary/50">Buka Chat</a>
+                        <a href="{{ route('chat', ['tab' => 'memo']) }}" wire:navigate class="rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-sm font-semibold text-stone-700 transition hover:border-ista-primary/30 hover:text-ista-primary dark:border-gray-800 dark:bg-gray-800/80 dark:text-gray-100 dark:hover:border-ista-primary/50">Buka Memo</a>
                         @if($prompyEnabled)
-                        <a href="{{ route('chat', ['tab' => 'prompy']) }}" class="rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-sm font-semibold text-stone-700 transition hover:border-ista-primary/30 hover:text-ista-primary dark:border-gray-800 dark:bg-gray-800/80 dark:text-gray-100 dark:hover:border-ista-primary/50">Buka Prompy</a>
+                        <a href="{{ route('chat', ['tab' => 'prompy']) }}" wire:navigate class="rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-sm font-semibold text-stone-700 transition hover:border-ista-primary/30 hover:text-ista-primary dark:border-gray-800 dark:bg-gray-800/80 dark:text-gray-100 dark:hover:border-ista-primary/50">Buka Prompy</a>
                         @endif
                         @else
-                        <a href="{{ route('guest-chat') }}" class="rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-sm font-semibold text-stone-700 transition hover:border-ista-primary/30 hover:text-ista-primary dark:border-gray-800 dark:bg-gray-800/80 dark:text-gray-100 dark:hover:border-ista-primary/50">Buka Chat</a>
-                        <a href="{{ route('guest-memo') }}" class="rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-sm font-semibold text-stone-700 transition hover:border-ista-primary/30 hover:text-ista-primary dark:border-gray-800 dark:bg-gray-800/80 dark:text-gray-100 dark:hover:border-ista-primary/50">Buka Memo</a>
+                        <a href="{{ route('guest-chat') }}" wire:navigate class="rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-sm font-semibold text-stone-700 transition hover:border-ista-primary/30 hover:text-ista-primary dark:border-gray-800 dark:bg-gray-800/80 dark:text-gray-100 dark:hover:border-ista-primary/50">Buka Chat</a>
+                        <a href="{{ route('guest-memo') }}" wire:navigate class="rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-sm font-semibold text-stone-700 transition hover:border-ista-primary/30 hover:text-ista-primary dark:border-gray-800 dark:bg-gray-800/80 dark:text-gray-100 dark:hover:border-ista-primary/50">Buka Memo</a>
                         @if($prompyEnabled)
-                        <a href="{{ route('guest-prompy') }}" class="rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-sm font-semibold text-stone-700 transition hover:border-ista-primary/30 hover:text-ista-primary dark:border-gray-800 dark:bg-gray-800/80 dark:text-gray-100 dark:hover:border-ista-primary/50">Buka Prompy</a>
+                        <a href="{{ route('guest-prompy') }}" wire:navigate class="rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-sm font-semibold text-stone-700 transition hover:border-ista-primary/30 hover:text-ista-primary dark:border-gray-800 dark:bg-gray-800/80 dark:text-gray-100 dark:hover:border-ista-primary/50">Buka Prompy</a>
                         @endif
                         @endauth
                     </div>

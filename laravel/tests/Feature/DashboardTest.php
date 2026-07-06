@@ -64,6 +64,7 @@ class DashboardTest extends TestCase
         $response->assertStatus(200);
         $response->assertSee(route('chat'), false);
         $response->assertSee(route('chat', ['tab' => 'memo']), false);
+        $response->assertSee('wire:navigate', false);
     }
 
     public function test_authenticated_dashboard_links_to_prompy_when_feature_is_enabled(): void

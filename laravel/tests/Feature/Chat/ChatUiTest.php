@@ -585,6 +585,7 @@ class ChatUiTest extends TestCase
             ->assertSee('wire:poll.60s="refreshPendingChatState"', false)
             ->assertSee('navigateToConversation($event,', false)
             ->assertSee('navigateToNewChat($event)', false)
+            ->assertSee('wire:navigate', false)
             ->assertSee('chat-history-item', false)
             ->assertSee('wire:key="chat-history-visible-', false)
             ->assertSee('Cari riwayat...', false)
@@ -629,6 +630,21 @@ class ChatUiTest extends TestCase
             ->assertSee('Halo dari history URL', false)
             ->assertSee('data-chat-last-user-message-created-at=', false)
             ->assertSee('data-chat-history-id="'.$conversation->id.'"', false);
+    }
+
+    public function test_chat_skips_pending_poll_when_no_active_responses(): void
+    {
+        $user = User::factory()->create();
+        Conversation::create([
+            'user_id' => $user->id,
+            'title' => 'Selesai tanpa pending',
+        ]);
+
+        $this->actingAs($user)
+            ->get('/chat')
+            ->assertOk()
+            ->assertDontSee('wire:poll.5s="pollPendingChatSignals"', false)
+            ->assertDontSee('wire:poll.60s="refreshPendingChatState"', false);
     }
 
     public function test_chat_route_with_foreign_conversation_id_returns_404(): void

@@ -75,7 +75,10 @@
 
 @endphp
 
-<div class="admin-users-page" wire:poll.30s>
+<div class="admin-users-page">
+    @if ($shouldPollUserPresence)
+        <div wire:poll.30s class="admin-users-presence-poll hidden" aria-hidden="true"></div>
+    @endif
     <div class="admin-users-hero">
         <div class="max-w-2xl">
             <p class="admin-users-eyebrow">Monitoring</p>

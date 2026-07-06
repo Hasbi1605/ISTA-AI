@@ -2,7 +2,7 @@
     <div class="mx-auto flex w-full max-w-6xl flex-col gap-6 px-5 py-6">
         <header class="flex flex-col gap-3 border-b border-stone-200 pb-5 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
             <div>
-                <a href="{{ route('chat') }}" class="text-sm font-semibold text-stone-500 hover:text-ista-primary dark:text-gray-400">ISTA AI</a>
+                <a href="{{ route('chat') }}" wire:navigate class="text-sm font-semibold text-stone-500 hover:text-ista-primary dark:text-gray-400">ISTA AI</a>
                 <h1 class="mt-2 text-2xl font-semibold tracking-normal">Memo</h1>
             </div>
             <a href="{{ route('memos.create') }}" wire:navigate class="inline-flex items-center justify-center rounded-lg bg-ista-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-800">

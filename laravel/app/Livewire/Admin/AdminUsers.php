@@ -74,10 +74,13 @@ class AdminUsers extends Component
             $this->getPage(),
         );
 
+        $presenceSummary = $metrics->userPresenceSummary(role: User::ROLE_USER);
+
         return view('livewire.admin.admin-users', [
             'users' => $users,
             'usersPerPage' => self::USERS_PER_PAGE,
-            'presenceSummary' => $metrics->userPresenceSummary(role: User::ROLE_USER),
+            'presenceSummary' => $presenceSummary,
+            'shouldPollUserPresence' => (($presenceSummary['online'] ?? 0) + ($presenceSummary['idle'] ?? 0)) > 0,
             'statusOptions' => [
                 'online' => 'Online',
                 'idle' => 'Idle',

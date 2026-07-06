@@ -879,6 +879,30 @@ class AdminMonitoringDashboardTest extends TestCase
             ->assertSee('Usage Events');
     }
 
+    public function test_admin_users_skips_presence_poll_when_everyone_offline(): void
+    {
+        $now = Carbon::parse('2026-05-18 12:00:00');
+        Carbon::setTestNow($now);
+
+        $admin = User::factory()->create([
+            'role' => User::ROLE_ADMIN,
+            'last_seen_at' => $now,
+        ]);
+
+        User::factory()->create([
+            'role' => User::ROLE_USER,
+            'name' => 'Offline Person',
+            'last_seen_at' => $now->copy()->subDays(3),
+        ]);
+
+        $this->actingAsVerifiedAdmin($admin)
+            ->get('/admin/users')
+            ->assertOk()
+            ->assertDontSee('wire:poll.30s', false);
+
+        Carbon::setTestNow();
+    }
+
     private function makeEvent(int $userId, string $feature, string $action, string $status, Carbon $createdAt, ?string $requestId = null, ?int $latencyMs = null, ?string $errorCode = null, ?array $metadata = null): AIUsageEvent
     {
         $event = new AIUsageEvent([

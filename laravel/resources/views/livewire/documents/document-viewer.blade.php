@@ -136,7 +136,7 @@
                         </div>
                     @elseif (in_array($kind, ['docx', 'xlsx', 'csv'], true))
                         @if ($previewStatus === \App\Models\Document::PREVIEW_STATUS_READY)
-                            <div wire:poll.30s.keep-alive
+                            <div @if($shouldKeepPreviewAlive) wire:poll.30s.keep-alive @endif
                                  class="bg-white dark:bg-gray-900 px-6 py-5"
                                  wire:ignore>
                                 <iframe src="{{ $htmlUrl }}"
@@ -156,7 +156,7 @@
                         @else
                             {{-- Poll 5s: preview generation memakan 5-15 detik, 3s terlalu agresif.
                                  Rollback: ubah wire:poll.5s kembali ke wire:poll.3s --}}
-                            <div wire:poll.5s
+                            <div @if($shouldPollDocumentPreview) wire:poll.5s @endif
                                  class="flex flex-col items-center justify-center h-full p-8 text-center gap-3">
                                 <span class="h-6 w-6 rounded-full border-2 border-stone-400 border-t-transparent animate-spin"></span>
                                 <p class="text-sm text-gray-600 dark:text-gray-300">

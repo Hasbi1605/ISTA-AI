@@ -55,6 +55,16 @@ class DocumentViewer extends Component
             }
         }
 
+        $previewableOfficeKind = in_array($kind, ['docx', 'xlsx', 'csv'], true);
+        $shouldPollDocumentPreview = $this->isOpen
+            && $document !== null
+            && $previewableOfficeKind
+            && ! in_array($previewStatus, [Document::PREVIEW_STATUS_READY, Document::PREVIEW_STATUS_FAILED], true);
+        $shouldKeepPreviewAlive = $this->isOpen
+            && $document !== null
+            && $previewableOfficeKind
+            && $previewStatus === Document::PREVIEW_STATUS_READY;
+
         return view('livewire.documents.document-viewer', [
             'document' => $document,
             'kind' => $kind,
@@ -62,6 +72,8 @@ class DocumentViewer extends Component
             'streamUrl' => $streamUrl,
             'htmlUrl' => $htmlUrl,
             'pdfPreviewAvailable' => $pdfPreviewAvailable,
+            'shouldPollDocumentPreview' => $shouldPollDocumentPreview,
+            'shouldKeepPreviewAlive' => $shouldKeepPreviewAlive,
         ]);
     }
 
