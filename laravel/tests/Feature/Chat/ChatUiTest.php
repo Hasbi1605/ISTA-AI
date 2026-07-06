@@ -129,7 +129,38 @@ class ChatUiTest extends TestCase
             ->assertSee('x-on:blur.window="resetDraggingFile()"', false)
             ->assertSee('x-on:keydown.escape.window="resetDraggingFile()"', false)
             ->assertSee('x-show="isDraggingFile" x-cloak', false)
+            ->assertSee('Seret hingga 5 dokumen untuk upload', false)
+            ->assertSee('x-on:chat-files-drop.window="handleDroppedFiles($event)"', false)
+            ->assertSee('Seret hingga 5 dokumen untuk upload', false)
+            ->assertDontSee('document.querySelector(\'[x-ref="chatAttachmentInput"]\')', false)
             ->assertDontSee('x-on:dragenter.window.prevent', false);
+    }
+
+    public function test_chat_drop_handler_prevents_default_before_non_chat_tab_guard(): void
+    {
+        $chatPageJs = file_get_contents(resource_path('js/chat-page.js'));
+
+        $this->assertIsString($chatPageJs);
+        $this->assertStringContainsString('onDropFile(event)', $chatPageJs);
+        $this->assertStringContainsString('const hasDroppedFiles = this.hasFiles(event);', $chatPageJs);
+        $this->assertStringContainsString('if (hasDroppedFiles) {', $chatPageJs);
+        $this->assertStringContainsString('event.preventDefault();', $chatPageJs);
+        $this->assertStringContainsString("if (!hasDroppedFiles || this.activeTab !== 'chat')", $chatPageJs);
+    }
+
+    public function test_chat_attachment_input_supports_multi_file_drop_queue(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('chat'))
+            ->assertOk()
+            ->assertSee('multiple', false)
+            ->assertSee('handleDroppedFiles($event)', false)
+            ->assertSee('handleAttachmentPickerChange($event)', false)
+            ->assertSee('Seret hingga 5 dokumen ke sini untuk mengunggah', false)
+            ->assertSee('maxDocumentsPerUser', false)
+            ->assertSee('userDocumentCount', false);
     }
 
     public function test_create_conversation_if_needed_throws_for_unowned_conversation(): void

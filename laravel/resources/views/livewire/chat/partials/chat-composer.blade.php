@@ -5,23 +5,28 @@
         'extension' => (string) ($doc->extension ?? strtolower(pathinfo($doc->original_name, PATHINFO_EXTENSION))),
         'status' => (string) $doc->status,
     ])->values();
+    $userDocumentCount = \App\Models\Document::where('user_id', auth()->id())->count();
 @endphp
 <div x-data="chatComposer({
         prompt: @js($prompt ?? ''),
         webSearchMode: $wire.entangle('webSearchMode'),
         conversationDocuments: $wire.entangle('conversationDocuments'),
         availableDocuments: @js($composerDocuments),
+        maxDocumentsPerUser: @js(\App\Services\DocumentLifecycleService::MAX_DOCUMENTS_PER_USER),
+        userDocumentCount: @js($userDocumentCount),
     })"
      x-on:show-drop-error.window="sendError = $event.detail.message"
+     x-on:chat-files-drop.window="handleDroppedFiles($event)"
      x-on:conversation-documents-preview.window="previewConversationDocuments($event)"
      class="chat-composer-safe mx-auto w-full max-w-4xl shrink-0 px-3 pt-1 sm:px-6 bg-transparent"
 >
     <input
         x-ref="chatAttachmentInput"
         type="file"
-        wire:model.live="chatAttachment"
         accept=".pdf,.docx,.xlsx,.csv"
+        multiple
         class="hidden"
+        x-on:change="handleAttachmentPickerChange($event)"
     >
     <form x-on:submit.prevent="submitPrompt($event)" class="chat-form max-w-3xl mx-auto relative rounded-[1.35rem] border border-stone-200/70 bg-white/[0.82] shadow-[0_18px_50px_-32px_rgba(15,23,42,0.55)] backdrop-blur-xl transition-colors dark:border-gray-700/80 dark:bg-gray-800/[0.82]">
         <div class="flex flex-col w-full">
@@ -33,6 +38,11 @@
                         <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
+            </div>
+
+            <div x-show="attachmentQueueProcessing" x-cloak class="px-5 pt-4 flex items-center gap-2 text-[12px] text-ista-primary dark:text-[#8E81FF]">
+                <span class="h-2 w-2 rounded-full bg-current animate-pulse"></span>
+                <span x-text="attachmentQueueTotal > 1 ? `Mengunggah ${attachmentQueueIndex}/${attachmentQueueTotal}: ${attachmentQueueLabel}` : `Mengunggah lampiran: ${attachmentQueueLabel}`"></span>
             </div>
 
             <div wire:loading.flex wire:target="chatAttachment" class="px-5 pt-4 items-center gap-2 text-[12px] text-ista-primary dark:text-[#8E81FF]">
@@ -128,7 +138,7 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                     </svg>
-                    Seret file ke sini untuk mengunggah
+                    Seret hingga 5 dokumen ke sini untuk mengunggah
                 </div>
             </div>
         </div>
