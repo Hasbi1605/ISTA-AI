@@ -20,6 +20,11 @@ class AdminKnowledgeManagementTest extends TestCase
 {
     use RefreshDatabase;
 
+    private function adminCss(): string
+    {
+        return file_get_contents(resource_path('css/admin.css'));
+    }
+
     public function test_admin_knowledge_page_renders_for_admin(): void
     {
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
@@ -48,7 +53,7 @@ class AdminKnowledgeManagementTest extends TestCase
         $response->assertDontSee('Urutan proses dokumen knowledge', false);
 
         $blade = file_get_contents(resource_path('views/livewire/admin/admin-knowledge.blade.php'));
-        $css = file_get_contents(resource_path('css/app.css'));
+        $css = $this->adminCss();
 
         $this->assertStringNotContainsString('admin-knowledge-content-grid', $blade);
         $this->assertStringNotContainsString('admin-knowledge-side-grid', $blade);
@@ -61,7 +66,7 @@ class AdminKnowledgeManagementTest extends TestCase
 
     public function test_upload_modal_backdrop_stays_behind_panel(): void
     {
-        $css = file_get_contents(resource_path('css/app.css'));
+        $css = $this->adminCss();
 
         $this->assertStringContainsString(
             ".admin-knowledge-upload-modal {\n        @apply fixed inset-0 z-50 flex items-center justify-center p-4;\n    }",
@@ -91,7 +96,7 @@ class AdminKnowledgeManagementTest extends TestCase
             ->assertSee('Pilih source dan file untuk mengaktifkan tombol upload')
             ->assertSee('Processing...');
 
-        $css = file_get_contents(resource_path('css/app.css'));
+        $css = $this->adminCss();
 
         $this->assertStringContainsString('.admin-knowledge-upload-progress', $css);
         $this->assertStringContainsString('.admin-knowledge-upload-button__spinner', $css);
@@ -100,7 +105,7 @@ class AdminKnowledgeManagementTest extends TestCase
     public function test_upload_modal_submit_uses_explicit_action_and_client_lock(): void
     {
         $blade = file_get_contents(resource_path('views/livewire/admin/admin-knowledge.blade.php'));
-        $css = file_get_contents(resource_path('css/app.css'));
+        $css = $this->adminCss();
 
         $this->assertStringContainsString('x-on:submit.prevent="submitKnowledgeUpload()"', $blade);
         $this->assertStringContainsString("Promise.resolve(\$wire.\$call('submitKnowledgeUpload'))", $blade);

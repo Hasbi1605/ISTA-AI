@@ -707,18 +707,19 @@ const registerChatPageData = (Alpine) => {
         },
 
         onDropFile(event) {
-            if (this.activeTab !== 'chat') {
-                this.resetDraggingFile();
+            const hasDroppedFiles = this.hasFiles(event);
 
-                return;
-            }
-
-            if (this.hasFiles(event)) {
+            if (hasDroppedFiles) {
                 event.preventDefault();
             }
 
-            const files = event.dataTransfer?.files;
             this.resetDraggingFile();
+
+            if (!hasDroppedFiles || this.activeTab !== 'chat') {
+                return;
+            }
+
+            const files = event.dataTransfer?.files;
 
             if (!files || files.length === 0) {
                 return;
