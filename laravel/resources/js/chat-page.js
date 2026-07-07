@@ -1129,6 +1129,33 @@ const registerChatPageData = (Alpine) => {
             this.markConversationPending(conversationId, loadingContext);
             this.startStreamingPlaceholder(loadingContext);
             this.scrollToBottom(false, true);
+            // Navigating away aborts the EventSource (net::ERR_ABORTED). Returning
+            // to (or refreshing into) a still-pending conversation must resume the
+            // stream, otherwise the UI is stuck on the loading placeholder until a
+            // hard refresh. Safe to reopen: the endpoint is idempotent — if a
+            // runner already holds the claim or the answer is already persisted,
+            // it replies `done` immediately and the client reconciles from DB.
+            this.reopenPendingStream(conversationId, loadingContext);
+        },
+
+        reopenPendingStream(conversationId, loadingContext = 'general') {
+            const id = Number(conversationId);
+
+            if (!Number.isFinite(id) || id <= 0 || !this.isActiveConversation(id)) {
+                return;
+            }
+
+            // A live EventSource already drives this conversation; don't stack another.
+            if (this.activeEventSources && this.activeEventSources[id]) {
+                return;
+            }
+
+            const documentIds = Array.isArray(this.$wire?.conversationDocuments)
+                ? this.$wire.conversationDocuments
+                : [];
+            const webSearchMode = Boolean(this.$wire?.webSearchMode);
+
+            this.openChatStream(id, documentIds, webSearchMode, loadingContext, '');
         },
 
         handleChatBoxScroll() {
