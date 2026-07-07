@@ -1425,6 +1425,7 @@ const registerChatPageData = (Alpine) => {
                 if (msg && this.isActiveConversation(conversationId)) {
                     this.stalePendingWarning = msg;
                 }
+                this.setStreamActive(false);
                 this.markStreamFailed(conversationId);
                 this.closeChatStream(conversationId);
                 // Polling will recover the final state from DB
@@ -1432,6 +1433,7 @@ const registerChatPageData = (Alpine) => {
 
             es.addEventListener('done', () => {
                 this.closeChatStream(conversationId);
+                this.setStreamActive(false);
                 const streamedMessageId = streamState.streamedAssistantMessageId;
                 const userStopped = this._userStoppedGeneration;
 
@@ -1456,6 +1458,7 @@ const registerChatPageData = (Alpine) => {
             });
 
             es.onerror = () => {
+                this.setStreamActive(false);
                 this.markStreamFailed(conversationId);
                 this.closeChatStream(conversationId);
             };
@@ -1696,10 +1699,22 @@ const registerChatPageData = (Alpine) => {
 
             this.appendAssistantTypewriterText(chunk);
             this.streaming = true;
+            this.setStreamActive(true);
             this.hasFirstAssistantChunk = true;
             this.clearPendingStaleTimeout();
             this.stalePendingWarning = '';
             this.moveToAnswerPhase();
+        },
+
+        // Sinyal global "generasi sedang berjalan". Berbeda dari `streaming`
+        // yang sengaja tetap true setelah selesai (untuk mempertahankan bubble
+        // hasil sampai Livewire mem-morph pesan permanen). Composer memakai
+        // sinyal ini untuk menampilkan tombol Stop, lalu kembali ke Kirim tepat
+        // saat stream berakhir (done/error/stop), bukan menunggu navigasi.
+        setStreamActive(active) {
+            const next = Boolean(active);
+            window.__istaStreamActive = next;
+            window.dispatchEvent(new CustomEvent('chat-stream-state', { detail: { active: next } }));
         },
 
         startStreamingTypewriter() {
@@ -1727,6 +1742,7 @@ const registerChatPageData = (Alpine) => {
             this.resetStreamingState(false);
             this._userStoppedGeneration = false;
             this.streaming = true;
+            this.setStreamActive(true);
             this.streamingTimeLabel = formatChatTimeLabel();
             this.streamingActionsReady = false;
             this.observeStreamingAnswerResize();
@@ -1793,6 +1809,7 @@ const registerChatPageData = (Alpine) => {
 
             if (stopStreaming) {
                 this.streaming = false;
+                this.setStreamActive(false);
             }
 
             const { conversationId, hasPendingUserWithoutAssistant } = this.getConversationMeta();
@@ -3387,6 +3404,14 @@ const registerChatPageData = (Alpine) => {
         attachmentQueueTotal: 0,
         attachmentQueueLabel: '',
 
+        // Driven by the chatMessages component via the `chat-stream-state`
+        // window event (see setStreamActive). Kept as a plain reactive prop so
+        // the Stop/Kirim button binding never depends on querying another
+        // component's proxy during Livewire morphs (a source of stale state).
+        isStreamingAnswer: false,
+        _streamStateHandler: null,
+        _applySuggestionHandler: null,
+
         get chatMessagesComponent() {
             const root = document.querySelector('[data-chat-messages-ready="true"]');
 
@@ -3397,18 +3422,21 @@ const registerChatPageData = (Alpine) => {
             return Alpine.$data(root);
         },
 
-        get isStreamingAnswer() {
-            return Boolean(this.chatMessagesComponent?.streaming);
-        },
-
         init() {
             if (this.promptDraft) {
                 this.schedulePendingPromptSubmission();
             }
 
-            window.addEventListener('chat-apply-suggestion', (event) => {
+            this.isStreamingAnswer = window.__istaStreamActive === true;
+            this._streamStateHandler = (event) => {
+                this.isStreamingAnswer = Boolean(event?.detail?.active);
+            };
+            window.addEventListener('chat-stream-state', this._streamStateHandler);
+
+            this._applySuggestionHandler = (event) => {
                 this.applySuggestion(String(event?.detail?.text || ''));
-            });
+            };
+            window.addEventListener('chat-apply-suggestion', this._applySuggestionHandler);
 
             this.$wire.on('user-message-acked', (data) => {
                 this.messageAcked = true;
@@ -3420,6 +3448,17 @@ const registerChatPageData = (Alpine) => {
                     this.markPendingConversation(ackConversationId, this._pendingLoadingContext || 'general');
                 }
             });
+        },
+
+        destroy() {
+            if (this._streamStateHandler) {
+                window.removeEventListener('chat-stream-state', this._streamStateHandler);
+                this._streamStateHandler = null;
+            }
+            if (this._applySuggestionHandler) {
+                window.removeEventListener('chat-apply-suggestion', this._applySuggestionHandler);
+                this._applySuggestionHandler = null;
+            }
         },
 
         markPendingConversation(conversationId, loadingContext = 'general') {
