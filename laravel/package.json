@@ -22,6 +22,7 @@
         "@fontsource/eb-garamond": "^5.2.7",
         "@fontsource/inter": "^5.2.8",
         "dompurify": "^3.4.3",
+        "highlight.js": "^11.11.1",
         "marked": "^18.0.3",
         "sortablejs": "1.15.6"
     }

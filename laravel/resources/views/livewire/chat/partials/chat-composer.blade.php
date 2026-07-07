@@ -17,6 +17,7 @@
     })"
      x-on:show-drop-error.window="sendError = $event.detail.message"
      x-on:chat-files-drop.window="handleDroppedFiles($event)"
+     x-on:chat-apply-suggestion.window="applySuggestion($event.detail.text)"
      x-on:conversation-documents-preview.window="previewConversationDocuments($event)"
      class="chat-composer-safe mx-auto w-full max-w-4xl shrink-0 px-3 pt-1 sm:px-6 bg-transparent"
 >
@@ -122,12 +123,15 @@
                         </button>
 
                         <button type="submit"
-                                :disabled="isSendingMessage"
+                                :disabled="isSendingMessage && !isStreamingAnswer"
                                 class="bg-ista-primary hover:bg-ista-dark dark:bg-ista-primary dark:hover:bg-ista-dark disabled:opacity-50 rounded-full transition-all duration-300 h-[32px] w-[32px] flex items-center justify-center group"
-                                :aria-label="isSendingMessage ? 'Mengirim pesan' : 'Kirim pesan'">
-                            <span x-show="isSendingMessage" class="h-[17px] w-[17px] rounded-full border-2 border-white/70 border-t-transparent animate-spin" aria-hidden="true"></span>
-                            <img x-show="!isSendingMessage" src="{{ $uiIcons['sendLight'] }}" alt="" class="h-[17px] w-[17px] dark:hidden brightness-0 invert" />
-                            <img x-show="!isSendingMessage" src="{{ $uiIcons['sendDark'] }}" alt="" class="h-[17px] w-[17px] hidden dark:block brightness-0 invert" />
+                                :aria-label="isStreamingAnswer ? 'Hentikan generasi' : (isSendingMessage ? 'Mengirim pesan' : 'Kirim pesan')">
+                            <span x-show="isSendingMessage && !isStreamingAnswer" class="h-[17px] w-[17px] rounded-full border-2 border-white/70 border-t-transparent animate-spin" aria-hidden="true"></span>
+                            <svg x-show="isStreamingAnswer" xmlns="http://www.w3.org/2000/svg" class="h-[14px] w-[14px] text-white" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                <rect x="7" y="7" width="10" height="10" rx="1.5" />
+                            </svg>
+                            <img x-show="!isSendingMessage && !isStreamingAnswer" src="{{ $uiIcons['sendLight'] }}" alt="" class="h-[17px] w-[17px] dark:hidden brightness-0 invert" />
+                            <img x-show="!isSendingMessage && !isStreamingAnswer" src="{{ $uiIcons['sendDark'] }}" alt="" class="h-[17px] w-[17px] hidden dark:block brightness-0 invert" />
                         </button>
                     </div>
                 </div>

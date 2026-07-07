@@ -281,3 +281,93 @@
         -webkit-text-fill-color: #94a3b8;
     }
 }
+
+.ista-code-block {
+    margin: 0.75rem 0;
+    overflow: hidden;
+    border-radius: 0.75rem;
+    border: 1px solid rgb(226 232 240 / 0.9);
+    background: rgb(248 250 252);
+}
+
+.dark .ista-code-block {
+    border-color: rgb(51 65 85 / 0.9);
+    background: rgb(15 23 42);
+}
+
+.ista-code-block__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border-bottom: 1px solid rgb(226 232 240 / 0.9);
+    padding: 0.4rem 0.75rem;
+    font-size: 11px;
+    text-transform: lowercase;
+    color: rgb(100 116 139);
+}
+
+.dark .ista-code-block__header {
+    border-color: rgb(51 65 85 / 0.9);
+    color: rgb(148 163 184);
+}
+
+.ista-code-block__copy {
+    border-radius: 9999px;
+    padding: 0.15rem 0.55rem;
+    font-size: 11px;
+    font-weight: 600;
+    color: rgb(71 85 105);
+    transition: background-color 150ms ease, color 150ms ease;
+}
+
+.ista-code-block__copy:hover {
+    background: rgb(255 255 255 / 0.85);
+    color: rgb(15 23 42);
+}
+
+.dark .ista-code-block__copy {
+    color: rgb(203 213 225);
+}
+
+.dark .ista-code-block__copy:hover {
+    background: rgb(30 41 59);
+    color: rgb(248 250 252);
+}
+
+.ista-code-block pre {
+    margin: 0;
+    overflow-x: auto;
+    padding: 0.85rem 1rem;
+    font-size: 12.5px;
+    line-height: 1.55;
+}
+
+.ista-code-block pre code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    white-space: pre;
+}
+
+.ista-table-wrap {
+    margin: 0.75rem 0;
+    max-width: 100%;
+}
+
+.ista-table-wrap table {
+    width: max-content;
+    min-width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.ista-table-wrap th,
+.ista-table-wrap td {
+    border: 1px solid rgb(226 232 240 / 0.9);
+    padding: 0.45rem 0.65rem;
+    vertical-align: top;
+}
+
+.dark .ista-table-wrap th,
+.dark .ista-table-wrap td {
+    border-color: rgb(51 65 85 / 0.9);
+}

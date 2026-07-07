@@ -9,9 +9,9 @@
      x-ref="chatBox"
      data-chat-box
      x-on:message-streamed.window="scrollToBottom()"
-     x-on:message-send.window="optimisticUserMessage = $event.detail.text; isSwitchingConversation = false; startStreamingPlaceholder($event.detail.loadingContext || 'general'); scrollToBottom(true)"
+     x-on:message-send.window="optimisticUserMessage = $event.detail.text; isSwitchingConversation = false; startStreamingPlaceholder($event.detail.loadingContext || 'general'); scrollToBottom(false, true)"
      x-on:conversation-loading.window="isSwitchingConversation = true; optimisticUserMessage = ''; resetStreamingState()"
-     x-on:conversation-loaded.window="isSwitchingConversation = false; resetStreamingState(); $nextTick(() => { maybeRestorePendingPlaceholder(); scrollToBottom(); })"
+     x-on:conversation-loaded.window="isSwitchingConversation = false; resetStreamingState(); $nextTick(() => { maybeRestorePendingPlaceholder(); scrollToBottom(false, true); })"
      data-chat-messages-ready="true">
     <div class="hidden"
          data-chat-conversation-id="{{ $currentConversationId ?? '' }}"
@@ -26,9 +26,23 @@
                 <img src="{{ asset('images/ista/logo.png') }}" alt="ISTA AI" class="h-full w-full object-contain" />
             </div>
             <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-2">ISTA AI</h2>
-            <p class="text-gray-500 dark:text-[#94A3B8] text-[14px]">
+            <p class="text-gray-500 dark:text-[#94A3B8] text-[14px] max-w-md">
                 Mulai percakapan baru untuk meminta ringkasan, informasi, atau bantuan kerja.
             </p>
+            <div class="mt-6 flex flex-wrap items-center justify-center gap-2 max-w-xl px-2">
+                @foreach([
+                    'Ringkas isi dokumen keputusan presiden terbaru',
+                    'Buatkan poin-poin rapat internal singkat',
+                    'Jelaskan prosedur tata naskah dinas resmi',
+                    'Bantu susun draft memo undangan kegiatan',
+                ] as $suggestion)
+                    <button type="button"
+                            @click="$dispatch('chat-apply-suggestion', { text: @js($suggestion) })"
+                            class="rounded-full border border-stone-200/80 bg-white/90 px-3.5 py-1.5 text-[12px] font-medium text-stone-600 transition-colors hover:border-ista-primary/30 hover:text-ista-primary dark:border-gray-700 dark:bg-gray-900/80 dark:text-gray-300 dark:hover:text-amber-200">
+                        {{ $suggestion }}
+                    </button>
+                @endforeach
+            </div>
         </div>
     @else
     @if($messagesHasOlder)
@@ -109,8 +123,43 @@
                             @include('livewire.chat.partials.assistant-answer-actions')
                         </div>
                     @else
-                        <div class="inline-block w-fit max-w-[656px] min-w-0 rounded-2xl rounded-br-sm bg-ista-primary px-4 py-3 text-[14.5px] leading-relaxed text-white shadow-sm">
-                            <p class="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{{ $message['content'] }}</p>
+                        <div
+                            wire:key="chat-user-message-{{ $message['id'] }}"
+                            x-data="chatUserMessage({
+                                messageId: @js((int) $message['id']),
+                                content: @js((string) $message['content']),
+                            })"
+                            class="group relative max-w-[656px]"
+                        >
+                            <div x-show="!editing" class="inline-block w-fit max-w-[656px] min-w-0 rounded-2xl rounded-br-sm bg-ista-primary px-4 py-3 text-[14.5px] leading-relaxed text-white shadow-sm">
+                                <p class="whitespace-pre-wrap break-words [overflow-wrap:anywhere]" x-text="content"></p>
+                            </div>
+                            <div x-show="editing" x-cloak class="w-full max-w-[656px] rounded-2xl border border-stone-200/80 bg-white px-3 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900">
+                                <textarea
+                                    x-ref="editInput"
+                                    x-model="draft"
+                                    x-on:keydown.enter="handleEditEnter($event)"
+                                    class="w-full min-h-[44px] max-h-[200px] resize-none border-none bg-transparent text-[14.5px] text-stone-800 focus:outline-none focus:ring-0 dark:text-gray-100"
+                                    rows="2"
+                                ></textarea>
+                                <div class="mt-2 flex items-center justify-end gap-2">
+                                    <button type="button" @click="cancelEdit()" class="rounded-full px-3 py-1 text-[12px] font-medium text-stone-500 hover:text-stone-700 dark:text-gray-400 dark:hover:text-gray-200">Batal</button>
+                                    <button type="button" @click="saveEdit()" :disabled="saving" class="rounded-full bg-ista-primary px-3 py-1 text-[12px] font-semibold text-white hover:bg-ista-dark disabled:opacity-60">Kirim ulang</button>
+                                </div>
+                                <p x-show="error" x-text="error" class="mt-1 text-[11px] text-rose-500"></p>
+                            </div>
+                            <button
+                                type="button"
+                                x-show="!editing"
+                                @click="startEdit()"
+                                title="Edit pesan"
+                                aria-label="Edit pesan"
+                                class="absolute -left-9 top-1/2 hidden -translate-y-1/2 rounded-lg p-1.5 text-stone-400 opacity-0 transition hover:bg-white/80 hover:text-stone-700 group-hover:opacity-100 dark:hover:bg-gray-800/80 dark:hover:text-gray-100 sm:inline-flex"
+                            >
+                                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z" />
+                                </svg>
+                            </button>
                         </div>
                     @endif
                 </div>
@@ -212,4 +261,17 @@
             </div>
         </div>
     </div>
+
+    <button
+        type="button"
+        x-show="showJumpToLatest"
+        x-transition.opacity
+        @click="jumpToLatest()"
+        title="Ke pesan terbaru"
+        aria-label="Ke pesan terbaru"
+        class="sticky bottom-3 left-1/2 z-20 inline-flex h-9 w-9 -translate-x-1/2 items-center justify-center rounded-full border border-stone-200/80 bg-white/95 text-stone-600 shadow-lg backdrop-blur-sm transition hover:border-ista-primary/30 hover:text-ista-primary dark:border-gray-700 dark:bg-gray-900/95 dark:text-gray-200 dark:hover:text-amber-200"
+        style="display: none;"
+    >
+        <span aria-hidden="true" class="text-base leading-none">↓</span>
+    </button>
 </div>

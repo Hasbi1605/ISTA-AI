@@ -527,6 +527,40 @@ class ChatOrchestrationService
         Cache::forget($claimKey);
     }
 
+    public function streamStoppedKey(int $conversationId): string
+    {
+        return sprintf('chat:stream-stopped:conversation:%d', $conversationId);
+    }
+
+    public function markStreamStopped(int $conversationId): void
+    {
+        Cache::put($this->streamStoppedKey($conversationId), true, now()->addMinutes(10));
+    }
+
+    public function isStreamStopped(int $conversationId): bool
+    {
+        return (bool) Cache::get($this->streamStoppedKey($conversationId));
+    }
+
+    public function clearStreamStopped(int $conversationId): void
+    {
+        Cache::forget($this->streamStoppedKey($conversationId));
+    }
+
+    public function deleteMessagesAfter(int $conversationId, int $fromMessageId, bool $inclusive = true): int
+    {
+        $query = Message::query()
+            ->where('conversation_id', $conversationId);
+
+        if ($inclusive) {
+            $query->where('id', '>=', $fromMessageId);
+        } else {
+            $query->where('id', '>', $fromMessageId);
+        }
+
+        return (int) $query->delete();
+    }
+
     /**
      * Returns true if a stream claim (intent or active) exists for the latest
      * user message. The fallback job defers in both states.

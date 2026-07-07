@@ -538,7 +538,9 @@ class ChatUiTest extends TestCase
         $this->assertStringContainsString('observeStreamingAnswerResize()', $chatPageJs);
         $this->assertStringContainsString('new window.ResizeObserver', $chatPageJs);
         $this->assertStringContainsString('settleStreamingLayout(() => {', $chatPageJs);
-        $this->assertStringContainsString('scrollToBottomNow(smooth = false)', $chatPageJs);
+        $this->assertStringContainsString('scrollToBottomNow(smooth = false, force = false)', $chatPageJs);
+        $this->assertStringContainsString('stickToBottom', $chatPageJs);
+        $this->assertStringContainsString('showJumpToLatest', $chatPageJs);
         $this->assertStringContainsString('this.clearPendingStaleTimeout();', $chatPageJs);
         $this->assertStringContainsString('this.moveToAnswerPhase();', $chatPageJs);
         $this->assertStringContainsString('shouldPreserveCurrentStream', $chatPageJs);
@@ -2126,5 +2128,154 @@ class ChatUiTest extends TestCase
             ->set('tab', 'memo')
             ->assertSet('memoTabMounted', true)
             ->assertSee('Konfigurasi Memo', false);
+    }
+
+    public function test_chat_ux_controls_are_wired_in_ui_and_js(): void
+    {
+        $user = User::factory()->create();
+        $chatPageJs = file_get_contents(resource_path('js/chat-page.js'));
+        $chatMessagesBlade = file_get_contents(resource_path('views/livewire/chat/partials/chat-messages.blade.php'));
+        $chatComposerBlade = file_get_contents(resource_path('views/livewire/chat/partials/chat-composer.blade.php'));
+        $answerActionsBlade = file_get_contents(resource_path('views/livewire/chat/partials/assistant-answer-actions.blade.php'));
+
+        $this->assertIsString($chatPageJs);
+        $this->assertStringContainsString('stickToBottom', $chatPageJs);
+        $this->assertStringContainsString('showJumpToLatest', $chatPageJs);
+        $this->assertStringContainsString('jumpToLatest()', $chatPageJs);
+        $this->assertStringContainsString('ensureIstaHljs', $chatPageJs);
+        $this->assertStringContainsString('stopGeneration()', $chatPageJs);
+        $this->assertStringContainsString('chat-regenerate', $chatPageJs);
+        $this->assertStringContainsString('chat-edit-user-message', $chatPageJs);
+        $this->assertStringContainsString('applySuggestion', $chatPageJs);
+        $this->assertStringContainsString('ista-code-block', $chatPageJs);
+
+        $this->assertStringContainsString('chat-apply-suggestion', $chatMessagesBlade);
+        $this->assertStringContainsString('jumpToLatest()', $chatMessagesBlade);
+        $this->assertStringContainsString('chatUserMessage', $chatMessagesBlade);
+        $this->assertStringContainsString('isStreamingAnswer', $chatComposerBlade);
+        $this->assertStringContainsString('Hentikan generasi', $chatComposerBlade);
+        $this->assertStringContainsString('regenerateAnswer()', $answerActionsBlade);
+        $this->assertStringContainsString('Coba lagi', $answerActionsBlade);
+
+        Livewire::actingAs($user)
+            ->test(ChatIndex::class)
+            ->assertSee('Ringkas isi dokumen keputusan presiden terbaru', false)
+            ->assertSee('chat-apply-suggestion', false);
+    }
+
+    public function test_stop_generation_persists_partial_assistant_message_and_clears_pending(): void
+    {
+        Queue::fake();
+
+        $user = User::factory()->create();
+        $conversation = Conversation::create([
+            'user_id' => $user->id,
+            'title' => 'Stop test',
+        ]);
+
+        $userMessage = Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'user',
+            'content' => 'Jawab singkat',
+        ]);
+
+        $component = Livewire::actingAs($user)
+            ->test(ChatIndex::class)
+            ->set('currentConversationId', $conversation->id)
+            ->call('stopGeneration', $conversation->id, 'Jawaban sebagian dari SSE.')
+            ->assertReturned(fn (array $payload) => ($payload['conversationId'] ?? null) === $conversation->id
+                && ($payload['messageId'] ?? 0) > 0);
+
+        $assistant = Message::query()
+            ->where('conversation_id', $conversation->id)
+            ->where('role', 'assistant')
+            ->where('id', '>', $userMessage->id)
+            ->latest('id')
+            ->first();
+
+        $this->assertNotNull($assistant);
+        $this->assertSame('Jawaban sebagian dari SSE.', $assistant->content);
+        $this->assertFalse((bool) $assistant->is_error);
+
+        $component->assertSet('pendingConversationIds', []);
+    }
+
+    public function test_regenerate_removes_assistant_reply_and_redispatches_generation(): void
+    {
+        Queue::fake();
+
+        $user = User::factory()->create();
+        $conversation = Conversation::create([
+            'user_id' => $user->id,
+            'title' => 'Regenerate test',
+        ]);
+
+        $userMessage = Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'user',
+            'content' => 'Pertanyaan awal',
+        ]);
+
+        $assistant = Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'assistant',
+            'content' => 'Jawaban lama',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ChatIndex::class)
+            ->set('currentConversationId', $conversation->id)
+            ->call('regenerate', $assistant->id)
+            ->assertReturned(fn (array $payload) => ($payload['conversationId'] ?? null) === $conversation->id
+                && ($payload['messageId'] ?? null) === $userMessage->id
+                && isset($payload['requestId']));
+        $this->assertNull(Message::query()->find($assistant->id));
+        Queue::assertPushed(GenerateChatResponse::class);
+    }
+
+    public function test_edit_user_message_updates_content_truncates_following_messages_and_redispatches(): void
+    {
+        Queue::fake();
+
+        $user = User::factory()->create();
+        $conversation = Conversation::create([
+            'user_id' => $user->id,
+            'title' => 'Edit test',
+        ]);
+
+        $firstUser = Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'user',
+            'content' => 'Pertanyaan pertama',
+        ]);
+
+        Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'assistant',
+            'content' => 'Jawaban pertama',
+        ]);
+
+        $secondUser = Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'user',
+            'content' => 'Pertanyaan kedua',
+        ]);
+
+        $secondAssistant = Message::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'assistant',
+            'content' => 'Jawaban kedua',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ChatIndex::class)
+            ->set('currentConversationId', $conversation->id)
+            ->call('editUserMessage', $firstUser->id, 'Pertanyaan pertama (revisi)');
+
+        $firstUser->refresh();
+        $this->assertSame('Pertanyaan pertama (revisi)', $firstUser->content);
+        $this->assertNull(Message::query()->find($secondUser->id));
+        $this->assertNull(Message::query()->find($secondAssistant->id));
+        Queue::assertPushed(GenerateChatResponse::class);
     }
 }

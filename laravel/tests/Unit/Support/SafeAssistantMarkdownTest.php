@@ -35,4 +35,26 @@ class SafeAssistantMarkdownTest extends TestCase
         $this->assertStringNotContainsString('style=', $html);
         $this->assertStringNotContainsString('https://evil.test', $html);
     }
+
+    public function test_it_wraps_code_blocks_with_copy_controls_and_tables_with_overflow_wrapper(): void
+    {
+        $html = app(SafeAssistantMarkdown::class)->toHtml(implode("\n", [
+            '```php',
+            'echo "hello";',
+            '```',
+            '',
+            '| Kolom | Nilai |',
+            '| --- | --- |',
+            '| A | 1 |',
+        ]));
+
+        $this->assertStringContainsString('data-ista-code-block', $html);
+        $this->assertStringContainsString('data-ista-copy-code', $html);
+        $this->assertStringContainsString('class="language-php"', $html);
+        $this->assertStringContainsString('ista-table-wrap overflow-x-auto', $html);
+        $this->assertStringContainsString('echo "hello";', $html);
+
+        // A table must be wrapped exactly once (no nested identical wrappers).
+        $this->assertSame(1, substr_count($html, 'ista-table-wrap'));
+    }
 }

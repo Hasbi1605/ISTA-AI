@@ -20,7 +20,11 @@ class SafeAssistantMarkdown
             'allow_unsafe_links' => false,
         ]);
 
-        return $this->stripResourceLoadingHtml($html);
+        $html = $this->stripResourceLoadingHtml($html);
+        $html = $this->enhanceCodeBlocks($html);
+        $html = $this->wrapTables($html);
+
+        return $html;
     }
 
     private function stripResourceLoadingHtml(string $html): string
@@ -47,6 +51,42 @@ class SafeAssistantMarkdown
         $this->sanitizeChildren($root);
 
         return $this->innerHtml($root);
+    }
+
+    private function enhanceCodeBlocks(string $html): string
+    {
+        return (string) preg_replace_callback(
+            '/<pre>\s*<code(?:\s+class="language-([^"]*)")?>(.*?)<\/code>\s*<\/pre>/is',
+            function (array $matches): string {
+                $language = strtolower(trim((string) ($matches[1] ?? '')));
+                $language = $language !== '' ? $language : 'text';
+                $code = (string) ($matches[2] ?? '');
+
+                return implode('', [
+                    '<div class="ista-code-block" data-ista-code-block>',
+                    '<div class="ista-code-block__header">',
+                    '<span class="ista-code-block__lang">'.htmlspecialchars($language, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8').'</span>',
+                    '<button type="button" class="ista-code-block__copy" data-ista-copy-code aria-label="Salin kode">Salin</button>',
+                    '</div>',
+                    '<pre><code class="language-'.htmlspecialchars($language, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8').'">'.$code.'</code></pre>',
+                    '</div>',
+                ]);
+            },
+            $html,
+        );
+    }
+
+    private function wrapTables(string $html): string
+    {
+        if (! str_contains($html, '<table')) {
+            return $html;
+        }
+
+        return (string) preg_replace(
+            '/<table(\s|>)/',
+            '<div class="ista-table-wrap overflow-x-auto"><table$1',
+            str_replace('</table>', '</table></div>', $html),
+        );
     }
 
     private function sanitizeChildren(DOMNode $parent): void

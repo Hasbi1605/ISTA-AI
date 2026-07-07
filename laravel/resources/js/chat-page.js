@@ -17,6 +17,22 @@ window.ensureIstaSortable = async () => {
     return sortableModulePromise;
 };
 
+let hljsModulePromise = null;
+
+window.ensureIstaHljs = async () => {
+    if (window.hljs) {
+        return window.hljs;
+    }
+
+    hljsModulePromise ??= import('highlight.js').then(({ default: hljs }) => {
+        window.hljs = hljs;
+
+        return hljs;
+    });
+
+    return hljsModulePromise;
+};
+
 let hasRegisteredChatPageData = false;
 const CHAT_PENDING_STORAGE_KEY = 'ista.chat.pendingResponses.v1';
 const CHAT_COMPLETED_STORAGE_KEY = 'ista.chat.completedResponses.v1';
@@ -53,6 +69,187 @@ const STREAMING_MARKDOWN_SANITIZE_OPTIONS = {
     USE_PROFILES: { html: true },
     FORBID_TAGS: RESOURCE_LOADING_MARKDOWN_TAGS,
     FORBID_ATTR: RESOURCE_LOADING_MARKDOWN_ATTRS,
+    ADD_ATTR: ['class', 'data-ista-code-block', 'data-ista-copy-code', 'aria-label'],
+    ADD_TAGS: ['button'],
+};
+
+const ISTA_CODE_BLOCK_CLASS = 'ista-code-block';
+const ISTA_TABLE_WRAP_CLASS = 'ista-table-wrap';
+const CHAT_NEAR_BOTTOM_THRESHOLD_PX = 120;
+
+const prefersReducedMotion = () => {
+    try {
+        return window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
+    } catch (_) {
+        return false;
+    }
+};
+
+let markedRendererConfigured = false;
+
+const normalizeCodeLanguage = (lang = '') => {
+    const normalized = String(lang || '').trim().toLowerCase();
+
+    return normalized !== '' ? normalized : 'text';
+};
+
+const buildCodeBlockHtml = (code, lang = '') => {
+    const language = normalizeCodeLanguage(lang);
+    const safeLanguage = escapeHtmlForMarkdown(language);
+    const safeCode = escapeHtmlForMarkdown(code);
+
+    return [
+        `<div class="${ISTA_CODE_BLOCK_CLASS}" data-ista-code-block>`,
+        `<div class="ista-code-block__header">`,
+        `<span class="ista-code-block__lang">${safeLanguage}</span>`,
+        `<button type="button" class="ista-code-block__copy" data-ista-copy-code aria-label="Salin kode">Salin</button>`,
+        `</div>`,
+        `<pre><code class="language-${safeLanguage}">${safeCode}</code></pre>`,
+        `</div>`,
+    ].join('');
+};
+
+const wrapMarkdownTables = (html = '') => {
+    const source = String(html);
+
+    // Idempotent: tables emitted by the custom `table` renderer are already
+    // wrapped, so avoid nesting an identical wrapper when this runs again on
+    // the full parsed HTML.
+    if (source.includes(`class="${ISTA_TABLE_WRAP_CLASS}`)) {
+        return source;
+    }
+
+    return source
+        .replace(
+            /<table(\s|>)/g,
+            `<div class="${ISTA_TABLE_WRAP_CLASS} overflow-x-auto"><table$1`,
+        )
+        .replace(/<\/table>/g, '</table></div>');
+};
+
+const configureMarkedRenderer = () => {
+    if (markedRendererConfigured) {
+        return;
+    }
+
+    markedRendererConfigured = true;
+
+    marked.use({
+        ...MARKDOWN_RENDER_OPTIONS,
+        renderer: {
+            code({ text, lang }) {
+                return buildCodeBlockHtml(text, lang);
+            },
+            table(token) {
+                const header = token.header
+                    .map((cell) => `<th${cell.align ? ` align="${cell.align}"` : ''}>${cell.text}</th>`)
+                    .join('');
+                const body = token.rows
+                    .map((row) => `<tr>${row
+                        .map((cell) => `<td${cell.align ? ` align="${cell.align}"` : ''}>${cell.text}</td>`)
+                        .join('')}</tr>`)
+                    .join('');
+
+                return wrapMarkdownTables(`<table><thead><tr>${header}</tr></thead><tbody>${body}</tbody></table>`);
+            },
+        },
+    });
+};
+
+let codeCopyListenerAttached = false;
+
+const attachCodeCopyListener = () => {
+    if (codeCopyListenerAttached) {
+        return;
+    }
+
+    codeCopyListenerAttached = true;
+
+    document.addEventListener('click', async (event) => {
+        const button = event.target?.closest?.('[data-ista-copy-code]');
+
+        if (!button) {
+            return;
+        }
+
+        event.preventDefault();
+
+        const block = button.closest('[data-ista-code-block]');
+        const codeEl = block?.querySelector('pre code');
+
+        if (!codeEl) {
+            return;
+        }
+
+        const text = codeEl.textContent || '';
+
+        if (text === '') {
+            return;
+        }
+
+        try {
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(text);
+            } else {
+                const helper = document.createElement('textarea');
+                helper.value = text;
+                helper.setAttribute('readonly', 'true');
+                helper.style.position = 'fixed';
+                helper.style.opacity = '0';
+                document.body.appendChild(helper);
+                helper.select();
+                document.execCommand('copy');
+                document.body.removeChild(helper);
+            }
+
+            const original = button.textContent;
+            button.textContent = 'Tersalin';
+            window.setTimeout(() => {
+                button.textContent = original || 'Salin';
+            }, 1500);
+        } catch (_) {
+            // ignore clipboard failures
+        }
+    });
+};
+
+let highlightScheduled = false;
+
+const scheduleAssistantCodeHighlight = (root = document) => {
+    if (!root) {
+        return;
+    }
+
+    if (highlightScheduled) {
+        return;
+    }
+
+    highlightScheduled = true;
+
+    window.requestAnimationFrame(async () => {
+        highlightScheduled = false;
+
+        const blocks = root.querySelectorAll?.('[data-ista-code-block] pre code') || [];
+
+        if (blocks.length === 0) {
+            return;
+        }
+
+        try {
+            const hljs = await window.ensureIstaHljs();
+
+            blocks.forEach((block) => {
+                if (block.dataset.istaHighlighted === 'true') {
+                    return;
+                }
+
+                hljs.highlightElement(block);
+                block.dataset.istaHighlighted = 'true';
+            });
+        } catch (_) {
+            // highlight.js is optional polish
+        }
+    });
 };
 
 const formatChatTimeLabel = (date = new Date()) => {
@@ -82,8 +279,11 @@ const escapeHtmlForMarkdown = (value = '') => String(value)
     .replace(/'/g, '&#039;');
 
 const renderSafeStreamingMarkdown = (value = '') => {
+    configureMarkedRenderer();
+    attachCodeCopyListener();
+
     try {
-        const html = marked.parse(escapeHtmlForMarkdown(value), MARKDOWN_RENDER_OPTIONS);
+        const html = wrapMarkdownTables(marked.parse(escapeHtmlForMarkdown(value)));
 
         return DOMPurify.sanitize(String(html), STREAMING_MARKDOWN_SANITIZE_OPTIONS);
     } catch (_) {
@@ -195,6 +395,7 @@ const createAssistantTypewriterState = (config = {}) => ({
     renderAssistantTypewriterMarkdownNow() {
         this.clearAssistantTypewriterMarkdownRender();
         this.typewriterHtml = renderSafeStreamingMarkdown(this.typewriterDisplayedText);
+        scheduleAssistantCodeHighlight(this.$el || document);
     },
 
     scheduleAssistantTypewriterMarkdownRender() {
@@ -205,6 +406,7 @@ const createAssistantTypewriterState = (config = {}) => ({
         this.typewriterMarkdownRenderFrame = window.requestAnimationFrame(() => {
             this.typewriterMarkdownRenderFrame = null;
             this.typewriterHtml = renderSafeStreamingMarkdown(this.typewriterDisplayedText);
+            scheduleAssistantCodeHighlight(this.$el || document);
 
             if (typeof this.scrollToBottom === 'function') {
                 this.scrollToBottom();
@@ -815,6 +1017,12 @@ const registerChatPageData = (Alpine) => {
         _messageCompleteHandler: null,
         chatMutationObserver: null,
         streamingResizeObserver: null,
+        stickToBottom: true,
+        showJumpToLatest: false,
+        _chatScrollHandler: null,
+        _userStoppedGeneration: false,
+        _regenerateHandler: null,
+        _editUserMessageHandler: null,
         wireListeners: [],
         windowListeners: [],
         activeEventSources: {},
@@ -920,16 +1128,37 @@ const registerChatPageData = (Alpine) => {
             const loadingContext = hasFreshMarker ? (marker.loadingContext || 'general') : 'general';
             this.markConversationPending(conversationId, loadingContext);
             this.startStreamingPlaceholder(loadingContext);
-            this.scrollToBottom();
+            this.scrollToBottom(false, true);
+        },
+
+        handleChatBoxScroll() {
+            const chatBox = this.$refs.chatBox;
+
+            if (!chatBox) {
+                return;
+            }
+
+            const distance = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight;
+            const nearBottom = distance <= CHAT_NEAR_BOTTOM_THRESHOLD_PX;
+            this.stickToBottom = nearBottom;
+            this.showJumpToLatest = !nearBottom && (this.streaming || chatBox.scrollHeight > chatBox.clientHeight + CHAT_NEAR_BOTTOM_THRESHOLD_PX);
+        },
+
+        jumpToLatest() {
+            this.stickToBottom = true;
+            this.showJumpToLatest = false;
+            this.scrollToBottomNow(true, true);
         },
 
         init() {
             this.$el.dataset.chatMessagesReady = 'true';
-            this.scrollToBottom();
+            this.scrollToBottom(false, true);
 
             const chatBox = this.$refs.chatBox;
 
             if (chatBox) {
+                this._chatScrollHandler = () => this.handleChatBoxScroll();
+                chatBox.addEventListener('scroll', this._chatScrollHandler, { passive: true });
                 this.chatMutationObserver = new MutationObserver(() => this.scrollToBottom());
                 this.chatMutationObserver.observe(chatBox, { childList: true, subtree: true, characterData: true });
             }
@@ -1015,7 +1244,29 @@ const registerChatPageData = (Alpine) => {
             };
             window.addEventListener('chat-open-stream', this._chatStreamHandler);
 
-            this.$nextTick(() => this.maybeRestorePendingPlaceholder());
+            this._regenerateHandler = (event) => {
+                const messageId = Number(event?.detail?.messageId || 0);
+
+                if (messageId > 0) {
+                    this.regenerateAnswer(messageId);
+                }
+            };
+            window.addEventListener('chat-regenerate', this._regenerateHandler);
+
+            this._editUserMessageHandler = (event) => {
+                const messageId = Number(event?.detail?.messageId || 0);
+                const newText = String(event?.detail?.newText || '').trim();
+
+                if (messageId > 0 && newText !== '') {
+                    this.editUserMessage(messageId, newText);
+                }
+            };
+            window.addEventListener('chat-edit-user-message', this._editUserMessageHandler);
+
+            this.$nextTick(() => {
+                this.maybeRestorePendingPlaceholder();
+                scheduleAssistantCodeHighlight(this.$el);
+            });
         },
 
         registerWireListener(event, callback) {
@@ -1182,12 +1433,19 @@ const registerChatPageData = (Alpine) => {
             es.addEventListener('done', () => {
                 this.closeChatStream(conversationId);
                 const streamedMessageId = streamState.streamedAssistantMessageId;
+                const userStopped = this._userStoppedGeneration;
 
                 if (this.isActiveConversation(conversationId)) {
-                    if (streamState.finalText && !streamState.finalQueued) {
+                    if (streamState.finalText && !streamState.finalQueued && !userStopped) {
                         this.queueFinalStreamingText(streamState.finalText);
                         streamState.finalQueued = true;
                     }
+                }
+
+                if (userStopped) {
+                    this._userStoppedGeneration = false;
+
+                    return;
                 }
 
                 // Trigger wire refresh so Livewire loads the persisted message
@@ -1213,6 +1471,18 @@ const registerChatPageData = (Alpine) => {
             if (this._chatStreamHandler) {
                 window.removeEventListener('chat-open-stream', this._chatStreamHandler);
                 this._chatStreamHandler = null;
+            }
+            if (this._regenerateHandler) {
+                window.removeEventListener('chat-regenerate', this._regenerateHandler);
+                this._regenerateHandler = null;
+            }
+            if (this._editUserMessageHandler) {
+                window.removeEventListener('chat-edit-user-message', this._editUserMessageHandler);
+                this._editUserMessageHandler = null;
+            }
+            if (this._chatScrollHandler && this.$refs.chatBox) {
+                this.$refs.chatBox.removeEventListener('scroll', this._chatScrollHandler);
+                this._chatScrollHandler = null;
             }
             if (this._messageCompleteHandler) {
                 window.removeEventListener('message-complete', this._messageCompleteHandler);
@@ -1455,6 +1725,7 @@ const registerChatPageData = (Alpine) => {
 
         startStreamingPlaceholder(context = 'general') {
             this.resetStreamingState(false);
+            this._userStoppedGeneration = false;
             this.streaming = true;
             this.streamingTimeLabel = formatChatTimeLabel();
             this.streamingActionsReady = false;
@@ -1546,7 +1817,11 @@ const registerChatPageData = (Alpine) => {
             return ['AI sedang berpikir', 'Menampilkan jawaban'];
         },
 
-        scrollToBottomNow(smooth = false) {
+        scrollToBottomNow(smooth = false, force = false) {
+            if (!force && !this.stickToBottom) {
+                return;
+            }
+
             const chatBox = this.$refs.chatBox;
 
             if (!chatBox) {
@@ -1555,14 +1830,156 @@ const registerChatPageData = (Alpine) => {
 
             chatBox.scrollTo({
                 top: chatBox.scrollHeight,
-                behavior: smooth ? 'smooth' : 'auto',
+                behavior: smooth && !prefersReducedMotion() ? 'smooth' : 'auto',
+            });
+
+            if (force) {
+                this.stickToBottom = true;
+                this.showJumpToLatest = false;
+            }
+        },
+
+        scrollToBottom(smooth = false, force = false) {
+            this.$nextTick(() => {
+                this.scrollToBottomNow(smooth, force);
             });
         },
 
-        scrollToBottom(smooth = false) {
-            this.$nextTick(() => {
-                this.scrollToBottomNow(smooth);
-            });
+        collectPartialStreamingContent() {
+            const displayed = String(this.typewriterDisplayedText || '');
+            const queued = String(this.typewriterQueue || '');
+            const full = String(this.typewriterFullText || '');
+            const finalText = String(this.streamingFinalText || '');
+
+            return (finalText || full || `${displayed}${queued}`).trim();
+        },
+
+        stopGeneration() {
+            if (!this.streaming) {
+                return;
+            }
+
+            this._userStoppedGeneration = true;
+
+            const { conversationId } = this.getConversationMeta();
+            const partialContent = this.collectPartialStreamingContent();
+
+            this.clearAssistantTypewriterTimer();
+            this.clearAssistantTypewriterMarkdownRender();
+            this.closeChatStream(conversationId);
+
+            if (!this.$wire || typeof this.$wire.stopGeneration !== 'function') {
+                this.resetStreamingState();
+                window.dispatchEvent(new CustomEvent('message-complete'));
+
+                return;
+            }
+
+            this.$wire.stopGeneration(conversationId, partialContent)
+                .then((response) => {
+                    const payload = response || {};
+                    const ackConversationId = Number(payload.conversationId || conversationId || 0);
+                    const ackMessageId = Number(payload.messageId || 0);
+
+                    this.resetStreamingState();
+
+                    if (ackConversationId > 0) {
+                        this.clearConversationPending(ackConversationId);
+                    }
+
+                    if (ackMessageId > 0) {
+                        this.streamedAssistantMessageId = ackMessageId;
+                    }
+
+                    window.dispatchEvent(new CustomEvent('message-complete'));
+                    this.$nextTick(() => {
+                        scheduleAssistantCodeHighlight(this.$el);
+                        this.scrollToBottom(false, true);
+                    });
+                })
+                .catch(() => {
+                    this._userStoppedGeneration = false;
+                    this.resetStreamingState();
+                    window.dispatchEvent(new CustomEvent('message-complete'));
+                });
+        },
+
+        openStreamFromWireResponse(response, loadingContext = 'general') {
+            const conversationId = Number(response?.conversationId || 0);
+            const documentIds = Array.isArray(response?.documentIds) ? response.documentIds : [];
+            const webSearchMode = Boolean(response?.webSearchMode);
+            const requestId = typeof response?.requestId === 'string' ? response.requestId : '';
+
+            if (conversationId <= 0) {
+                return;
+            }
+
+            this._userStoppedGeneration = false;
+            this.markConversationPending(conversationId, loadingContext);
+            this.startStreamingPlaceholder(loadingContext);
+            this.scrollToBottom(false, true);
+
+            window.dispatchEvent(new CustomEvent('chat-open-stream', {
+                detail: {
+                    conversationId,
+                    documentIds,
+                    webSearchMode,
+                    loadingContext,
+                    requestId,
+                },
+            }));
+        },
+
+        regenerateAnswer(messageId) {
+            if (this.streaming || !this.$wire || typeof this.$wire.regenerate !== 'function') {
+                return;
+            }
+
+            this.isSwitchingConversation = false;
+            this.optimisticUserMessage = '';
+
+            this.$wire.regenerate(messageId)
+                .then((response) => {
+                    if (response?.rejected) {
+                        this.sendRegenerateError(response?.reason);
+
+                        return;
+                    }
+
+                    this.openStreamFromWireResponse(response, response?.loadingContext || 'general');
+                })
+                .catch(() => {
+                    this.sendRegenerateError('request_failed');
+                });
+        },
+
+        editUserMessage(messageId, newText) {
+            if (this.streaming || !this.$wire || typeof this.$wire.editUserMessage !== 'function') {
+                return;
+            }
+
+            this.isSwitchingConversation = false;
+            this.optimisticUserMessage = '';
+
+            this.$wire.editUserMessage(messageId, newText)
+                .then((response) => {
+                    if (response?.rejected) {
+                        this.sendRegenerateError(response?.reason);
+
+                        return;
+                    }
+
+                    this.openStreamFromWireResponse(response, response?.loadingContext || 'general');
+                })
+                .catch(() => {
+                    this.sendRegenerateError('request_failed');
+                });
+        },
+
+        sendRegenerateError(reason = 'pending_response') {
+            this.stalePendingWarning = reason === 'pending_response'
+                ? 'Tunggu jawaban sebelumnya selesai sebelum meminta ulang.'
+                : 'Permintaan ulang gagal. Coba lagi sebentar.';
         },
     }));
 
@@ -2645,6 +3062,22 @@ const registerChatPageData = (Alpine) => {
             return this.copied ? 'Tersalin' : 'Salin';
         },
 
+        init() {
+            this.$nextTick(() => scheduleAssistantCodeHighlight(this.$el));
+        },
+
+        regenerateAnswer() {
+            const messageId = this.resolvedMessageId();
+
+            if (!messageId) {
+                return;
+            }
+
+            window.dispatchEvent(new CustomEvent('chat-regenerate', {
+                detail: { messageId },
+            }));
+        },
+
         toggleExportMenu() {
             if (this.exportLoading) {
                 return;
@@ -2860,6 +3293,77 @@ const registerChatPageData = (Alpine) => {
         },
     }));
 
+    Alpine.data('chatUserMessage', (config = {}) => ({
+        messageId: Number(config.messageId || 0),
+        content: String(config.content || ''),
+        editing: false,
+        draft: '',
+        saving: false,
+        error: '',
+
+        startEdit() {
+            this.editing = true;
+            this.draft = this.content;
+            this.error = '';
+
+            this.$nextTick(() => {
+                const input = this.$refs.editInput;
+
+                if (input) {
+                    input.focus();
+                    input.setSelectionRange(input.value.length, input.value.length);
+                    input.style.height = 'auto';
+                    input.style.height = `${Math.min(Math.max(input.scrollHeight, 44), 200)}px`;
+                }
+            });
+        },
+
+        cancelEdit() {
+            this.editing = false;
+            this.draft = '';
+            this.error = '';
+        },
+
+        saveEdit() {
+            const newText = String(this.draft || '').trim();
+
+            if (newText === '') {
+                this.error = 'Pesan tidak boleh kosong.';
+
+                return;
+            }
+
+            if (newText === this.content) {
+                this.cancelEdit();
+
+                return;
+            }
+
+            this.saving = true;
+            this.error = '';
+
+            window.dispatchEvent(new CustomEvent('chat-edit-user-message', {
+                detail: {
+                    messageId: this.messageId,
+                    newText,
+                },
+            }));
+
+            this.content = newText;
+            this.editing = false;
+            this.saving = false;
+        },
+
+        handleEditEnter(event) {
+            if (event.isComposing || event.shiftKey) {
+                return;
+            }
+
+            event.preventDefault();
+            this.saveEdit();
+        },
+    }));
+
     Alpine.data('chatComposer', (config = {}) => ({
         promptDraft: config.prompt || '',
         webSearchMode: config.webSearchMode || false,
@@ -2883,10 +3387,28 @@ const registerChatPageData = (Alpine) => {
         attachmentQueueTotal: 0,
         attachmentQueueLabel: '',
 
+        get chatMessagesComponent() {
+            const root = document.querySelector('[data-chat-messages-ready="true"]');
+
+            if (!root || typeof Alpine === 'undefined' || typeof Alpine.$data !== 'function') {
+                return null;
+            }
+
+            return Alpine.$data(root);
+        },
+
+        get isStreamingAnswer() {
+            return Boolean(this.chatMessagesComponent?.streaming);
+        },
+
         init() {
             if (this.promptDraft) {
                 this.schedulePendingPromptSubmission();
             }
+
+            window.addEventListener('chat-apply-suggestion', (event) => {
+                this.applySuggestion(String(event?.detail?.text || ''));
+            });
 
             this.$wire.on('user-message-acked', (data) => {
                 this.messageAcked = true;
@@ -3003,6 +3525,12 @@ const registerChatPageData = (Alpine) => {
                 event.preventDefault();
             }
 
+            if (this.isStreamingAnswer) {
+                this.stopStreaming();
+
+                return;
+            }
+
             if (this.isSendingMessage) {
                 return;
             }
@@ -3109,6 +3637,26 @@ const registerChatPageData = (Alpine) => {
                 .finally(() => {
                     this.isSendingMessage = false;
                 });
+        },
+
+        stopStreaming() {
+            const messages = this.chatMessagesComponent;
+
+            if (messages && typeof messages.stopGeneration === 'function') {
+                messages.stopGeneration();
+            }
+        },
+
+        applySuggestion(text) {
+            const suggestion = String(text || '').trim();
+
+            if (suggestion === '' || this.isSendingMessage || this.isStreamingAnswer) {
+                return;
+            }
+
+            this.promptDraft = suggestion;
+            this.autoResizeTextarea(this.$refs.chatInput);
+            this.submitPrompt();
         },
 
         handleEnterKey(event) {
@@ -3276,6 +3824,14 @@ const registerChatPageData = (Alpine) => {
         },
 
         scrollChatToBottom(smooth = false) {
+            const messages = this.chatMessagesComponent;
+
+            if (messages && typeof messages.scrollToBottom === 'function') {
+                messages.scrollToBottom(smooth, true);
+
+                return;
+            }
+
             const chatBox = document.querySelector('[data-chat-box]');
 
             if (!chatBox) {

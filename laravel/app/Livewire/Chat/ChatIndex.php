@@ -559,6 +559,7 @@ class ChatIndex extends Component
         // Create stream intent as early as possible so the background job
         // fallback can defer while EventSource is still connecting.
         $orchestrator->createStreamIntent($conversationIdForRequest);
+        $orchestrator->clearStreamStopped($conversationIdForRequest);
         $this->streamingConversationId = $conversationIdForRequest;
 
         $requestId = $usageEvents->newRequestId();
@@ -748,6 +749,236 @@ class ChatIndex extends Component
                 preserveStream: $shouldPreserveCompletedStream,
             );
         }
+    }
+
+    public function stopGeneration(int $conversationId, string $partialContent = ''): array
+    {
+        $this->enforceRateLimit('stopGeneration', 30, 60, 'Terlalu banyak permintaan hentikan generasi. Coba lagi sebentar.');
+
+        $conversation = Conversation::query()
+            ->whereKey($conversationId)
+            ->where('user_id', Auth::id())
+            ->first();
+
+        if ($conversation === null) {
+            return ['conversationId' => $conversationId, 'messageId' => null, 'rejected' => true];
+        }
+
+        $orchestrator = app(ChatOrchestrationService::class);
+        $orchestrator->markStreamStopped($conversationId);
+        $orchestrator->releaseStreamClaim($orchestrator->streamClaimKeyForLatestUserMessage($conversationId));
+
+        $partialContent = trim($partialContent);
+        $contentToSave = $partialContent !== '' ? $partialContent : '*(Generasi dihentikan)*';
+
+        $saved = $orchestrator->saveAssistantMessage($conversationId, $contentToSave, (int) Auth::id());
+        $messageId = $saved?->id;
+
+        $this->streamingConversationId = null;
+        $conversation->touch();
+        $this->loadConversations();
+
+        if ((int) $this->currentConversationId === (int) $conversationId) {
+            if ($messageId) {
+                $this->syncActiveAssistantMessageIntoState($conversationId, (int) $messageId);
+            } else {
+                $this->loadConversation($conversationId);
+            }
+
+            $this->dispatch(
+                'assistant-message-persisted',
+                conversationId: $conversationId,
+                messageId: $messageId ? (int) $messageId : null,
+                createdAt: $this->formatMessageCreatedAtForBrowser($saved),
+                preserveStream: false,
+            );
+        }
+
+        return [
+            'conversationId' => $conversationId,
+            'messageId' => $messageId ? (int) $messageId : null,
+        ];
+    }
+
+    public function regenerate(int $messageId, ?ChatOrchestrationService $orchestrator = null, ?AIUsageEventService $usageEvents = null): array
+    {
+        $this->enforceRateLimit('regenerate', 20, 60, 'Terlalu banyak permintaan ulang jawaban. Coba lagi sebentar.');
+
+        $assistant = $this->findOwnedAssistantMessage($messageId);
+
+        if ($assistant === null) {
+            return ['rejected' => true, 'reason' => 'not_found'];
+        }
+
+        $userMessage = Message::query()
+            ->where('conversation_id', $assistant->conversation_id)
+            ->where('role', 'user')
+            ->where('id', '<', $assistant->id)
+            ->latest('id')
+            ->first();
+
+        if ($userMessage === null) {
+            return ['rejected' => true, 'reason' => 'not_found'];
+        }
+
+        return $this->resendFromUserMessage($userMessage, $orchestrator, $usageEvents);
+    }
+
+    public function editUserMessage(int $messageId, string $newText, ?ChatOrchestrationService $orchestrator = null, ?AIUsageEventService $usageEvents = null): array
+    {
+        $this->enforceRateLimit('editUserMessage', 20, 60, 'Terlalu banyak edit pesan. Coba lagi sebentar.');
+
+        $normalizedText = trim($newText);
+
+        if ($normalizedText === '' || strlen($normalizedText) > 8000) {
+            throw ValidationException::withMessages([
+                'prompt' => 'Pesan harus berisi 1-8000 karakter.',
+            ]);
+        }
+
+        $userMessage = $this->findOwnedUserMessage($messageId);
+
+        if ($userMessage === null) {
+            return ['rejected' => true, 'reason' => 'not_found'];
+        }
+
+        $userMessage->forceFill(['content' => $normalizedText])->save();
+
+        return $this->resendFromUserMessage($userMessage->fresh(), $orchestrator, $usageEvents);
+    }
+
+    private function resendFromUserMessage(Message $userMessage, ?ChatOrchestrationService $orchestrator = null, ?AIUsageEventService $usageEvents = null): array
+    {
+        $orchestrator = $orchestrator ?? app(ChatOrchestrationService::class);
+        $usageEvents = $usageEvents ?? app(AIUsageEventService::class);
+
+        $conversationId = (int) $userMessage->conversation_id;
+
+        $locked = DB::transaction(function () use ($conversationId, $userMessage, $orchestrator) {
+            $conversation = Conversation::query()
+                ->lockForUpdate()
+                ->whereKey($conversationId)
+                ->where('user_id', Auth::id())
+                ->first();
+
+            if ($conversation === null) {
+                return null;
+            }
+
+            if ($this->conversationHasPendingResponse($conversation)) {
+                return false;
+            }
+
+            $orchestrator->deleteMessagesAfter($conversationId, (int) $userMessage->id, inclusive: false);
+            $orchestrator->clearStreamStopped($conversationId);
+            $orchestrator->releaseStreamClaim($orchestrator->streamClaimKeyForLatestUserMessage($conversationId));
+
+            return $conversation;
+        });
+
+        if ($locked === null) {
+            return ['rejected' => true, 'reason' => 'not_found'];
+        }
+
+        if ($locked === false) {
+            return ['rejected' => true, 'reason' => 'pending_response'];
+        }
+
+        $conversation = $locked;
+
+        $conversationDocuments = $orchestrator->normalizeDocumentIds(
+            is_array($userMessage->document_ids) ? $userMessage->document_ids : []
+        );
+
+        $this->currentConversationId = $conversationId;
+        $this->conversationDocuments = $conversationDocuments;
+        $this->newMessageId = null;
+        $this->preservedStreamMessageId = null;
+        $this->streamingConversationId = null;
+        $this->hydrateConversationMessages($conversationId);
+
+        $history = $this->buildConversationHistory($conversationId, $orchestrator);
+        $webSearchMode = (bool) $this->webSearchMode;
+
+        $conversation->touch();
+        $this->loadConversations();
+        $this->dispatch('conversation-activated', id: $conversationId);
+
+        $orchestrator->createStreamIntent($conversationId);
+        $this->streamingConversationId = $conversationId;
+
+        $requestId = $usageEvents->newRequestId();
+        $hasDocumentContext = ! empty($conversationDocuments);
+        $feature = $this->resolveChatFeature($webSearchMode, $hasDocumentContext);
+        $loadingContext = $this->resolveLoadingContext($webSearchMode, $hasDocumentContext);
+
+        $usageEvents->started(
+            feature: $feature,
+            userId: (int) Auth::id(),
+            metadata: [
+                'conversation_id' => $conversationId,
+                'message_id' => (int) $userMessage->id,
+                'document_count' => count($conversationDocuments),
+                'has_documents' => $hasDocumentContext,
+                'web_search_mode' => $webSearchMode,
+                'history_message_count' => count($history),
+                'channel' => 'livewire',
+            ],
+            requestId: $requestId,
+        );
+
+        GenerateChatResponse::dispatch(
+            $conversationId,
+            (int) Auth::id(),
+            $history,
+            $conversationDocuments,
+            $webSearchMode,
+            $requestId,
+        );
+
+        return [
+            'conversationId' => $conversationId,
+            'messageId' => (int) $userMessage->id,
+            'requestId' => $requestId,
+            'documentIds' => $conversationDocuments,
+            'webSearchMode' => $webSearchMode,
+            'loadingContext' => $loadingContext,
+        ];
+    }
+
+    private function resolveLoadingContext(bool $webSearchMode, bool $hasDocumentContext): string
+    {
+        if ($webSearchMode && $hasDocumentContext) {
+            return 'hybrid';
+        }
+
+        if ($webSearchMode) {
+            return 'web-search';
+        }
+
+        if ($hasDocumentContext) {
+            return 'documents';
+        }
+
+        return 'general';
+    }
+
+    private function findOwnedAssistantMessage(int $messageId): ?Message
+    {
+        return Message::query()
+            ->whereKey($messageId)
+            ->where('role', 'assistant')
+            ->whereHas('conversation', fn ($query) => $query->where('user_id', Auth::id()))
+            ->first();
+    }
+
+    private function findOwnedUserMessage(int $messageId): ?Message
+    {
+        return Message::query()
+            ->whereKey($messageId)
+            ->where('role', 'user')
+            ->whereHas('conversation', fn ($query) => $query->where('user_id', Auth::id()))
+            ->first();
     }
 
     public function render()

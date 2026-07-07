@@ -319,6 +319,12 @@ class ChatStreamController extends Controller
                 $cleanContent = 'Maaf, ISTA AI belum menerima jawaban yang bisa ditampilkan. Silakan coba lagi.';
             }
 
+            if ($orchestrator->isStreamStopped($conversationId)) {
+                $this->sendSseEvent('done', '1');
+
+                return;
+            }
+
             $this->sendSseEvent('final-content', $cleanContent);
 
             // Persist final message via saveAssistantMessage which now enforces

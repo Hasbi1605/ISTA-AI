@@ -1,6 +1,22 @@
 <div data-answer-actions class="mt-2 flex flex-wrap items-center gap-1 text-[12px] text-[#64748B] dark:text-[#94A3B8]">
     <button
         type="button"
+        @click="regenerateAnswer()"
+        title="Coba lagi"
+        aria-label="Coba lagi"
+        class="inline-flex h-8 w-8 items-center justify-center rounded-lg transition hover:bg-white/80 hover:text-stone-900 dark:hover:bg-gray-800/80 dark:hover:text-gray-100"
+    >
+        <svg class="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M3 12a9 9 0 0 1 15.6-6.3L21 8" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M21 3v5h-5" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M21 12a9 9 0 0 1-15.6 6.3L3 16" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M3 21v-5h5" />
+        </svg>
+        <span class="sr-only">Coba lagi</span>
+    </button>
+
+    <button
+        type="button"
         @click="copyToClipboard()"
         :title="copyStatusLabel()"
         :aria-label="copyStatusLabel()"
