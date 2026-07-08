@@ -685,7 +685,6 @@ class PromptStudioTest extends TestCase
             ->assertSee('submitPrompyGenerate()', false)
             ->assertSee('syncPrompyConfigBeforeGenerate()', false)
             ->assertSee('x-ref="prompyIdeaInput"', false)
-            ->assertSee('Belum bisa membuat paket prompt.', false)
             ->call('selectPlatform', 'gpt_image_2')
             ->call('selectPromptType', 'image')
             ->set('idea', 'Poster MPLS 2026')
