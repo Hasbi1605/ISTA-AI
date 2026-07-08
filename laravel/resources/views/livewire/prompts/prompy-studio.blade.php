@@ -654,6 +654,19 @@
                 this.syncReferenceDocumentInput();
             }
         },
+        async syncPrompyConfigBeforeGenerate() {
+            const idea = (this.$refs.prompyIdeaInput?.value || '').trim();
+
+            if (this.selectedPlatform) {
+                await this.$wire.set('platform', this.selectedPlatform);
+            }
+
+            if (this.selectedPromptType) {
+                await this.$wire.set('promptType', this.selectedPromptType);
+            }
+
+            await this.$wire.set('idea', idea);
+        },
         async submitPrompyGenerate() {
             if (this.referenceImageUploading || this.referenceDocumentUploading || this.$wire?.isGenerating) {
                 return;
@@ -665,6 +678,8 @@
             if (this.referenceImageUploading || this.referenceDocumentUploading || this.$wire?.isGenerating) {
                 return;
             }
+
+            await this.syncPrompyConfigBeforeGenerate();
 
             if (typeof this.showPrompyPreviewPanel === 'function') {
                 this.showPrompyPreviewPanel();
@@ -918,7 +933,7 @@
                     </div>
                     <div>
                         <label class="memo-config-label">Ide / permintaan <span class="text-red-500">*</span></label>
-                        <textarea wire:model="idea" rows="4" maxlength="{{ \App\Services\Prompts\PromptStudioService::IDEA_MAX_LENGTH }}"
+                        <textarea wire:model="idea" x-ref="prompyIdeaInput" rows="4" maxlength="{{ \App\Services\Prompts\PromptStudioService::IDEA_MAX_LENGTH }}"
                             placeholder="Mis. Buat poster acara kenegaraan bertema persatuan, nuansa emas dan merah putih."
                             class="memo-config-textarea"></textarea>
                         @error('idea') <p class="memo-config-error">{{ $message }}</p> @enderror

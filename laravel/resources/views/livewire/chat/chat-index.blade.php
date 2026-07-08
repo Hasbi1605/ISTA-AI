@@ -31,8 +31,9 @@
     @endphp
 
     {{-- ===== CHAT TAB CONTENT ===== --}}
+    @if($chatShellHydrated)
     <div x-show="activeTab === 'chat'" class="flex w-full h-full overflow-hidden">
-        @if(! empty($pendingConversationIds))
+        @if($tab === 'chat' && ! empty($pendingConversationIds))
             {{-- Poll ringan 5s: cek cache signal dari GenerateChatResponse; full refresh hanya bila ada sinyal. --}}
             <div wire:poll.5s="pollPendingChatSignals" class="hidden" aria-hidden="true"></div>
             {{-- Fallback reconcile 60s bila sinyal cache terlewat (TTL/eviction/restart). --}}
@@ -93,6 +94,7 @@
         <!-- RIGHT SIDEBAR: Documents -->
         @include('livewire.chat.partials.chat-right-sidebar')
     </div>
+    @endif
 
     {{-- ===== MEMO TAB CONTENT ===== --}}
     @if($memoTabMounted)

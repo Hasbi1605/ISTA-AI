@@ -81,6 +81,9 @@ class ChatIndex extends Component
 
     public bool $prompyTabMounted = false;
 
+    /** Riwayat chat + dokumen sidebar hanya di-hidrasi saat tab chat aktif agar tab Memo/Prompy tidak membawa snapshot besar. */
+    public bool $chatShellHydrated = false;
+
     public bool $messagesHasOlder = false;
 
     // Maximum chats to show before "Show More"
@@ -92,8 +95,12 @@ class ChatIndex extends Component
 
     public function mount($id = null)
     {
-        $this->loadConversations();
-        $this->loadAvailableDocuments();
+        $this->tab = $this->normalizeTab($this->tab);
+        $this->syncMountedTabs();
+
+        if ($this->tab === 'chat' || $id) {
+            $this->hydrateChatShellIfNeeded();
+        }
 
         if ($id) {
             $this->loadConversation($id);
@@ -1033,6 +1040,39 @@ class ChatIndex extends Component
     {
         $this->tab = $this->normalizeTab($value);
         $this->syncMountedTabs();
+
+        if ($this->tab === 'chat') {
+            $this->hydrateChatShellIfNeeded();
+        } else {
+            $this->releaseChatShellPayload();
+        }
+    }
+
+    private function hydrateChatShellIfNeeded(): void
+    {
+        if ($this->chatShellHydrated) {
+            return;
+        }
+
+        $this->loadConversations();
+        $this->loadAvailableDocuments();
+        $this->chatShellHydrated = true;
+    }
+
+    private function releaseChatShellPayload(): void
+    {
+        if (! $this->chatShellHydrated) {
+            return;
+        }
+
+        $this->conversations = collect();
+        $this->pendingConversationIds = [];
+        $this->messages = [];
+        $this->messagesHasOlder = false;
+        $this->availableDocuments = [];
+        $this->hasDocumentsInProgress = false;
+        $this->chatShellHydrated = false;
+        $this->dispatchPendingConversationState();
     }
 
     private function syncMountedTabs(): void

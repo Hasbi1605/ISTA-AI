@@ -2104,6 +2104,7 @@ class ChatUiTest extends TestCase
         Livewire::actingAs($user)
             ->test(ChatIndex::class)
             ->assertSet('tab', 'chat')
+            ->assertSet('chatShellHydrated', true)
             ->assertSet('memoTabMounted', false)
             ->assertSet('prompyTabMounted', false)
             ->assertSee('data-ista-chat-shell', false)
@@ -2115,19 +2116,57 @@ class ChatUiTest extends TestCase
             ->test(ChatIndex::class)
             ->assertSet('memoTabMounted', true)
             ->assertSet('prompyTabMounted', false)
+            ->assertSet('chatShellHydrated', false)
             ->assertSee('Konfigurasi Memo', false);
 
         Livewire::actingAs($user)
             ->withQueryParams(['tab' => 'prompy'])
             ->test(ChatIndex::class)
             ->assertSet('prompyTabMounted', true)
+            ->assertSet('chatShellHydrated', false)
             ->assertSee('Prompy Studio', false);
 
         Livewire::actingAs($user)
             ->test(ChatIndex::class)
             ->set('tab', 'memo')
             ->assertSet('memoTabMounted', true)
+            ->assertSet('chatShellHydrated', false)
             ->assertSee('Konfigurasi Memo', false);
+    }
+
+    public function test_prompy_tab_skips_chat_history_hydration_and_pending_poll(): void
+    {
+        config(['features.prompy' => true]);
+        $user = User::factory()->create();
+
+        for ($i = 0; $i < 12; $i++) {
+            Conversation::create([
+                'user_id' => $user->id,
+                'title' => "Percakapan {$i}",
+            ]);
+        }
+
+        $pendingConversation = Conversation::create([
+            'user_id' => $user->id,
+            'title' => 'Pending response',
+        ]);
+        Message::create([
+            'conversation_id' => $pendingConversation->id,
+            'role' => 'user',
+            'content' => 'Tes pending',
+        ]);
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['tab' => 'prompy'])
+            ->test(ChatIndex::class)
+            ->assertSet('chatShellHydrated', false)
+            ->assertCount('conversations', 0)
+            ->assertDontSee('wire:poll.5s="pollPendingChatSignals"', false)
+            ->assertDontSee('wire:poll.60s="refreshPendingChatState"', false)
+            ->set('tab', 'chat')
+            ->assertSet('chatShellHydrated', true)
+            ->assertSee('wire:poll.5s="pollPendingChatSignals"', false)
+            ->assertSee('wire:poll.60s="refreshPendingChatState"', false);
     }
 
     public function test_chat_ux_controls_are_wired_in_ui_and_js(): void
