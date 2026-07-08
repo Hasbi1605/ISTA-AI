@@ -31,8 +31,8 @@
     x-on:prompt-loaded.window="isSwitchingPrompt = false"
     x-data="{
         copied: null,
-        selectedPlatform: @entangle('platform'),
-        selectedPromptType: @entangle('promptType'),
+        selectedPlatform: @entangle('platform').live,
+        selectedPromptType: @entangle('promptType').live,
         referenceImages: [],
         referenceImageFiles: [],
         referenceImageSyncing: false,
@@ -620,14 +620,57 @@
 
             return { valid: true };
         },
+        waitForPrompyAttachmentUploads(timeoutMs = 30000) {
+            return new Promise((resolve) => {
+                const startedAt = Date.now();
+                const tick = () => {
+                    if (!this.referenceImageUploading && !this.referenceDocumentUploading) {
+                        resolve();
+
+                        return;
+                    }
+
+                    if (Date.now() - startedAt >= timeoutMs) {
+                        resolve();
+
+                        return;
+                    }
+
+                    setTimeout(tick, 50);
+                };
+
+                this.$nextTick(() => tick());
+            });
+        },
         syncPrompyAttachmentsBeforeGenerate() {
-            if (this.referenceImageFiles.length > 0) {
+            const wireImageCount = Array.isArray(this.$wire?.referenceImages) ? this.$wire.referenceImages.length : 0;
+            const wireDocumentCount = Array.isArray(this.$wire?.referenceDocuments) ? this.$wire.referenceDocuments.length : 0;
+
+            if (this.referenceImageFiles.length > 0 && wireImageCount === 0) {
                 this.syncReferenceImageInput();
             }
 
-            if (this.referenceDocumentFiles.length > 0) {
+            if (this.referenceDocumentFiles.length > 0 && wireDocumentCount === 0) {
                 this.syncReferenceDocumentInput();
             }
+        },
+        async submitPrompyGenerate() {
+            if (this.referenceImageUploading || this.referenceDocumentUploading || this.$wire?.isGenerating) {
+                return;
+            }
+
+            this.syncPrompyAttachmentsBeforeGenerate();
+            await this.waitForPrompyAttachmentUploads();
+
+            if (this.referenceImageUploading || this.referenceDocumentUploading || this.$wire?.isGenerating) {
+                return;
+            }
+
+            if (typeof this.showPrompyPreviewPanel === 'function') {
+                this.showPrompyPreviewPanel();
+            }
+
+            await this.$wire.generate();
         },
         syncRevisionAttachmentsBeforeSubmit() {
             if (this.revisionReferenceImageFiles.length > 0) {
@@ -857,7 +900,7 @@
             @endif
 
             @if(! $activePrompt || $showPromptConfiguration)
-            <form id="prompy-form" @submit.prevent="syncPrompyAttachmentsBeforeGenerate(); $wire.generate()" class="chat-form memo-config-panel relative">
+            <form id="prompy-form" @submit.prevent="submitPrompyGenerate()" class="chat-form memo-config-panel relative">
                 <div class="border-b border-stone-100 bg-white px-4 py-4 dark:border-gray-800 dark:bg-gray-900">
                     <h2 class="mt-1 text-[15px] font-bold text-stone-900 dark:text-gray-100">Konfigurasi Prompt</h2>
                     <p class="mt-1 max-w-[26rem] text-[12px] leading-relaxed text-stone-500 dark:text-gray-400">Isi ide, target, dan referensi visual untuk membuat paket prompt.</p>
@@ -886,6 +929,7 @@
                         <div class="grid grid-cols-2 gap-2">
                             @foreach($platforms as $key => $label)
                                 <button type="button"
+                                    wire:click="selectPlatform('{{ $key }}')"
                                     @click="selectedPlatform = @js($key)"
                                     :aria-pressed="selectedPlatform === @js($key) ? 'true' : 'false'"
                                     :class="selectedPlatform === @js($key) ? 'border-ista-primary bg-ista-primary/[0.04] text-stone-800 ring-1 ring-ista-primary/20 dark:border-ista-primary dark:bg-gray-800/80 dark:text-gray-100 dark:ring-ista-primary/40' : 'border-stone-200 text-stone-600 hover:border-ista-primary/40 dark:border-gray-700 dark:text-gray-300'"
@@ -903,6 +947,7 @@
                         <div class="grid grid-cols-2 gap-2">
                             @foreach($promptTypes as $key => $label)
                                 <button type="button"
+                                    wire:click="selectPromptType('{{ $key }}')"
                                     @click="selectedPromptType = @js($key)"
                                     :aria-pressed="selectedPromptType === @js($key) ? 'true' : 'false'"
                                     :class="selectedPromptType === @js($key) ? 'border-ista-primary bg-ista-primary/[0.04] text-stone-800 ring-1 ring-ista-primary/20 dark:border-ista-primary dark:bg-gray-800/80 dark:text-gray-100 dark:ring-ista-primary/40' : 'border-stone-200 text-stone-600 hover:border-ista-primary/40 dark:border-gray-700 dark:text-gray-300'"
@@ -1123,12 +1168,17 @@
         <div class="chat-composer-safe flex-shrink-0 px-4 pt-2 bg-transparent w-full">
             @if(! $activePrompt || $showPromptConfiguration)
                 <div class="rounded-lg border border-stone-200 bg-white p-2 shadow-[0_-10px_30px_-24px_rgba(28,25,23,0.45)] dark:border-gray-800 dark:bg-gray-900">
+                    @if ($errors->any())
+                        <div class="mb-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-left dark:border-rose-900/60 dark:bg-rose-950/30">
+                            <p class="text-[12px] font-semibold text-rose-700 dark:text-rose-300">Belum bisa membuat paket prompt.</p>
+                            <p class="mt-0.5 text-[11.5px] leading-relaxed text-rose-600 dark:text-rose-300">{{ $errors->first() }}</p>
+                        </div>
+                    @endif
                     <button type="submit"
                             form="prompy-form"
                             wire:loading.attr="disabled"
                             wire:target="generate,generateConfiguredPrompt,generateConfiguredRevision,referenceImages,referenceDocuments"
-                            :disabled="referenceImageUploading || referenceDocumentUploading"
-                            @click="syncPrompyAttachmentsBeforeGenerate(); showPrompyPreviewPanel()"
+                            :disabled="referenceImageUploading || referenceDocumentUploading || $wire.isGenerating"
                             class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-ista-primary px-4 text-[13px] font-semibold text-white shadow-sm transition hover:bg-ista-dark active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50">
                         <span wire:loading.remove wire:target="generate,generateConfiguredPrompt,generateConfiguredRevision">{{ $activePrompt ? 'Buat ulang dari konfigurasi' : 'Buat Prompt' }}</span>
                         <span wire:loading.inline-flex wire:target="generate,generateConfiguredPrompt,generateConfiguredRevision" class="items-center gap-2">

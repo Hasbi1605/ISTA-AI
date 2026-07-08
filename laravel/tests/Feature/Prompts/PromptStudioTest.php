@@ -671,6 +671,27 @@ class PromptStudioTest extends TestCase
             ->assertSee('this.revisionReferenceImageSyncing = true;', false);
     }
 
+    public function test_prompy_config_submit_syncs_platform_and_waits_for_attachment_uploads(): void
+    {
+        Http::fake([
+            '*/api/prompts/generate' => Http::response($this->fakePackageResponse(), 200),
+        ]);
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->test(PrompyStudio::class)
+            ->assertSee('wire:click="selectPlatform(\'gpt_image_2\')"', false)
+            ->assertSee('wire:click="selectPromptType(\'image\')"', false)
+            ->assertSee('submitPrompyGenerate()', false)
+            ->assertSee('waitForPrompyAttachmentUploads(', false)
+            ->assertSee('Belum bisa membuat paket prompt.', false)
+            ->call('selectPlatform', 'gpt_image_2')
+            ->call('selectPromptType', 'image')
+            ->set('idea', 'Poster MPLS 2026')
+            ->call('generate')
+            ->assertSee('berhasil dibuat');
+    }
+
     public function test_config_reference_image_preview_can_open_full_size_modal(): void
     {
         $user = User::factory()->create();
@@ -697,6 +718,8 @@ class PromptStudioTest extends TestCase
             ->assertSee('destroyReferenceImageSortable()', false)
             ->assertSee('moveReferenceImage(evt.oldIndex, evt.newIndex)', false)
             ->assertSee('syncPrompyAttachmentsBeforeGenerate()', false)
+            ->assertSee('wireImageCount === 0', false)
+            ->assertSee('submitPrompyGenerate()', false)
             ->assertSee('syncRevisionAttachmentsBeforeSubmit()', false)
             ->assertSee('x-ref="referenceImageGrid"', false)
             ->assertSee('return () => destroyReferenceImageSortable();', false)
